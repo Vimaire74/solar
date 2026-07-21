@@ -1,0 +1,17 @@
+{
+  "name": "Solar Conquest",
+  "short_name": "Solar Conquest",
+  "description": "Jeu de stratégie spatiale au tour par tour — conquête du système solaire.",
+  "lang": "fr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070718",
+  "theme_color": "#070718",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
