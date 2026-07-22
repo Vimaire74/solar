@@ -506,9 +506,44 @@ function showFinal(scores){
   document.getElementById('sc-again').onclick = ()=> screenLobby();
 }
 
+// ───────────────────────── Reprise du formulaire d'accueil du jeu ─────────────────────────
+// L'écran d'accueil d'index.html (« Se connecter / Créer un compte ») appelait l'ancien PHP
+// (lvSubmit → api/login.php → 404) puis cliquait le bouton flottant (caché par le CSS du jeu).
+// On REMPLACE ses fonctions globales : mêmes boutons, mais ils parlent au serveur WebSocket.
+function hijackBuiltinAuth(){
+  try {
+    const err = document.getElementById('lv-err');
+    const uEl = document.getElementById('lv-user');
+    if (uEl){ uEl.placeholder='Pseudo (3-20 lettres/chiffres)'; try{ uEl.type='text'; uEl.setAttribute('autocomplete','username'); }catch(e){} }
+    window.lvSubmit = function(){
+      const u=(document.getElementById('lv-user')||{}).value||'', p=(document.getElementById('lv-pass')||{}).value||'';
+      if (err) err.textContent='';
+      let user=u.trim().toLowerCase();
+      if (user.indexOf('@')!==-1) user=user.split('@')[0];      // tolère un email : on prend la partie avant @
+      user=user.replace(/[^a-z0-9_.-]/g,'').slice(0,20);
+      if (user.length<3){ if(err) err.textContent='Pseudo trop court (min. 3 caractères).'; return; }
+      if (p.length<6){ if(err) err.textContent='Mot de passe trop court (min. 6).'; return; }
+      let reg=false; try{ reg=(typeof _lvMode!=='undefined' && _lvMode==='register'); }catch(e){}
+      _errCb = (msg)=>{ if(err) err.textContent=msg; };
+      STATE._pendingPass = p;
+      STATE._afterLogin = ()=>{ _errCb=null; screenLobby(); };
+      connect(()=>{ send(reg ? {t:'register', user, pass:p} : {t:'login', user, pass:p}); });
+    };
+    // Auto-connexion : notre token remplace l'ancienne session PHP.
+    window.lvTryAutoLogin = function(){
+      let tok=null; try{ tok=localStorage.getItem('sc_ws_token'); }catch(e){}
+      if (!tok) return;
+      STATE.token = tok;
+      STATE._afterLogin = ()=> screenLobby();
+      connect(()=>{}); // le token part à l'ouverture ; 'logged' ouvrira le lobby
+    };
+  } catch(e){ console.warn('[SC] hijackBuiltinAuth:', e); }
+}
+
 // ───────────────────────── Démarrage de la couche ─────────────────────────
 function init(){
   injectStyles();
+  hijackBuiltinAuth();
   const btn=el('<button id="sc-online-btn" style="position:fixed;bottom:12px;right:12px;z-index:8000;background:linear-gradient(135deg,#2f6fd0,#1f4fa0);color:#fff;border:0;border-radius:10px;padding:9px 14px;font:700 .85em system-ui;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.4)">🌐 Jouer en ligne</button>');
   btn.onclick = ()=>{
     let tok=null; try{ tok=localStorage.getItem('sc_ws_token'); }catch(e){}
