@@ -1,0 +1,16 @@
+{
+  "name": "solar-conquest-server",
+  "version": "0.2.0",
+  "description": "Serveur multijoueur Solar Conquest (Node + WebSocket). Fait tourner la logique d'index.html comme autorité. Comptes en fichier JSON (v1) ; BDD plus tard.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node selftest.js 1",
+    "test-ws": "node test_ws.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
