@@ -80,10 +80,11 @@ function handle(m){
       STATE.isHost = (m.game.host === STATE.user);
       try{ localStorage.setItem('sc_ws_game', m.game.code); }catch(e){}
       if (m.game.status === 'lobby') renderWait();
-      else if (m.game.status === 'playing' && !STATE.started){ STATE.started = true; hideOverlay(); revealGameUI(); reqState(true); send({t:'resync'}); }
+      else if (m.game.status === 'playing' && !STATE.started){ STATE.started = true; installIntercepts(); hideOverlay(); revealGameUI(); reqState(true); send({t:'resync'}); }
       break;
     case 'started':
       STATE.started = true;
+      installIntercepts();
       hideOverlay(); revealGameUI();
       status('Partie lancée — synchronisation…');
       reqState(true);
@@ -95,11 +96,11 @@ function handle(m){
       onMyActionTurn();
       break;
     case 'turn':
-      if (m.civId !== STATE.myCiv){ status('Tour '+(m.turn||'')+' — au tour de '+civLabel(m.civId)+'…'); showWaitBlock(); }
+      if (m.civId !== STATE.myCiv){ STATE._myTurn=false; turnBar(false); status('Tour '+(m.turn||'')+' — au tour de '+civLabel(m.civId)+'…'); showWaitBlock(); }
       reqState();
       break;
     case 'waiting':
-      if (m.civId !== STATE.myCiv){ status('Choix de '+civLabel(m.civId)+'…'); showWaitBlock(); }
+      if (m.civId !== STATE.myCiv){ STATE._myTurn=false; turnBar(false); status('Choix de '+civLabel(m.civId)+'…'); showWaitBlock(); }
       reqState();
       break;
     case 'log':
@@ -115,6 +116,7 @@ function handle(m){
       break;
     case 'over':
       STATE.started = false;
+      STATE._myTurn=false; turnBar(false);
       try{ localStorage.removeItem('sc_ws_game'); }catch(e){}
       reqState(true);
       showFinal(m.scores||[]);
@@ -147,6 +149,7 @@ function renderBoard(){ try { if (window.render) window.render(); } catch(e){} }
 function onDecision(pending){
   if (STATE._answering) return;
   STATE._answering = true;
+  STATE._myTurn=false; turnBar(false);
   hideWaitBlock();
   reqState();
   askLocalDecision(pending).then(ans=>{
@@ -243,12 +246,77 @@ function listUpgrades(){
   }catch(e){ console.warn('[SC] listUpgrades:', e); }
   return out;
 }
-function sendAction(action){ closeDecision(); send({t:'act', action}); showWaitBlock(); status('Coup envoyé…'); }
+function sendAction(action){
+  STATE._myTurn=false;
+  closeDecision(); turnBar(false);
+  window._scOnPass=null;
+  send({t:'act', action});
+  showWaitBlock(); status('Coup envoyé…');
+}
+
+// ── ERGONOMIE NORMALE : jouer sur le VRAI plateau ──────────────────────────
+// Pendant ton tour, le plateau est débloqué : les fonctions d'action du jeu (doColonize,
+// doEstablishRoute, buyTech, doUpgrade, endTurn) sont INTERCEPTÉES → au lieu de s'exécuter
+// localement, elles envoient l'INTENTION au serveur (qui reste l'autorité et re-valide).
+// Hors de ton tour, elles reprennent leur comportement normal (solo intact).
+const INTENT_MAP = {
+  doColonize:       a=>({type:'colonize', node:a[0]}),
+  doEstablishRoute: a=>({type:'route', from:a[0], to:a[1]}),
+  buyTech:          a=>({type:'buyTech', card:a[0]}),
+  doUpgrade:        a=>({type:'upgrade', node:a[0]})
+};
+function installIntercepts(){
+  for(const fn in INTENT_MAP){
+    const orig=window[fn];
+    if(typeof orig!=='function' || orig._scWrapped) continue;
+    (function(fn, orig){
+      const w=function(){
+        if(STATE.started && STATE._myTurn){
+          const action=INTENT_MAP[fn](Array.prototype.slice.call(arguments));
+          if(fn==='doEstablishRoute'){
+            const me=myNation();
+            if(me && me.forceTokens>0){ askRouteToken(action); return; }
+            action.token=false;
+          }
+          sendAction(action);
+          return;
+        }
+        return orig.apply(this, arguments);
+      };
+      w._scWrapped=true; window[fn]=w;
+    })(fn, orig);
+  }
+}
+function askRouteToken(action){
+  decisionPanel(`<h2>🛤️ Protéger la route ?</h2><div class="muted">Un jeton maintient la connexion et repousse les pirates.</div>
+    <button class="opt" id="sc-t1">⚔️ Oui, déployer 1 jeton</button>
+    <button class="opt" id="sc-t0">Non, route passive</button>`);
+  document.getElementById('sc-t1').onclick=()=>{ action.token=true; sendAction(action); };
+  document.getElementById('sc-t0').onclick=()=>{ action.token=false; sendAction(action); };
+}
+// Barre de tour discrète (en haut) : le plateau reste visible et cliquable.
+function turnBar(show){
+  let b=document.getElementById('sc-turnbar');
+  if(!b){
+    injectStyles();
+    b=el('<div id="sc-turnbar" style="position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:8600;background:rgba(16,42,98,.96);border:1px solid #3a6abf;border-top:0;border-radius:0 0 10px 10px;padding:6px 12px;color:#dce8ff;font:600 .82em system-ui;display:flex;gap:8px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.5)"></div>');
+    b.innerHTML='🎮 <b>À toi de jouer</b> — utilise le plateau'
+      +' <button id="sc-tb-menu" style="background:#16223c;color:#9fb6e6;border:0;border-radius:7px;padding:5px 10px;cursor:pointer">☰ Menu</button>'
+      +' <button id="sc-tb-ai" style="background:#16223c;color:#9fb6e6;border:0;border-radius:7px;padding:5px 10px;cursor:pointer">🤖 IA</button>'
+      +' <button id="sc-tb-pass" style="background:#2f6fd0;color:#fff;border:0;border-radius:7px;padding:5px 10px;cursor:pointer">⏭ Passer</button>';
+    document.body.appendChild(b);
+    document.getElementById('sc-tb-menu').onclick=()=>actionMenu();
+    document.getElementById('sc-tb-ai').onclick=()=>{ STATE._myTurn=false; turnBar(false); window._scOnPass=null; closeDecision(); send({t:'auto'}); showWaitBlock(); };
+    document.getElementById('sc-tb-pass').onclick=()=>sendAction({type:'pass'});
+  }
+  b.style.display = show?'flex':'none';
+}
 function onMyActionTurn(){
-  hideWaitBlock();
-  reqState();
-  // petit délai pour laisser l'état arriver avant de calculer les listes
-  setTimeout(actionMenu, 350);
+  STATE._myTurn = true;
+  hideWaitBlock(); closeDecision(); hideStatus();
+  reqState(true);                                   // état frais → plateau à jour
+  window._scOnPass = ()=> sendAction({type:'pass'}); // le bouton « Fin de Tour » du jeu = passer
+  turnBar(true);
 }
 function actionMenu(){
   const me = myNation();
@@ -281,8 +349,8 @@ function actionMenu(){
   }));
   bind('sc-a-tech', ()=>sub(techs, it=>sendAction({type:'buyTech', card:it.id})));
   bind('sc-a-up',   ()=>sub(ups,  it=>sendAction({type:'upgrade', node:it.id})));
-  bind('sc-auto', ()=>{ closeDecision(); send({t:'auto'}); showWaitBlock(); });
-  bind('sc-pass', ()=>{ closeDecision(); send({t:'act', action:{type:'pass'}}); showWaitBlock(); });
+  bind('sc-auto', ()=>{ STATE._myTurn=false; turnBar(false); window._scOnPass=null; closeDecision(); send({t:'auto'}); showWaitBlock(); });
+  bind('sc-pass', ()=>sendAction({type:'pass'}));
 }
 
 // ───────────────────────── UI overlay (repris de la v1, transport en moins) ─────────────────────────

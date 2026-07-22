@@ -2232,10 +2232,25 @@ function showInvestmentModal(){
   // Chaque IA choisit STRATÉGIQUEMENT (le joueur choisit en dernier)
   for(const a of G.ais)a._inv1=chooseInvestmentForAI(a,1);
   G.aiInvest=G.ais[0]?G.ais[0]._inv1:null;
-  if(_decisionActive()){ // mode serveur : router le choix d'investissement Niv.1
-    _emitDecision('invest1', G.player,
-      {ai:G.ais.map(a=>({civ:a.civ.id,pick:a._inv1})), options:INVESTMENT_CARDS.map(c=>({id:c.id,name:c.name,emoji:c.emoji,benefit:c.benefit,contrepartie:c.contrepartie}))},
-      selectInvestment, (ans)=>(ans&&ans.cardId)||INVESTMENT_CARDS[0].id);
+  if(_decisionActive()){ // mode serveur : chaque HUMAIN choisit son investissement Niv.1 (les invités d'abord, puis l'hôte)
+    const _invOpts=INVESTMENT_CARDS.map(c=>({id:c.id,name:c.name,emoji:c.emoji,benefit:c.benefit,contrepartie:c.contrepartie}));
+    const _invQueue=G.ais.filter(a=>!a._isAI);
+    const _invAsk=()=>{
+      if(_invQueue.length){
+        const nat=_invQueue.shift();
+        _emitRemote('invest1', nat, {options:_invOpts}, (ans)=>{
+          const id=(ans&&ans.cardId)||nat._inv1||INVESTMENT_CARDS[0].id;
+          nat._inv1=id;
+          addLog('💼 '+nat.civ.emoji+' '+nat.civ.name+' — investissement choisi.','dim');
+          _invAsk();
+        });
+      } else {
+        _emitDecision('invest1', G.player,
+          {ai:G.ais.map(a=>({civ:a.civ.id,pick:a._inv1})), options:_invOpts},
+          selectInvestment, (ans)=>(ans&&ans.cardId)||INVESTMENT_CARDS[0].id);
+      }
+    };
+    _invAsk();
     return;
   }
   const aiPick=document.getElementById('inv-ai-pick');
@@ -2267,10 +2282,25 @@ function showInvestmentModal2(){
   // Celui qui a terminé son tour 6 en dernier (l'IA) choisit en premier
   for(const a of G.ais)a._inv2=chooseInvestmentForAI(a,2);
   G.aiInvest2=G.ais[0]?G.ais[0]._inv2:null;
-  if(_decisionActive()){ // mode serveur : router le choix d'investissement Niv.2
-    _emitDecision('invest2', G.player,
-      {ai:G.ais.map(a=>({civ:a.civ.id,pick:a._inv2})), options:INVESTMENT_CARDS_2.map(c=>({id:c.id,name:c.name,emoji:c.emoji,benefit:c.benefit,contrepartie:c.contrepartie}))},
-      selectInvestment2, (ans)=>(ans&&ans.cardId)||INVESTMENT_CARDS_2[0].id);
+  if(_decisionActive()){ // mode serveur : chaque HUMAIN choisit son investissement Niv.2 (les invités d'abord, puis l'hôte)
+    const _inv2Opts=INVESTMENT_CARDS_2.map(c=>({id:c.id,name:c.name,emoji:c.emoji,benefit:c.benefit,contrepartie:c.contrepartie}));
+    const _inv2Queue=G.ais.filter(a=>!a._isAI);
+    const _inv2Ask=()=>{
+      if(_inv2Queue.length){
+        const nat=_inv2Queue.shift();
+        _emitRemote('invest2', nat, {options:_inv2Opts}, (ans)=>{
+          const id=(ans&&ans.cardId)||nat._inv2||INVESTMENT_CARDS_2[0].id;
+          nat._inv2=id;
+          addLog('💼 '+nat.civ.emoji+' '+nat.civ.name+' — investissement Niv.2 choisi.','dim');
+          _inv2Ask();
+        });
+      } else {
+        _emitDecision('invest2', G.player,
+          {ai:G.ais.map(a=>({civ:a.civ.id,pick:a._inv2})), options:_inv2Opts},
+          selectInvestment2, (ans)=>(ans&&ans.cardId)||INVESTMENT_CARDS_2[0].id);
+      }
+    };
+    _inv2Ask();
     return;
   }
   document.getElementById('inv2-ai-pick').innerHTML=G.ais.map(a=>{const c=INVESTMENT_CARDS_2.find(x=>x.id===a._inv2);return '🤖 '+a.civ.emoji+' <strong>'+a.civ.name+'</strong> : '+(c?c.emoji+' '+c.name:'—');}).join('<br>');
