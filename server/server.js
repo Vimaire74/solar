@@ -23,13 +23,28 @@ fs.mkdirSync(path.join(DATA, 'games'), { recursive: true });
 
 const CIVS = ['terriens', 'martiens', 'jupiteriens', 'ceinturiens'];
 
-/* ============ sérialisation sûre (Set/Map → __set/__map, comme le solo) ============ */
-function replacer(k, v) {
-  if (v instanceof Set) return { __set: [...v] };
-  if (v instanceof Map) return { __map: [...v] };
-  return v;
+/* ============ sérialisation sûre ============
+   - Set/Map → __set/__map (même convention que le solo, reviver scDeserialize côté client) ;
+   - CYCLES coupés (ex. vues de guerre `_enemy` qui se référencent mutuellement) : seule la
+     référence circulaire est omise, les objets partagés légitimes sont conservés
+     (rehydrateState + refreshWarViews recréent les liens côté client). */
+function safeEncode(root) {
+  const stack = [];
+  function enc(v) {
+    if (v instanceof Set) return { __set: [...v].map(enc) };
+    if (v instanceof Map) return { __map: [...v].map(([k, val]) => [enc(k), enc(val)]) };
+    if (v === null || typeof v !== 'object') return (typeof v === 'function' || v === undefined) ? undefined : v;
+    if (stack.indexOf(v) !== -1) return undefined; // cycle → on coupe ici
+    stack.push(v);
+    let out;
+    if (Array.isArray(v)) out = v.map(enc);
+    else { out = {}; for (const k in v) { const e = enc(v[k]); if (e !== undefined) out[k] = e; } }
+    stack.pop();
+    return out;
+  }
+  return enc(root);
 }
-function J(obj) { return JSON.stringify(obj, replacer); }
+function J(obj) { return JSON.stringify(safeEncode(obj)); }
 
 /* ============ comptes (fichier JSON + scrypt, pas de mot de passe en clair) ============ */
 const USERS_FILE = path.join(DATA, 'users.json');
@@ -69,8 +84,7 @@ function broadcast(g, obj) { for (const s of g.seats) sendTo(s.ws, obj); }
 function snapshot(g) {
   if (!g.driver) return;
   try {
-    const s = (typeof g.driver.sb.scSerialize === 'function') ? g.driver.sb.scSerialize() : J(g.driver.state());
-    fs.writeFileSync(path.join(DATA, 'games', g.code + '.json'), s);
+    fs.writeFileSync(path.join(DATA, 'games', g.code + '.json'), J(g.driver.state()));
   } catch (e) { console.error('snapshot', g.code, ':', e.message); }
 }
 
@@ -235,7 +249,15 @@ wss.on('connection', (ws) => {
           g.driver.onLog = entries => broadcast(g, { t: 'log', entries });
           g.status = 'playing';
           broadcast(g, { t: 'started', game: gameView(g) });
-          g.driver.boot(g.seats.map(s => ({ civId: s.civId, isAI: s.ai })), () => {}); // décisions récupérées via pump()
+          // Décisions humaines : récupérées via pump(). Notices (résultats de combat/événement/fin de tour) :
+          // le pump les acquitte automatiquement, mais on les DIFFUSE ici pour que les joueurs les voient.
+          g.driver.boot(g.seats.map(s => ({ civId: s.civId, isAI: s.ai })), (p) => {
+            try {
+              if (p && (p.notice || ['war_result', 'event_result', 'event_announce', 'eot'].includes(p.kind))) {
+                broadcast(g, { t: 'notice', kind: p.kind, payload: p.payload });
+              }
+            } catch (e) {}
+          });
           route(g, g.driver.pump());
           break;
         }
@@ -275,8 +297,7 @@ wss.on('connection', (ws) => {
           if (!requireGame()) break;
           const g = games.get(sess.game);
           if (!g.driver) return err('partie pas démarrée');
-          const s = (typeof g.driver.sb.scSerialize === 'function') ? g.driver.sb.scSerialize() : J(g.driver.state());
-          sendTo(ws, { t: 'state', state: JSON.parse(s) });
+          sendTo(ws, { t: 'state', state: safeEncode(g.driver.state()) });
           break;
         }
 

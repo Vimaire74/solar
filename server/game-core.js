@@ -66,10 +66,24 @@ function loadLogic(htmlPath) {
 }
 
 // Dispatch d'une action client -> fonction du jeu. À compléter au fil des actions.
+// _postAction : en headless les modales sont des stubs DOM → on applique nous-mêmes leurs suites :
+// - dismissDiscovery() : applique la tuile Découverte en attente après une colonisation ;
+// - _scHideConfirm() : désarme le popup Valider/Annuler (sinon _scGuard bloque l'action suivante).
+function _postAction(sb){
+  try { if (typeof sb.dismissDiscovery === 'function') sb.dismissDiscovery(); } catch (e) {}
+  try { if (typeof sb._scHideConfirm === 'function') sb._scHideConfirm(); } catch (e) {}
+}
 const ACTIONS = {
-  colonize: (sb, a) => sb.doColonize(a.node),
-  route:    (sb, a) => sb.doEstablishRoute(a.from, a.to),
-  buyTech:  (sb, a) => sb.buyTech(a.card),
+  colonize: (sb, a) => { sb.doColonize(a.node); _postAction(sb); },
+  route:    (sb, a) => {
+    const before = sb.__G.player.routes.length;
+    sb.doEstablishRoute(a.from, a.to);
+    // le choix « déployer un jeton » est une modale en solo → on applique la décision envoyée par le client
+    if (sb.__G.player.routes.length > before && typeof sb.confirmRouteToken === 'function') sb.confirmRouteToken(!!a.token);
+    _postAction(sb);
+  },
+  upgrade:  (sb, a) => { sb.doUpgrade(a.node); _postAction(sb); },
+  buyTech:  (sb, a) => { sb.buyTech(a.card); _postAction(sb); },
   endTurn:  (sb)    => (sb._il ? sb.passTurnIL && sb.passTurnIL() : sb.endTurn && sb.endTurn())
 };
 
