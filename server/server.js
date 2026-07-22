@@ -145,12 +145,34 @@ function route(g, r) {
     snapshot(g);
     return;
   }
-  // 'idle' / 'guard' : rien à router
+  // 'idle' / 'guard' : le moteur n'a rien rendu à distribuer → anti-gel : on retente une fois peu après.
+  console.error('route', g.code, ': état', r.kind, '(anti-gel armé)');
+  if (!g._idleRetry) {
+    g._idleRetry = setTimeout(() => {
+      g._idleRetry = null;
+      try { route(g, g.driver.pump()); } catch (e) { console.error('anti-gel', g.code, ':', e.message); }
+    }, 1200);
+  }
+}
+/* Reprise sûre après une exception du moteur : on repompe pour re-dispatcher le jeu. */
+function recover(g, tag, e) {
+  console.error(tag, g.code, ':', e.message.split('\n')[0]);
+  try { route(g, g.driver.pump()); } catch (e2) { console.error(tag, 'recover KO:', e2.message.split('\n')[0]); }
 }
 
 /* ============ HTTP (health) + WebSocket ============ */
 const server = http.createServer((req, res) => {
   if (req.url === '/health') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true,"games":' + games.size + '}'); return; }
+  if (req.url === '/debug') { // diagnostic de rodage (pas de secrets : codes + avancement)
+    const out = [];
+    for (const g of games.values()) {
+      let turn = null, pend = null;
+      try { turn = g.driver ? g.driver.state().turn : null; const p = g.driver && g.driver.state()._pending; if (p) pend = p.kind + '/' + ((typeof p.nation === 'object' && p.nation) ? p.nation.civ.id : p.nation); } catch (e) {}
+      out.push({ code: g.code, status: g.status, turn, lastRoute: g.lastRoute ? (g.lastRoute.kind + '/' + (g.lastRoute.civId || '')) : null, pending: pend,
+                 seats: g.seats.map(s => ({ civ: s.civId, ai: s.ai, user: s.user, on: !!(s.ws && s.ws.readyState === 1) })) });
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(out)); return;
+  }
   res.writeHead(404); res.end('Solar Conquest server — WebSocket only. GET /health');
 });
 const wss = new WebSocketServer({ server });
@@ -271,7 +293,8 @@ wss.on('connection', (ws) => {
           if (!p || p.id !== m.id) return err('décision périmée', { id: m.id });
           const civ = (typeof p.nation === 'object' && p.nation) ? (p.nation.civ && p.nation.civ.id) : p.nation;
           if (civ !== s.civId) return err('cette décision n\'est pas pour toi');
-          route(g, g.driver.answer(m.id, m.ans || {}));
+          try { route(g, g.driver.answer(m.id, m.ans || {})); }
+          catch (e) { err(e.message.split('\n')[0]); recover(g, 'answer', e); }
           break;
         }
 
@@ -280,7 +303,8 @@ wss.on('connection', (ws) => {
           const g = games.get(sess.game);
           const s = seatOf(g, ws) || seatOf(g, sess.user);
           if (!g.driver || !s) return err('pas dans cette partie');
-          route(g, g.driver.act(s.civId, m.action || { type: 'pass' }));
+          try { route(g, g.driver.act(s.civId, m.action || { type: 'pass' })); }
+          catch (e) { err(e.message.split('\n')[0]); recover(g, 'act', e); }
           break;
         }
 
@@ -289,7 +313,19 @@ wss.on('connection', (ws) => {
           const g = games.get(sess.game);
           const s = seatOf(g, ws) || seatOf(g, sess.user);
           if (!g.driver || !s) return err('pas dans cette partie');
-          route(g, g.driver.actAuto(s.civId));
+          try { route(g, g.driver.actAuto(s.civId)); }
+          catch (e) { err(e.message.split('\n')[0]); recover(g, 'auto', e); }
+          break;
+        }
+
+        case 'resync': { // le client se sent perdu → on lui renvoie où en est la partie
+          if (!requireGame()) break;
+          const g = games.get(sess.game);
+          const s = seatOf(g, ws) || seatOf(g, sess.user);
+          if (!g.driver || !s) return err('pas dans cette partie');
+          if (g.lastRoute && g.lastRoute.kind === 'decision' && g.lastRoute.civId === s.civId) sendTo(ws, { t: 'decision', pending: g.lastRoute.pending });
+          else if (g.lastRoute && g.lastRoute.kind === 'action' && g.lastRoute.civId === s.civId) sendTo(ws, { t: 'your_action', civId: s.civId });
+          else if (g.status === 'playing' && g.lastRoute) sendTo(ws, { t: g.lastRoute.kind === 'decision' ? 'waiting' : 'turn', civId: g.lastRoute.civId });
           break;
         }
 

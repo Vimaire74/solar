@@ -63,6 +63,7 @@ function reqState(force){
 // ───────────────────────── Réception des messages serveur ─────────────────────────
 let _errCb = null; // affichage d'erreur contextuel (formulaires)
 function handle(m){
+  STATE._lastMsg = Date.now();
   switch(m.t){
     case 'registered':
       send({t:'login', user:m.user, pass:STATE._pendingPass||''});
@@ -77,7 +78,9 @@ function handle(m){
       STATE.game = m.game;
       if (!STATE.myCiv){ const s = m.game.seats.find(x=>x.user===STATE.user); if(s) STATE.myCiv = s.civId; }
       STATE.isHost = (m.game.host === STATE.user);
+      try{ localStorage.setItem('sc_ws_game', m.game.code); }catch(e){}
       if (m.game.status === 'lobby') renderWait();
+      else if (m.game.status === 'playing' && !STATE.started){ STATE.started = true; hideOverlay(); revealGameUI(); reqState(true); send({t:'resync'}); }
       break;
     case 'started':
       STATE.started = true;
@@ -112,6 +115,7 @@ function handle(m){
       break;
     case 'over':
       STATE.started = false;
+      try{ localStorage.removeItem('sc_ws_game'); }catch(e){}
       reqState(true);
       showFinal(m.scores||[]);
       break;
@@ -298,7 +302,7 @@ function injectStyles(){
   #sc-ov .muted{color:#7187b4;font-size:.82em}
   #sc-ov .row{display:flex;gap:8px}#sc-ov .row>*{flex:1}
   #sc-status{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:8500;background:#0d1426cc;border:1px solid #26406e;border-radius:10px;padding:6px 14px;color:#bcd3ff;font:600 .82em system-ui;backdrop-filter:blur(4px)}
-  #sc-decision{position:fixed;inset:0;z-index:8800;background:rgba(4,6,18,.82);display:flex;align-items:center;justify-content:center}
+  #sc-decision{position:fixed;inset:0;z-index:8800;background:rgba(4,6,18,.45);display:flex;align-items:center;justify-content:center}
   #sc-decision .card{background:#101a30;border:2px solid #3a6abf;border-radius:14px;padding:20px;width:min(92vw,440px);max-height:84vh;overflow:auto}
   #sc-decision .muted{color:#7187b4;font-size:.82em}
   #sc-decision .opt{display:block;width:100%;text-align:left;margin:6px 0;padding:10px 12px;border-radius:9px;border:1px solid #2c4a7e;background:#0a1326;color:#dce8ff;cursor:pointer}
@@ -348,6 +352,7 @@ const CIVS_LIST = [['terriens','🌍 Terriens'],['martiens','🔴 Martiens'],['j
 function civLabel(id){ const c=CIVS_LIST.find(x=>x[0]===id); return c?c[1]:id; }
 function screenLobby(){
   STATE.game=null; STATE.myCiv=null; STATE.started=false;
+  try{ localStorage.removeItem('sc_ws_game'); }catch(e){}
   overlay(`
     <h2>Bonjour ${STATE.user}</h2>
     <button class="pri" id="sc-create">Créer une partie</button>
@@ -418,12 +423,26 @@ function renderWait(){
 }
 
 // ── Panneau de décision générique (contrat de réponses = celui des modales du jeu) ──
+// Chaque panneau a un bouton « 👁 Voir le plateau » : il replie le panneau (le plateau devient
+// visible et consultable), et une pastille « ▶ Reprendre » le rouvre. Le fond est peu opaque.
 function decisionPanel(html){
   let p=document.getElementById('sc-decision');
   if(!p){ injectStyles(); p=el('<div id="sc-decision"></div>'); document.body.appendChild(p); }
-  p.innerHTML='<div class="card">'+html+'</div>'; p.style.display='flex'; return p;
+  p.innerHTML='<div class="card"><button id="sc-peek" style="float:right;background:#16223c;color:#9fb6e6;border:0;border-radius:7px;padding:5px 9px;cursor:pointer;font-size:.78em">👁 Voir le plateau</button>'+html+'</div>';
+  p.style.display='flex';
+  const peek=document.getElementById('sc-peek');
+  if(peek) peek.onclick=()=>{ p.style.display='none'; showResumeChip(); };
+  hideResumeChip();
+  return p;
 }
-function closeDecision(){ const p=document.getElementById('sc-decision'); if(p) p.style.display='none'; }
+function closeDecision(){ const p=document.getElementById('sc-decision'); if(p) p.style.display='none'; hideResumeChip(); }
+function showResumeChip(){
+  let c=document.getElementById('sc-resume');
+  if(!c){ c=el('<button id="sc-resume" style="position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:8900;background:linear-gradient(135deg,#2f6fd0,#1f4fa0);color:#fff;border:0;border-radius:10px;padding:10px 18px;font:700 .9em system-ui;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.5)">▶ Reprendre (choix en attente)</button>'); document.body.appendChild(c);
+    c.onclick=()=>{ const p=document.getElementById('sc-decision'); if(p) p.style.display='flex'; hideResumeChip(); }; }
+  c.style.display='block';
+}
+function hideResumeChip(){ const c=document.getElementById('sc-resume'); if(c) c.style.display='none'; }
 function askLocalDecision(pending){
   return new Promise(resolve=>{
     const o=pending.payload||{}; const k=pending.kind;
@@ -530,12 +549,14 @@ function hijackBuiltinAuth(){
       connect(()=>{ send(reg ? {t:'register', user, pass:p} : {t:'login', user, pass:p}); });
     };
     // Auto-connexion : notre token remplace l'ancienne session PHP.
+    // Si une partie était en cours (code mémorisé), on la REJOINT automatiquement (reprise après rechargement).
     window.lvTryAutoLogin = function(){
-      let tok=null; try{ tok=localStorage.getItem('sc_ws_token'); }catch(e){}
+      let tok=null, code=null; try{ tok=localStorage.getItem('sc_ws_token'); code=localStorage.getItem('sc_ws_game'); }catch(e){}
       if (!tok) return;
       STATE.token = tok;
-      STATE._afterLogin = ()=> screenLobby();
-      connect(()=>{}); // le token part à l'ouverture ; 'logged' ouvrira le lobby
+      if (code) STATE.game = { code };           // 'logged' fera le join automatique
+      else STATE._afterLogin = ()=> screenLobby();
+      connect(()=>{});
     };
   } catch(e){ console.warn('[SC] hijackBuiltinAuth:', e); }
 }
@@ -554,6 +575,13 @@ function init(){
     setTimeout(()=>{ if(!STATE.user && STATE.connected) screenAuth('login'); }, 1500);
   };
   document.body.appendChild(btn);
+  // Garde-fou anti-gel : en partie, si plus aucun message depuis 40 s, on redemande où on en est.
+  setInterval(()=>{
+    if (STATE.started && STATE.connected && Date.now()-(STATE._lastMsg||0) > 40000){
+      STATE._lastMsg = Date.now();
+      send({t:'resync'}); reqState(true);
+    }
+  }, 10000);
 }
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
 
