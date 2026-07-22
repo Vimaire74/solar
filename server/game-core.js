@@ -27,8 +27,11 @@ function makeEl() {
 }
 
 function buildSandbox() {
+  // getElementById CACHE les éléments par id : indispensable pour piloter les modales
+  // headless (ex. attaque : showAttackModal règle slider.min, confirmAttack le relit).
+  const _els = {};
   const document = {
-    getElementById(){ return makeEl(); }, createElement(){ return makeEl(); },
+    getElementById(id){ return _els[id] || (_els[id] = makeEl()); }, createElement(){ return makeEl(); },
     createElementNS(){ return makeEl(); }, createTextNode(){ return makeEl(); },
     querySelector(){ return makeEl(); }, querySelectorAll(){ return []; },
     body: makeEl(), documentElement: makeEl(), head: makeEl(),
@@ -84,6 +87,16 @@ const ACTIONS = {
   },
   upgrade:  (sb, a) => { sb.doUpgrade(a.node); _postAction(sb); },
   buyTech:  (sb, a) => { sb.buyTech(a.card); _postAction(sb); },
+  raid:     (sb, a) => { if (a.target && typeof sb.doRaidTarget === 'function') sb.doRaidTarget(a.target, a.node || null); else sb.doRaid(); _postAction(sb); },
+  attack:   (sb, a) => { // on PILOTE la vraie modale (règles du jeu, rien de réécrit) : min/coût de trajet posés par showAttackModal
+    sb.showAttackModal(a.node);
+    const sl = sb.document.getElementById('atk-slider');
+    const min = parseInt(sl.min) || 1, max = parseInt(sl.max) || min;
+    sl.value = String(Math.max(min, Math.min(max, parseInt(a.tokens) || min)));
+    sb.confirmAttack();
+    _postAction(sb);
+  },
+  power:    (sb)    => { if (typeof sb.useAbility === 'function') sb.useAbility(); _postAction(sb); },
   endTurn:  (sb)    => (sb._il ? sb.passTurnIL && sb.passTurnIL() : sb.endTurn && sb.endTurn())
 };
 

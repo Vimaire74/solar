@@ -104,11 +104,17 @@ function autoAnswer(pending) {
 }
 
 function clearTimer(g) { if (g.timer) { clearTimeout(g.timer); g.timer = null; } }
+const RECONNECT_GRACE_MS = parseInt(process.env.RECONNECT_GRACE_MS || '30000', 10);
 function armTimer(g, civId, fn) {
   clearTimer(g);
   const s = g.seats.find(x => x.civId === civId);
   const connected = !!(s && s.ws && s.ws.readyState === 1);
-  if (!connected) { g.timer = setTimeout(fn, 3000); return; }  // déconnecté : l'IA reprend vite
+  g.timerFn = fn; g.timerCiv = civId; // mémorisé pour ré-armer à la reconnexion
+  if (!connected) { // déconnecté : on laisse 30 s pour se reconnecter avant que l'IA reprenne
+    broadcast(g, { t: 'notice', kind: 'info', payload: { msg: civId + ' est déconnecté — l\'IA jouera pour lui dans ' + Math.round(RECONNECT_GRACE_MS / 1000) + ' s s\'il ne revient pas.' } });
+    g.timer = setTimeout(fn, RECONNECT_GRACE_MS);
+    return;
+  }
   if (AFK_MS > 0) g.timer = setTimeout(fn, AFK_MS);            // connecté : délai anti-AFK
 }
 
@@ -163,6 +169,19 @@ function recover(g, tag, e) {
 /* ============ HTTP (health) + WebSocket ============ */
 const server = http.createServer((req, res) => {
   if (req.url === '/health') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true,"games":' + games.size + '}'); return; }
+  if (req.url && req.url.indexOf('/bot') === 0) { // inviter le bot « Claude » : /bot?code=XXXX[&civ=martiens]
+    let code = '', civId;
+    let fast = false;
+    try { const u = new URL(req.url, 'http://x'); code = (u.searchParams.get('code') || '').toUpperCase(); civId = u.searchParams.get('civ') || undefined; fast = u.searchParams.get('fast') === '1'; } catch (e) {}
+    const g = games.get(code);
+    res.writeHead(g ? 200 : 404, { 'Content-Type': 'application/json' });
+    if (!g) { res.end('{"ok":false,"msg":"partie introuvable (code ?)"}'); return; }
+    try {
+      const user = require('./bot.js').spawnBot(PORT, code, { civId, fast });
+      res.end(JSON.stringify({ ok: true, user, msg: 'Le bot rejoint la partie ' + code + ' (il prend un siège humain libre).' }));
+    } catch (e) { res.end(JSON.stringify({ ok: false, msg: e.message })); }
+    return;
+  }
   if (req.url === '/debug') { // diagnostic de rodage (pas de secrets : codes + avancement)
     const out = [];
     for (const g of games.values()) {
@@ -256,6 +275,8 @@ wss.on('connection', (ws) => {
           if (g.status === 'playing' && g.lastRoute) {
             if (g.lastRoute.kind === 'decision' && g.lastRoute.civId === s.civId) sendTo(ws, { t: 'decision', pending: g.lastRoute.pending });
             if (g.lastRoute.kind === 'action' && g.lastRoute.civId === s.civId) sendTo(ws, { t: 'your_action', civId: s.civId });
+            // il est revenu : annuler le compte à rebours « déconnecté » et repartir sur le délai anti-AFK normal
+            if (g.timerCiv === s.civId && g.timerFn) armTimer(g, s.civId, g.timerFn);
           }
           break;
         }
@@ -329,11 +350,22 @@ wss.on('connection', (ws) => {
           break;
         }
 
-        case 'state': { // état complet (v1 : non filtré — TODO masquer les secrets adverses)
+        case 'state': { // état complet, FILTRÉ par joueur : les agendas adverses (secrets) sont masqués
           if (!requireGame()) break;
           const g = games.get(sess.game);
           if (!g.driver) return err('partie pas démarrée');
-          sendTo(ws, { t: 'state', state: safeEncode(g.driver.state()) });
+          const seat = seatOf(g, ws) || seatOf(g, sess.user);
+          const enc = safeEncode(g.driver.state());
+          if (seat && g.status !== 'over') {
+            const hide = (nat) => {
+              if (nat && nat.civ && nat.civ.id !== seat.civId && nat.agenda) {
+                nat.agenda = { id: null, hidden: true, name: '🔒 Agenda secret', emoji: '🔒', desc: 'Révélé en fin de partie.' };
+              }
+            };
+            hide(enc.player); (enc.ais || []).forEach(hide);
+            enc.agendas = [enc.player].concat(enc.ais || []).map(p => p && p.agenda).filter(Boolean);
+          }
+          sendTo(ws, { t: 'state', state: enc });
           break;
         }
 

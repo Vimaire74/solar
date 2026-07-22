@@ -40,16 +40,26 @@ function connect(onReady){
   ws.onclose = () => {
     STATE.connected = false;
     clearInterval(STATE._pingTimer);
-    if (STATE.started){ status('⚠️ Connexion perdue — reconnexion…'); scheduleReconnect(); }
+    // reconnexion systématique dès qu'on a une session (pas seulement en partie)
+    if (STATE.user || STATE.token){ status('🔌 Connexion perdue — reconnexion en cours…'); scheduleReconnect(); }
   };
   ws.onerror = () => {};
 }
 function scheduleReconnect(){
   clearTimeout(STATE._reconnectTimer);
   STATE._reconnectTimer = setTimeout(()=>{
+    if (STATE.connected) return;
     connect(()=>{ /* onopen renvoie le token ; le re-join se fait sur 'logged' */ });
-  }, 2500);
+    scheduleReconnect(); // boucle : retente tant que ce n'est pas rouvert
+  }, 3000);
 }
+// Au retour sur l'onglet (Firefox coupe parfois les WebSockets en arrière-plan) : re-vérifier la connexion.
+try {
+  document.addEventListener('visibilitychange', ()=>{
+    if (!document.hidden && !STATE.connected && (STATE.user || STATE.token)) connect(()=>{});
+  });
+  window.addEventListener('focus', ()=>{ if (!STATE.connected && (STATE.user || STATE.token)) connect(()=>{}); });
+} catch(e){}
 function send(obj){ if (STATE.ws && STATE.ws.readyState === 1){ try{ STATE.ws.send(JSON.stringify(obj)); }catch(e){} } }
 
 // Demande d'état (throttlée) : le serveur renvoie {t:'state'}.
@@ -68,12 +78,16 @@ function handle(m){
     case 'registered':
       send({t:'login', user:m.user, pass:STATE._pendingPass||''});
       break;
-    case 'logged':
+    case 'logged': {
       STATE.user = m.user; STATE.token = m.token; STATE.tier = m.tier||1;
       try{ localStorage.setItem('sc_ws_token', m.token); localStorage.setItem('sc_ws_user', m.user); }catch(e){}
-      if (STATE.game && STATE.game.code){ send({t:'join', code:STATE.game.code}); } // reconnexion en partie
+      hideStatus();
+      let code = (STATE.game && STATE.game.code) || null;
+      if (!code){ try{ code = localStorage.getItem('sc_ws_game'); }catch(e){} } // partie mémorisée
+      if (code){ send({t:'join', code}); }
       else if (STATE._afterLogin){ const f=STATE._afterLogin; STATE._afterLogin=null; f(); }
       break;
+    }
     case 'game':
       STATE.game = m.game;
       if (!STATE.myCiv){ const s = m.game.seats.find(x=>x.user===STATE.user); if(s) STATE.myCiv = s.civId; }
@@ -123,8 +137,13 @@ function handle(m){
       break;
     case 'error':
       console.warn('[SC] serveur:', m.msg);
-      if (_errCb){ _errCb(m.msg); }
-      else if (/token/.test(m.msg||'')){ STATE.token=null; try{localStorage.removeItem('sc_ws_token');}catch(e){} }
+      if (/token/.test(m.msg||'')){
+        // token invalide (ex. serveur redémarré) : redemander le mot de passe, pseudo prérempli — PAS de blocage silencieux
+        STATE.token=null; try{localStorage.removeItem('sc_ws_token');}catch(e){}
+        status('Session expirée — reconnecte-toi.');
+        screenAuth('login');
+      }
+      else if (_errCb){ _errCb(m.msg); }
       else status('⚠️ '+m.msg);
       break;
     case 'pong': break;
@@ -170,6 +189,7 @@ function showNotice(m){
   else if(k==='eot'){ title='📊 Fin du tour '+(o.turn||''); const mt=o.maint||{}; const parts=[];
     if(mt.energyCost) parts.push('−'+mt.energyCost+'⚡'); if(mt.matCost) parts.push('−'+mt.matCost+'🪨'); if(mt.routeEnergyCost) parts.push('routes −'+mt.routeEnergyCost+'⚡');
     body='Entretien : '+(parts.length?parts.join(' '):'aucun')+'. Revenus appliqués.'; }
+  else if(k==='info'){ title='ℹ️'; body=o.msg||''; }
   else { title=k; }
   // panneau séparé du panneau de décision (une décision peut être ouverte en même temps)
   let p=document.getElementById('sc-notice');
@@ -263,7 +283,18 @@ const INTENT_MAP = {
   doColonize:       a=>({type:'colonize', node:a[0]}),
   doEstablishRoute: a=>({type:'route', from:a[0], to:a[1]}),
   buyTech:          a=>({type:'buyTech', card:a[0]}),
-  doUpgrade:        a=>({type:'upgrade', node:a[0]})
+  doUpgrade:        a=>({type:'upgrade', node:a[0]}),
+  doRaid:           ()=>({type:'raid'}),
+  doRaidTarget:     a=>({type:'raid', target:a[0], node:a[1]}),
+  useAbility:       ()=>({type:'power'}),
+  confirmAttack:    ()=>{ // lit la vraie modale d'attaque de la page, puis la ferme
+    let node=null, tokens=1;
+    try{ node=_attackTargetNode; }catch(e){}
+    try{ tokens=parseInt((document.getElementById('atk-slider')||{}).value)||1; }catch(e){}
+    try{ if(window.cancelAttack) window.cancelAttack(); }catch(e){}
+    if(!node) return null; // rien à envoyer
+    return {type:'attack', node, tokens};
+  }
 };
 function installIntercepts(){
   for(const fn in INTENT_MAP){
@@ -273,6 +304,7 @@ function installIntercepts(){
       const w=function(){
         if(STATE.started && STATE._myTurn){
           const action=INTENT_MAP[fn](Array.prototype.slice.call(arguments));
+          if(!action) return; // interception annulée (ex. modale d'attaque vide)
           if(fn==='doEstablishRoute'){
             const me=myNation();
             if(me && me.forceTokens>0){ askRouteToken(action); return; }
