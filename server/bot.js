@@ -88,14 +88,20 @@ function chooseAction(G, civ) {
       if (n && !c.noUpgrade && c.level < (n.maxLv || 1)) options.push({ type: 'upgrade', node: c.nodeId });
     }
   } catch (e) {}
-  try { // raid occasionnel si assez de jetons
+  try { // raid occasionnel si beaucoup de jetons en réserve
     const tc = me.civ.id === 'ceinturiens' ? 1 : 2;
-    if (me.acLeft >= 1 && me.forceTokens >= tc && Math.random() < 0.25) {
+    if (me.acLeft >= 1 && me.forceTokens >= tc + 2 && Math.random() < 0.2) {
       const foes = [G.player].concat(G.ais || []).filter(x => x.civ.id !== civ && x.colonies.length);
       if (foes.length) { const f = pick(foes); options.push({ type: 'raid', target: f.civ.id, node: f.colonies[0].nodeId }); }
     }
   } catch (e) {}
-  return options.length ? pick(options) : null;
+  if (!options.length) return null;
+  // CHOIX PONDÉRÉ (au lieu d'aléatoire pur) : l'expansion et les techs rapportent le plus de VP,
+  // les routes connectent (revenus), l'amélioration densifie. Le bot joue donc « utilement ».
+  const weight = a => ({ colonize: 5, buyTech: 4, upgrade: 3, route: 3, raid: 1 }[a.type] || 2);
+  const pool = [];
+  for (const a of options) { const w = weight(a); for (let i = 0; i < w; i++) pool.push(a); }
+  return pick(pool);
 }
 
 const bots = new Map(); // user -> ws (évite les doublons)

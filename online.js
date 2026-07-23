@@ -166,8 +166,14 @@ function applyState(state){
     // mémoriser l'onglet actif (Carte/Techs/Empire/Diplo/Journal) pour ne pas revenir à la carte après chaque sync
     let activeTab=null;
     try{ const t=document.querySelector('.mtab.active'); if(t) activeTab=t.getAttribute('data-tab'); }catch(e){}
+    // mémoriser la VUE CARTE locale (global vs zoom + planète centrée) : c'est de l'affichage CLIENT,
+    // le serveur ne doit pas la réinitialiser à chaque synchro (sinon retour forcé à la carte globale).
+    let vView=null, vZoom=null;
+    try{ const G0=scGetG(); if(G0){ vView=G0.mapView; vZoom=G0._zoomNode; } }catch(e){}
     // reconstruire Set/Map (le serveur envoie __set/__map)
     const g = (typeof scDeserialize === 'function') ? scDeserialize(JSON.stringify(state)) : state;
+    if (vView!=null) g.mapView = vView;       // conserver la vue carte du joueur
+    if (vZoom!=null) g._zoomNode = vZoom;
     if (typeof scSetG === 'function') scSetG(g);
     if (typeof rehydrateState === 'function') rehydrateState(g);
     if (typeof scSetLocalHuman === 'function' && STATE.myCiv) scSetLocalHuman(STATE.myCiv);
@@ -665,7 +671,19 @@ function askLocalDecision(pending){
     const opts=o.options||[];
     if(!opts.length){ decisionPanel(body+'<button class="opt" id="sc-ok">Continuer</button>'); document.getElementById('sc-ok').onclick=()=>done({}); return; }
     const key = k==='agenda'?'agendaId' : (k==='strategy'?'cardId' : (k==='invest1'||k==='invest2'?'cardId' : (k==='espionage'?'branch' : (k==='extrasolar'?'node' : (k==='empath_copy'?'cardId':'value')))));
-    body += opts.map((op,i)=>`<button class="opt" data-i="${i}">${op.emoji||''} <b>${op.name||op.id||op.branch||op.node}</b>${op.desc?'<br><span class="muted">'+op.desc+'</span>':''}</button>`).join('');
+    // Pour les investissements : montrer ce que les IA/adversaires ont choisi (comme la vraie modale)
+    if((k==='invest1'||k==='invest2') && Array.isArray(o.ai) && o.ai.length){
+      const optName=(id)=>{ const op=opts.find(x=>x.id===id); return op?((op.emoji||'')+' '+op.name):id; };
+      body += '<div class="muted" style="margin:2px 0 8px">Choix adverses : '+o.ai.map(a=>a.civ+' → '+optName(a.pick)).join(' · ')+'</div>';
+    }
+    if(k==='strategy' && o.rank){ body += '<div class="muted" style="margin-bottom:6px">Ton rang d\'initiative : '+o.rank+'/'+(o.total||'?')+'</div>'; }
+    // Chaque option : nom + (bénéfice/contrepartie pour invest, effet tension pour stratégie, desc sinon)
+    body += opts.map((op,i)=>{
+      let sub='';
+      if(op.benefit||op.contrepartie){ sub = (op.benefit?'<span style="color:#8fe0a0">✅ '+op.benefit+'</span>':'') + (op.contrepartie?'<br><span style="color:#e0a86a">⚠️ '+op.contrepartie+'</span>':''); }
+      else if(op.desc){ sub = op.desc + (op.calmTension?'<br><span style="color:#8fb6e6">🕊️ Calme la tension</span>':''); }
+      return `<button class="opt" data-i="${i}">${op.emoji||''} <b>${op.name||op.id||op.branch||op.node}</b>${sub?'<br><span class="muted">'+sub+'</span>':''}</button>`;
+    }).join('');
     if(k==='empath_copy') body+='<button class="opt" data-skip="1">Aucune copie</button>';
     decisionPanel(body);
     document.querySelectorAll('#sc-decision .opt').forEach(b=>{ b.onclick=()=>{
