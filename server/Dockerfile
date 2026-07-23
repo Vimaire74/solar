@@ -6,7 +6,7 @@ WORKDIR /app
 COPY server/package.json server/
 RUN cd server && npm install --omit=dev --no-fund --no-audit
 COPY index.html ./
-COPY server/server.js server/driver.js server/game-core.js server/
+COPY server/server.js server/driver.js server/game-core.js server/bot.js server/
 ENV GAME_HTML=/app/index.html \
     DATA_DIR=/data \
     PORT=8080
