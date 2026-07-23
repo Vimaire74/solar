@@ -117,9 +117,13 @@ function handle(m){
       if (m.civId !== STATE.myCiv){ STATE._myTurn=false; turnBar(false); status('Choix de '+civLabel(m.civId)+'…'); showWaitBlock(); }
       reqState();
       break;
-    case 'log':
-      // le journal complet arrive avec l'état ; ici juste une trace console
-      try{ (m.entries||[]).forEach(e=>console.log('[JEU]', typeof e==='string'?e:(e&&e.msg)||JSON.stringify(e).slice(0,120))); }catch(e){}
+    case 'log': // actions des autres joueurs → pop-up rouge (comme les tours d'IA en solo)
+      try{
+        const txts=(m.entries||[]).map(e=>String((e&&e.msg)||e).replace(/<[^>]+>/g,'').trim()).filter(Boolean);
+        if(txts.length) showLogToast(txts);
+        txts.forEach(t=>console.log('[JEU]', t));
+      }catch(e){}
+      reqState();
       break;
     case 'notice':
       showNotice(m);
@@ -159,6 +163,9 @@ function handle(m){
 // ───────────────────────── Affichage de l'état reçu ─────────────────────────
 function applyState(state){
   try {
+    // mémoriser l'onglet actif (Carte/Techs/Empire/Diplo/Journal) pour ne pas revenir à la carte après chaque sync
+    let activeTab=null;
+    try{ const t=document.querySelector('.mtab.active'); if(t) activeTab=t.getAttribute('data-tab'); }catch(e){}
     // reconstruire Set/Map (le serveur envoie __set/__map)
     const g = (typeof scDeserialize === 'function') ? scDeserialize(JSON.stringify(state)) : state;
     if (typeof scSetG === 'function') scSetG(g);
@@ -166,9 +173,27 @@ function applyState(state){
     if (typeof scSetLocalHuman === 'function' && STATE.myCiv) scSetLocalHuman(STATE.myCiv);
     if (typeof refreshWarViews === 'function') refreshWarViews();
     renderBoard();
+    refreshJournal(g);   // le log arrive dans l'état serveur ; render() ne le redessine pas → on le fait ici
+    // restaurer l'onglet actif s'il a été réinitialisé par le rendu
+    try{
+      if(activeTab && typeof uiTab==='function'){
+        const cur=document.querySelector('.mtab.active');
+        if(!cur || cur.getAttribute('data-tab')!==activeTab) uiTab(activeTab);
+      }
+    }catch(e){}
   } catch(e){ console.error('[SC] applyState:', e); }
 }
 function renderBoard(){ try { if (window.render) window.render(); } catch(e){} }
+// Redessine le panneau Journal depuis G.log (en solo c'est addLog qui le fait ; en ligne le log
+// vient tout fait dans l'état serveur, donc on le reconstruit à chaque synchro).
+function refreshJournal(g){
+  try {
+    const el = document.getElementById('log-content');
+    if (!el || !g || !Array.isArray(g.log)) return;
+    const color = (window._logColorNations) ? window._logColorNations : (s=>s);
+    el.innerHTML = g.log.map(e => '<div class="log-e '+(e.cls||'')+'">'+color((e&&e.msg)||'')+'</div>').join('');
+  } catch(e){}
+}
 
 // ───────────────────────── Décisions (routées par le serveur) ─────────────────────────
 function onDecision(pending){
@@ -183,6 +208,17 @@ function onDecision(pending){
     showWaitBlock();
     status('En attente des autres joueurs…');
   }).catch(()=>{ STATE._answering = false; });
+}
+
+// ── Pop-up rouge : ce que font les AUTRES (bot, IA) pendant la partie ──
+function showLogToast(txts){
+  let p=document.getElementById('sc-logtoast');
+  if(!p){ injectStyles(); p=el('<div id="sc-logtoast" style="position:fixed;top:78px;left:50%;transform:translateX(-50%);z-index:8650;background:#2a0e14;border:2px solid #c0392b;border-radius:12px;padding:10px 14px;width:min(92vw,430px);color:#ffd7d0;font:600 .85em system-ui;box-shadow:0 10px 30px rgba(0,0,0,.55);line-height:1.4"></div>'); document.body.appendChild(p); p.onclick=()=>{ p.style.display='none'; }; }
+  p._buf=(p._buf||[]).concat(txts).slice(-4); // les 4 dernières lignes
+  p.innerHTML=p._buf.map(t=>'• '+t).join('<br>');
+  p.style.display='block';
+  clearTimeout(p._timer);
+  p._timer=setTimeout(()=>{ p.style.display='none'; p._buf=[]; }, 5000);
 }
 
 // ───────────────────────── Notices (résultats de combat / événements / fin de tour) ─────────────────────────
@@ -278,6 +314,10 @@ function sendAction(action){
   window._scOnPass=null;
   send({t:'act', action});
   showWaitBlock(); status('Coup envoyé…');
+  // anti-flicker : redemander l'état autoritaire rapidement (le round-trip est court),
+  // pour que le plateau reflète le résultat réel sans rester sur l'affichage local périmé.
+  setTimeout(()=>reqState(true), 120);
+  setTimeout(()=>reqState(true), 500);
 }
 
 // ── ERGONOMIE NORMALE : jouer sur le VRAI plateau ──────────────────────────
@@ -293,6 +333,21 @@ const INTENT_MAP = {
   doRaid:           ()=>({type:'raid'}),
   doRaidTarget:     a=>({type:'raid', target:a[0], node:a[1]}),
   useAbility:       ()=>({type:'power'}),
+  buyGeneral:       a=>({type:'call', fn:'buyGeneral', args:[a[0]]}),
+  buyMarket:        a=>({type:'call', fn:'buyMarket', args:[a[0]]}),
+  applyCalmTension: a=>({type:'call', fn:'applyCalmTension', args:a}),
+  _forgeUpgrade:    a=>({type:'call', fn:'_forgeUpgrade', args:[a[0]]}),
+  proposeAccord:    a=>({type:'call', fn:'proposeAccord', args:[a[0]]}),
+  routeManageDeploy: ()=>{ // lit la route sélectionnée dans la page, ferme la modale, envoie l'intention
+    let r=null; try{ r=scGetG().player.routes[_routeManageIdx]; }catch(e){}
+    try{ if(window.routeManageClose) window.routeManageClose(); }catch(e){}
+    return r ? {type:'routeToken', from:r.from, to:r.to, deploy:true} : null;
+  },
+  routeManageRecall: ()=>{
+    let r=null; try{ r=scGetG().player.routes[_routeManageIdx]; }catch(e){}
+    try{ if(window.routeManageClose) window.routeManageClose(); }catch(e){}
+    return r ? {type:'routeToken', from:r.from, to:r.to, deploy:false} : null;
+  },
   confirmAttack:    ()=>{ // lit la vraie modale d'attaque de la page, puis la ferme
     let node=null, tokens=1;
     try{ node=_attackTargetNode; }catch(e){}
@@ -324,6 +379,14 @@ function installIntercepts(){
       w._scWrapped=true; window[fn]=w;
     })(fn, orig);
   }
+  // EN LIGNE : neutraliser le système « Valider / Annuler » (undo) du solo. En multijoueur le serveur
+  // valide et fige chaque action immédiatement — pas de take-back. Ça supprime les boutons Valider/Annuler
+  // incohérents et le blocage _scGuard (« valide ton action avant d'en jouer une autre ») qui gênaient en ligne.
+  try{
+    if(typeof window.scArmConfirm==='function' && !window.scArmConfirm._scOff){ const o=window.scArmConfirm; window.scArmConfirm=function(){ if(STATE.started) return; return o.apply(this,arguments); }; window.scArmConfirm._scOff=true; }
+    if(typeof window._scGuard==='function' && !window._scGuard._scOff){ const g=window._scGuard; window._scGuard=function(){ if(STATE.started) return false; return g.apply(this,arguments); }; window._scGuard._scOff=true; }
+    if(typeof window.saveUndo==='function' && !window.saveUndo._scOff){ const s=window.saveUndo; window.saveUndo=function(){ if(STATE.started) return; return s.apply(this,arguments); }; window.saveUndo._scOff=true; }
+  }catch(e){ console.warn('[SC] neutralisation confirm:', e); }
 }
 function askRouteToken(action){
   decisionPanel(`<h2>🛤️ Protéger la route ?</h2><div class="muted">Un jeton maintient la connexion et repousse les pirates.</div>
@@ -368,7 +431,7 @@ function actionMenu(){
     ${btn('sc-a-up','⬆️ Améliorer une colonie',ups.length)}
     <button class="opt" id="sc-auto">🤖 L'IA joue ce coup pour moi</button>
     <button class="opt" id="sc-pass">⏭ Passer (fin de ma manche)</button>
-    <div class="muted" style="margin-top:6px">1 action = la main passe, puis ça revient à toi s'il te reste des AC. Raids/attaques/pouvoirs : bientôt (utilise 🤖 en attendant).</div>`);
+    <div class="muted" style="margin-top:6px">Ce menu est un secours : le mieux est de jouer directement sur le plateau (coloniser, routes, techs, gouvernement, raid, attaque, pouvoir — tout est branché). 1 action = la main passe, puis revient à toi s'il te reste des AC.</div>`);
   const sub=(items, mk)=>{ // sous-menu générique
     decisionPanel('<h2>Choisis</h2>'+items.map((it,i)=>`<button class="opt" data-i="${i}"><b>${it.label}</b><br><span class="muted">${it.sub||''}</span></button>`).join('')+'<button class="opt" id="sc-back">↩ Retour</button>');
     document.querySelectorAll('#sc-decision .opt[data-i]').forEach(b=>{ b.onclick=()=>mk(items[parseInt(b.getAttribute('data-i'))]); });

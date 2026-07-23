@@ -107,7 +107,7 @@ function spawnBot(serverPort, code, opts) {
   const ws = new WebSocket('ws://127.0.0.1:' + serverPort);
   const send = o => { try { ws.send(JSON.stringify(o)); } catch (e) {} };
   const delay = opts.fast ? (() => 25) : (() => 600 + Math.floor(Math.random() * 1200)); // rythme « humain » (fast=tests)
-  let civ = null, lastState = null, pendingAction = false;
+  let civ = null, lastState = null, pendingAction = false, lastSig = null, rep = 0;
   ws.on('open', () => send({ t: 'register', user, pass }));
   ws.on('message', raw => {
     let m; try { m = JSON.parse(raw.toString()); } catch (e) { return; }
@@ -125,8 +125,14 @@ function spawnBot(serverPort, code, opts) {
         lastState = revive(m.state);
         if (pendingAction) {
           pendingAction = false;
-          const a = chooseAction(lastState, civ);
-          setTimeout(() => { if (a) send({ t: 'act', action: a }); else send({ t: 'auto' }); }, delay());
+          let a = null;
+          try { a = chooseAction(lastState, civ); } catch (e) { console.log('[bot] chooseAction:', e.message); }
+          // ANTI-BOUCLE : si la même action revient (= refusée par le serveur), on passe en auto
+          const sig = a ? JSON.stringify(a) : null;
+          if (sig && sig === lastSig) rep++; else rep = 0;
+          lastSig = sig;
+          if (!a || rep >= 1) { setTimeout(() => send({ t: 'auto' }), delay()); }
+          else setTimeout(() => send({ t: 'act', action: a }), delay());
         }
         break;
       case 'over': setTimeout(() => { try { ws.close(); } catch (e) {} bots.delete(user); }, 1500); break;

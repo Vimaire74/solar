@@ -65,6 +65,12 @@ function loadLogic(htmlPath) {
   vm.runInContext(logic, sb, { timeout: 8000 });
   // exposer l'état G (déclaré en `let`, donc non global) via un getter
   vm.runInContext("Object.defineProperty(globalThis,'__G',{get:()=>G,set:v=>{G=v},configurable:true});", sb);
+  // Neutraliser les fonctions client-only qui font un JSON.stringify de l'état :
+  // - scSaveGame (sauvegarde localStorage), - saveUndo (pile d'annulation locale).
+  // Toutes deux inutiles côté serveur (autorité), et elles plantent sur les références
+  // circulaires _enemy des vues de guerre. L'annulation n'a pas de sens en multijoueur.
+  vm.runInContext("if(typeof scSaveGame==='function'){scSaveGame=function(){};}", sb);
+  vm.runInContext("if(typeof saveUndo==='function'){saveUndo=function(){};}", sb);
   return sb;
 }
 
@@ -75,6 +81,9 @@ function loadLogic(htmlPath) {
 function _postAction(sb){
   try { if (typeof sb.dismissDiscovery === 'function') sb.dismissDiscovery(); } catch (e) {}
   try { if (typeof sb._scHideConfirm === 'function') sb._scHideConfirm(); } catch (e) {}
+  // FINALISER l'action (équivalent de « Valider » en solo) : vider la pile d'annulation pour
+  // qu'aucun undo tardif ne défasse l'action, et lever tout blocage de confirmation.
+  try { vm.runInContext('undoStack=[];_scConfirmArmed=false;', sb); } catch (e) {}
 }
 const ACTIONS = {
   colonize: (sb, a) => { sb.doColonize(a.node); _postAction(sb); },
@@ -97,6 +106,25 @@ const ACTIONS = {
     _postAction(sb);
   },
   power:    (sb)    => { if (typeof sb.useAbility === 'function') sb.useAbility(); _postAction(sb); },
+  // Appel générique SUR LISTE BLANCHE de TOUTES les fonctions d'action du jeu (cartes civiques/générales
+  // dont gouvernement & Extraction d'He3, calmer une tension, Forge Orbitale, accord commercial…).
+  // Le moteur re-valide tout (coûts, AC, déjà pris…). C'est le pont unique : toute nouvelle action du
+  // jeu passe par ici sans modif serveur, tant que sa fonction est dans la liste.
+  call:     (sb, a) => {
+    const OK = ['buyGeneral', 'buyMarket', 'applyCalmTension', '_forgeUpgrade', 'proposeAccord', 'doRaid', 'doUpgrade', 'buyTech'];
+    if (OK.indexOf(a.fn) !== -1 && typeof sb[a.fn] === 'function') sb[a.fn].apply(null, a.args || []);
+    _postAction(sb);
+  },
+  // Gestion des jetons d'une route existante (le client envoie la route, pas l'index local)
+  routeToken: (sb, a) => {
+    const p = sb.__G.player;
+    const idx = p.routes.findIndex(r => (r.from === a.from && r.to === a.to) || (r.from === a.to && r.to === a.from));
+    if (idx >= 0) {
+      vm.runInContext('_routeManageIdx=' + idx, sb);
+      if (a.deploy) sb.routeManageDeploy(); else sb.routeManageRecall();
+    }
+    _postAction(sb);
+  },
   endTurn:  (sb)    => (sb._il ? sb.passTurnIL && sb.passTurnIL() : sb.endTurn && sb.endTurn())
 };
 

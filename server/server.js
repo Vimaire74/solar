@@ -187,8 +187,17 @@ const server = http.createServer((req, res) => {
     for (const g of games.values()) {
       let turn = null, pend = null;
       try { turn = g.driver ? g.driver.state().turn : null; const p = g.driver && g.driver.state()._pending; if (p) pend = p.kind + '/' + ((typeof p.nation === 'object' && p.nation) ? p.nation.civ.id : p.nation); } catch (e) {}
+      let nations = [], journal = [];
+      try {
+        const G = g.driver.state();
+        nations = [G.player].concat(G.ais || []).map(p => ({ civ: p.civ.id, AC: p.acLeft, jetons: p.forceTokens,
+          res: (p.res.energy||0)+'⚡ '+(p.res.materials||0)+'🪨 '+(p.res.science||0)+'🔬 '+(p.res.morale||0)+'🙂',
+          colonies: p.colonies.length, routes: p.routes.length, cartes: p.cards.length }));
+        journal = (G.log || []).slice(0, 15).map(l => String((l && l.msg) || l).replace(/<[^>]+>/g, '').slice(0, 120));
+      } catch (e) {}
       out.push({ code: g.code, status: g.status, turn, lastRoute: g.lastRoute ? (g.lastRoute.kind + '/' + (g.lastRoute.civId || '')) : null, pending: pend,
-                 seats: g.seats.map(s => ({ civ: s.civId, ai: s.ai, user: s.user, on: !!(s.ws && s.ws.readyState === 1) })) });
+                 seats: g.seats.map(s => ({ civ: s.civId, ai: s.ai, user: s.user, on: !!(s.ws && s.ws.readyState === 1) })),
+                 nations, journal });
     }
     res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(out)); return;
   }
