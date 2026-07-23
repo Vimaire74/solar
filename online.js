@@ -137,7 +137,13 @@ function handle(m){
       break;
     case 'error':
       console.warn('[SC] serveur:', m.msg);
-      if (/token/.test(m.msg||'')){
+      if (/introuvable/.test(m.msg||'') && STATE.user){
+        // la partie mémorisée n'existe plus (serveur redéployé) : on l'oublie et on va au lobby
+        try{ localStorage.removeItem('sc_ws_game'); }catch(e){}
+        STATE.game=null;
+        if (!STATE.started) screenLobby();
+      }
+      else if (/token/.test(m.msg||'')){
         // token invalide (ex. serveur redémarré) : redemander le mot de passe, pseudo prérempli — PAS de blocage silencieux
         STATE.token=null; try{localStorage.removeItem('sc_ws_token');}catch(e){}
         status('Session expirée — reconnecte-toi.');
