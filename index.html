@@ -7050,11 +7050,38 @@ window.addEventListener('load',function(){try{
 </script>
 <script>
 /* PWA : enregistrement du service worker (installable + hors-ligne).
-   Nécessite HTTPS (ou localhost). Silencieux si non supporté. */
+   Nécessite HTTPS (ou localhost). Silencieux si non supporté.
+   + Détection de MISE À JOUR : quand une nouvelle version est déployée, l'app installée s'actualise
+   automatiquement (petit bandeau) au lieu de rester coincée sur une vieille version en cache
+   → garantit que le multijoueur (online.js) et les visuels restent identiques au web. */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js').catch(function (e) {
+    navigator.serviceWorker.register('sw.js').then(function (reg) {
+      // Une nouvelle version du SW est trouvée → on prévient dès qu'elle est prête.
+      reg.addEventListener('updatefound', function () {
+        var nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener('statechange', function () {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            // Nouvelle version en attente : bandeau discret « Mettre à jour ».
+            try {
+              var b = document.createElement('div');
+              b.style.cssText = 'position:fixed;bottom:12px;left:12px;z-index:9999;background:linear-gradient(135deg,#2f6fd0,#1f4fa0);color:#fff;border-radius:10px;padding:9px 14px;font:700 .82em system-ui;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.4)';
+              b.textContent = '🔄 Nouvelle version — toucher pour mettre à jour';
+              b.onclick = function () { nw.postMessage && nw.postMessage('skipWaiting'); if (reg.waiting) reg.waiting.postMessage('skipWaiting'); location.reload(); };
+              document.body.appendChild(b);
+              setTimeout(function () { try { b.remove(); } catch (e) {} }, 15000);
+            } catch (e) { location.reload(); }
+          }
+        });
+      });
+    }).catch(function (e) {
       console.log('SW non enregistré :', e && e.message);
+    });
+    // Quand le nouveau SW prend le contrôle, recharger une fois pour servir la version fraîche.
+    var _reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (_reloaded) return; _reloaded = true; location.reload();
     });
   });
 }
