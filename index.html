@@ -7078,11 +7078,9 @@ if ('serviceWorker' in navigator) {
     }).catch(function (e) {
       console.log('SW non enregistré :', e && e.message);
     });
-    // Quand le nouveau SW prend le contrôle, recharger une fois pour servir la version fraîche.
-    var _reloaded = false;
-    navigator.serviceWorker.addEventListener('controllerchange', function () {
-      if (_reloaded) return; _reloaded = true; location.reload();
-    });
+    // NOTE : PAS de rechargement automatique sur controllerchange — ça coupait la connexion
+    // multijoueur en pleine partie. La mise à jour se fait uniquement via le bandeau manuel ci-dessus,
+    // que le joueur touche quand il le veut (ex. entre deux parties).
   });
 }
 </script>

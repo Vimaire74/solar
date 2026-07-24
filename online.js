@@ -208,12 +208,82 @@ function onDecision(pending){
   STATE._myTurn=false; turnBar(false);
   hideWaitBlock();
   reqState();
-  askLocalDecision(pending).then(ans=>{
+  const finish=(ans)=>{
+    STATE._realDecide=null;
     send({t:'answer', id:pending.id, ans:ans});
     STATE._answering = false;
     showWaitBlock();
     status('En attente des autres joueurs…');
-  }).catch(()=>{ STATE._answering = false; });
+  };
+  // VRAIES modales du jeu (même graphisme qu'en solo) pour ces décisions :
+  if(pending.kind==='agenda' && showAgendaReal(pending)){ STATE._realDecide=finish; return; }
+  if(pending.kind==='strategy' && showStrategyReal(pending)){ STATE._realDecide=finish; return; }
+  if(pending.kind==='invest1' && showInvestReal(pending,1)){ STATE._realDecide=finish; return; }
+  if(pending.kind==='invest2' && showInvestReal(pending,2)){ STATE._realDecide=finish; return; }
+  // sinon : panneau générique (agenda, événements, guerre, etc.)
+  askLocalDecision(pending).then(finish).catch(()=>{ STATE._answering = false; });
+}
+
+// ── Rendu dans les VRAIES modales du jeu (réutilise le DOM + les classes CSS d'index.html) ──
+// Retourne true si la modale existe (sinon repli sur le panneau générique).
+function showAgendaReal(pending){
+  const o=pending.payload||{}, opts=o.options||[];
+  const modal=document.getElementById('agenda-sel-modal'), cont=document.getElementById('agsel-agendas'), ctx=document.getElementById('agsel-context');
+  if(!modal || !cont) return false;
+  // Contexte (ressources + revenus prévus + prochain événement) — calculé comme la vraie modale.
+  try{
+    const G=scGetG(), p=G.player;
+    const preview={energy:0,materials:0,science:0,morale:0};
+    for(const col of (p.colonies||[])){ if(!col.connected)continue; const node=NODES[col.nodeId]; if(!node||node.decorative)continue; const mult=col.level===3?2:col.level===2?1.5:1; for(const k in node.res){ preview[k]=(preview[k]||0)+Math.floor(node.res[k]*mult); } if(col.level===2)preview.morale++; else if(col.level>=3)preview.morale+=2; }
+    for(const k in (p.rpt||{})) preview[k]=(preview[k]||0)+p.rpt[k];
+    const evNext = (typeof eventForTurn==='function') ? eventForTurn((G.turn||1)+1) : null;
+    const rE = (typeof rEmoji==='function') ? rEmoji : (r=>r);
+    const resStr='<i class=ri-energy></i>'+(p.res.energy||0)+' <i class=ri-materials></i>'+(p.res.materials||0)+' <i class=ri-science></i>'+(p.res.science||0)+' <i class=ri-morale></i>'+(p.res.morale||0);
+    const gainStr=Object.keys(preview).filter(k=>preview[k]>0).map(k=>'<span class="agsel-res">'+rE(k)+' +'+preview[k]+'</span>').join('') || '—';
+    if(ctx) ctx.innerHTML='<div class="agsel-ctx-box"><div class="agsel-ctx-label">Vos ressources</div><div class="agsel-ctx-val">'+resStr+'</div></div>'
+      +'<div class="agsel-ctx-box"><div class="agsel-ctx-label">Revenus prévus/tour</div><div class="agsel-ctx-val">'+gainStr+'</div></div>'
+      +'<div class="agsel-ctx-box"><div class="agsel-ctx-label">Prochain événement</div><div class="agsel-ctx-val">'+(evNext?(evNext.emoji+' '+evNext.preview):'Aucun')+'</div></div>';
+  }catch(e){ if(ctx) ctx.innerHTML=''; }
+  cont.innerHTML=opts.map(ag=>'<div class="agsel-ag" id="agsel-ag-'+ag.id+'" onclick="selectAgenda(\''+ag.id+'\')">'
+    +'<div class="agsel-ag-emoji">'+(ag.emoji||'')+'</div>'
+    +'<div class="agsel-ag-name">'+(ag.name||ag.id)+'</div>'
+    +'<div class="agsel-ag-desc">'+(ag.desc||'')+'</div></div>').join('');
+  const b=document.getElementById('agsel-confirm-btn'); if(b) b.disabled=true;
+  modal.classList.remove('hidden');
+  return true;
+}
+function showStrategyReal(pending){
+  const o=pending.payload||{}, opts=o.options||[];
+  const el=document.getElementById('strat-options'), modal=document.getElementById('strategy-modal');
+  if(!el || !modal) return false;
+  el.innerHTML=opts.map(c=>'<div class="strat-opt" id="strat-opt-'+c.id+'" onclick="selectStrategy(\''+c.id+'\')">'
+    +'<div class="so-emoji">'+(c.emoji||'')+'</div>'
+    +'<div class="so-name">'+(c.name||c.id)+'</div>'
+    +'<div class="so-desc">'+(c.desc||'')+(c.calmTension?' 🕊️ (calme une tension)':'')+'</div></div>').join('');
+  const b=document.getElementById('strat-confirm-btn'); if(b) b.disabled=true;
+  const sub=document.getElementById('strat-sub'); if(sub) sub.textContent='Draft : à toi en '+(o.rank||1)+((o.rank||1)===1?'er':'e')+'/'+(o.total||'?')+'.';
+  modal.classList.remove('hidden');
+  return true;
+}
+function showInvestReal(pending, lvl){
+  const o=pending.payload||{}, opts=o.options||[];
+  const two=(lvl===2);
+  const optsEl=document.getElementById(two?'inv2-opts':'inv-opts'), modal=document.getElementById(two?'invest2-modal':'invest-modal');
+  if(!optsEl || !modal) return false;
+  const selFn=two?'selectInvestment2':'selectInvestment';
+  optsEl.innerHTML=opts.map(c=>'<div class="inv-opt" onclick="'+selFn+'(\''+c.id+'\')">'
+    +'<div class="inv-opt-emoji">'+(c.emoji||'')+'</div>'
+    +'<div class="inv-opt-name">'+(c.name||c.id)+'</div>'
+    +'<div class="inv-opt-benefit">✅ '+(c.benefit||'')+'</div>'
+    +'<div class="inv-opt-cost">⚠️ '+(c.contrepartie||'')+'</div></div>').join('');
+  const aiEl=document.getElementById(two?'inv2-ai-pick':'inv-ai-pick');
+  if(aiEl && Array.isArray(o.ai) && o.ai.length){
+    const nm=(id)=>{ const x=opts.find(y=>y.id===id); return x?((x.emoji||'')+' '+x.name):id; };
+    aiEl.innerHTML=o.ai.map(a=>'🤖 '+a.civ+' : '+nm(a.pick)).join('<br>');
+    aiEl.classList.remove('hidden');
+  }
+  modal.classList.remove('hidden');
+  return true;
 }
 
 // ── Pop-up rouge : ce que font les AUTRES (bot, IA) pendant la partie ──
@@ -392,6 +462,60 @@ function installIntercepts(){
     if(typeof window.scArmConfirm==='function' && !window.scArmConfirm._scOff){ const o=window.scArmConfirm; window.scArmConfirm=function(){ if(STATE.started) return; return o.apply(this,arguments); }; window.scArmConfirm._scOff=true; }
     if(typeof window._scGuard==='function' && !window._scGuard._scOff){ const g=window._scGuard; window._scGuard=function(){ if(STATE.started) return false; return g.apply(this,arguments); }; window._scGuard._scOff=true; }
     if(typeof window.saveUndo==='function' && !window.saveUndo._scOff){ const s=window.saveUndo; window.saveUndo=function(){ if(STATE.started) return; return s.apply(this,arguments); }; window.saveUndo._scOff=true; }
+    // Rappel de pouvoir gratuit : en ligne, « Utiliser » → intention power (useAbility est déjà intercepté),
+    // « Passer le tour » → intention pass (au lieu du passTurnIL local).
+    if(typeof window._scAbilityReminderSkip==='function' && !window._scAbilityReminderSkip._scOff){
+      const o=window._scAbilityReminderSkip;
+      window._scAbilityReminderSkip=function(){ if(STATE.started){ try{ if(window._scCloseAbilityReminder)_scCloseAbilityReminder(); }catch(e){} sendAction({type:'pass'}); return; } return o.apply(this,arguments); };
+      window._scAbilityReminderSkip._scOff=true;
+    }
+    // VRAIES modales stratégie / investissement : quand une décision en ligne est en cours
+    // (STATE._realDecide posé), les boutons de validation ENVOIENT la réponse au serveur au lieu
+    // d'appliquer localement. Hors décision en ligne → comportement solo d'origine.
+    if(typeof window.confirmAgendaChoice==='function' && !window.confirmAgendaChoice._scOff){
+      const o=window.confirmAgendaChoice;
+      window.confirmAgendaChoice=function(){
+        if(STATE.started && STATE._realDecide){
+          const sel=document.querySelector('#agenda-sel-modal .agsel-ag.ag-selected');
+          if(!sel) return;
+          const id=sel.id.replace('agsel-ag-','');
+          const modal=document.getElementById('agenda-sel-modal'); if(modal) modal.classList.add('hidden');
+          const f=STATE._realDecide; STATE._realDecide=null; f({agendaId:id});
+          return;
+        }
+        return o.apply(this,arguments);
+      };
+      window.confirmAgendaChoice._scOff=true;
+    }
+    if(typeof window.confirmStrategy==='function' && !window.confirmStrategy._scOff){
+      const o=window.confirmStrategy;
+      window.confirmStrategy=function(){
+        if(STATE.started && STATE._realDecide){
+          const sel=document.querySelector('#strategy-modal .strat-opt.so-selected');
+          if(!sel) return;
+          const id=sel.id.replace('strat-opt-','');
+          const modal=document.getElementById('strategy-modal'); if(modal) modal.classList.add('hidden');
+          const f=STATE._realDecide; STATE._realDecide=null; f({cardId:id});
+          return;
+        }
+        return o.apply(this,arguments);
+      };
+      window.confirmStrategy._scOff=true;
+    }
+    ['selectInvestment','selectInvestment2'].forEach(function(fn){
+      if(typeof window[fn]==='function' && !window[fn]._scOff){
+        const o=window[fn], two=(fn==='selectInvestment2');
+        window[fn]=function(cardId){
+          if(STATE.started && STATE._realDecide){
+            const modal=document.getElementById(two?'invest2-modal':'invest-modal'); if(modal) modal.classList.add('hidden');
+            const f=STATE._realDecide; STATE._realDecide=null; f({cardId:cardId});
+            return;
+          }
+          return o.apply(this,arguments);
+        };
+        window[fn]._scOff=true;
+      }
+    });
   }catch(e){ console.warn('[SC] neutralisation confirm:', e); }
 }
 function askRouteToken(action){
@@ -424,6 +548,17 @@ function onMyActionTurn(){
   reqState(true);                                   // état frais → plateau à jour
   window._scOnPass = ()=> sendAction({type:'pass'}); // le bouton « Fin de Tour » du jeu = passer
   turnBar(true);
+  // Si je n'ai plus d'AC mais mon POUVOIR GRATUIT est encore dispo → rappel (comme en solo),
+  // au lieu de finir le tour sans l'avoir proposé. Le serveur m'a laissé la main exprès pour ça.
+  setTimeout(()=>{
+    try{
+      if(!STATE._myTurn) return;
+      const me=myNation();
+      if(me && me.acLeft<=0 && typeof _scAbilityAvailable==='function' && _scAbilityAvailable()){
+        if(typeof _scShowAbilityReminder==='function') _scShowAbilityReminder();
+      }
+    }catch(e){}
+  }, 400);
 }
 function actionMenu(){
   const me = myNation();

@@ -333,7 +333,18 @@ wss.on('connection', (ws) => {
           const g = games.get(sess.game);
           const s = seatOf(g, ws) || seatOf(g, sess.user);
           if (!g.driver || !s) return err('pas dans cette partie');
-          try { route(g, g.driver.act(s.civId, m.action || { type: 'pass' })); }
+          try {
+            const rr = g.driver.act(s.civId, m.action || { type: 'pass' });
+            // Feedback de rejet : si l'action a produit un avertissement (⚠️ pas assez / impossible / déjà…),
+            // le montrer au joueur pour que ce ne soit pas un « gel » silencieux (il garde la main + peut Passer).
+            const act = m.action || {};
+            if (act.type && act.type !== 'pass') {
+              const warn = (g.driver._lastActionLog || []).map(x => String(x).replace(/<[^>]+>/g, ''))
+                .filter(x => /⚠️|pas assez|impossible|déjà|non adjacent|invalide|refuse/i.test(x));
+              if (warn.length) sendTo(ws, { t: 'notice', kind: 'info', payload: { msg: warn[0] } });
+            }
+            route(g, rr);
+          }
           catch (e) { err(e.message.split('\n')[0]); recover(g, 'act', e); }
           break;
         }

@@ -156,7 +156,12 @@ class GameDriver {
   _emitLog(before){
     if(!this.onLog) return;
     const G = this.sb.__G;
-    if(G.log && G.log.length>before) this.onLog(G.log.slice(before));
+    // addLog UNSHIFT en tête (le plus récent en index 0) → les NOUVELLES entrées sont au DÉBUT,
+    // pas à la fin. On envoie donc slice(0, nb nouvelles), remis dans l'ordre chronologique.
+    if(G.log && G.log.length>before){
+      const nNew = G.log.length - before;
+      this.onLog(G.log.slice(0, nNew).reverse());
+    }
   }
 
   /* ================= ORCHESTRATION COMPLÈTE (queue de tour) =================
@@ -235,15 +240,33 @@ class GameDriver {
   // Le client répond à une décision → on applique puis on ré-avance.
   answer(id, ans){ this.sb.resolveDecision(id, ans||{}); return this.pump(); }
 
+  // Un pouvoir de nation GRATUIT (0 AC) est-il encore disponible pour cette nation ?
+  // Sert à NE PAS faire passer un humain à 0 AC avant qu'il ait pu l'utiliser (rappel côté client).
+  _freePowerAvailable(nat){
+    try{
+      const ab = nat.civ && nat.civ.active; if(!ab) return false;
+      if(nat.abilityUsed) return false;
+      if((ab.ac||0) !== 0) return false;                 // seulement les pouvoirs 0 AC
+      for(const r in (ab.cost||{})){ if((nat.res[r]||0) < ab.cost[r]) return false; }
+      if(nat.civ.id==='jupiteriens'){ const el=(nat.colonies||[]).filter(c=>['io','europe','ganymede','callisto'].includes(c.nodeId)&&c.level===1&&c.connected); if(!el.length) return false; }
+      return true;
+    }catch(e){ return false; }
+  }
+
   // Le client soumet une action de jeu pendant son tour → on applique sur sa nation puis on ré-avance.
   act(civId, action){
     const nat=this._currentActor();
     if(!nat || nat.civ.id!==civId) throw new Error('pas le tour d\'action de '+civId);
     this.activate(civId);
-    const before=this.sb.__G.log?this.sb.__G.log.length:0;
+    const G=this.sb.__G;
+    const before=G.log?G.log.length:0;
     if(action && action.type && action.type!=='pass'){ this.engine.apply(action); }
     this._emitLog(before);
-    if(!action || action.type==='pass' || nat.acLeft<=0) nat._passedRound=true;
+    // Mémoriser les nouvelles lignes de log (feedback de rejet côté serveur.js).
+    this._lastActionLog = (G.log && G.log.length>before) ? G.log.slice(0, G.log.length-before).map(e=>String((e&&e.msg)||e)) : [];
+    // Passer la nation SAUF si un humain a encore son pouvoir gratuit à jouer (0 AC power) → le client le lui rappelle.
+    const keepForPower = !nat._isAI && action && action.type==='pass' ? false : (nat.acLeft<=0 && !nat._isAI && this._freePowerAvailable(nat));
+    if(!action || action.type==='pass' || (nat.acLeft<=0 && !keepForPower)) nat._passedRound=true;
     this._advanceActor();
     return this.pump();
   }
