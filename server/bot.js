@@ -127,6 +127,7 @@ function spawnBot(serverPort, code, opts) {
       }
       case 'decision': setTimeout(() => send({ t: 'answer', id: m.pending.id, ans: answerDecision(m.pending) }), delay()); break;
       case 'your_action': pendingAction = true; send({ t: 'state' }); break;
+      case 'confirm_pending': setTimeout(() => send({ t: 'confirm' }), delay()); break; // le bot valide toujours
       case 'state':
         lastState = revive(m.state);
         if (pendingAction) {

@@ -335,15 +335,24 @@ wss.on('connection', (ws) => {
           if (!g.driver || !s) return err('pas dans cette partie');
           try {
             const rr = g.driver.act(s.civId, m.action || { type: 'pass' });
-            // Feedback de rejet : si l'action a produit un avertissement (⚠️ pas assez / impossible / déjà…),
-            // le montrer au joueur pour que ce ne soit pas un « gel » silencieux (il garde la main + peut Passer).
             const act = m.action || {};
             if (act.type && act.type !== 'pass') {
-              const warn = (g.driver._lastActionLog || []).map(x => String(x).replace(/<[^>]+>/g, ''))
-                .filter(x => /⚠️|pas assez|impossible|déjà|non adjacent|invalide|refuse/i.test(x));
+              const lines = (g.driver._lastActionLog || []).map(x => String(x).replace(/<[^>]+>/g, '').trim()).filter(Boolean);
+              const warn = lines.filter(x => /⚠️|pas assez|impossible|déjà|non adjacent|invalide|refuse/i.test(x));
               if (warn.length) sendTo(ws, { t: 'notice', kind: 'info', payload: { msg: warn[0] } });
+              else if (lines.length) sendTo(ws, { t: 'notice', kind: 'result', payload: { lines: lines.slice(-4) } });
             }
-            route(g, rr);
+            if (rr && rr.kind === 'confirm') {
+              // Action ANNULABLE réussie : le serveur la TIENT. Le client montre Valider/Annuler.
+              snapshot(g);
+              g.lastRoute = { kind: 'confirm', civId: s.civId };
+              sendTo(ws, { t: 'confirm_pending', civId: s.civId });   // le client redemandera l'état (reqState)
+              // Sécurité : pas de réponse / déconnexion → auto-Valider (le jeu n'attend pas indéfiniment).
+              clearTimer(g);
+              g.timer = setTimeout(() => { try { route(g, g.driver.commit(s.civId)); } catch (e) {} }, AFK_MS > 0 ? AFK_MS : 120000);
+            } else {
+              route(g, rr);
+            }
           }
           catch (e) { err(e.message.split('\n')[0]); recover(g, 'act', e); }
           break;
@@ -356,6 +365,26 @@ wss.on('connection', (ws) => {
           if (!g.driver || !s) return err('pas dans cette partie');
           try { route(g, g.driver.actAuto(s.civId)); }
           catch (e) { err(e.message.split('\n')[0]); recover(g, 'auto', e); }
+          break;
+        }
+
+        case 'confirm': { // Valider une action tenue (annulable)
+          if (!requireAuth() || !requireGame()) break;
+          const g = games.get(sess.game);
+          const s = seatOf(g, ws) || seatOf(g, sess.user);
+          if (!g.driver || !s) return err('pas dans cette partie');
+          try { route(g, g.driver.commit(s.civId)); }
+          catch (e) { err(e.message.split('\n')[0]); recover(g, 'confirm', e); }
+          break;
+        }
+
+        case 'undo': { // Annuler une action tenue → restaure l'état d'avant (découvertes figées)
+          if (!requireAuth() || !requireGame()) break;
+          const g = games.get(sess.game);
+          const s = seatOf(g, ws) || seatOf(g, sess.user);
+          if (!g.driver || !s) return err('pas dans cette partie');
+          try { route(g, g.driver.undo(s.civId)); }
+          catch (e) { err(e.message.split('\n')[0]); recover(g, 'undo', e); }
           break;
         }
 

@@ -253,22 +253,85 @@ class GameDriver {
     }catch(e){ return false; }
   }
 
+  // Une action est-elle ANNULABLE (déterministe ou aléa figé par nœud) ? → colonisation, route,
+  // amélioration, tech, cartes civiques/générales (gouv), pouvoir. NON annulable (commit direct) :
+  // raid, attaque, accord, gestion de jeton (aléa/irréversible ou négociation).
+  _isConfirmable(action){
+    if(!action || !action.type) return false;
+    if(['colonize','route','upgrade','buyTech','power'].includes(action.type)) return true;
+    if(action.type==='call' && ['buyGeneral','buyMarket','doUpgrade','buyTech'].includes(action.fn)) return true;
+    return false;
+  }
+  // Sérialise l'état en coupant les cycles (_enemy) — pour la photo d'annulation.
+  _snap(){
+    const enc=(v,seen)=>{ if(v instanceof Set)return{__set:[...v].map(x=>enc(x,seen))}; if(v instanceof Map)return{__map:[...v].map(kv=>[enc(kv[0],seen),enc(kv[1],seen)])};
+      if(v===null||typeof v!=='object')return (typeof v==='function'||v===undefined)?undefined:v;
+      if(seen.indexOf(v)!==-1)return undefined; seen.push(v); let out;
+      if(Array.isArray(v))out=v.map(x=>enc(x,seen)); else{ out={}; for(const k in v){ const e=enc(v[k],seen); if(e!==undefined)out[k]=e; } }
+      seen.pop(); return out; };
+    return JSON.stringify(enc(this.sb.__G,[]));
+  }
+  _restore(snapJson){
+    const g=this.sb.scDeserialize(snapJson);           // reviver __set/__map
+    this.sb.scSetG(g);
+    if(typeof this.sb.rehydrateState==='function') this.sb.rehydrateState(g);
+    if(typeof this.sb.refreshWarViews==='function') this.sb.refreshWarViews();
+    // CRUCIAL : après désérialisation, G contient de NOUVEAUX objets nations → reconstruire le roster
+    // du driver (sinon activate() ré-attache les ANCIENS objets et l'annulation semble sans effet).
+    const G=this.sb.__G;
+    const flags={}; for(const p of this.roster){ flags[p.civ.id]=p._isAI; }   // garder humain/IA
+    this.roster=[G.player].concat(G.ais||[]);
+    for(const p of this.roster){ if(flags[p.civ.id]!==undefined) p._isAI=flags[p.civ.id]; }
+  }
+
   // Le client soumet une action de jeu pendant son tour → on applique sur sa nation puis on ré-avance.
   act(civId, action){
     const nat=this._currentActor();
     if(!nat || nat.civ.id!==civId) throw new Error('pas le tour d\'action de '+civId);
     this.activate(civId);
     const G=this.sb.__G;
+    const confirmable = !nat._isAI && this._isConfirmable(action);
+    const snap = confirmable ? this._snap() : null;    // photo AVANT l'action (pour annuler)
     const before=G.log?G.log.length:0;
     if(action && action.type && action.type!=='pass'){ this.engine.apply(action); }
     this._emitLog(before);
-    // Mémoriser les nouvelles lignes de log (feedback de rejet côté serveur.js).
     this._lastActionLog = (G.log && G.log.length>before) ? G.log.slice(0, G.log.length-before).map(e=>String((e&&e.msg)||e)) : [];
-    // Passer la nation SAUF si un humain a encore son pouvoir gratuit à jouer (0 AC power) → le client le lui rappelle.
-    const keepForPower = !nat._isAI && action && action.type==='pass' ? false : (nat.acLeft<=0 && !nat._isAI && this._freePowerAvailable(nat));
+    // Si action ANNULABLE et RÉUSSIE (pas de ⚠️ rejet) → on TIENT (Valider/Annuler), on n'avance pas encore.
+    if(confirmable){
+      // Rejet = l'action n'a rien fait (vrais mots de refus, PAS un simple ⚠️ d'info type « colonie éloignée »).
+      const rejected = this._lastActionLog.some(x=>/pas assez|impossible|déjà|non adjacent|invalide|refuse|besoin/i.test(String(x)));
+      if(!rejected){ this._hold={civId, snap}; return {kind:'confirm', civId}; }
+    }
+    // Sinon : commit direct. Passer la nation sauf si pouvoir gratuit encore dispo.
+    const keepForPower = !nat._isAI && (!action || action.type!=='pass') && nat.acLeft<=0 && this._freePowerAvailable(nat);
     if(!action || action.type==='pass' || (nat.acLeft<=0 && !keepForPower)) nat._passedRound=true;
     this._advanceActor();
     return this.pump();
+  }
+  // Valider une action tenue : on la fige et on continue (passe la main si plus d'AC ni pouvoir).
+  commit(civId){
+    if(this._hold && this._hold.civId===civId) this._hold=null;
+    const nat=this.nation(civId); this.activate(civId);
+    const keepForPower = nat && nat.acLeft<=0 && this._freePowerAvailable(nat);
+    if(nat && nat.acLeft<=0 && !keepForPower) nat._passedRound=true;
+    this._advanceActor();
+    return this.pump();
+  }
+  // Annuler une action tenue : restaurer la photo, MAIS garder les découvertes figées (pas de re-tirage).
+  undo(civId){
+    if(this._hold && this._hold.civId===civId){
+      const postDisc = (this.sb.__G && this.sb.__G._discCache) || {};
+      this._restore(this._hold.snap);
+      this.sb.__G._discCache = Object.assign({}, this.sb.__G._discCache||{}, postDisc);
+      this._hold=null;
+      this.activate(civId);
+      // repositionner le pointeur d'acteur sur ce joueur (c'est de nouveau son tour après annulation)
+      const order=this.sb.__G._order||[];
+      this._aorderRef=order;
+      const idx=order.findIndex(n=>n&&n.civ&&n.civ.id===civId);
+      this._aptr = idx>=0?idx:0;
+    }
+    return {kind:'action', civId};   // c'est de nouveau son tour, état d'avant l'action
   }
 
   // Repli IA pour un humain (déconnexion/timeout) pendant son tour d'action.

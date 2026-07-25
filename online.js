@@ -107,7 +107,14 @@ function handle(m){
       onDecision(m.pending);
       break;
     case 'your_action':
+      STATE._confirmPending=false; hideConfirmBar();
       onMyActionTurn();
+      break;
+    case 'confirm_pending':
+      // Le serveur tient une action annulable → afficher l'état résultant + la barre Valider/Annuler.
+      STATE._confirmPending=true; STATE._myTurn=false; turnBar(false); hideWaitBlock();
+      reqState(true);
+      showConfirmBar();
       break;
     case 'turn':
       if (m.civId !== STATE.myCiv){ STATE._myTurn=false; turnBar(false); status('Tour '+(m.turn||'')+' — au tour de '+civLabel(m.civId)+'…'); showWaitBlock(); }
@@ -126,7 +133,8 @@ function handle(m){
       reqState();
       break;
     case 'notice':
-      showNotice(m);
+      if(m.kind==='result') showResultToast(m.payload&&m.payload.lines||[]);
+      else showNotice(m);
       reqState();
       break;
     case 'state':
@@ -286,6 +294,17 @@ function showInvestReal(pending, lvl){
   return true;
 }
 
+// ── Pop-up VERTE : résultat de TON action (raid volé, combat gagné/perdu, colonie prise/capturée…) ──
+function showResultToast(lines){
+  if(!lines || !lines.length) return;
+  let p=document.getElementById('sc-resulttoast');
+  if(!p){ injectStyles(); p=el('<div id="sc-resulttoast" style="position:fixed;top:78px;left:50%;transform:translateX(-50%);z-index:8680;background:#0e2a16;border:2px solid #2e9e57;border-radius:12px;padding:10px 14px;width:min(92vw,430px);color:#d0ffdc;font:600 .88em system-ui;box-shadow:0 10px 30px rgba(0,0,0,.55);line-height:1.4"></div>'); document.body.appendChild(p); p.onclick=()=>{ p.style.display='none'; }; }
+  p.innerHTML='<div style="font-weight:800;margin-bottom:3px">✅ Résultat de ton action</div>'+lines.map(t=>'• '+t).join('<br>');
+  p.style.display='block';
+  clearTimeout(p._timer);
+  p._timer=setTimeout(()=>{ p.style.display='none'; }, 6000);
+}
+
 // ── Pop-up rouge : ce que font les AUTRES (bot, IA) pendant la partie ──
 function showLogToast(txts){
   let p=document.getElementById('sc-logtoast');
@@ -385,6 +404,7 @@ function listUpgrades(){
   return out;
 }
 function sendAction(action){
+  if(STATE._confirmPending) return;   // une action est en attente de Valider/Annuler → bloquer
   STATE._myTurn=false;
   closeDecision(); turnBar(false);
   window._scOnPass=null;
@@ -395,6 +415,16 @@ function sendAction(action){
   setTimeout(()=>reqState(true), 120);
   setTimeout(()=>reqState(true), 500);
 }
+// Barre « ✓ Valider / ↩ Annuler » du jeu (DOM #sc-confirm), pilotée par le serveur en ligne.
+function showConfirmBar(){
+  try{
+    const b=document.getElementById('sc-confirm'); if(!b) return;
+    const lbl=document.getElementById('sc-confirm-label'); if(lbl) lbl.innerHTML='<span class="scc-act">Action jouée</span>';
+    b.classList.add('show');
+    hideWaitBlock();
+  }catch(e){}
+}
+function hideConfirmBar(){ try{ const b=document.getElementById('sc-confirm'); if(b) b.classList.remove('show'); }catch(e){} }
 
 // ── ERGONOMIE NORMALE : jouer sur le VRAI plateau ──────────────────────────
 // Pendant ton tour, le plateau est débloqué : les fonctions d'action du jeu (doColonize,
@@ -501,6 +531,17 @@ function installIntercepts(){
         return o.apply(this,arguments);
       };
       window.confirmStrategy._scOff=true;
+    }
+    // Boutons ✓ Valider / ↩ Annuler : en ligne, valident/annulent l'action tenue par le SERVEUR.
+    if(typeof window.scConfirmValidate==='function' && !window.scConfirmValidate._scOff){
+      const o=window.scConfirmValidate;
+      window.scConfirmValidate=function(){ if(STATE.started){ hideConfirmBar(); STATE._confirmPending=false; send({t:'confirm'}); showWaitBlock(); status('Validé…'); return; } return o.apply(this,arguments); };
+      window.scConfirmValidate._scOff=true;
+    }
+    if(typeof window.scConfirmCancel==='function' && !window.scConfirmCancel._scOff){
+      const o=window.scConfirmCancel;
+      window.scConfirmCancel=function(){ if(STATE.started){ hideConfirmBar(); STATE._confirmPending=false; send({t:'undo'}); showWaitBlock(); status('Annulé — retour en arrière…'); return; } return o.apply(this,arguments); };
+      window.scConfirmCancel._scOff=true;
     }
     ['selectInvestment','selectInvestment2'].forEach(function(fn){
       if(typeof window[fn]==='function' && !window[fn]._scOff){
