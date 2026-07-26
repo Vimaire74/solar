@@ -501,6 +501,10 @@ function installIntercepts(){
           if(fn==='useAbility'){ const me=myNation(); if(me && me.civ && me.civ.id==='jupiteriens'){ return orig.apply(this, arguments); } }
           const action=INTENT_MAP[fn](Array.prototype.slice.call(arguments));
           if(!action) return; // interception annulée (ex. modale d'attaque vide)
+          // Forge Orbitale : la version LOCALE de _forgeUpgrade fermait la modale de choix de lune ; comme on
+          // n'exécute PAS orig (on envoie juste l'intention), il faut fermer la modale nous-mêmes — sinon elle
+          // reste affichée par-dessus le jeu (bug #24 : « popup Forge qui se réaffiche, je ne vois plus le jeu »).
+          if(fn==='_forgeUpgrade'){ try{ const m=document.getElementById('forge-modal'); if(m)m.classList.add('hidden'); }catch(e){} }
           if(fn==='doEstablishRoute'){
             const me=myNation();
             if(me && me.forceTokens>0){ askRouteToken(action); return; }

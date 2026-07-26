@@ -188,17 +188,28 @@ const server = http.createServer((req, res) => {
     for (const g of games.values()) {
       let turn = null, pend = null;
       try { turn = g.driver ? g.driver.state().turn : null; const p = g.driver && g.driver.state()._pending; if (p) pend = p.kind + '/' + ((typeof p.nation === 'object' && p.nation) ? p.nation.civ.id : p.nation); } catch (e) {}
-      let nations = [], journal = [];
+      let nations = [], journal = [], wars = [], phase = null, warTrace = [];
       try {
         const G = g.driver.state();
-        nations = [G.player].concat(G.ais || []).map(p => ({ civ: p.civ.id, AC: p.acLeft, jetons: p.forceTokens,
+        phase = G.phase + (G._serverActionPhase ? '/actions' : '');
+        nations = [G.player].concat(G.ais || []).map(p => ({ civ: p.civ.id, ai: !!p._isAI, AC: p.acLeft + '/' + p.acMax,
+          jetons: p.forceTokens, recup: (p.forceCooldown || []).reduce((s, c) => s + (c.count || 0), 0),
           res: (p.res.energy||0)+'⚡ '+(p.res.materials||0)+'🪨 '+(p.res.science||0)+'🔬 '+(p.res.morale||0)+'🙂',
-          colonies: p.colonies.length, routes: p.routes.length, cartes: p.cards.length }));
-        journal = (G.log || []).slice(0, 15).map(l => String((l && l.msg) || l).replace(/<[^>]+>/g, '').slice(0, 120));
+          // colonies détaillées : nœud + niveau + (✗ si déconnectée) + (⚑n si récemment conquise)
+          colonies: (p.colonies || []).map(c => c.nodeId + 'Nv' + (c.level||1) + (c.connected === false ? '✗' : '') + (c._conquest ? '⚑' + c._conquest : '')),
+          routes: (p.routes || []).map(r => r.from + '→' + r.to + ((r.tokens||0) ? '[' + r.tokens + ']' : '')),
+          cartes: (p.cards || []).length }));
+        // état des guerres : qui, cible de reconquête IA, tours restants, agresseur
+        wars = (G.wars || []).map(w => ({ entre: (w.a || '?') + '↔' + (w.b || w.aiId || '?'), aiId: w.aiId,
+          reconqCible: w.aiRecaptureTarget || null, toursRestants: w.turnsLeft, live: !!w.live, wins: w.wins, agresseurIA: !!w.aiAggressor, aFrappeCeTour: !!w._aiAssaultedThisTurn }));
+        // journal COMPLET (jusqu'à 200 lignes), remis dans l'ordre chronologique
+        journal = (G.log || []).slice(0, 200).map(l => String((l && l.msg) || l).replace(/<[^>]+>/g, '').slice(0, 180)).reverse();
+        // trace de guerre dédiée (capture/reprise/combat/défense) — sous-ensemble du journal filtré
+        warTrace = journal.filter(l => /captur|reprend|assaut|combat|défense|defense|guerre|paix|pill|raid|jeton/i.test(l));
       } catch (e) {}
-      out.push({ code: g.code, status: g.status, turn, lastRoute: g.lastRoute ? (g.lastRoute.kind + '/' + (g.lastRoute.civId || '')) : null, pending: pend,
+      out.push({ code: g.code, status: g.status, turn, phase, lastRoute: g.lastRoute ? (g.lastRoute.kind + '/' + (g.lastRoute.civId || '')) : null, pending: pend,
                  seats: g.seats.map(s => ({ civ: s.civId, ai: s.ai, user: s.user, on: !!(s.ws && s.ws.readyState === 1) })),
-                 nations, journal });
+                 nations, wars, warTrace, journal });
     }
     res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(out)); return;
   }

@@ -2920,7 +2920,7 @@ function processAllWars(onDone){
           const aiAtt=G._aiWarCommitted||1;const t=G._aiWarTarget;G._aiWarTarget=null;
           G.player.forceTokens=Math.max(0,G.player.forceTokens-defTokens);
           G.player.forceCooldown.push({count:defTokens,returnTurn:getCooldownTurn(G.player)});
-          if(defTokens>0){G.player.res.materials=Math.max(0,(G.player.res.materials||0)-defTokens);G.player.res.energy=Math.max(0,(G.player.res.energy||0)-defTokens);addLog('⚔️ Coût défense : −'+defTokens+'<i class=ri-materials></i> −'+defTokens+'<i class=ri-energy></i> ('+defTokens+' jeton(s) engagé(s))','dim');}
+          if(defTokens>0){const _dc=(typeof hasSpec==='function'&&hasSpec(G.player,'nav2_war'))?Math.floor(defTokens/2):defTokens;G.player.res.materials=Math.max(0,(G.player.res.materials||0)-_dc);G.player.res.energy=Math.max(0,(G.player.res.energy||0)-_dc);addLog('⚔️ Coût défense : −'+_dc+'<i class=ri-materials></i> −'+_dc+'<i class=ri-energy></i> ('+defTokens+' jeton(s) engagé(s))','dim');}
           const pDef=defTokens;let txt,cls;
           if(pDef>=aiAtt){
             if(warEnemy)warEnemy.forceTokens=Math.max(0,warEnemy.forceTokens-Math.ceil(aiAtt*0.5));
@@ -4145,8 +4145,10 @@ function playerAssaultColony(nodeId,enemyAI){
 // la moitié est détruite définitivement, le reste revient après récupération.
 function applyCombatEngage(p,e,won){
   e=Math.max(0,e|0); if(e<=0||!p)return;
-  p.res.materials=Math.max(0,(p.res.materials||0)-e);
-  p.res.energy=Math.max(0,(p.res.energy||0)-e);
+  // IA de Navigation (nav2_war) : COÛT en ressources ÷2 (arrondi bas). Les jetons immobilisés restent identiques.
+  const rc=(typeof hasSpec==='function'&&hasSpec(p,'nav2_war'))?Math.floor(e/2):e;
+  p.res.materials=Math.max(0,(p.res.materials||0)-rc);
+  p.res.energy=Math.max(0,(p.res.energy||0)-rc);
   p.forceTokens=Math.max(0,(p.forceTokens||0)-e);      // tous les engagés quittent le pool
   const lost=won?0:Math.floor(e/2);                    // défaite : moitié perdue définitivement
   const back=e-lost;                                   // le reste revient après récupération
@@ -4202,7 +4204,7 @@ function resolveAiAssault(ai,targetId,commit){
   const aPow=commit+aEmpath+((ai.stratBonus&&ai.stratBonus.combatBonus)||0)+(_aiCru?(ai.cruiserPower||5):0);
   ai.acLeft=Math.max(0,ai.acLeft-1);ai.spentThisTurn+=1+commit;
   const _aiWins=aPow>pDef;
-  if(dCommit>0)applyCombatEngage(ai,commit,_aiWins); // l'attaquant ne paie/récupération QUE si tu défends (≥1 jeton engagé)
+  applyCombatEngage(ai,commit,_aiWins); // l'attaquant paie TOUJOURS ses jetons engagés (coût + récupération), même si le défenseur n'engage rien — sinon reprise quasi GRATUITE en boucle (bug Marc : colonie rendue sans frais)
   applyCombatEngage(p,dCommit,!_aiWins);             // défenseur joueur : coût + récupération de ce qu'il engage
   if(dCommit>0)addLog('🛡️ Défense : '+dCommit+' jeton(s) engagé(s) (−'+dCommit+'<i class=ri-materials></i> −'+dCommit+'<i class=ri-energy></i>).','dim');
   const node=NODES[targetId];
@@ -4313,7 +4315,7 @@ function resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,defender){
   if(_aiCru){ai.res.materials=Math.max(0,(ai.res.materials||0)-5);ai.res.energy=Math.max(0,(ai.res.energy||0)-5);addLog('⚓ '+ai.civ.emoji+' '+ai.civ.name+' déploie son Supercroiseur (+'+(ai.cruiserPower||5)+'⚔️).','dim');}
   const aPow=aiCommit+aEmp+((ai.stratBonus&&ai.stratBonus.combatBonus)||0)+(_aiCru?(ai.cruiserPower||5):0);
   // Coût + récupération SYMÉTRIQUES : l'attaquant IA paie/récupération ses jetons ; si tu repousses l'assaut, l'IA en perd la MOITIÉ définitivement (défendre fait perdre des jetons à l'ennemi). Le défenseur paie ce qu'il engage.
-  if(defTokens>0)applyCombatEngage(ai,aiCommit,aPow>pDef); // l'attaquant ne paie/récupération QUE si tu défends (≥1 jeton)
+  applyCombatEngage(ai,aiCommit,aPow>pDef); // l'attaquant paie TOUJOURS ses jetons engagés (même si tu ne défends pas) — sinon capture GRATUITE
   applyCombatEngage(p,defTokens,pDef>=aPow);
   if(defTokens>0)addLog('🛡️ Défense : '+defTokens+' jeton(s) engagé(s) (−'+defTokens+'<i class=ri-materials></i> −'+defTokens+'<i class=ri-energy></i>).','dim');
   let resultTxt,cls;
@@ -5141,6 +5143,10 @@ function doAITurn(aiPlayer,oneShot){
   // ── Boucle d'exécution ──
   function tryRecaptureAssault(){
     if(!ai._warRecapture)return false;
+    // EN LIGNE : la reprise pendant le tour d'action de l'IA se résout de façon INVISIBLE (défense auto, non routée).
+    // On la DIFFÈRE au chemin de fin de manche (maybeAiAssaultPlayer), qui t'affiche la fenêtre de défense et
+    // te laisse choisir tes jetons. (En solo _decisionActive()=false → comportement inchangé.)
+    if(typeof _decisionActive==='function'&&_decisionActive())return false;
     const targetId=ai._warRecapture;
     if(!ai._enemy.colonies.some(c=>c.nodeId===targetId)){ai._warRecapture=null;return false;}
     if(ai.acLeft<1)return false;
@@ -6469,22 +6475,28 @@ function _warSelectColonyTarget(nodeId){
 function _warShowAttackSlider(){
   const p=G.player;const ai=G.warWith?G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0]:G.ais[0];
   const aiTok=ai?ai.forceTokens:0;
-  const aiCommitted=Math.max(0,Math.ceil(aiTok*(0.5+Math.random()*0.5)));
+  // Défense RÉELLEMENT engageable par l'IA = ce qu'elle peut PAYER (1🪨+1⚡/jeton). Déterministe → l'affichage ne ment pas.
+  const usableDef=ai?Math.min(aiTok,ai.res.materials||0,ai.res.energy||0):0;
+  const aiCommitted=usableDef; // l'IA engagera ce qu'elle peut payer (la garnison +1 est ajoutée au combat)
   G._aiWarCommitted=aiCommitted;
   const stratBonus=(p.stratBonus&&p.stratBonus.combatBonus)||0;
   const targetNode=NODES[_warAttackColonyTarget];
+  // Plancher de défense : 1 jeton réservé par colonie connectée hors base (non engageables en attaque)
+  const defFloor=p.colonies.filter(c=>c.connected&&c.nodeId!==p.civ.home).length;
+  const engageable=Math.max(0,(p.forceTokens||0)-defFloor); // jetons réellement engageables (hors garnison)
+  const intel=getIntelLevel(G.player);
   document.getElementById('wcm-sub').textContent='Attaque '+(targetNode?targetNode.name:'colonie')+' — choisis tes jetons :';
   document.getElementById('wcm-info').innerHTML=
     'Cible : <strong style="color:#ffaa66">'+(targetNode?targetNode.emoji+' '+targetNode.name:'?')+'</strong><br>'+
-    'Tes jetons disponibles : <strong>'+p.forceTokens+'</strong>'+
+    'Tes jetons engageables : <strong>'+engageable+'</strong> <span style="color:#7880a0;font-size:.8em">('+(p.forceTokens||0)+' au total · '+defFloor+' réservé(s) en garnison)</span>'+
     (stratBonus?'<br>Bonus stratégie : <strong>+'+stratBonus+'</strong>':'')+
-    '<br><span style="color:#7880a0;font-size:.82em">'+(getIntelLevel(G.player)>=1?('🛰️ Défense ennemie estimée : '+Math.max(0,aiCommitted-1)+'–'+(aiCommitted+1)+' jeton(s) (±1, renseignement)'):'🌫️ Défense ennemie : inconnue (sans renseignement) — tu engages à l\'aveugle.')+'</span>';
+    '<br><span style="color:#7880a0;font-size:.82em">'+(intel>=2
+      ? ('🛰️ Défense ennemie utilisable : <strong>'+(usableDef+1)+'</strong> jeton(s) (garnison incluse — renseignement précis)')
+      : ('🌫️ Force ennemie totale : <strong>~'+aiTok+'</strong> jeton(s) (±1) — part utilisable inconnue sans renseignement'))+'</span>';
   const slider=document.getElementById('wcm-slider');
   slider.parentElement.style.display='';
   document.getElementById('wcm-power').style.display='';
   document.getElementById('war-combat-modal').querySelector('.atk-btns').style.display='';
-  // Plancher de défense : 1 jeton réservé par colonie connectée hors base
-  const defFloor=p.colonies.filter(c=>c.connected&&c.nodeId!==p.civ.home).length;
   const _afford=Math.min(p.res.materials||0,p.res.energy||0); // 1<i class=ri-materials></i>+1<i class=ri-energy></i> par jeton engagé
   const maxCommit=Math.max(0,Math.min(p.forceTokens-defFloor,_afford));
   slider.min=0;slider.max=maxCommit;slider.value=maxCommit;
