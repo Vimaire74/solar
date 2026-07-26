@@ -298,6 +298,12 @@ class GameDriver {
     if(action && action.type && action.type!=='pass'){ this.engine.apply(action); }
     this._emitLog(before);
     this._lastActionLog = (G.log && G.log.length>before) ? G.log.slice(0, G.log.length-before).map(e=>String((e&&e.msg)||e)) : [];
+    // Action REJETÉE (sans effet : pas assez de ressources/AC, déjà pris, impossible…) → on GARDE la main du
+    // joueur : une action ratée ne doit NI passer le tour NI faire tourner la main vers l'autre joueur.
+    if(action && action.type && action.type!=='pass' && !nat._isAI){
+      const rej=this._lastActionLog.some(x=>/pas assez|impossible|déjà|non adjacent|invalide|refuse|besoin|insuffisant/i.test(String(x)));
+      if(rej){ return {kind:'action', civId}; } // rien appliqué → c'est encore son tour
+    }
     // Si action ANNULABLE et RÉUSSIE (pas de ⚠️ rejet) → on TIENT (Valider/Annuler), on n'avance pas encore.
     if(confirmable){
       // Rejet = l'action n'a rien fait (vrais mots de refus, PAS un simple ⚠️ d'info type « colonie éloignée »).

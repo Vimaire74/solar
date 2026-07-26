@@ -904,6 +904,7 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
       <h4>Votre Civilisation</h4>
       <div class="civ-hdr" id="r-civ-hdr"></div>
       <div class="res-grid" id="r-res"></div>
+      <div id="r-ability" style="margin-top:8px;font-size:.76em;line-height:1.4"></div>
     </div>
     <div class="rps">
       <h4>🏛️ Gouvernement</h4>
@@ -4129,12 +4130,25 @@ function playerAssaultColony(nodeId,enemyAI){
   _warAttackColonyTarget=nodeId;
   try{document.getElementById('wcm-turn').textContent=G.turn;}catch(e){}
   _warCombatCb=(committed)=>{
-    const res=resolveWarCombat(committed);
-    war.turnsLeft=99;G.warTurnsLeft=99;
-    if(G.player.colonies.some(c=>c.nodeId===nodeId))war.aiRecaptureTarget=nodeId; // l'IA voudra la reprendre
-    undoStack=[]; // pas d'annulation d'un combat (aléatoire)
-    showWarModal('⚔️ Assaut sur '+(NODES[nodeId]?.name||nodeId),res?('Puissance — Toi : <strong>'+res.pPow+'</strong> | '+enemyAI.civ.name+' : <strong>'+res.aPow+'</strong>'):'',res?{txt:res.txt,cls:res.cls}:null);
-    _warModalCb=()=>{render();const _a=G._assaultThenCb;G._assaultThenCb=null;if(_a)_a('WAR');};
+    const _resolve=()=>{
+      const res=resolveWarCombat(committed);
+      war.turnsLeft=99;G.warTurnsLeft=99;
+      if(G.player.colonies.some(c=>c.nodeId===nodeId))war.aiRecaptureTarget=nodeId; // l'IA voudra la reprendre
+      undoStack=[]; // pas d'annulation d'un combat (aléatoire)
+      showWarModal('⚔️ Assaut sur '+(NODES[nodeId]?.name||nodeId),res?('Puissance — Toi : <strong>'+res.pPow+'</strong> | '+enemyAI.civ.name+' : <strong>'+res.aPow+'</strong>'):'',res?{txt:res.txt,cls:res.cls}:null);
+      _warModalCb=()=>{render();const _a=G._assaultThenCb;G._assaultThenCb=null;if(_a)_a('WAR');};
+    };
+    // DÉFENSEUR HUMAIN (multijoueur) : on lui AFFICHE la fenêtre de défense pour qu'il choisisse ses jetons
+    // AVANT de résoudre. Son choix pilote la défense via G._aiWarCommitted (que resolveWarCombat lit déjà).
+    if(enemyAI && enemyAI._isAI===false && _decisionActive()){
+      const maxDef=Math.max(0,Math.min(enemyAI.forceTokens||0, enemyAI.res.materials||0, enemyAI.res.energy||0));
+      const _atkName=(typeof window!=='undefined'&&window._scPseudo&&window._scPseudo[G.player.civ.id])||G.player.civ.name;
+      _emitDecision('defense', enemyAI,
+        {attacker:G.player.civ.id, attackerName:_atkName, target:{type:'colony', name:NODES[nodeId]?.name||nodeId}, threat:committed, maxDef},
+        (ans)=>{ G._aiWarCommitted=Math.max(0,Math.min(maxDef,(ans&&ans.defTokens)||0)); _resolve(); });
+      return;
+    }
+    _resolve();
   };
   document.getElementById('war-combat-modal').classList.remove('hidden');
   _warSelectColonyTarget(nodeId);
@@ -4149,10 +4163,19 @@ function applyCombatEngage(p,e,won){
   const rc=(typeof hasSpec==='function'&&hasSpec(p,'nav2_war'))?Math.floor(e/2):e;
   p.res.materials=Math.max(0,(p.res.materials||0)-rc);
   p.res.energy=Math.max(0,(p.res.energy||0)-rc);
-  p.forceTokens=Math.max(0,(p.forceTokens||0)-e);      // tous les engagés quittent le pool
-  const lost=won?0:Math.floor(e/2);                    // défaite : moitié perdue définitivement
-  const back=e-lost;                                   // le reste revient après récupération
-  if(back>0){if(!p.forceCooldown)p.forceCooldown=[];p.forceCooldown.push({count:back,returnTurn:getCooldownTurn(p)});}
+  p.forceTokens=Math.max(0,(p.forceTokens||0)-e);      // tous les engagés quittent temporairement le pool
+  if(!p.forceCooldown)p.forceCooldown=[];
+  if(won){
+    // VICTOIRE (règle) : seule la MOITIÉ des jetons engagés part en récupération ; l'autre moitié reste DISPO tout de suite.
+    const recov=Math.floor(e/2);
+    p.forceTokens+=(e-recov);                          // l'autre moitié revient immédiatement
+    if(recov>0)p.forceCooldown.push({count:recov,returnTurn:getCooldownTurn(p)});
+  }else{
+    // DÉFAITE : la moitié est perdue définitivement, le reste part en récupération.
+    const lost=Math.floor(e/2);
+    const back=e-lost;
+    if(back>0)p.forceCooldown.push({count:back,returnTurn:getCooldownTurn(p)});
+  }
 }
 // ── ATTAQUE DE ROUTE : détruit la route (pas de récupération, indéfendable) — sauf protection ──
 function resolveRouteAttack(attacker,defender,route,commit){
@@ -4251,6 +4274,9 @@ function _aiPickPlayerTarget(ai,defender){
 function maybeAiAssaultPlayer(ai,done,defender){
   const war=ai&&_warOf(ai.civ.id);
   if(!war){done();return;}
+  // ATTAQUANT HUMAIN (multijoueur) : il n'attaque PAS automatiquement en fin de tour — il assaille lui-même
+  // pendant SON tour d'action (combat visible + choix des jetons). Sinon la guerre paraîtrait « occultée ».
+  if(ai._isAI===false){done();return;}
   defender=defender||_warHumanFoe(war,ai)||G.player;
   if(war._aiAssaultedThisTurn){done();return;} // l'IA a déjà attaqué pendant son tour → pas de double assaut
   const afford=Math.min(ai.res.materials||0,ai.res.energy||0);
@@ -5477,7 +5503,10 @@ function render(){
   renderTopBar();renderWarRisk();renderEvents();renderMap();renderTechTree();renderRight();renderActions();
   document.getElementById('score-p').textContent='~'+calcVP(G.player).total+' VP';
   document.getElementById('score-a').textContent='~'+G.ais.map(ai=>calcVP(ai).total).join('/') +' VP';
-  document.getElementById('score-a-label').textContent=G.ais.length===1?'IA':G.ais.map(a=>a.civ.emoji).join(' ');
+  // Label adverse : pseudo si connu (multijoueur, fourni par online.js via window._scPseudo), sinon nom de civ.
+  // (Avant : « IA » en dur dès qu'il n'y avait qu'un adversaire → faux en multijoueur humain.)
+  {const _lbl=(a)=>{try{if(window._scPseudo&&window._scPseudo[a.civ.id])return a.civ.emoji+' '+window._scPseudo[a.civ.id];}catch(e){}return a.civ.emoji+(G.ais.length===1?(' '+a.civ.name):'');};
+   document.getElementById('score-a-label').textContent=G.ais.map(_lbl).join(' · ');}
 }
 function renderTopBar(){
   const p=G.player;
@@ -5957,6 +5986,12 @@ function renderTechTree(){
 function renderRight(){
   const p=G.player;
   document.getElementById('r-civ-hdr').innerHTML=`<span class="ce">${p.civ.emoji}</span><span class="cn">${p.civ.name}</span><span style="font-size:.62em;color:${TECH_BRANCHES[p.civ.techBonus]?.color||'#5a6a8a'};margin-left:4px">★ ${TECH_BRANCHES[p.civ.techBonus]?.emoji||''}</span>`;
+  // Capacité de la nation (passif + pouvoir actif avec coût) — sous les ressources dans le menu Empire.
+  {const _ab=p.civ.active;const _rE=(typeof rEmoji==='function')?rEmoji:(r=>r);
+   const _cost=_ab?((_ab.ac||0)+' AC'+(Object.keys(_ab.cost||{}).length?(' '+Object.entries(_ab.cost).map(([r,v])=>'−'+v+_rE(r)).join(' ')):' (gratuit)')):'';
+   const _abEl=document.getElementById('r-ability');
+   if(_abEl)_abEl.innerHTML=(p.civ.passive?('<div style="color:#9fb4d6"><b>Passif :</b> '+p.civ.passive+'</div>'):'')
+     +(_ab?('<div style="margin-top:5px;color:#ffd9a0"><b>💫 '+_ab.name+'</b> <span style="color:#8fb0d8">('+_cost+')</span>'+(p.abilityUsed?' <span style="color:#ff8888">· déjà utilisée</span>':'')+'<div style="color:#9aa8c4;margin-top:1px">'+(_ab.desc||'')+'</div></div>'):'');}
   const res=[['energy','<i class=ri-energy></i>','Énergie','#FFD700'],['materials','<i class=ri-materials></i>','Mat.','#FFA040'],['science','<i class=ri-science></i>','Savoir','#40D0FF'],['morale','<i class=ri-morale></i>','Moral','#FF6080']];
   const _netR=_netIncome(p);
   document.getElementById('r-res').innerHTML=res.map(([r,e,n,col])=>{const nv=_netR[r]||0;const nc=nv<0?'#ff6b6b':nv>0?'#7fe0a0':'#8898b8';return`<div class="rbox"><div class="rn" style="color:${col}">${e} ${n}</div><div class="rv" style="color:${col}">${p.res[r]||0}</div><div style="font-size:.66em;font-weight:700;color:${nc}" title="Revenu net estimé par tour (revenus − entretien)">${nv>0?'+':''}${nv}/t</div></div>`;}).join('');

@@ -90,6 +90,8 @@ function handle(m){
     }
     case 'game':
       STATE.game = m.game;
+      // Table civId -> pseudo, pour afficher le nom du joueur (au lieu de « IA ») partout dans le jeu.
+      try{ window._scPseudo = window._scPseudo || {}; (m.game.seats||[]).forEach(s=>{ if(s.civId && s.user) window._scPseudo[s.civId]=s.user; }); }catch(e){}
       if (!STATE.myCiv){ const s = m.game.seats.find(x=>x.user===STATE.user); if(s) STATE.myCiv = s.civId; }
       STATE.isHost = (m.game.host === STATE.user);
       try{ localStorage.setItem('sc_ws_game', m.game.code); }catch(e){}
