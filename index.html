@@ -281,6 +281,9 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
 .debug-export{flex:1;padding:7px;background:#1a3a1a;border:1px solid #44aa44;color:#88ee88;border-radius:6px;cursor:pointer;font-size:.85em}
 .debug-close{padding:7px 14px;background:none;border:1px solid #2a3a5a;color:#7880a0;border-radius:6px;cursor:pointer;font-size:.85em}
 #debug-export-area{display:none;margin-top:12px}
+#debug-export-preview{max-height:300px;overflow:auto;background:#050510;border:1px solid #2a3a5a;border-radius:6px;padding:10px;font-size:.74em;line-height:1.5;white-space:pre-wrap;font-family:ui-monospace,Menlo,Consolas,monospace}
+#debug-export-preview .jr-turn{color:#9fb4e0;font-weight:700;display:block;margin:8px 0 3px}
+#debug-export-preview .jr-vp{color:#ffd166;font-weight:700;display:block;margin-top:4px}
 #debug-export-area textarea{width:100%;height:160px;background:#050510;border:1px solid #2a3a5a;color:#88aacc;font-size:.72em;border-radius:6px;padding:8px;font-family:monospace}
 /* Tech detail modal */
 #tech-detail-modal{position:fixed;inset:0;background:rgba(4,4,18,.92);backdrop-filter:blur(8px);z-index:390;display:flex;align-items:center;justify-content:center}
@@ -1055,7 +1058,8 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
       <button class="debug-close" onclick="closeDebugModal()">Fermer</button>
     </div>
     <div id="debug-export-area">
-      <p style="font-size:.72em;color:#7880a0;margin-bottom:6px">Copiez ce texte et collez-le dans une nouvelle conversation :</p>
+      <div id="debug-export-preview"></div>
+      <p style="font-size:.72em;color:#7880a0;margin:10px 0 6px">Version texte (à copier / coller) :</p>
       <textarea id="debug-export-text" readonly onclick="this.select()"></textarea>
     </div>
   </div>
@@ -1405,7 +1409,7 @@ const AGENDAS_POOL=[
   {id:'ag1',name:'Explorateur',emoji:'🚀',desc:'5+ colonies connectées → +8 VP',score(p){return p.colonies.filter(c=>c.connected).length>=5?8:0;}},
   {id:'ag2',name:'Maître des Routes',emoji:'🛤️',desc:'5+ routes → +6 VP',score(p){return p.routes.length>=5?6:0;}},
   {id:'ag3',name:'Superpuissance Tech.',emoji:'⚗️',desc:'Plus de cartes Tech que toute autre nation → +8 VP',score(p){const myT=p.cards.filter(c=>c.branch).length;const best=Math.max(...allPlayers().filter(x=>x!==p).map(x=>x.cards.filter(c=>c.branch).length),0);return myT>=best&&myT>0?8:0;}},
-  {id:'ag4',name:'Armada Solaire',emoji:'⚔️',desc:'15+ jetons Force (cooldown inclus) → +8 VP',score(p){return (p.forceTokens+((p.forceCooldown||[]).reduce((s,c)=>s+(c.count||0),0)))>=15?8:0;}},
+  {id:'ag4',name:'Armada Solaire',emoji:'⚔️',desc:'15+ jetons Force (récupération inclus) → +8 VP',score(p){return (p.forceTokens+((p.forceCooldown||[]).reduce((s,c)=>s+(c.count||0),0)))>=15?8:0;}},
   {id:'ag6',name:'Gouvernance Éclairée',emoji:'🏛️',desc:'Gouvernement niveau 4 et Moral 8+ → +8 VP',score(p){return p.gov_level>=4&&(p.res.morale||0)>=8?8:0;}},
   {id:'ag8',name:'Hub Jovien',emoji:'🟠',desc:'3+ colonies joviennes → +6 VP',score(p){const j=['io','europe','ganymede','callisto'];return p.colonies.filter(c=>j.includes(c.nodeId)).length>=3?6:0;}},
   {id:'ag13',name:'Empire Énergétique',emoji:'⚡',desc:'Toutes les cartes tech qui génèrent <i class=ri-energy></i> → +12 VP',score(p){const energyCards=CARDS_POOL.filter(c=>c.rGain&&(c.rGain.energy||0)>0).map(c=>c.id);return energyCards.length>0&&energyCards.every(id=>p.cards.find(c=>c.id===id||c.id===id+'_esp'))?12:0;}},
@@ -1528,8 +1532,8 @@ const CIVIC_MARKET=[
   {id:'cm_calm', name:'Calmer la Population', emoji:'🕊️', type:'social', repeatable:true,
    effect:'+1<i class=ri-morale></i> −3 tension vers une nation', desc:'Festivals de paix — apaisement populaire ciblé.',
    calmAction:true, cost:{materials:1,energy:1}},
-  {id:'cm_research', name:'Investissement dans la Recherche', emoji:'📖', type:'social',
-   effect:'+2<i class=ri-science></i> immédiat', desc:'Subventions aux labos et universités.',
+  {id:'cm_research', name:'Investissement dans la Recherche', emoji:'📖', type:'social', perTurn:true,
+   effect:'+2<i class=ri-science></i> immédiat (1×/tour)', desc:'Subventions aux labos et universités.',
    resGain:{science:2}, cost:{materials:2}},
   {id:'cm_univ', name:'Universités des Colonies', emoji:'🎓', type:'social',
    effect:'+1<i class=ri-science></i>/tour (permanent)', desc:'Réseau universitaire — savoir continu.',
@@ -1565,14 +1569,14 @@ const EVENTS=[
   {id:'storm',type:'menace',name:'Tempêtes Solaires',emoji:'🌩️',preview:'Sans IA Défensive, chaque nation perd 1 jeton Force, 1 route et 2<i class=ri-materials></i>.',
    resolve(G){let n=0;const pProt=hasSpec(G.player,'storm_immune');for(const p of allPlayers()){if(hasSpec(p,'storm_immune'))continue;p.forceTokens=Math.max(0,(p.forceTokens||0)-1);if(p.routes&&p.routes.length){p.routes.pop();updateConnections(p);}p.res.materials=Math.max(0,(p.res.materials||0)-2);n++;}return (pProt?'Tu as réussi à te protéger. ':'')+'Tempêtes Solaires — '+n+' nation(s) touchée(s) : −1 jeton, −1 route, −2<i class=ri-materials></i>.';}},
   {id:'pirates',type:'menace',name:'Prolifération des pirates',emoji:'☠️',preview:'Les pirates frappent les routes de la nation la plus riche en <i class=ri-materials></i> : non protégées détruites ; protégées 50% de chance mais 2 perdues au maximum.',
-   resolve(G){const h=_evTop(function(p){return p.res.materials||0;});if(h.length!==1)return 'Prolifération des pirates — aucune cible claire.';const tgt=h[0];let unp=0,prot=0;const keep=[];for(const r of tgt.routes){if((r.tokens||0)>0){/* protégée : 50% chacune, MAX 2 perdues */ if(prot<2&&Math.random()<0.5){tgt.forceCooldown.push({count:r.tokens,returnTurn:getCooldownTurn(tgt)});prot++;}else keep.push(r);}else unp++;/* non protégée : détruite */}tgt.routes=keep;updateConnections(tgt);return 'Prolifération des pirates — '+_evName(tgt)+' perd '+(unp+prot)+' route(s) : '+unp+' non protégée(s) détruite(s)'+(prot?', '+prot+' protégée(s) pillée(s) (max 2 — jetons en cooldown)':'')+'. Protège-toi avec l\'IA Défensive ou le Réseau Orbital.';}},
+   resolve(G){const h=_evTop(function(p){return p.res.materials||0;});if(h.length!==1)return 'Prolifération des pirates — aucune cible claire.';const tgt=h[0];let unp=0,prot=0;const keep=[];for(const r of tgt.routes){if((r.tokens||0)>0){/* protégée : 50% chacune, MAX 2 perdues */ if(prot<2&&Math.random()<0.5){tgt.forceCooldown.push({count:r.tokens,returnTurn:getCooldownTurn(tgt)});prot++;}else keep.push(r);}else unp++;/* non protégée : détruite */}tgt.routes=keep;updateConnections(tgt);return 'Prolifération des pirates — '+_evName(tgt)+' perd '+(unp+prot)+' route(s) : '+unp+' non protégée(s) détruite(s)'+(prot?', '+prot+' protégée(s) pillée(s) (max 2 — jetons en récupération)':'')+'. Protège-toi avec l\'IA Défensive ou le Réseau Orbital.';}},
   {id:'sci',type:'competition',name:'Conférence Scientifique Solaire',emoji:'🔬',preview:'La nation avec la plus grosse production de <i class=ri-science></i> gagne +6 VP.',
    resolve(G){const h=_evTop(_sciProd);return 'Conférence Scientifique — '+_evAwardVP(h,6);}},
   {id:'tech',type:'competition',name:'Développement Technologique',emoji:'⚗️',preview:'La nation avec le plus de technologies de niveau 2 et 3 gagne +6 VP.',
    resolve(G){const h=_evTop(function(p){return p.cards.filter(function(c){return c.branch&&c.tier>=2;}).length;});return 'Développement Technologique — '+_evAwardVP(h,6);}},
   {id:'attract',type:'opportunite',name:'Civilisation la plus attractive',emoji:'✨',preview:'La nation avec le plus de moral gagne +2<i class=ri-materials></i> +2<i class=ri-science></i> +3 VP (2 à égalité : les deux ; 3+ : personne).',
    resolve(G){const h=_evTop(function(p){return p.res.morale||0;});if(h.length===0||h.length>=3)return 'Civilisation attractive — personne (trop d\'égalités).';h.forEach(function(p){const c=getResCapFor(p);p.res.materials=Math.min(c.materials,(p.res.materials||0)+2);p.res.science=Math.min(c.science,(p.res.science||0)+2);p.tempVP=(p.tempVP||0)+3;});return 'Civilisation attractive — '+h.map(_evName).join(' & ')+' → +2<i class=ri-materials></i> +2<i class=ri-science></i> +3 VP';}},
-  {id:'milsup',type:'competition',name:'Suprématie Militaire',emoji:'⚔️',preview:'La nation avec le plus de jetons Force (cooldown inclus) gagne +6 VP.',
+  {id:'milsup',type:'competition',name:'Suprématie Militaire',emoji:'⚔️',preview:'La nation avec le plus de jetons Force (récupération inclus) gagne +6 VP.',
    resolve(G){const h=_evTop(_forceTotal);return 'Suprématie Militaire — '+_evAwardVP(h,6);}},
   {id:'comm',type:'opportunite',name:'Accords Commerciaux',emoji:'🤝',interactive:true,preview:'Occasion de conclure un accord commercial gratuit (+3 VP par nation ; met fin à une guerre).',
    resolve(G){return _evAccordAuto('comm',G);}},
@@ -1617,6 +1621,12 @@ function showEventChoiceModal(ev,onDone){if(ev.id==='comm')showCommEventModal(on
 function showCommEventModal(onDone){
   _evCommDone=onDone;
   const cands=G.ais.filter(function(ai){return !ai.colonies.some(function(c){return G.commercialAccords.includes(c.nodeId);});});
+  if(_decisionActive()){ // EN LIGNE : router vers le client, qui affiche la vraie modale (pas de panneau générique)
+    _emitDecision('event_comm', G.player, {cands:cands.map(function(ai){return {id:ai.civ.id,name:ai.civ.name,emoji:ai.civ.emoji,war:!!(G.wars&&G.wars.find(function(w){return w.aiId===ai.civ.id;})),info:_evAiInfo(ai)};})}, function(ans){
+      _evCommDone=onDone; _evCommPick(ans&&ans.aiId?ans.aiId:null);
+    });
+    return;
+  }
   let opts;
   if(cands.length===0)opts='<div style="color:#8898b8;font-size:.85em;margin:8px 0">Toutes les nations ont déjà un accord avec toi.</div>';
   else opts=cands.map(function(ai){
@@ -1642,6 +1652,14 @@ function _evCommPick(aiId){
 }
 function showDiploEventModal(onDone){
   _evDiploDone=onDone;_evDiploSel={};
+  if(_decisionActive()){ // EN LIGNE : router vers le client (vraie modale de pactes)
+    _emitDecision('event_diplo', G.player, {mat:(G.player.res.materials||0), energy:(G.player.res.energy||0), rows:G.ais.map(function(ai){return {id:ai.civ.id,name:ai.civ.name,emoji:ai.civ.emoji,war:!!(G.wars&&G.wars.find(function(w){return w.aiId===ai.civ.id;})),info:_evAiInfo(ai)};})}, function(ans){
+      _evDiploDone=onDone; _evDiploSel={};
+      if(ans&&ans.selected){for(var i=0;i<ans.selected.length;i++)_evDiploSel[ans.selected[i]]=true;}
+      _evDiploConfirm();
+    });
+    return;
+  }
   const rows=G.ais.map(function(ai){
     const war=G.wars&&G.wars.find(function(w){return w.aiId===ai.civ.id;});
     const cost=war?'6<i class=ri-materials></i> +2<i class=ri-energy></i> (annule la guerre)':'6<i class=ri-materials></i>';
@@ -1911,7 +1929,7 @@ function getCooldownTurn(p){
   const fast=p.investBonus2&&p.investBonus2.fastCooldown&&(p.investBonus2.turnsLeft===undefined||p.investBonus2.turnsLeft>0);
   return G.turn+(fast?1:2);
 }
-// Supercroiseur : disponible si possédé et hors cooldown ; déployable si on peut payer 5<i class=ri-materials></i> 5<i class=ri-energy></i>
+// Supercroiseur : disponible si possédé et hors récupération ; déployable si on peut payer 5<i class=ri-materials></i> 5<i class=ri-energy></i>
 function cruiserAvailable(p){return !!p.hasCruiser&&(!p.cruiserCooldown||G.turn>=p.cruiserCooldown);}
 function cruiserAfford(p){return Math.min(p.res.materials||0,p.res.energy||0)>=5;}
 /* ============================================================ INIT ============================================================ */
@@ -1988,7 +2006,7 @@ function initGame(civId,aiCivIds){
     techTaken:new Set(),
     agendas:[],  // compat display — chaque joueur a son propre .agenda
     events:EVENTS,eventSchedule:buildEventSchedule(),curEvent:null,nextEvent:null,
-    log:[],turnActions:[],aiActions:[],_raidsThisTurn:[],
+    log:[],turnActions:[],aiActions:[],_raidsThisTurn:[],_journal:[],
     wars:[],warRisk:0,warState:null,warTurnsLeft:0,warWins:{player:0,ai:0},_warDeclaredBy:'other',_aiWarTarget:null,_aiWarStance:'hold',
     warWith:null,tensions:{},
     commercialAccords:[],mapPanel:0,wormholeUsed:false,_pendingEvModal:null,
@@ -2329,6 +2347,8 @@ function applyInvestments2(){
   const aCard=INVESTMENT_CARDS_2.find(c=>c.id===G.aiInvest2);
   if(pCard){pCard.applyBenefit(G,G.player);pCard.applyCost(G,G.player);}
   for(const a of G.ais){const ac=INVESTMENT_CARDS_2.find(c=>c.id===a._inv2);if(ac){ac.applyBenefit(G,a);ac.applyCost(G,a);}}
+  if(pCard)_journalAuto(G.player.civ.name,'Résolution investissement Niv.2',pCard.name);
+  for(const a of G.ais){const ac3=INVESTMENT_CARDS_2.find(c=>c.id===a._inv2);if(ac3)_journalAuto(a.civ.name,'Résolution investissement Niv.2',ac3.name);}
 }
 function isEmpathesAvailableFor(p){
   if(!G.empathesFounder)return false;
@@ -2383,15 +2403,30 @@ function showDysonModal(){
     </div>`;
     if(!accepts)warTriggered.push(ai);
   }
-  if(_decisionActive()){ // mode serveur : décision (forcer/renoncer) si refus, sinon notice
-    G._dysonWarTargets=warTriggered.map(a=>a.civ.id);
-    if(warTriggered.length>0){
-      _emitDecision('dyson_build', G.player,
-        {refusing:warTriggered.map(a=>a.civ.id), accepting:G.ais.filter(a=>!warTriggered.includes(a)).map(a=>a.civ.id)},
-        null, (ans)=>{ if(ans&&ans.force)applyDysonClose(); else dysonRenounce(); });
-    } else {
-      _emitNotice('dyson_build', G.player, {refusing:[], accepting:G.ais.map(a=>a.civ.id)}, ()=>applyDysonClose());
-    }
+  if(_decisionActive()){ // mode serveur : chaque AUTRE HUMAIN décide accepter/guerre ; les IA gardent la décision auto
+    const _humanOthers=G.ais.filter(a=>!a._isAI);
+    const _aiRefusers=warTriggered.filter(a=>a._isAI).map(a=>a.civ.id); // seules les IA sont auto-décidées
+    const _humanRefusers=[];
+    const _builderName=G.player.civ.name, _builderId=G.player.civ.id;
+    const _finalize=()=>{
+      const refusing=_aiRefusers.concat(_humanRefusers);
+      G._dysonWarTargets=refusing;
+      if(refusing.length>0){
+        _emitDecision('dyson_build', G.player,
+          {refusing, accepting:G.ais.filter(a=>!refusing.includes(a.civ.id)).map(a=>a.civ.id)},
+          null, (ans)=>{ if(ans&&ans.force)applyDysonClose(); else dysonRenounce(); });
+      } else {
+        _emitNotice('dyson_build', G.player, {refusing:[], accepting:G.ais.map(a=>a.civ.id)}, ()=>applyDysonClose());
+      }
+    };
+    let _hi=0;
+    const _askNextHuman=()=>{
+      if(_hi>=_humanOthers.length){ _finalize(); return; }
+      const _h=_humanOthers[_hi++];
+      _emitDecision('human_dyson', _h, {builder:_builderId, builderName:_builderName},
+        null, (ans)=>{ if(ans&&ans.war)_humanRefusers.push(_h.civ.id); _askNextHuman(); });
+    };
+    _askNextHuman();
     return;
   }
   document.getElementById('dyson-nations').innerHTML=html;
@@ -2543,6 +2578,8 @@ function _finishInvestmentsAfterEspionage(){
   for(const a of G.ais){const ac=INVESTMENT_CARDS.find(c=>c.id===a._inv1);if(ac){ac.applyBenefit(G,a);ac.applyCost(G,a);}}
   addLog('💼 Tour 3 : effets Investissement Niv.1 appliqués — actifs jusqu\'au tour 10 !','gold');
   const pCard=INVESTMENT_CARDS.find(c=>c.id===G.playerInvest);
+  if(pCard)_journalAuto(G.player.civ.name,'Résolution investissement Niv.1',pCard.name);
+  for(const a of G.ais){const ac2=INVESTMENT_CARDS.find(c=>c.id===a._inv1);if(ac2)_journalAuto(a.civ.name,'Résolution investissement Niv.1',ac2.name);}
   if(pCard)showInvestmentActiveModal(pCard,aCard);
 }
 const BRANCH_NAMES={
@@ -2569,6 +2606,8 @@ function applyInvestments(){
   // Niv.1 : actif T3→T5 (3 tours) — turnsLeft=4 pour compenser le décompte immédiat dans startTurn
   for(const p of allPlayers()){if(p.investBonus)p.investBonus.turnsLeft=4;}
   addLog('💼 Tour 3 : effets Investissement Niv.1 appliqués — actifs T3→T5 !','gold');
+  if(pCard)_journalAuto(G.player.civ.name,'Résolution investissement Niv.1',pCard.name);
+  for(const a of G.ais){const ac2=INVESTMENT_CARDS.find(c=>c.id===a._inv1);if(ac2)_journalAuto(a.civ.name,'Résolution investissement Niv.1',ac2.name);}
   // Popup de confirmation avec résumé des effets actifs
   if(pCard) showInvestmentActiveModal(pCard, aCard);
 }
@@ -2588,6 +2627,7 @@ function dismissInvestActive(){
 /* ============================================================ STRATEGY ============================================================ */
 // ── DRAFT DES BONUS DE DÉBUT DE TOUR (mémo #12) : pool commun limité, choix du plus faible (VP) au plus fort, égalité départagée par jetons Force ──
 function runStrategyDraft(){
+  _startTurnPrep(); // revenus + AC à jour AVANT le choix des cartes Stratégie
   const nations=[G.player,...G.ais];
   const order=nations.slice().sort((a,b)=>{const va=calcVP(a),vb=calcVP(b);if(va!==vb)return va-vb;return (a.forceTokens||0)-(b.forceTokens||0);});
   const poolSize=Math.min(STRATEGY_CARDS.length, nations.length+(G.turn===1?3:2));
@@ -2608,7 +2648,7 @@ function _aiBestStratFromPool(ai,pool){
   return pool[0];
 }
 function _runDraftStep(){
-  const order=G._stratOrder,pool=G._stratPool;if(!order){startTurn();return;}
+  const order=G._stratOrder,pool=G._stratPool;if(!order){_startTurnBegin();return;}
   while(order.length){
     const nat=order[0];
     if(_isRemote(nat)){ // EN LIGNE : humain DISTANT (pivot) → relayer son choix de Stratégie
@@ -2658,7 +2698,7 @@ function _playerStratDone(){
   if(G._stratOrder&&G._stratOrder[0]===G.player)G._stratOrder.shift();
   _runDraftStep();
 }
-function _finishDraft(){G._stratPool=null;G._stratOrder=null;startTurn();}
+function _finishDraft(){G._stratPool=null;G._stratOrder=null;_startTurnBegin();}
 function _tensionMiniHtml(){
   if(!G.ais||!G.ais.length)return '';
   const rows=G.ais.map(ai=>{
@@ -2695,6 +2735,8 @@ function _applyStratTo(nat,card){
   if(card.warRisk)G.warRisk=Math.max(0,G.warRisk+(card.warRisk));
   if(card.acBonus||card.spec||card.combatBonus||card.upkeepDiscount){
     nat.stratBonus={acBonus:card.acBonus||0,spec:card.spec||null,combatBonus:card.combatBonus||0,upkeepDiscount:card.upkeepDiscount||0};
+    // L'AC est déjà calculé avant le draft → on ajoute ici le bonus AC de la carte Stratégie choisie.
+    if(card.acBonus){nat.acLeft=(nat.acLeft||0)+card.acBonus;nat.acMax=(nat.acMax||0)+card.acBonus;}
   }else nat.stratBonus=null;
   addLog((nat===G.player?'🎯 Stratégie : ':'🎯 '+nat.civ.emoji+' '+nat.civ.name+' — Stratégie : ')+card.name+' — '+card.desc, nat===G.player?'gold':'dim');
   return false;
@@ -2765,17 +2807,46 @@ function applyCalmTension(aiId,mode,amount){
 }
 function skipStrategy(){document.getElementById('strategy-modal').classList.add('hidden');G.player.stratBonus=null;G._playerDraftCard=null;_playerStratDone();}
 /* ============================================================ TURN ============================================================ */
-function startTurn(){
+function startTurn(){ _startTurnPrep(); _startTurnBegin(); }
+// PRÉPARATION DU TOUR (avant le choix des cartes Stratégie) : remet à jour les revenus déjà
+// encaissés, les jetons revenus de récupération, les points de gouvernement ET surtout le NOMBRE
+// D'ACTIONS (AC), pour que tout soit à jour AVANT que le joueur ne choisisse sa stratégie.
+function _startTurnPrep(){
+  if(G._prepDoneTurn===G.turn)return; // une seule préparation par tour
+  G._prepDoneTurn=G.turn;
   if(typeof enforceCaps==='function')enforceCaps(); // écrêtage : correction des excès du tour précédent (après entretien)
   G.phase='actions';G.turnActions=[];G.aiActions=[];G._raidsThisTurn=[];
   G.player._milBoughtThisTurn=new Set(); // militaires : 1× par carte par tour (joueur)
-  mode=null;routeFrom=null;undoStack=[];if(typeof _scHideConfirm==='function')_scHideConfirm();
+  allPlayers().forEach(p=>{ p._civicPerTurn=new Set(); }); // civiques « 1×/tour » (ex. Investissement Recherche) — remis à zéro chaque tour, par nation
+  mode=null;routeFrom=null;undoStack=[];if(typeof _scHideConfirm==='function')_scHideConfirm();G._scStuckTries=0;G._scStuckShown=false;
   G.player.abilityUsed=false;G.ais.forEach(ai=>{ai.abilityUsed=false;});
   G.player._stratColUsed=false;
   G.player._attacksThisTurn=0;G.ais.forEach(ai=>{ai._attacksThisTurn=0;});
   if(G.player.bonusMat){G.player.res.materials+=1;G.player.bonusMat=false;addLog('🔀 Bonus : +1<i class=ri-materials></i>','green');}
   G.ais.forEach(ai=>{if(ai.bonusMat){ai.res.materials+=1;ai.bonusMat=false;}});
   G.player.spentThisTurn=0;G.player.combatBonus=0;G.ais.forEach(ai=>{ai.spentThisTurn=0;ai.combatBonus=0;});
+  // Retours récupération jetons
+  for(const p of allPlayers()){
+    const rec=p.forceCooldown.filter(fc=>fc.returnTurn<=G.turn);
+    for(const fc of rec)p.forceTokens+=fc.count;
+    p.forceCooldown=p.forceCooldown.filter(fc=>fc.returnTurn>G.turn);
+  }
+  // Retirer les jetons Force temporaires de la stratégie du tour précédent
+  if(G.player.stratForceBonus){G.player.forceTokens=Math.max(0,G.player.forceTokens-G.player.stratForceBonus);addLog('⏱️ Jetons Force temporaires expirés (−'+G.player.stratForceBonus+').','dim');G.player.stratForceBonus=0;}
+  if(G.player.milLoseNext){G.player.forceTokens=Math.max(0,G.player.forceTokens-G.player.milLoseNext);addLog('⏱️ Renforts militaires dissous (−'+G.player.milLoseNext+' jeton(s)).','dim');G.player.milLoseNext=0;}
+  if(G.player.civ.id==='terriens'&&(G.player.res.morale||0)>=5)addGovPts(G.player,1);
+  for(const ai of G.ais){if(ai.civ.id==='terriens'&&(ai.res.morale||0)>=5)addGovPts(ai,1);}
+  if(G.player.govRpt>0)addGovPts(G.player,G.player.govRpt);
+  for(const ai of G.ais){if(ai.govRpt>0)addGovPts(ai,ai.govRpt);}
+  G.player.acMax=Math.min(5,calcAC(G.player));G.player.acLeft=G.player.acMax;
+  // Moral v6 : Moral=0 → AC max divisé par 2 (arrondi bas)
+  if((G.player._moraleRev!==undefined?G.player._moraleRev:(G.player.res.morale||0))===0){const half=Math.floor(G.player.acMax/2);G.player.acLeft=half;addLog('😞 Moral nul — AC réduit à '+half+'/'+G.player.acMax,'red');}
+  // (Filet IA « se relève » supprimé — parité : tout le monde subit la pénalité basée sur le moral FIGÉ en fin de phase d'actions, et remonte par ses propres actions.)
+  G.ais.forEach(ai=>{ai.acMax=Math.min(5,calcAC(ai));ai.acLeft=ai.acMax;if((ai._moraleRev!==undefined?ai._moraleRev:(ai.res.morale||0))===0){ai.acLeft=Math.floor(ai.acMax/2);}});
+  if(typeof render==='function')render(); // affiche AC + revenus à jour AVANT le draft Stratégie
+}
+// DÉBUT EFFECTIF DU TOUR (après le choix des cartes Stratégie) : investissements, événement, jeu.
+function _startTurnBegin(){
   // Appliquer les investissements EN PREMIER (avant les décomptes) pour que T7 soit effectif
   if(G.turn===3&&!G.investApplied)applyInvestments();
   if(G.turn===7&&!G.invest2Applied)applyInvestments2();
@@ -2799,24 +2870,6 @@ function startTurn(){
       }
     }
   }
-  // Retours cooldown jetons
-  for(const p of allPlayers()){
-    const rec=p.forceCooldown.filter(fc=>fc.returnTurn<=G.turn);
-    for(const fc of rec)p.forceTokens+=fc.count;
-    p.forceCooldown=p.forceCooldown.filter(fc=>fc.returnTurn>G.turn);
-  }
-  // Retirer les jetons Force temporaires de la stratégie du tour précédent
-  if(G.player.stratForceBonus){G.player.forceTokens=Math.max(0,G.player.forceTokens-G.player.stratForceBonus);addLog('⏱️ Jetons Force temporaires expirés (−'+G.player.stratForceBonus+').','dim');G.player.stratForceBonus=0;}
-  if(G.player.milLoseNext){G.player.forceTokens=Math.max(0,G.player.forceTokens-G.player.milLoseNext);addLog('⏱️ Renforts militaires dissous (−'+G.player.milLoseNext+' jeton(s)).','dim');G.player.milLoseNext=0;}
-  if(G.player.civ.id==='terriens'&&(G.player.res.morale||0)>=5)addGovPts(G.player,1);
-  for(const ai of G.ais){if(ai.civ.id==='terriens'&&(ai.res.morale||0)>=5)addGovPts(ai,1);}
-  if(G.player.govRpt>0)addGovPts(G.player,G.player.govRpt);
-  for(const ai of G.ais){if(ai.govRpt>0)addGovPts(ai,ai.govRpt);}
-  G.player.acMax=Math.min(5,calcAC(G.player));G.player.acLeft=G.player.acMax;
-  // Moral v6 : Moral=0 → AC max divisé par 2 (arrondi bas)
-  if((G.player._moraleRev!==undefined?G.player._moraleRev:(G.player.res.morale||0))===0){const half=Math.floor(G.player.acMax/2);G.player.acLeft=half;addLog('😞 Moral nul — AC réduit à '+half+'/'+G.player.acMax,'red');}
-  // (Filet IA « se relève » supprimé — parité : tout le monde subit la pénalité basée sur le moral FIGÉ en fin de phase d'actions, et remonte par ses propres actions.)
-  G.ais.forEach(ai=>{ai.acMax=Math.min(5,calcAC(ai));ai.acLeft=ai.acMax;if((ai._moraleRev!==undefined?ai._moraleRev:(ai.res.morale||0))===0){ai.acLeft=Math.floor(ai.acMax/2);}});
   G.curEvent=eventForTurn(G.turn);              // se résout en fin de CE tour
   G.nextEvent=eventForTurn(G.turn+1);           // révélé maintenant pour qu'on s'y prépare
   if(G.nextEvent){
@@ -3003,8 +3056,31 @@ function _ilPhrase(nation, msg){
   rest=rest.replace(/^route\s*/i,'construisent une route vers ').replace(/^:\s*/,'');
   return nation+' : '+_ilVerb(rest);
 }
+// FILET DE SÉCURITÉ UNIVERSEL : dès que c'est le tour du joueur, on arme un chien de garde ; si dans
+// ~5 s rien n'a avancé (même tour, même position, toujours 0 issue visible : pas de modale, pas de
+// confirmation, pas de rappel de pouvoir), on affiche une sortie « Fin de tour » manuelle. Ça garantit
+// qu'on ne reste JAMAIS bloqué sans fin de tour, quelle que soit la cause (bug signalé par Marc, tour 6).
+function _armPlayerStuckWatch(){
+  try{
+    clearTimeout(G._playerStuckWatch);
+    const t=G.turn, idx=G._ilIdx;
+    G._playerStuckWatch=setTimeout(function(){
+      try{
+        if(!G||G.phase!=='actions'||!G._il||!G._humanActive)return;
+        if(G.turn!==t||G._ilIdx!==idx)return;                 // ça a avancé → ok
+        if(_scConfirmArmed)return;                            // barre Valider visible → sortie existe
+        if(typeof _scAbilityReminderOpen==='function'&&_scAbilityReminderOpen())return;
+        if(typeof _ilModalOpen==='function'&&_ilModalOpen())return; // une modale d'action est ouverte
+        if(typeof _scAnyModalOpen==='function'&&_scAnyModalOpen())return;
+        if(G._scStuckShown)return;
+        G._scStuckShown=true; if(typeof _scShowStuckModal==='function')_scShowStuckModal();
+      }catch(e){}
+    }, 5000);
+  }catch(e){}
+}
 function interleaveStep(){
   if(G._ilPaused) return;
+  try{ clearTimeout(G._playerStuckWatch); }catch(e){}   // ça avance → désarmer le chien de garde
   let guard=0;
   while(guard++ < 60){
     if(allPlayers().every(p=>p._passedRound)){ _ilHide(); runEndOfRound(); return; }
@@ -3015,10 +3091,10 @@ function interleaveStep(){
       // Action par action : quand tes actions sont finies (0 AC) et aucune confirmation en attente →
       // rappel du pouvoir gratuit s'il n'est pas utilisé, sinon on passe automatiquement au tour suivant (plus besoin de « Fin de Tour »).
       if(G.player.acLeft<=0 && !_scConfirmArmed && !_scAbilityReminderOpen()){
-        if(_scAbilityAvailable()){ render(); _scShowAbilityReminder(); return; }
+        if(_scAbilityAvailable()){ render(); _scShowAbilityReminder(); _armPlayerStuckWatch(); return; }
         return passTurnIL();
       }
-      clearTimeout(G._ilHideTimer); G._ilHideTimer=setTimeout(_ilHide,2000); render(); return;
+      clearTimeout(G._ilHideTimer); G._ilHideTimer=setTimeout(_ilHide,2000); render(); _scMaybeStuck(); _armPlayerStuckWatch(); return;
     }
     if(actor._remoteHuman){ // EN LIGNE : nation d'un joueur humain DISTANT → la couche en ligne gère son tour
       if(actor.acLeft<=0){ actor._passedRound=true; G._ilIdx++; continue; }
@@ -3038,6 +3114,7 @@ function interleaveStep(){
     _ilShow(G._ilLines);
     render();
     if(G._aiAssaultCtx){ G._ilPaused=true; return; }
+    if(G._ilPlayerHits&&G._ilPlayerHits.length){ G._ilPaused=true; _showPlayerHitModal(); return; } // une nation t'a attaqué → popup à valider
     setTimeout(interleaveStep, 1000);
     return;
   }
@@ -3045,10 +3122,19 @@ function interleaveStep(){
 function playerActed(){ if(!G._il||!G._humanActive) return; _scHideConfirm(); G._ilLines=[]; G._ilMarkEntry=(G.log&&G.log[0])||null; _ilHide(); G._humanActive=false; G._ilIdx++; interleaveStep(); }
 function passTurnIL(){ if(!G._il) return; _scHideConfirm(); G._ilLines=[]; G._ilMarkEntry=(G.log&&G.log[0])||null; _ilHide(); G._humanActive=false; G.player._passedRound=true; G._ilIdx++; interleaveStep(); }
 function runEndOfRound(){
+  // GARDE-FOU ANTI-RÉEXÉCUTION (indexé sur le tour) : évite que la fin de manche tourne DEUX fois
+  // (ex. reprise d'une partie sauvée pendant le bilan → interleaveStep revoit « tous ont passé »
+  //  et rappelait runEndOfRound → revenus/pirates/événement en double). Bug corrigé 2026-07-26.
+  if(G._eotDoneTurn===G.turn){
+    if(G._lastEOT){ showEOTModal(G._lastEOT.maint,G._lastEOT.revs,null,null); } // ré-afficher le bilan au lieu de tout refaire
+    return;
+  }
+  G._eotDoneTurn=G.turn;
   advancePirates(); updateWarRisk(); updateTension();
-  const finishTurn=()=>{ _applyMoraleFlags(); const revs=doRevenues(); const maint=doMaintenance(); refillGeneralRiver();
-    if(G.curEvent){ const evMsg=G.curEvent.resolve(G); if(evMsg)addLog('🎯 ÉVÉNEMENT '+G.curEvent.emoji+' '+G.curEvent.name+' : '+evMsg,'gold'); G._pendingEvModal={ev:G.curEvent,msg:evMsg}; }
+  const finishTurn=()=>{ _applyMoraleFlags(); const revs=doRevenues(); const maint=doMaintenance(); _emitNetRevenueLog(maint); refillGeneralRiver();
+    if(G.curEvent){ const evMsg=G.curEvent.resolve(G); if(evMsg)addLog('🎯 ÉVÉNEMENT '+G.curEvent.emoji+' '+G.curEvent.name+' : '+evMsg,'gold'); if(evMsg)_journalAuto(G.player.civ.name,'Événement : '+G.curEvent.name,evMsg);G._pendingEvModal={ev:G.curEvent,msg:evMsg}; }
     enforceCaps();
+    G._lastEOT={maint,revs}; // mémorisé pour ré-affichage sûr en cas de reprise
     showEOTModal(maint,revs,null,null); };
   const afterWars=()=>processAllWars(()=>finishTurn());
   // Une IA a construit la Sphère de Dyson ce tour → demander au joueur : accepter le monopole ou déclarer la guerre.
@@ -3072,9 +3158,9 @@ function endTurn(){
     updateWarRisk();
     updateTension();
     const finishTurn=()=>{
-      _applyMoraleFlags();const revs=doRevenues();const maint=doMaintenance();
+      _applyMoraleFlags();const revs=doRevenues();const maint=doMaintenance();_emitNetRevenueLog(maint);
       refillGeneralRiver();
-      if(G.curEvent){const evMsg=G.curEvent.resolve(G);if(evMsg)addLog('🎯 ÉVÉNEMENT '+G.curEvent.emoji+' '+G.curEvent.name+' : '+evMsg,'gold');G._pendingEvModal={ev:G.curEvent,msg:evMsg};}
+      if(G.curEvent){const evMsg=G.curEvent.resolve(G);if(evMsg)addLog('🎯 ÉVÉNEMENT '+G.curEvent.emoji+' '+G.curEvent.name+' : '+evMsg,'gold');if(evMsg)_journalAuto(G.player.civ.name,'Événement : '+G.curEvent.name,evMsg);G._pendingEvModal={ev:G.curEvent,msg:evMsg};}
       enforceCaps();
       showEOTModal(maint,revs,null,null);
     };
@@ -3095,9 +3181,29 @@ function continueAfterEOT(){
   if(G._pendingEvModal){
     const{ev,msg}=G._pendingEvModal;G._pendingEvModal=null;
     _evModalCb=proceed;
-    if(ev.interactive&&msg===null&&typeof showEventChoiceModal==='function')showEventChoiceModal(ev,function(){const c=_evModalCb;_evModalCb=null;if(c)c();});
+    if(ev.interactive&&msg===null&&typeof showEventChoiceModal==='function'){
+      if(_decisionActive()){ _evModalCb=null; _runInteractiveEventAllHumans(ev, proceed); } // EN LIGNE : CHAQUE humain fait SES propres accords
+      else showEventChoiceModal(ev,function(){const c=_evModalCb;_evModalCb=null;if(c)c();});
+    }
     else showEventModal(ev,msg);
   }else proceed();
+}
+// EN LIGNE : un événement interactif (accords commerciaux/diplomatiques) est proposé à CHAQUE humain, l'un
+// après l'autre, en « activant » sa nation (G.player) le temps de sa décision. Les tensions passent par
+// _tk('player')→G.player.civ.id, donc l'échange de G.player suffit à traiter correctement chaque humain.
+function _runInteractiveEventAllHumans(ev, done){
+  const _all=allPlayers();
+  const humans=_all.filter(p=>!p._isAI);
+  const _origPlayer=G.player;
+  const _swapTo=(nat)=>{ G.player=nat; G.ais=_all.filter(p=>p!==nat); if(typeof refreshWarViews==='function')refreshWarViews(); };
+  let i=0;
+  const next=()=>{
+    if(i>=humans.length){ _swapTo(_origPlayer); if(done)done(); return; }
+    const H=humans[i++];
+    _swapTo(H);
+    showEventChoiceModal(ev, next);
+  };
+  next();
 }
 function refillGeneralRiver(){
   // Militaires : TOUTES visibles (grisées si non acquérables) ; 1× par carte par tour (suivi via _milBoughtThisTurn).
@@ -3124,16 +3230,10 @@ function advancePirates(){
       p.routes=p.routes.filter(r=>!hitRoutes.includes(r));updateConnections(p);
       attacked=true;
       if(p===G.player)hitRoutes.forEach(r=>addLog('☠️ Pirates ! Route '+(NODES[r.from]?.name||r.from)+'→'+(NODES[r.to]?.name||r.to)+' pillée et DÉTRUITE — à reconstruire (protège tes routes avec un jeton).','red'));
-    }else if(unprotected.length===0&&Math.random()<chance){
-      // Aucune route exposée : raid sur une colonie connectée (hors base).
-      const targets=p.colonies.filter(c=>c.connected&&c.nodeId!==p.civ.home&&!NODES[c.nodeId]?.decorative);
-      if(targets.length){
-        const col=targets[Math.floor(Math.random()*targets.length)];const nodeName=NODES[col.nodeId]?.name||col.nodeId;
-        if(col.level>1){col.level--;if(p===G.player)addLog('☠️ Pirates ! '+nodeName+' rétrogradée Nv.'+col.level,'red');}
-        else{p.res.morale=Math.max(0,(p.res.morale||0)-1);if(p===G.player)addLog('☠️ Pirates ! '+nodeName+' — −1<i class=ri-morale></i>','red');}
-        attacked=true;
-      }
     }
+    // (Règle voulue par Marc : les pirates de FIN DE TOUR n'attaquent QUE les routes non protégées,
+    //  JAMAIS les colonies. La branche « raid sur colonie » a été retirée. L'événement « Prolifération
+    //  des pirates » reste distinct.)
   }
   if(attacked){
     // Risque guerre +1 avec Ceinturiens (lore : ils soutiennent les pirates en secret)
@@ -3215,6 +3315,23 @@ function doMaintenance(){
   }
   return result;
 }
+// Ligne de journal « Revenus nets » : revenus bruts − entretien (colonies, routes, gouvernement).
+function _emitNetRevenueLog(maint){
+  const d=G&&G._revLogData;if(!d){return;}G._revLogData=null;
+  maint=maint||{};
+  const eCost=(maint.energyCost||0)+(maint.routeEnergyCost||0);
+  const mCost=(maint.matCost||0)-(maint.routeMatGain||0);
+  const net={energy:(d.gross.energy||0)-eCost,materials:(d.gross.materials||0)-mCost,science:(d.gross.science||0)};
+  const parts=[];
+  for(const r of['energy','materials','science']){const a=net[r];if(a!==0)parts.push((a>=0?'+':'')+a+rEmoji(r));}
+  const netM=d.grossM-(d.conquestPen||0)-(d.manif||0)-(maint.moraleLostCols||0);
+  if(d.conquestPen||d.manif||maint.moraleLostCols){
+    parts.push('<i class=ri-morale></i> '+(d.grossM>=0?'+':'')+d.grossM+' brut'+(d.conquestPen?' −'+d.conquestPen+' conquête':'')+(d.manif?' −'+d.manif+' tension':'')+(maint.moraleLostCols?' −'+maint.moraleLostCols+' entretien':'')+' → '+(netM>=0?'+':'')+netM+' net');
+  }else if(d.grossM!==0){
+    parts.push((d.grossM>=0?'+':'')+d.grossM+'<i class=ri-morale></i>');
+  }
+  if(parts.length)addLog('💰 Revenus nets (après entretien) : '+parts.join(' '));
+}
 // ── TOOLTIP REVENU : détail des sources et malus permanents (lecture seule) ──
 function revenueBreakdownHTML(p){
   if(!p||!p.colonies)return '';
@@ -3274,6 +3391,48 @@ function revenueBreakdownHTML(p){
   h+='<div style="border-top:1px solid #2a3a5a;margin-top:6px;padding-top:4px;font-weight:700;color:#dfe8ff">Revenu net (avant entretien) : '+fmt(g)+'</div>';
   return h;
 }
+// Revenu NET estimé du prochain end-of-turn, PAR ressource (revenus BRUTS − entretien colonies/routes/gouv,
+// règles de moral incluses). Sert à l'aperçu barre du haut + menu Empire. Estimation (≈) : l'entretien
+// routes suppose toutes les routes alimentées ; les pénalités de moral pour entretien impayé ne sont pas déduites.
+function _netIncome(p){
+  const g={energy:0,materials:0,science:0,morale:0};
+  if(!p||!p.civ) return g;
+  const _terra=hasSpec(p,'terra3'),_bio=hasSpec(p,'bio2_bonus');
+  for(const c of p.colonies){
+    if(!c.connected) continue; const n=NODES[c.nodeId]; if(!n||n.decorative) continue;
+    const mult=c.level>=3?2:(c.level>=2?1.5:1);
+    for(const r in n.res) g[r]=(g[r]||0)+Math.floor(n.res[r]*mult);
+    if(c.level>=3){g.morale+=2;g.science+=2;} else if(c.level>=2){g.morale+=1;g.science+=1;}
+    if(_bio) g.materials+=1;
+    if(_terra){g.materials+=1;g.morale+=1;}
+    if(p.civ.id==='jupiteriens'&&['io','europe','ganymede','callisto'].includes(c.nodeId)) g.energy+=1;
+  }
+  if(G.commercialAccords&&G.commercialAccords.length){g.materials+=G.commercialAccords.length;g.morale+=G.commercialAccords.length;}
+  if(p.civ.id==='ceinturiens') g.energy+=1;
+  if(p.rpt) for(const r in p.rpt) g[r]=(g[r]||0)+(p.rpt[r]||0);
+  if(p.investBonus&&(p.investBonus.turnsLeft===undefined||p.investBonus.turnsLeft>0)){
+    if(p.investBonus.matX2&&g.materials>0) g.materials=Math.floor(g.materials*2);
+    if(p.investBonus.sciX2&&g.science>0) g.science=Math.floor(g.science*2);
+    if(p.investBonus.matHalf&&g.materials>0) g.materials=Math.floor(g.materials/2);
+    if(p.investBonus.moraleBonus) g.morale+=p.investBonus.moraleBonus;
+  }
+  if(p.investBonus2&&(p.investBonus2.turnsLeft===undefined||p.investBonus2.turnsLeft>0)&&p.investBonus2.moraleX2&&g.morale>0) g.morale=Math.floor(g.morale*2);
+  // Règles de moral (appliquées aux REVENUS) : 0 = guerre civile (rien), 1 = ÷2.
+  const m=(p.res.morale||0);
+  if(m===0){ g.energy=0;g.materials=0;g.science=0;g.morale=0; }
+  else if(m===1){ for(const r of ['energy','materials','science','morale']) g[r]=Math.floor((g[r]||0)/2); }
+  // ENTRETIEN (déduit après) — colonies hors base
+  const extraCols=p.colonies.filter(c=>c.nodeId!==p.civ.home&&!(p.civ.id==='jupiteriens'&&String(c.nodeId).startsWith('jorbital')));
+  let upE=0,upM=0; for(const c of extraCols){const lvl=c.level||1; if(lvl>=2&&_terra)continue; if(!(lvl>=2&&(_bio||_terra)))upE+=lvl; upM+=lvl>=3?2:lvl>=2?1:0;}
+  upE=Math.max(0,upE-((p.stratBonus&&p.stratBonus.upkeepDiscount)||0));
+  if(p.investBonus2&&(p.investBonus2.freeUpkeep||0)>0){upE=0;upM=0;}
+  g.energy-=upE; g.materials-=upM;
+  const nr=p.routes.length; if(!hasSpec(p,'route_force_free')) g.energy-=nr; g.materials+=nr; // route : −1⚡ +1🪨
+  if(p.govFormUpkeep) for(const r in p.govFormUpkeep) g[r]=(g[r]||0)-(p.govFormUpkeep[r]||0);
+  return g;
+}
+// Petit badge « +N/t » ou « −N/t » coloré (vert positif, rouge négatif).
+function _netBadge(v,big){ const c=v<0?'#ff6b6b':v>0?'#7fe0a0':'#8898b8'; const sz=big?'.66em':'.7em'; return '<span style="font-size:'+sz+';color:'+c+';font-weight:700;margin-left:3px">'+(v>0?'+':'')+v+'/t</span>'; }
 function _showRevTip(){
   _hideRevTip();const p=G&&G.player;if(!p)return;
   const el=document.getElementById('top-res');if(!el)return;
@@ -3383,17 +3542,10 @@ function doRevenues(){
     }
     if(p===G.player){
       playerGains=gains;
-      const _manif=p._manifLoss||0;
-      const _grossM=gains.morale||0;
-      const _netM=_grossM-_conquestPen-_manif;
-      const _parts=Object.entries(gains).filter(([r])=>r!=='morale').map(([r,a])=>(a>=0?'+':'')+a+rEmoji(r));
-      if(_conquestPen||_manif){
-        // cœur affiché en NET, avec le détail des malus (mécanique inchangée)
-        _parts.push('<i class=ri-morale></i> '+(_grossM>=0?'+':'')+_grossM+' brut'+(_conquestPen?' −'+_conquestPen+' conquête':'')+(_manif?' −'+_manif+' tension':'')+' → '+(_netM>=0?'+':'')+_netM+' net');
-      }else if(_grossM!==0){
-        _parts.push((_grossM>=0?'+':'')+_grossM+'<i class=ri-morale></i>');
-      }
-      if(_parts.length)addLog('💰 Revenus : '+_parts.join(' '));
+      // Le journal affiche le revenu NET (après entretien) : on garde les gains bruts ici,
+      // et la ligne « 💰 Revenus nets » est émise après doMaintenance (voir _emitNetRevenueLog).
+      G._revLogData={gross:{energy:gains.energy||0,materials:gains.materials||0,science:gains.science||0},
+        grossM:gains.morale||0,conquestPen:_conquestPen,manif:(p._manifLoss||0)};
     }
   }
   return playerGains;
@@ -3484,10 +3636,14 @@ function buyMarket(cardId){
   if(_scGuard())return;
   const card=CIVIC_MARKET.find(c=>c.id===cardId);if(!card)return;
   const isGov=card.type==='government';
-  const isRepeat=!!(card.repeatable||card.calmAction);
+  const isPerTurn=!!card.perTurn;
+  const isRepeat=!!(card.repeatable||card.calmAction||isPerTurn); // perTurn = pas bloqué à vie, mais 1×/tour (voir ci-dessous)
   if(isGov){
     if(G.player.govForm===cardId){addLog('⚠️ '+card.name+' est déjà ta forme de gouvernement actuelle.','red');return;}
-  } else if(!isRepeat&&G.civicTaken.has(cardId)){addLog('⚠️ '+card.name+' a déjà été utilisé cette partie.','red');return;}
+  } else if(isPerTurn){
+    if(!G.player._civicPerTurn)G.player._civicPerTurn=new Set();
+    if(G.player._civicPerTurn.has(cardId)){addLog('⚠️ '+card.name+' déjà activé ce tour (1×/tour).','red');return;}
+  } else if(!isRepeat&&G.player._civicTaken&&G.player._civicTaken.has(cardId)){addLog('⚠️ '+card.name+' a déjà été utilisé cette partie.','red');return;} // par NATION (multi : chaque nation a ses civiques)
   if(G.player.acLeft<1){addLog('⚠️ Pas assez d\'AC (besoin 1).','red');return;}
   for(const[r,a]of Object.entries(card.cost)){if((G.player.res[r]||0)<a){addLog('⚠️ Pas assez de '+rLabel(r)+' (besoin '+a+').','red');return;}}
   // Calmer la Population : ouvre popup de choix de nation avant débit (−3 tension)
@@ -3501,7 +3657,8 @@ function buyMarket(cardId){
   if(card.rGain)for(const[r,a]of Object.entries(card.rGain))G.player.rpt[r]=(G.player.rpt[r]||0)+a; // ex. Universités : +1<i class=ri-science></i>/tour permanent
   if(card.govForm)adoptGovForm(G.player,card);
   if(card.govPts)addGovPts(G.player,card.govPts);
-  if(!isGov&&!isRepeat)G.civicTaken.add(cardId);
+  if(isPerTurn){ if(!G.player._civicPerTurn)G.player._civicPerTurn=new Set(); G.player._civicPerTurn.add(cardId); } // 1×/tour
+  else if(!isGov&&!isRepeat){ if(!G.player._civicTaken)G.player._civicTaken=new Set(); G.player._civicTaken.add(cardId); } // par NATION
   const costStr=Object.entries(card.cost).map(([r,a])=>'-'+a+rEmoji(r)).join(' ');
   addLog('💼 '+card.emoji+' '+card.name+' — 1AC'+(costStr?' '+costStr:'')+' → '+card.effect,'gold');
   addAction(card.emoji,card.name,1,card.cost,card.effect);
@@ -3515,7 +3672,7 @@ function showMarketDetail(cardId){
   const isGov=card.type==='government';
   const isRepeat=!!(card.repeatable||card.calmAction);
   const isCurrentForm=isGov&&G.player.govForm===cardId;
-  const blocked=isGov?isCurrentForm:(!isRepeat&&G.civicTaken.has(cardId));
+  const blocked=isGov?isCurrentForm:(!isRepeat&&G.player._civicTaken&&G.player._civicTaken.has(cardId));
   const canBuy=G.phase==='actions'&&G.player.acLeft>=1&&!blocked&&Object.entries(cost).every(([r,a])=>(G.player.res[r]||0)>=a);
   const border=isGov?'#4a90e8':'#66cc88';
   document.getElementById('td-card').style.borderTop=`4px solid ${border}`;
@@ -3984,18 +4141,18 @@ function playerAssaultColony(nodeId,enemyAI){
 }
 // ── Économie de combat UNIFIÉE (attaque ET défense identiques) ──
 // Engager e jetons coûte 1<i class=ri-materials></i> +1<i class=ri-energy></i> par jeton. Les jetons engagés quittent le pool :
-// s'ils survivent (camp non vaincu) ils reviennent après cooldown ; si le camp PERD,
-// la moitié est détruite définitivement, le reste revient après cooldown.
+// s'ils survivent (camp non vaincu) ils reviennent après récupération ; si le camp PERD,
+// la moitié est détruite définitivement, le reste revient après récupération.
 function applyCombatEngage(p,e,won){
   e=Math.max(0,e|0); if(e<=0||!p)return;
   p.res.materials=Math.max(0,(p.res.materials||0)-e);
   p.res.energy=Math.max(0,(p.res.energy||0)-e);
   p.forceTokens=Math.max(0,(p.forceTokens||0)-e);      // tous les engagés quittent le pool
   const lost=won?0:Math.floor(e/2);                    // défaite : moitié perdue définitivement
-  const back=e-lost;                                   // le reste revient après cooldown
+  const back=e-lost;                                   // le reste revient après récupération
   if(back>0){if(!p.forceCooldown)p.forceCooldown=[];p.forceCooldown.push({count:back,returnTurn:getCooldownTurn(p)});}
 }
-// ── ATTAQUE DE ROUTE : détruit la route (pas de cooldown, indéfendable) — sauf protection ──
+// ── ATTAQUE DE ROUTE : détruit la route (pas de récupération, indéfendable) — sauf protection ──
 function resolveRouteAttack(attacker,defender,route,commit){
   commit=Math.max(1,commit|0);
   const rn=(NODES[route.from]?.name||route.from)+'→'+(NODES[route.to]?.name||route.to);
@@ -4007,8 +4164,9 @@ function resolveRouteAttack(attacker,defender,route,commit){
   if(tok>=1&&commit<=1){addLog('🛡️ Route '+rn+' défendue par son jeton — tient contre 1 jeton.',youAtk?'red':'gold');return {held:true};}
   const wasProtected=tok>=1;
   defender.routes=defender.routes.filter(r=>r!==route);updateConnections(defender);
-  if(wasProtected){applyCombatEngage(attacker,commit,true);addLog('💥 '+atkName+' DÉTRUIT la route '+rn+' — jeton de protection brisé ; jetons engagés en cooldown.',youAtk?'gold':'red');}
-  else{addLog('💥 '+atkName+' DÉTRUIT la route '+rn+' — non protégée, à reconstruire ; tes jetons reviennent (pas de cooldown).',youAtk?'gold':'red');}
+  if(wasProtected){applyCombatEngage(attacker,commit,true);addLog('💥 '+atkName+' DÉTRUIT la route '+rn+' — jeton de protection brisé ; jetons engagés en récupération.',youAtk?'gold':'red');}
+  else{addLog('💥 '+atkName+' DÉTRUIT la route '+rn+' — non protégée, à reconstruire ; tes jetons reviennent (pas de récupération).',youAtk?'gold':'red');}
+  if(!youAtk&&defender===G.player)_notePlayerHit((attacker.civ?attacker.civ.name:'Une nation')+' détruit ta route',rn+' est détruite'+(wasProtected?' (protection brisée)':' — à reconstruire')+'.');
   return {destroyed:true};
 }
 function attackEnemyRoute(aiId,ri){
@@ -4044,13 +4202,13 @@ function resolveAiAssault(ai,targetId,commit){
   const aPow=commit+aEmpath+((ai.stratBonus&&ai.stratBonus.combatBonus)||0)+(_aiCru?(ai.cruiserPower||5):0);
   ai.acLeft=Math.max(0,ai.acLeft-1);ai.spentThisTurn+=1+commit;
   const _aiWins=aPow>pDef;
-  if(dCommit>0)applyCombatEngage(ai,commit,_aiWins); // l'attaquant ne paie/cooldown QUE si tu défends (≥1 jeton engagé)
-  applyCombatEngage(p,dCommit,!_aiWins);             // défenseur joueur : coût + cooldown de ce qu'il engage
+  if(dCommit>0)applyCombatEngage(ai,commit,_aiWins); // l'attaquant ne paie/récupération QUE si tu défends (≥1 jeton engagé)
+  applyCombatEngage(p,dCommit,!_aiWins);             // défenseur joueur : coût + récupération de ce qu'il engage
   if(dCommit>0)addLog('🛡️ Défense : '+dCommit+' jeton(s) engagé(s) (−'+dCommit+'<i class=ri-materials></i> −'+dCommit+'<i class=ri-energy></i>).','dim');
   const node=NODES[targetId];
   if(aPow>pDef){
     war.winsBy[ai.civ.id]=(war.winsBy[ai.civ.id]||0)+1;
-    if(_cruDef)p.cruiserCooldown=getCooldownTurn(p); // croiseur en cooldown (2 tours, 1 avec tech) suite à la défense perdue
+    if(_cruDef)p.cruiserCooldown=getCooldownTurn(p); // croiseur en récupération (2 tours, 1 avec tech) suite à la défense perdue
     const pcol=p.colonies.find(c=>c.nodeId===targetId);const newLvl=pcol?Math.max(1,pcol.level-1):1;
     p.colonies=p.colonies.filter(c=>c.nodeId!==targetId);updateConnections(p);
     const conn=(typeof checkConnected==='function')?checkConnected(targetId,ai):true;
@@ -4059,11 +4217,13 @@ function resolveAiAssault(ai,targetId,commit){
     p.res.morale=Math.max(0,(p.res.morale||0)-1);
     addLog('🏴 '+ai.civ.emoji+' '+ai.civ.name+' REPREND '+(node?node.name:targetId)+' ! ('+aPow+'⚔️ vs '+pDef+'🛡️, Nv.'+newLvl+') — tu perds la colonie, −1<i class=ri-morale></i>','red');
     G.aiActions.push({emoji:'🏴',name:'Reprend '+(node?node.name:targetId),desc:aPow+'⚔️ vs '+pDef+'🛡️'});
+    if(p===G.player)_notePlayerHit(ai.civ.name+' prend '+(node?node.name:targetId),'Ta colonie tombe (Nv.'+newLvl+') — combat '+aPow+' contre '+pDef+'. Tu perds 1 moral.');
   }else{
     war.winsBy[p.civ.id]=(war.winsBy[p.civ.id]||0)+1;ai.res.morale=Math.max(0,(ai.res.morale||0)-1);
     if(_aiCru)ai.cruiserCooldown=getCooldownTurn(ai); // croiseur IA en réparation suite à la défaite
     addLog('🛡️ '+ai.civ.emoji+' '+ai.civ.name+' échoue à reprendre '+(node?node.name:targetId)+' ('+aPow+'⚔️ vs '+pDef+'🛡️) — assaut repoussé !','gold');
     G.aiActions.push({emoji:'🛡️',name:'Assaut repoussé : '+(node?node.name:targetId),desc:aPow+'⚔️ vs '+pDef+'🛡️'});
+    if(p===G.player)_notePlayerHit(ai.civ.name+' attaque '+(node?node.name:targetId),'Assaut repoussé ! Ta défense tient — combat '+aPow+' contre '+pDef+'.');
   }
 }
 // ── ASSAUT IA SUR LE JOUEUR (fin de tour, quand l'IA MAINTIENT la guerre / refuse la paix) : le joueur choisit sa défense ──
@@ -4152,8 +4312,8 @@ function resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,defender){
   const _aiCru=cruiserAvailable(ai)&&cruiserAfford(ai);
   if(_aiCru){ai.res.materials=Math.max(0,(ai.res.materials||0)-5);ai.res.energy=Math.max(0,(ai.res.energy||0)-5);addLog('⚓ '+ai.civ.emoji+' '+ai.civ.name+' déploie son Supercroiseur (+'+(ai.cruiserPower||5)+'⚔️).','dim');}
   const aPow=aiCommit+aEmp+((ai.stratBonus&&ai.stratBonus.combatBonus)||0)+(_aiCru?(ai.cruiserPower||5):0);
-  // Coût + cooldown SYMÉTRIQUES : l'attaquant IA paie/cooldown ses jetons ; si tu repousses l'assaut, l'IA en perd la MOITIÉ définitivement (défendre fait perdre des jetons à l'ennemi). Le défenseur paie ce qu'il engage.
-  if(defTokens>0)applyCombatEngage(ai,aiCommit,aPow>pDef); // l'attaquant ne paie/cooldown QUE si tu défends (≥1 jeton)
+  // Coût + récupération SYMÉTRIQUES : l'attaquant IA paie/récupération ses jetons ; si tu repousses l'assaut, l'IA en perd la MOITIÉ définitivement (défendre fait perdre des jetons à l'ennemi). Le défenseur paie ce qu'il engage.
+  if(defTokens>0)applyCombatEngage(ai,aiCommit,aPow>pDef); // l'attaquant ne paie/récupération QUE si tu défends (≥1 jeton)
   applyCombatEngage(p,defTokens,pDef>=aPow);
   if(defTokens>0)addLog('🛡️ Défense : '+defTokens+' jeton(s) engagé(s) (−'+defTokens+'<i class=ri-materials></i> −'+defTokens+'<i class=ri-energy></i>).','dim');
   let resultTxt,cls;
@@ -4287,6 +4447,7 @@ function triggerGuereeForcee(offendedSide,targetAi){
   G.player.res.morale=Math.max(0,(G.player.res.morale||0)-2);
   G.ais.forEach(ai=>{ai.res.morale=Math.max(0,(ai.res.morale||0)-2);});
   addLog('💥 Guerre populaire ! −2<i class=ri-morale></i> pour chaque camp.','red');
+  _journalAuto(G.player.civ.name,'Guerre populaire forcée','−2 moral pour chaque camp',true);
   // La tension reste à 10 pendant la guerre (épinglée par declareWar ; ne redescend qu'à la fin).
   G.playerTension=10;G.aiTension=10;
   const fwAi=G.warWith?G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0]:G.ais[0];
@@ -4423,21 +4584,21 @@ function resolveWarCombat(playerCommitted){
   if(_aiCru){warEnemy.res.materials=Math.max(0,(warEnemy.res.materials||0)-5);warEnemy.res.energy=Math.max(0,(warEnemy.res.energy||0)-5);addLog('⚓ '+warEnemy.civ.emoji+' '+warEnemy.civ.name+' déploie son Supercroiseur en défense (+'+(warEnemy.cruiserPower||5)+'⚔️).','dim');}
   const aPow=aiEngaged+aEmpathBonus+(_aiCru?(warEnemy.cruiserPower||5):0)+1/*garnison de base de la colonie IA défendue*/;
   G._aiWarCommitted=undefined;
-  // Coût + cooldown SYMÉTRIQUES (attaque ET défense) : 1<i class=ri-materials></i> +1<i class=ri-energy></i> par jeton engagé, jetons immobilisés (cooldown / moitié perdue si défaite).
+  // Coût + récupération SYMÉTRIQUES (attaque ET défense) : 1<i class=ri-materials></i> +1<i class=ri-energy></i> par jeton engagé, jetons immobilisés (récupération / moitié perdue si défaite).
   const pWin=pPow>aPow,aWin=aPow>pPow;
   // Règle jetons (memo v21) : l'attaquant immobilise 1 jeton par jeton adverse en défense — GARNISON DE BASE INCLUSE (la colonie défend toujours avec 1 jeton réservé). Plafonné à ce qu'il a engagé. Plus de « capture gratuite ».
   const _defenseFaced=aiEngaged+1; // +1 = garnison de base (jeton réservé de la colonie)
   const _atkUsed=Math.min(engagedP,_defenseFaced);
   if(engagedP>0)addLog('⚔️ Coût combat (toi) : '+_atkUsed+' jeton(s) immobilisé(s) — 1 par jeton adverse en défense, garnison incluse (−'+_atkUsed+'<i class=ri-materials></i> −'+_atkUsed+'<i class=ri-energy></i>)','dim');
   if(aiEngaged>0)addLog('🛡️ '+warEnemy.civ.emoji+' '+warEnemy.civ.name+' engage '+aiEngaged+' jeton(s) en défense (−'+aiEngaged+'<i class=ri-materials></i> −'+aiEngaged+'<i class=ri-energy></i>).','dim');
-  if(engagedP>0)applyCombatEngage(G.player,_atkUsed,!aWin); // coût + cooldown pour _atkUsed jetons (la garnison compte toujours comme défense)
+  if(engagedP>0)applyCombatEngage(G.player,_atkUsed,!aWin); // coût + récupération pour _atkUsed jetons (la garnison compte toujours comme défense)
   applyCombatEngage(warEnemy,aiEngaged,!pWin);
   const _rcw=G.wars.find(w=>w.aiId===G.warWith);if(_rcw){_rcw.turnsLeft--;G.warTurnsLeft=_rcw.turnsLeft;}else G.warTurnsLeft--;let txt,cls;
   const targetId=_warAttackColonyTarget;_warAttackColonyTarget=null;
   if(pPow>aPow){
     G.warWins.player++;G.player.tempVP+=2;warEnemy.res.morale=Math.max(0,(warEnemy.res.morale||0)-1);
     if(_aiCru)warEnemy.cruiserCooldown=getCooldownTurn(warEnemy); // croiseur IA en réparation suite à la défaite en défense
-    // (jetons : coût + cooldown gérés par applyCombatEngage ci-dessus, symétrique attaque/défense)
+    // (jetons : coût + récupération gérés par applyCombatEngage ci-dessus, symétrique attaque/défense)
     // Appliquer les dégâts sur la colonie ciblée
     if(targetId){
       const tc=warEnemy.colonies.find(c=>c.nodeId===targetId);
@@ -4459,7 +4620,7 @@ function resolveWarCombat(playerCommitted){
   }
   else if(aPow>pPow){
     G.warWins.ai++;warEnemy.tempVP+=2;G.player.res.morale=Math.max(0,(G.player.res.morale||0)-1);
-    if(_cruOn){G.player.cruiserCooldown=getCooldownTurn(G.player);addLog('⚓ Supercroiseur en réparation (cooldown) suite à la défaite — pas perdu.','dim');}
+    if(_cruOn){G.player.cruiserCooldown=getCooldownTurn(G.player);addLog('⚓ Supercroiseur en réparation (récupération) suite à la défaite — pas perdu.','dim');}
     txt='Défaite. (IA +2 VP — jetons engagés immobilisés, moitié perdue, −1<i class=ri-morale></i>)';cls='loss';
     addLog('⚔️ Combat : défaite ('+pPow+' vs '+aPow+')','red');
   }
@@ -4574,23 +4735,34 @@ function aiBuyMilitary(ai,card){
 }
 function doAITurn(aiPlayer,oneShot){
   const ai=aiPlayer;G.aiActions=[];G._raidsThisTurn=[];ai._warConserve=false;ai._warRecapture=null;ai._warAggressor=false;ai._enemy=_aiResolveTarget(ai);ai._pForceEst=perceivedForce(ai,ai._enemy).val;
+  // ── Suivi des coûts IA : snapshot avant chaque action, diff après, enregistré au journal ──
+  function _aiSnapRes(){return{energy:ai.res.energy||0,materials:ai.res.materials||0,science:ai.res.science||0,morale:ai.res.morale||0,force:ai.forceTokens||0};}
+  function _aiRec(bAc,bRes,fromIdx){
+    const acP=Math.max(0,bAc-ai.acLeft),cost={};
+    for(const r of['energy','materials','science']){const d=(bRes[r]||0)-(ai.res[r]||0);if(d>0)cost[r]=d;}
+    const df=(bRes.force||0)-(ai.forceTokens||0);if(df>0)cost.force=df;
+    for(let i=fromIdx;i<G.aiActions.length;i++){const e=G.aiActions[i];if(e&&!e._rec){e._rec=true;_journalAdd(ai,e.name,acP,cost,e.desc,{war:_isWarAct(e.name)});}}
+  }
+  function _aiStep(fn){const bAc=ai.acLeft,bRes=_aiSnapRes(),i0=G.aiActions.length;const r=fn();_aiRec(bAc,bRes,i0);return r;}
   // ── POUVOIRS GRATUITS (0 AC, 1×/tour) — l'IA active le sien quand c'est utile et abordable (parité joueur) ──
+  {const _bA=ai.acLeft,_bR=_aiSnapRes(),_i0=G.aiActions.length;
   if(!ai.abilityUsed){
     if(ai.civ.id==='ceinturiens'){ // Commerce avec les pirates (gratuit) — toujours
       const _cr=pirateCommerce(ai);ai.abilityUsed=true;
       if(_cr.length)G.aiActions.push({emoji:'💫',name:'Commerce avec les pirates',desc:'+'+_cr.map(rEmoji).join('')});
     }else if(ai.civ.id==='terriens'){ // Diplomatie Verte : +3 pts Gouv pour 3🪨 (garde 2🪨 de réserve pour bâtir)
       if((ai.res.materials||0)>=5){ai.res.materials-=3;addGovPts(ai,3);ai.abilityUsed=true;
-        G.aiActions.push({emoji:'💫',name:'Diplomatie Verte',desc:'+3 pts Gouv (−3🪨)'});}
+        G.aiActions.push({emoji:'💫',name:'Diplomatie Verte',desc:'+3 pts Gouvernement'});}
     }else if(ai.civ.id==='martiens'){ // Surtension : +1 AC pour 2⚡ (si l'AC supplémentaire est finançable et hors fin de partie)
       if((ai.res.energy||0)>=3&&(ai.res.materials||0)>=2&&G.turn<=7){ai.res.energy-=2;ai.acLeft+=1;ai.acMax=(ai.acMax||ai.acLeft)+1;ai.abilityUsed=true;
-        G.aiActions.push({emoji:'💫',name:'Surtension',desc:'+1 AC (−2⚡)'});}
+        G.aiActions.push({emoji:'💫',name:'Surtension',desc:'+1 AC'});}
     }else if(ai.civ.id==='jupiteriens'){ // Forge Orbitale : améliore une lune joviène 1→2 gratuitement (sans AC ni science)
       const _col=ai.colonies.find(c=>['io','europe','ganymede','callisto'].includes(c.nodeId)&&c.level===1&&c.connected);
       if(_col&&(ai.res.materials||0)>=3&&(ai.res.energy||0)>=3){ai.res.materials-=1;ai.res.energy-=1;_col.level=2;updateConnections(ai);ai.abilityUsed=true;
         G.aiActions.push({emoji:'💫',name:'Forge Orbitale',desc:NODES[_col.nodeId].name+' Nv.2'});}
     }
   }
+  _aiRec(_bA,_bR,_i0);}
   ai._milBoughtThisTurn=new Set(); // militaires : 1× par carte par tour (IA)
   {const _w0=_warOf(ai.civ.id);if(_w0)_w0._aiAssaultedThisTurn=false;} // reset : autorise un assaut ce tour
   const isPirate=ai.civ.id==='ceinturiens';
@@ -4770,6 +4942,7 @@ function doAITurn(aiPlayer,oneShot){
     G._raidsThisTurn.push({civ:ai.civ,stolen:[...stolen]});
     addLog('🤖 Raid '+ai.civ.emoji+' '+ai.civ.name+' ! Tu perds '+stolen.join('')+' (risque guerre +2, tension +2)','red');
     G.aiActions.push({emoji:'⚔️',name:'Raid',desc:'Vole : '+(stolen.join('')||'rien')});
+    if(_e===G.player)_notePlayerHit(ai.civ.name+' te pille',(stolen.length?'Ils volent '+_riToText(stolen.join(' '))+'.':'Raid sans butin.')+' Risque de guerre +2, tension +2.');
     return true;
   }
 
@@ -5098,15 +5271,15 @@ function doAITurn(aiPlayer,oneShot){
   ai._aiSetupDone=true;
   if(oneShot){ // INTERLACÉ : UNE action puis la main tourne
     if(ai.acLeft<=0) return false;
-    if(ai._warConserve) return tryRecaptureAssault();
-    return chooseAndAct();
+    if(ai._warConserve) return _aiStep(tryRecaptureAssault);
+    return _aiStep(chooseAndAct);
   }
   if(ai._warConserve){
     // En guerre jouable : conserver les ressources pour frapper au maximum.
-    for(let s=0;s<4&&ai.acLeft>0;s++){if(!tryRecaptureAssault())break;}
+    for(let s=0;s<4&&ai.acLeft>0;s++){if(!_aiStep(tryRecaptureAssault))break;}
     ai.acLeft=0;return;
   }
-  for(let safety=0;safety<16&&ai.acLeft>0;safety++){ if(!chooseAndAct())break; }
+  for(let safety=0;safety<16&&ai.acLeft>0;safety++){ if(!_aiStep(chooseAndAct))break; }
   ai.acLeft=0;
 }
 /* ============================================================ VP ============================================================ */
@@ -5138,17 +5311,97 @@ function calcVP(p){
   return{colVP,routeVP,cardsVP,techBonusVP,rptVP,forceVP,agendasVP,evtVP,extraVP,total:colVP+routeVP+cardsVP+techBonusVP+rptVP+agendasVP+evtVP+extraVP};
 }
 // ── Log de partie : construction + copier / email / télécharger (en jeu ET à la fin) ──
-function buildFullLog(){
-  const hdr=['=== SOLAR CONQUEST — LOG D\'ANALYSE ==='];
+// Rapport lisible : chaque action de chaque nation avec coûts + gain, groupée par tour,
+// puis le calcul final des points de victoire. Émojis de guerre seulement.
+function buildJournalReport(){
+  const L=[];
+  L.push('=== SOLAR CONQUEST — RAPPORT DE PARTIE ===');
   try{
-    hdr.push('Partie : '+G.player.civ.name+' vs '+G.ais.map(a=>a.civ.name).join(', '));
-    if(G.phase==='over'){const pv=calcVP(G.player).total,av=calcVP(G.ais[0]).total;hdr.push('Résultat : '+(pv>=av?'VICTOIRE':'DÉFAITE')+' — '+pv+' VP vs '+av+' VP');}
-    else hdr.push('En cours — Tour '+G.turn+'/'+G.maxTurns);
-    if(G.agendas&&G.agendas.length)hdr.push('Agendas : '+G.agendas.map(a=>a.name).join(' / '));
+    L.push('Nations : '+G.player.civ.name+' (toi) vs '+G.ais.map(a=>a.civ.name).join(', '));
+    if(G.phase==='over'){const pv=calcVP(G.player).total,av=Math.max(...G.ais.map(a=>calcVP(a).total));L.push('Résultat : '+(pv>=av?'VICTOIRE':'DÉFAITE')+' — '+pv+' VP contre '+av+' VP');}
+    else L.push('Partie en cours — tour '+G.turn+'/'+G.maxTurns);
   }catch(e){}
-  hdr.push('--- LOG COMPLET ---');
-  const body=(G.log||[]).map(e=>e.msg).join('\n');
-  return hdr.join('\n')+'\n'+body;
+  L.push('');
+  const J=G._journal||[];
+  const maxT=J.reduce((m,e)=>Math.max(m,e.turn||0),G.turn||0);
+  for(let t=1;t<=maxT;t++){
+    const ents=J.filter(e=>e.turn===t);
+    if(!ents.length)continue;
+    L.push('───────── TOUR '+t+' ─────────');
+    for(const e of ents){
+      const nat=e.nat||'?';
+      const ct=_costToText(e.cost);
+      let cost='';
+      if(e.ac>0&&ct)cost=e.ac+' AC, '+ct;
+      else if(e.ac>0)cost=e.ac+' AC';
+      else if(ct)cost=ct;
+      else if(!e.auto)cost='gratuit';
+      const pre=e.war?'⚔️ ':(e.auto?'⚙️ ':'');
+      let line=pre+'['+nat+'] '+(e.name||'action');
+      if(cost)line+=' — '+cost;
+      if(e.gain)line+=' → '+e.gain;
+      L.push(line);
+    }
+    L.push('');
+  }
+  L.push('═════ CALCUL FINAL DES POINTS DE VICTOIRE ═════');
+  const all=[G.player].concat(G.ais||[]);
+  for(const p of all){
+    let v;try{v=calcVP(p);}catch(e){continue;}
+    const isP=p===G.player;
+    L.push('');
+    L.push('▶ '+p.civ.name+(isP?' (toi)':' (IA)')+' — TOTAL '+v.total+' VP');
+    L.push('   Colonies : '+v.colVP+' · Routes : '+v.routeVP+' · Cartes : '+v.cardsVP);
+    L.push('   Bonus tech : '+v.techBonusVP+' · Bonus revenus/tour : '+v.rptVP);
+    L.push('   Agenda'+(p.agenda&&p.agenda.name?' ('+p.agenda.name+')':'')+' : '+v.agendasVP+' · Événements : '+v.evtVP+(v.extraVP?' · Bonus spéciaux : '+v.extraVP:''));
+  }
+  return L.join('\n');
+}
+function buildFullLog(){ return buildJournalReport(); }
+// Couleur fixe d'une nation (même couleur qu'en jeu, via civ.color) à partir de son nom.
+function _natColorByName(name){
+  try{for(const p of [G.player,...(G.ais||[])]){if(p&&p.civ&&p.civ.name===name)return p.civ.color;}}catch(e){}
+  return '#8faacc'; // Système / inconnu
+}
+function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+// Même rapport que buildJournalReport mais en HTML coloré (chaque nation dans SA couleur).
+function buildJournalReportHTML(){
+  const H=[];
+  try{
+    H.push('<b>SOLAR CONQUEST — RAPPORT DE PARTIE</b>');
+    H.push('Nations : '+[G.player,...(G.ais||[])].map(p=>'<span style="color:'+p.civ.color+';font-weight:700">'+_esc(p.civ.name)+'</span>').join(', '));
+    if(G.phase==='over'){const pv=calcVP(G.player).total,av=Math.max(...G.ais.map(a=>calcVP(a).total));H.push('Résultat : '+(pv>=av?'VICTOIRE':'DÉFAITE')+' — '+pv+' VP contre '+av+' VP');}
+    else H.push('Partie en cours — tour '+G.turn+'/'+G.maxTurns);
+  }catch(e){}
+  const J=G._journal||[];
+  const maxT=J.reduce((m,e)=>Math.max(m,e.turn||0),G.turn||0);
+  for(let t=1;t<=maxT;t++){
+    const ents=J.filter(e=>e.turn===t);
+    if(!ents.length)continue;
+    H.push('<span class="jr-turn">TOUR '+t+'</span>');
+    for(const e of ents){
+      const nat=e.nat||'?';
+      const col=_natColorByName(nat);
+      const ct=_costToText(e.cost);
+      let cost='';
+      if(e.ac>0&&ct)cost=e.ac+' AC, '+ct;else if(e.ac>0)cost=e.ac+' AC';else if(ct)cost=ct;else if(!e.auto)cost='gratuit';
+      const pre=e.war?'⚔️ ':(e.auto?'⚙️ ':'');
+      let line=pre+'<span style="color:'+col+';font-weight:700">['+_esc(nat)+']</span> '+_esc(e.name||'action');
+      if(cost)line+=' — '+_esc(cost);
+      if(e.gain)line+=' → '+_esc(e.gain);
+      H.push(line);
+    }
+  }
+  H.push('<span class="jr-vp">CALCUL FINAL DES POINTS DE VICTOIRE</span>');
+  for(const p of [G.player,...(G.ais||[])]){
+    let v;try{v=calcVP(p);}catch(e){continue;}
+    const isP=p===G.player;
+    H.push('<span style="color:'+p.civ.color+';font-weight:700">▶ '+_esc(p.civ.name)+(isP?' (toi)':' (IA)')+' — TOTAL '+v.total+' VP</span>');
+    H.push('&nbsp;&nbsp;&nbsp;Colonies : '+v.colVP+' · Routes : '+v.routeVP+' · Cartes : '+v.cardsVP);
+    H.push('&nbsp;&nbsp;&nbsp;Bonus tech : '+v.techBonusVP+' · Bonus revenus/tour : '+v.rptVP);
+    H.push('&nbsp;&nbsp;&nbsp;Agenda'+(p.agenda&&p.agenda.name?' ('+_esc(p.agenda.name)+')':'')+' : '+v.agendasVP+' · Événements : '+v.evtVP+(v.extraVP?' · Bonus spéciaux : '+v.extraVP:''));
+  }
+  return H.join('\n');
 }
 function _logToast(msg){
   let t=document.getElementById('_logtoast');
@@ -5182,6 +5435,8 @@ function copyEndLog(){copyLogText();} // compat écran de fin
 function doEndGame(){
   G.phase='over';scClearSave();const pVP=calcVP(G.player);const aiVPs=G.ais.map(ai=>({ai,vp:calcVP(ai)}));const bestAiVP=aiVPs.reduce((best,x)=>x.vp.total>best.vp.total?x:best,aiVPs[0]||{ai:null,vp:{total:0}});const aVP=bestAiVP.vp;
   addLog('═══ FIN ═══','gold');addLog('Toi : '+pVP.total+' VP','gold');G.ais.forEach(ai=>addLog(ai.civ.name+' : '+calcVP(ai).total+' VP'));
+  // Révélation des agendas secrets (une ligne par nation, attribuée à la nation)
+  for(const p of [G.player,...G.ais]){try{if(p.agenda&&p.agenda.name){const _asc=(typeof p.agenda.score==='function')?p.agenda.score(p):0;_journalAuto(p.civ.name,'Agenda secret révélé : '+p.agenda.name,_asc+' VP');}}catch(e){}}
   render();
   // Enregistrement serveur + email de récap au joueur (silencieux ; ne fait rien si non connecté / hors-ligne).
   try{
@@ -5191,7 +5446,7 @@ function doEndGame(){
     fetch('api/save_result.php',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',
       body:JSON.stringify({myCiv:G.player.civ.id,myCivName:G.player.civ.name,won:_win,turns:G.turn,players:_players,
         game_code:(window._scGameCode||''),
-        log:(G.log||[]).slice(0,150).map(e=>String((e&&e.msg)||e).replace(/<[^>]+>/g,''))})}).catch(()=>{});
+        log:(function(){try{return buildJournalReport().split('\n').slice(0,400).reverse();}catch(e){return(G.log||[]).slice(0,150).map(x=>String((x&&x.msg)||x).replace(/<[^>]+>/g,''));}})()})}).catch(()=>{});
   }catch(e){}
   setTimeout(()=>{
     const win=pVP.total>=aVP.total;
@@ -5238,7 +5493,8 @@ function renderTopBar(){
     `</span>`;
   document.getElementById('turn-disp').textContent='Tour '+G.turn+'/'+G.maxTurns;
   document.getElementById('phase-disp').textContent={actions:'⚡ Actions',ai:'🤖 IA joue…',over:'Terminé'}[G.phase]||'';
-  document.getElementById('top-res').innerHTML=[['energy','<i class=ri-energy></i>','energy'],['materials','<i class=ri-materials></i>','materials'],['science','<i class=ri-science></i>','science'],['morale','<i class=ri-morale></i>','morale']].map(([r,e,cls])=>`<div class="tres res-tag ${cls}"><span class="tv">${p.res[r]||0}</span>${e}</div>`).join('')+`<div class="tres res-tag" style="background:#221a05;border-color:#6b5600;color:#ffd34d" title="Points de victoire estimés">🏆<span class="tv" style="color:#ffd34d;margin-left:3px">${calcVP(p).total}</span></div>`+`<div class="tres res-tag" style="background:#2a0a0a;border:1px solid #7a2a2a" title="Jetons Force en réserve"><span class="tv" style="color:#ff9999;min-width:0">${p.forceTokens||0}</span><span style="display:inline-block;width:.72em;height:.72em;background:#e33;border-radius:2px;margin-left:4px;vertical-align:-1px"></span></div>`;
+  const _netTop=_netIncome(p);
+  document.getElementById('top-res').innerHTML=[['energy','<i class=ri-energy></i>','energy'],['materials','<i class=ri-materials></i>','materials'],['science','<i class=ri-science></i>','science'],['morale','<i class=ri-morale></i>','morale']].map(([r,e,cls])=>`<div class="tres res-tag ${cls}"><span class="tv">${p.res[r]||0}</span>${e}${_netBadge(_netTop[r]||0)}</div>`).join('')+`<div class="tres res-tag" style="background:#221a05;border-color:#6b5600;color:#ffd34d" title="Points de victoire estimés">🏆<span class="tv" style="color:#ffd34d;margin-left:3px">${calcVP(p).total}</span></div>`+`<div class="tres res-tag" style="background:#2a0a0a;border:1px solid #7a2a2a" title="Jetons Force ENGAGEABLES (hors garnison de colonies, routes et réarmement)"><span class="tv" style="color:#ff9999;min-width:0">${Math.max(0,(p.forceTokens||0)-p.colonies.filter(c=>c.connected&&c.nodeId!==p.civ.home).length)}</span><span style="display:inline-block;width:.72em;height:.72em;background:#e33;border-radius:2px;margin-left:4px;vertical-align:-1px"></span></div>`;
   _wireRevTip();
   document.getElementById('ac-disp').textContent=p.acLeft+'/'+p.acMax+' AC';
   document.getElementById('gov-disp').textContent='🏛️ Nv.'+p.gov_level+' ('+p.gov_pts+'pts)';
@@ -5696,11 +5952,12 @@ function renderRight(){
   const p=G.player;
   document.getElementById('r-civ-hdr').innerHTML=`<span class="ce">${p.civ.emoji}</span><span class="cn">${p.civ.name}</span><span style="font-size:.62em;color:${TECH_BRANCHES[p.civ.techBonus]?.color||'#5a6a8a'};margin-left:4px">★ ${TECH_BRANCHES[p.civ.techBonus]?.emoji||''}</span>`;
   const res=[['energy','<i class=ri-energy></i>','Énergie','#FFD700'],['materials','<i class=ri-materials></i>','Mat.','#FFA040'],['science','<i class=ri-science></i>','Savoir','#40D0FF'],['morale','<i class=ri-morale></i>','Moral','#FF6080']];
-  document.getElementById('r-res').innerHTML=res.map(([r,e,n,col])=>`<div class="rbox"><div class="rn" style="color:${col}">${e} ${n}</div><div class="rv" style="color:${col}">${p.res[r]||0}</div></div>`).join('');
+  const _netR=_netIncome(p);
+  document.getElementById('r-res').innerHTML=res.map(([r,e,n,col])=>{const nv=_netR[r]||0;const nc=nv<0?'#ff6b6b':nv>0?'#7fe0a0':'#8898b8';return`<div class="rbox"><div class="rn" style="color:${col}">${e} ${n}</div><div class="rv" style="color:${col}">${p.res[r]||0}</div><div style="font-size:.66em;font-weight:700;color:${nc}" title="Revenu net estimé par tour (revenus − entretien)">${nv>0?'+':''}${nv}/t</div></div>`;}).join('');
   // Gov track
   const next=[5,10,15,'MAX'][p.gov_level-1];
   document.getElementById('r-gov').innerHTML=`<div class="gov-track">`+[1,2,3,4].map(l=>`<span class="gov-dot ${p.gov_level>=l?'active':''}">${l}</span>`).join('')+`</div><div class="gov-info">${p.gov_pts} pts · <strong>${p.acLeft}/${p.acMax} AC</strong></div><div class="gov-next">${typeof next==='number'?'Nv.'+(p.gov_level+1)+' dans '+(next-p.gov_pts)+' pts':'Niveau max !'}</div>`;
-  // Force tokens — 4 catégories : dispo (rouge) / garnison colonies (rosé) / sur routes (gris) / cooldown (bleu)
+  // Force tokens — 4 catégories : dispo (rouge) / garnison colonies (rosé) / sur routes (gris) / récupération (bleu)
   const onRoute=p.routes.filter(r=>(r.tokens||0)>0).length;
   const onCd=p.forceCooldown.reduce((s,fc)=>s+fc.count,0);
   const reservedCol=p.colonies.filter(c=>c.connected&&c.nodeId!==p.civ.home).length; // 1 jeton réservé/garnison par colonie connectée
@@ -5712,13 +5969,20 @@ function renderRight(){
     if(i<freeAvail)return'<span class="ft-dot avail" title="Disponible (engageable)"></span>';
     if(i<freeAvail+garrison)return'<span class="ft-dot reserved" title="Réservé — garnison d\'une colonie"></span>';
     if(i<inReserve+onRoute)return'<span class="ft-dot deployed" title="Déployé sur une route"></span>';
-    return'<span class="ft-dot cd" title="En cooldown"></span>';
+    return'<span class="ft-dot cd" title="En récupération"></span>';
   }).join('');
   document.getElementById('r-force').innerHTML=`<div class="force-display">${dots}</div>`+
-    `<div class="force-info"><strong>${freeAvail}</strong> engageable(s)${garrison>0?' · '+garrison+' garnison':''}${onRoute>0?' · '+onRoute+' route(s)':''}${onCd>0?' · '+onCd+' cooldown':''} | Raid : −1 AC, −${p.civ.id==='ceinturiens'?'1':'2'} jeton(s)</div>`+
-    `<div class="force-legend" style="font-size:.66em;color:#8898b8;margin-top:4px;display:flex;gap:9px;flex-wrap:wrap;align-items:center"><span><span class="ft-dot avail" style="width:9px;height:9px;vertical-align:-1px"></span> dispo</span><span><span class="ft-dot reserved" style="width:9px;height:9px;vertical-align:-1px"></span> garnison colonies</span><span><span class="ft-dot deployed" style="width:9px;height:9px;vertical-align:-1px"></span> routes</span><span><span class="ft-dot cd" style="width:9px;height:9px;vertical-align:-1px"></span> cooldown</span></div>`;
+    `<div class="force-info"><strong>${freeAvail}</strong> engageable(s)${garrison>0?' · '+garrison+' garnison':''}${onRoute>0?' · '+onRoute+' route(s)':''}${onCd>0?' · '+onCd+' récupération':''} | Raid : −1 AC, −${p.civ.id==='ceinturiens'?'1':'2'} jeton(s)</div>`+
+    `<div class="force-legend" style="font-size:.66em;color:#8898b8;margin-top:4px;display:flex;gap:9px;flex-wrap:wrap;align-items:center"><span><span class="ft-dot avail" style="width:9px;height:9px;vertical-align:-1px"></span> dispo</span><span><span class="ft-dot reserved" style="width:9px;height:9px;vertical-align:-1px"></span> garnison colonies</span><span><span class="ft-dot deployed" style="width:9px;height:9px;vertical-align:-1px"></span> routes</span><span><span class="ft-dot cd" style="width:9px;height:9px;vertical-align:-1px"></span> récupération</span></div>`;
   // Colonies & Routes
-  document.getElementById('r-cols').innerHTML=p.colonies.map(c=>{const n=NODES[c.nodeId];return`<span><span class="col-dot" style="background:${n.color};opacity:${c.connected?.9:.3}"></span>${n.name} Nv${c.level}${c.connected?'':' ✗'}</span><br>`;}).join('')+(p.routes.length?`<span style="color:#5a6a8a">Routes : ${p.routes.length}</span>`:'');
+  document.getElementById('r-cols').innerHTML=p.colonies.map(c=>{const n=NODES[c.nodeId];return`<span><span class="col-dot" style="background:${n.color};opacity:${c.connected?.9:.3}"></span>${n.name} Nv${c.level}${c.connected?'':' ✗'}</span><br>`;}).join('')+(p.routes.length?`<span style="color:#5a6a8a">Routes : ${p.routes.length}</span>`:'')
+    +'<div style="margin-top:8px;padding-top:7px;border-top:1px solid #2a3a5a;font-size:.72em;color:#9fb0d0;line-height:1.5">'
+    +'<div style="font-weight:700;color:#ffd0a0;margin-bottom:3px">⚠️ En cas de manque en fin de tour</div>'
+    +'• <b>Entretien colonies impayé</b> (⚡ Nv.2-3, 🪨 Nv.3) → perte de <b>moral</b> (−1 par ressource manquante).<br>'
+    +'• <b>Moral 0</b> → GUERRE CIVILE : aucun revenu ce tour. <b>Moral 1</b> → revenus ÷2.<br>'
+    +'• <b>Route sans ⚡</b> (entretien impayé) → route <b>non alimentée</b> : pas de revenu commercial ce tour, cargos vulnérables.<br>'
+    +'• <b>Route non protégée</b> (sans jeton Force) → risque d\'être <b>pillée et DÉTRUITE</b> par les pirates. Protège tes routes avec un jeton.'
+    +'</div>';
   // Investissement actif
   const invEl=document.getElementById('r-invest');
   if(invEl){
@@ -5823,7 +6087,45 @@ function showNodePopup(nodeId){
 function closePopup(){document.getElementById('npop').style.display='none';}
 /* ============================================================ MODALS ============================================================ */
 let _toastTimer=null;
-function addAction(emoji,name,acPaid,resPaid,gainDesc){if(!G.turnActions)G.turnActions=[];G.turnActions.push({emoji,name,acPaid:acPaid||0,resPaid:resPaid||{},gainDesc:gainDesc||''});showToast(emoji,name,acPaid,resPaid,gainDesc);if(G&&G._il){G._ilPassTries=0;setTimeout(_ilMaybePass,60);}}
+/* ── Journal structuré (rapport lisible de fin de partie) ─────────────────────
+   Chaque action (humaine, IA ou automatique) est enregistrée avec : tour, nation,
+   coût en AC, coût en ressources, et gain/résultat. Sert à bâtir un rapport clair. */
+function _riToText(s){
+  if(s===undefined||s===null)return '';
+  s=String(s);
+  s=s.replace(/<i[^>]*class=["']?ri-energy["']?[^>]*><\/i>/g,' énergie')
+     .replace(/<i[^>]*class=["']?ri-materials["']?[^>]*><\/i>/g,' matériaux')
+     .replace(/<i[^>]*class=["']?ri-science["']?[^>]*><\/i>/g,' science')
+     .replace(/<i[^>]*class=["']?ri-morale["']?[^>]*><\/i>/g,' moral');
+  s=s.replace(/<[^>]+>/g,'');                 // retire tout autre HTML
+  // retire les émojis ressources / éco (on ne garde que les émojis de guerre : ⚔️ 🛡️ 🏴 🕊️ 💥)
+  s=s.replace(/[🪨⚡🔬💰💫🏗️⬆️🛤️🤖📈☠️😡🙂😊🗺️💼🏛️⌛🔧📝❓]/g,'');
+  return s.replace(/\s+/g,' ').trim();
+}
+const _RESNAME={energy:'énergie',materials:'matériaux',science:'science',morale:'moral',force:'jetons Force'};
+function _costToText(cost){
+  const parts=[];
+  for(const r of['energy','materials','science','morale','force']){const a=(cost&&cost[r])||0;if(a>0)parts.push(a+' '+_RESNAME[r]);}
+  return parts.join(', ');
+}
+function _journalAdd(civObj,name,ac,cost,gain,opts){
+  opts=opts||{};
+  if(!G)return;if(!G._journal)G._journal=[];
+  G._journal.push({turn:G.turn||0,nat:(civObj&&civObj.civ&&civObj.civ.name)||String(civObj||'Système'),
+    name:name,ac:ac||0,cost:_normCost(cost),gain:_riToText(gain),war:!!opts.war,auto:!!opts.auto});
+}
+// Résolution automatique attribuée à UNE nation (nat = nom de la nation concernée).
+function _journalAuto(nat,name,gain,war){
+  if(!G)return;if(!G._journal)G._journal=[];
+  G._journal.push({turn:G.turn||0,nat:nat||((G.player&&G.player.civ&&G.player.civ.name)||'?'),name:name,ac:0,cost:{},gain:_riToText(gain),war:!!war,auto:true});
+}
+function _normCost(cost){
+  const out={};if(!cost)return out;
+  for(const r of['energy','materials','science','morale','force']){const a=cost[r]||0;if(a>0)out[r]=a;}
+  return out;
+}
+function _isWarAct(name){return /guerre|assaut|capture|pill|raid|repouss|attaque|reprend|combat|paix|cessez/i.test(String(name||''));}
+function addAction(emoji,name,acPaid,resPaid,gainDesc){if(!G.turnActions)G.turnActions=[];G.turnActions.push({emoji,name,acPaid:acPaid||0,resPaid:resPaid||{},gainDesc:gainDesc||''});if(G){G._scStuckTries=0;try{G._journal=G._journal||[];G._journal.push({turn:G.turn||0,nat:(G.player&&G.player.civ&&G.player.civ.name)||'Toi',name:name,ac:acPaid||0,cost:_normCost(resPaid),gain:_riToText(gainDesc),war:_isWarAct(name),auto:false});}catch(e){}}showToast(emoji,name,acPaid,resPaid,gainDesc);if(G&&G._il){G._ilPassTries=0;setTimeout(_ilMaybePass,60);}}
 function showToast(emoji,name,acPaid,resPaid,gainDesc){
   const el=document.getElementById('action-toast');if(!el)return;
   const paid=[];if(acPaid)paid.push(acPaid+' AC');for(const[r,a]of Object.entries(resPaid||{}))if(a>0)paid.push(a+rEmoji(r));
@@ -6025,17 +6327,34 @@ function _warBackToChoice(){
 }
 function showWarCombatModal(cb){
   _warCombatCb=cb;G._warChoiceCb=cb; // mémorisé pour le bouton "Annuler" (retour au choix sans dépenser)
-  if(_decisionActive()){ // mode serveur : router le choix de combat vers le joueur
+  if(_decisionActive()){ // mode serveur : router le choix de combat vers le joueur (avec la CIBLE)
     const _p=G.player; const _ai=G.warWith?G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0]:G.ais[0];
-    const _cols=_p.colonies.filter(c=>c.nodeId!==_p.civ.home&&c.connected);
+    const _aiTok=_ai?_ai.forceTokens:0;
+    // Posture IA (attaquer/tenir) + cible menacée, comme en solo, pour que la défense fonctionne.
+    if(!G._warKeepStance){ G._aiWarStance=(_aiTok>=2&&Math.random()>0.35)?'attack':'hold';
+      const _tc=_p.colonies.filter(c=>c.nodeId!==_p.civ.home&&c.connected), _tr=_p.routes.filter(r=>(r.tokens||0)>0);
+      const _all=[..._tc.map(c=>({type:'colony',name:NODES[c.nodeId]?.name||c.nodeId,obj:c})),..._tr.map(r=>({type:'route',name:(NODES[r.from]?.name||r.from)+'→'+(NODES[r.to]?.name||r.to),obj:r}))];
+      G._aiWarTarget=_all.length?_all[Math.floor(Math.random()*_all.length)]:null;
+    }
+    G._warKeepStance=false;
+    // Colonies ennemies attaquables (à portée) + la colonie « focus » (celle pour laquelle on se bat).
+    const _reach=_ai?_getReachableWarTargets(_p,_ai):[];
+    const _warObj=G.wars.find(w=>w.aiId===G.warWith); const _focus=_warObj&&_warObj.focusColony;
+    const _cols=_reach.map(c=>({node:c.nodeId, name:NODES[c.nodeId]?.name||c.nodeId, emoji:NODES[c.nodeId]?.emoji||'', level:c.level,
+      isHome:(_ai&&c.nodeId===_ai.civ.home), isFocus:(c.nodeId===_focus),
+      dist:Math.min.apply(null,_p.colonies.map(pc=>getNodeDistance(pc.nodeId,c.nodeId)))}));
+    const _routes=_ai?_ai.routes.map((r,i)=>({i, from:r.from, to:r.to, name:(NODES[r.from]?.name||r.from)+'→'+(NODES[r.to]?.name||r.to), protected:(r.tokens||0)>=1, cost:(r.tokens||0)>=1?2:1})):[];
     _emitDecision('war_combat', _p,
-      {enemy:(_ai?_ai.civ.id:null), enemyName:(_ai?_ai.civ.name:'IA'), warTurnsLeft:G.warTurnsLeft, myForce:_p.forceTokens||0, canHold:((G._warDeclaredBy||'other')!=='player')},
+      {enemy:(_ai?_ai.civ.id:null), enemyName:(_ai?_ai.civ.name:'IA'), warTurnsLeft:G.warTurnsLeft, myForce:_p.forceTokens||0,
+       canHold:((G._warDeclaredBy||'other')!=='player'),
+       cols:_cols, routes:_routes,
+       aiThreat:(G._aiWarStance==='attack'&&G._aiWarTarget)?{type:G._aiWarTarget.type, name:G._aiWarTarget.name}:null},
       null,
       (ans)=>{ const cb2=_warCombatCb;_warCombatCb=null;G._warChoiceCb=null; if(!cb2)return;
         const act=ans&&ans.action;
         if(act==='hold')cb2('STANDOFF');
         else if(act==='defend')cb2('DEFEND:'+Math.max(0,(ans.tokens|0)));
-        else if(act==='attack')cb2(Math.max(0,(ans.tokens|0)));
+        else if(act==='attack'){ if(ans.node)_warAttackColonyTarget=ans.node; cb2(Math.max(0,(ans.tokens|0))); } // ← CIBLE routée → capture
         else cb2(0); });
     return;
   }
@@ -6180,7 +6499,7 @@ function _warShowAttackSlider(){
   G._cruiserDeployTemp=false;
   if(p.hasCruiser){
     let _cru;
-    if(!cruiserAvailable(p))_cru='<span style="color:#7880a0;font-size:.82em">⚓ Supercroiseur en réparation (cooldown).</span>';
+    if(!cruiserAvailable(p))_cru='<span style="color:#7880a0;font-size:.82em">⚓ Supercroiseur en réparation (récupération).</span>';
     else if(!cruiserAfford(p))_cru='<span style="color:#ff8866;font-size:.82em">⚓ Supercroiseur indisponible : besoin de 5<i class=ri-materials></i> + 5<i class=ri-energy></i>.</span>';
     else _cru='<button id="cru-btn" onclick="toggleCruiser()" style="margin-top:6px;padding:6px 10px;background:#0a1a2a;border:1px solid #4488cc;color:#88bbee;border-radius:6px;cursor:pointer;font-size:.82em">⚓ Déployer le Supercroiseur (+'+(p.cruiserPower||5)+'⚔️, coût 5<i class=ri-materials></i> 5<i class=ri-energy></i>)</button>';
     document.getElementById('wcm-info').innerHTML+='<br>'+_cru;
@@ -6190,7 +6509,7 @@ function _warShowAttackSlider(){
 }
 function warAttackRoute(idx){
   // Attaque d'une route ennemie (protégée ou non). Règle "route" (exception) :
-  //  • non protégée → 1 jeton, aucun coût ; protégée → 2 jetons (défenseur perd son jeton, 1 des tiens en cooldown).
+  //  • non protégée → 1 jeton, aucun coût ; protégée → 2 jetons (défenseur perd son jeton, 1 des tiens en récupération).
   //  • ensuite tu choisis de la RÉCUPÉRER (elle devient tienne) ou de la DÉTRUIRE.
   const warAtkAi=G.warWith?G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0]:G.ais[0];
   const r=warAtkAi?warAtkAi.routes[idx]:null;
@@ -6205,8 +6524,8 @@ function showRouteCaptureModal(route, prot){
   const rn=(NODES[route.from]?.name||route.from)+' → '+(NODES[route.to]?.name||route.to);
   document.getElementById('rcm-title').textContent='🛤️ '+rn;
   document.getElementById('rcm-desc').innerHTML=prot
-    ?'Tu as <b>brisé la protection</b> ennemie (son jeton est détruit). <b>2 jetons engagés : 1 part en cooldown.</b> Que faire de la route ?'
-    :'Route ennemie <b>non protégée</b>, prise <b>sans coût ni cooldown</b>. Que faire ?';
+    ?'Tu as <b>brisé la protection</b> ennemie (son jeton est détruit). <b>2 jetons engagés : 1 part en récupération.</b> Que faire de la route ?'
+    :'Route ennemie <b>non protégée</b>, prise <b>sans coût ni récupération</b>. Que faire ?';
   const keep=document.getElementById('rcm-keep');
   keep.innerHTML=prot?'🎖️ La récupérer <span style="opacity:.8;font-size:.85em">(1 jeton la protège)</span>':'🎖️ La récupérer <span style="opacity:.8;font-size:.85em">(elle devient tienne)</span>';
   document.getElementById('route-capture-modal').classList.remove('hidden');
@@ -6222,14 +6541,14 @@ function routeCaptureChoice(capture){
   if(ctx.prot){
     p.forceTokens=Math.max(0,(p.forceTokens||0)-2);
     if(!p.forceCooldown)p.forceCooldown=[];
-    p.forceCooldown.push({count:1,returnTurn:getCooldownTurn(p)}); // 1 seul jeton en cooldown
+    p.forceCooldown.push({count:1,returnTurn:getCooldownTurn(p)}); // 1 seul jeton en récupération
     if(capture){if(!p.routes)p.routes=[];p.routes.push({from:r.from,to:r.to,tokens:1});updateConnections(p);} // le 2e reste posé sur la route
     else{p.forceTokens+=1;} // détruire : le 2e jeton revient en réserve
   }else{
     if(capture){if(!p.routes)p.routes=[];p.routes.push({from:r.from,to:r.to,tokens:0});updateConnections(p);} // aucune perte : le jeton reste en réserve
   }
   const rn=(NODES[r.from]?.name||r.from)+'→'+(NODES[r.to]?.name||r.to);
-  addLog((capture?'🎖️ Tu captures la route ':'💥 Tu détruis la route ')+rn+(ctx.prot?' — défenseur −1 jeton, 1 des tiens en cooldown.':' — sans coût.'),'gold');
+  addLog((capture?'🎖️ Tu captures la route ':'💥 Tu détruis la route ')+rn+(ctx.prot?' — défenseur −1 jeton, 1 des tiens en récupération.':' — sans coût.'),'gold');
   // Contexte GUERRE POPULAIRE FORCÉE : on apaise la tension et on reprend le flux de guerre forcée.
   if(ctx.mode==='forced'){
     if(ai)halveTensions('player',ai.civ.id);
@@ -6569,9 +6888,10 @@ function exportDebugLog(){
     }
     out+='\n';
   }
-  out+='--- LOG COMPLET ---\n';
-  out+=G.log.slice().reverse().map(e=>e.msg).join('\n');
+  out+='--- RAPPORT DÉTAILLÉ ---\n';
+  out+=buildJournalReport();
   document.getElementById('debug-export-text').value=out;
+  try{const pv=document.getElementById('debug-export-preview');if(pv)pv.innerHTML=buildJournalReportHTML();}catch(e){}
   document.getElementById('debug-export-area').style.display='block';
   document.getElementById('debug-modal').classList.remove('hidden');
   document.getElementById('debug-turn-label').textContent=G.turn+'/'+G.maxTurns;
@@ -6680,9 +7000,120 @@ function renderLogLegend(){
   el.innerHTML='<span style="color:#7880a0">Légende —</span> '+[G.player,...(G.ais||[])].map(p=>'<span style="color:'+p.civ.color+';font-weight:700;margin-right:9px;white-space:nowrap">'+p.civ.emoji+' '+p.civ.name+(p===G.player?' (toi)':'')+'</span>').join('');
 }
 function addLog(msg,cls=''){
+  if(G)G._lastProgress=Date.now(); // battement de cœur pour le chien de garde anti-blocage
   G.log.unshift({msg,cls});if(G.log.length>80)G.log.pop();
   const el=document.getElementById('log-content');
   if(el)el.innerHTML=G.log.map(e=>`<div class="log-e ${e.cls}">${_logColorNations(e.msg)}</div>`).join('');
+}
+// Peut-on encore jouer une action ce tour ? (utilisé pour détecter un blocage « plus de ressources »)
+function _scCanPlayerAct(){
+  const p=(typeof G!=='undefined')&&G&&G.player; if(!p||!p.civ) return true;
+  if((p.acLeft||0)<=0) return true;                              // 0 AC → l'auto-passage gère (pas « bloqué »)
+  const r=p.res||{};
+  if((r.materials||0)>0 || (r.energy||0)>0 || (r.science||0)>0) return true; // il reste des ressources → peut agir
+  // Plus AUCUNE ressource : reste-t-il une action GRATUITE (sans coût en ressources) ?
+  // a) capacité gratuite non utilisée et jouable sans ressources (ex. Ceinturien : Commerce avec les pirates)
+  if(!p.abilityUsed && p.civ.active){
+    const ab=p.civ.active; let costOk=(p.acLeft||0)>=(ab.ac||0);
+    if(costOk)for(const k in (ab.cost||{})){ if((r[k]||0) < ab.cost[k]){ costOk=false; break; } }
+    if(costOk){
+      if(p.civ.id==='jupiteriens'){ if((p.colonies||[]).some(c=>['io','europe','ganymede','callisto'].includes(c.nodeId)&&c.level===1&&c.connected)) return true; }
+      else return true;
+    }
+  }
+  // b) raid possible (coûte des jetons Force, pas de ressources)
+  const tokCost = (p.civ.id==='ceinturiens')?1:2;
+  if((p.acLeft||0)>=1 && (p.forceTokens||0)>=tokCost && G.ais && G.ais.length>0) return true;
+  return false;                                                  // vraiment rien à faire ce tour
+}
+function _scMaybeStuck(){ // à appeler quand c'est le tour du joueur
+  try{
+    if(!G||G.phase!=='actions'||!G.player)return;
+    if(_scConfirmArmed || G._scStuckShown)return;
+    if(typeof _scAbilityReminderOpen==='function'&&_scAbilityReminderOpen())return;
+    if(!_scCanPlayerAct()){ G._scStuckShown=true; _scShowStuckModal(); }
+  }catch(e){}
+}
+// Chien de garde anti-blocage : si la partie devrait avancer seule (tour d'IA / fin de tour) mais reste figée
+// (aucune fenêtre ouverte, aucune décision en attente, rien depuis ~8 s), on relance la continuation en attente.
+function _scAnyModalOpen(){
+  if(typeof document==='undefined')return false;
+  const ids=['eot-modal','strategy-modal','agenda-sel-modal','invest-modal','invest2-modal','invest-active-modal','event-modal','event-announce-modal','dyson-modal','espionage-modal','empath-copy-modal','war-modal','war-combat-modal','attack-modal','discovery-modal','peace-modal','forced-war-modal','route-token-modal','forge-modal','accord-modal','sc-stuck-modal','sc-ability-reminder','sc-attack-notice'];
+  for(const id of ids){ const el=document.getElementById(id); if(el && !el.classList.contains('hidden') && el.style.display!=='none') return true; }
+  if(document.getElementById('aad-overlay')||document.getElementById('calm-overlay')) return true;
+  return false;
+}
+function _scWatchdogRecover(){
+  try{
+    if(G._assaultThenCb){ const cb=G._assaultThenCb; G._assaultThenCb=null; cb('WAR'); return; }
+    if(typeof _forcedWarCb!=='undefined' && _forcedWarCb){ const cb=_forcedWarCb; _forcedWarCb=null; cb(); return; }
+    if(typeof _warModalCb!=='undefined' && _warModalCb){ const cb=_warModalCb; _warModalCb=null; cb(); return; }
+    G._ilPaused=false; if(typeof interleaveStep==='function') interleaveStep();
+  }catch(e){ try{ G._ilPaused=false; if(typeof interleaveStep==='function') interleaveStep(); }catch(_e){} }
+}
+function _scWatchdogTick(){
+  try{
+    if(typeof G==='undefined'||!G||!G._il) return;
+    if(G.phase==='over'||G.phase==='setup'||G.phase==='lobby') return;
+    if(G._humanActive) return;        // ton tour interactif → attente légitime
+    if(G._pending) return;            // décision serveur en attente
+    if(_scAnyModalOpen()) return;     // une fenêtre attend une décision → attente légitime
+    const now=Date.now(); if(!G._lastProgress) G._lastProgress=now;
+    if(now - G._lastProgress > 8000){ G._lastProgress=now; _scWatchdogRecover(); }
+  }catch(e){}
+}
+if(typeof window!=='undefined' && typeof document!=='undefined' && document.getElementById) setInterval(_scWatchdogTick, 2500);
+function _scShowStuckModal(){
+  if(typeof document==='undefined'||!document.body||document.getElementById('sc-stuck-modal'))return;
+  document.body.insertAdjacentHTML('beforeend',
+    '<div id="sc-stuck-modal" style="position:fixed;inset:0;background:rgba(4,4,18,.88);z-index:640;display:flex;align-items:center;justify-content:center;padding:16px">'+
+      '<div style="background:#0f0f2a;border:2px solid #c85050;border-radius:14px;padding:22px;max-width:420px;text-align:center">'+
+        '<div style="font-size:1.05em;font-weight:700;color:#ffd0d0;margin-bottom:10px">⚠️ Tu sembles bloqué</div>'+
+        '<div style="font-size:.9em;color:#c8d8f8;margin-bottom:18px;line-height:1.5">Tu n\'as plus assez de ressources pour jouer une action ce tour. Que veux-tu faire ?</div>'+
+        '<div style="display:flex;flex-direction:column;gap:9px">'+
+          '<button onclick="_scStuckPass()" style="padding:11px;background:#16401a;border:1px solid #2f6b34;color:#9ad89a;border-radius:9px;font-weight:700;cursor:pointer;font-size:.95em">⏭ Passer mes actions et finir le tour</button>'+
+          '<button onclick="_scStuckRestart()" style="padding:11px;background:#4a1010;border:1px solid #c85050;color:#ffd0d0;border-radius:9px;font-weight:700;cursor:pointer;font-size:.95em">↺ Recommencer la partie du début</button>'+
+          '<button onclick="_scStuckDismiss()" style="padding:8px;background:#14182e;border:1px solid #3a3a5a;color:#9898b8;border-radius:9px;cursor:pointer;font-size:.85em">Fermer (continuer à essayer)</button>'+
+        '</div>'+
+      '</div></div>');
+}
+function _scCloseStuck(){const e=document.getElementById('sc-stuck-modal');if(e)e.remove();}
+function _scStuckPass(){_scCloseStuck();if(G)G._scStuckShown=false;if(typeof endTurn==='function')endTurn();}
+function _scStuckRestart(){_scCloseStuck();if(typeof scAbandonGame==='function')scAbandonGame();else location.reload();}
+function _scStuckDismiss(){_scCloseStuck();if(G){G._scStuckTries=0;G._scStuckShown=false;}}
+/* ── Attaques SUR TOI : popup à valider en mode interlacé (pour ne pas que ça défile trop vite) ──
+   Une autre nation t'attaque (assaut de colonie, destruction de route, raid) → on met en file
+   une notification ; l'interlacé se met en pause et affiche un popup ✓ Continuer. Les actions des
+   autres nations qui NE te concernent PAS continuent de défiler normalement. */
+function _notePlayerHit(title,body){
+  try{
+    if(!G||!G._il)return;                    // seulement en mode interlacé (partie en direct)
+    if(G.player&&G.player._remoteHuman)return; // ce client n'est pas le joueur concerné
+    if(!G._ilPlayerHits)G._ilPlayerHits=[];
+    G._ilPlayerHits.push({title:title||'Attaque',body:body||''});
+  }catch(e){}
+}
+function _showPlayerHitModal(){
+  if(typeof document==='undefined'||!document.body)return;
+  const hits=(G&&G._ilPlayerHits)||[];
+  if(!hits.length){return;}
+  const old=document.getElementById('sc-attack-notice');if(old)old.remove();
+  const rows=hits.map(h=>'<div style="background:#1a0e12;border:1px solid #7a2a2a;border-radius:9px;padding:10px 12px;margin-bottom:8px;text-align:left">'+
+      '<div style="font-weight:700;color:#ffb3a3;margin-bottom:3px">⚔️ '+h.title+'</div>'+
+      (h.body?'<div style="font-size:.88em;color:#e6d0d0;line-height:1.45">'+h.body+'</div>':'')+
+    '</div>').join('');
+  document.body.insertAdjacentHTML('beforeend',
+    '<div id="sc-attack-notice" style="position:fixed;inset:0;background:rgba(4,4,18,.86);z-index:650;display:flex;align-items:center;justify-content:center;padding:16px">'+
+      '<div style="background:#0f0f2a;border:2px solid #c85050;border-radius:14px;padding:20px;max-width:440px;width:100%">'+
+        '<div style="font-size:1.02em;font-weight:800;color:#ffd0d0;margin-bottom:12px;text-align:center">🚨 On t\'attaque !</div>'+
+        rows+
+        '<button onclick="_ackPlayerHits()" style="margin-top:6px;width:100%;padding:12px;background:#16401a;border:1px solid #2f6b34;color:#bff3cf;border-radius:9px;font-weight:800;cursor:pointer;font-size:1em">✓ Continuer</button>'+
+      '</div></div>');
+}
+function _ackPlayerHits(){
+  const e=document.getElementById('sc-attack-notice');if(e)e.remove();
+  if(G)G._ilPlayerHits=[];
+  if(G&&G._il){ G._ilPaused=false; if(typeof interleaveStep==='function') setTimeout(interleaveStep,40); }
 }
 /* ============================================================ SVG SETUP ============================================================ */
 function drawStars(){const el=document.getElementById('stars');if(el)el.innerHTML='';/* étoiles décoratives retirées : le fond image fournit les étoiles */}

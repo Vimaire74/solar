@@ -258,7 +258,9 @@ class GameDriver {
   // raid, attaque, accord, gestion de jeton (aléa/irréversible ou négociation).
   _isConfirmable(action){
     if(!action || !action.type) return false;
-    if(['colonize','route','upgrade','buyTech','power'].includes(action.type)) return true;
+    // 'power' RETIRÉ des annulables : un pouvoir comme Surtension change le nombre d'AC → on veut garder
+    // la main immédiatement après (voir act), pas un cycle Valider/Annuler ni une rotation inutile.
+    if(['colonize','route','upgrade','buyTech'].includes(action.type)) return true;
     if(action.type==='call' && ['buyGeneral','buyMarket','doUpgrade','buyTech'].includes(action.fn)) return true;
     return false;
   }
@@ -301,6 +303,11 @@ class GameDriver {
       // Rejet = l'action n'a rien fait (vrais mots de refus, PAS un simple ⚠️ d'info type « colonie éloignée »).
       const rejected = this._lastActionLog.some(x=>/pas assez|impossible|déjà|non adjacent|invalide|refuse|besoin/i.test(String(x)));
       if(!rejected){ this._hold={civId, snap}; return {kind:'confirm', civId}; }
+    }
+    // POUVOIR qui laisse de l'AC (ex. Surtension +1 AC) → le joueur GARDE la main : pas de rotation vers
+    // un joueur qui a déjà passé, il enchaîne directement sa/ses action(s) (bug #4).
+    if(action && action.type==='power' && !nat._isAI && nat.acLeft>0){
+      return this.pump(); // _currentActor renverra la même nation (pointeur non avancé)
     }
     // Sinon : commit direct. Passer la nation sauf si pouvoir gratuit encore dispo.
     const keepForPower = !nat._isAI && (!action || action.type!=='pass') && nat.acLeft<=0 && this._freePowerAvailable(nat);

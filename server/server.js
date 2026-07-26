@@ -115,7 +115,8 @@ function armTimer(g, civId, fn) {
     g.timer = setTimeout(fn, RECONNECT_GRACE_MS);
     return;
   }
-  if (AFK_MS > 0) g.timer = setTimeout(fn, AFK_MS);            // connecté : délai anti-AFK
+  // CONNECTÉ = on NE joue JAMAIS à sa place (bugs #2/#13 : le jeu choisissait l'agenda / jouait une action
+  // alors que le joueur réfléchissait). Il prend tout son temps. L'auto-jeu ne sert QU'à un joueur déconnecté.
 }
 
 /* Le cœur : appliquer le résultat de pump() → router vers les clients. */
@@ -415,6 +416,27 @@ wss.on('connection', (ws) => {
             enc.agendas = [enc.player].concat(enc.ais || []).map(p => p && p.agenda).filter(Boolean);
           }
           sendTo(ws, { t: 'state', state: enc });
+          break;
+        }
+
+        case 'leave': { // quitter / abandonner la partie → libère tout le monde (fix #3 : plus de partie fantôme)
+          if (!sess.game || !games.has(sess.game)) { sendTo(ws, { t: 'game_ended' }); break; }
+          const g = games.get(sess.game);
+          const s = seatOf(g, ws) || seatOf(g, sess.user);
+          const wasHost = g.host === sess.user;
+          if (wasHost || g.status !== 'lobby') {
+            // l'hôte quitte, ou partie en cours → on TERMINE la partie pour tout le monde.
+            clearTimer(g);
+            broadcast(g, { t: 'game_ended', by: sess.user });
+            try { fs.unlinkSync(path.join(DATA, 'games', g.code + '.json')); } catch (e) {}
+            games.delete(g.code);
+          } else {
+            // un invité quitte le lobby → on libère juste son siège.
+            if (s) { s.user = null; s.ws = null; }
+            broadcast(g, { t: 'game', game: gameView(g) });
+            sendTo(ws, { t: 'game_ended' });
+          }
+          sess.game = null;
           break;
         }
 

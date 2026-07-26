@@ -105,7 +105,16 @@ const ACTIONS = {
     sb.confirmAttack();
     _postAction(sb);
   },
-  power:    (sb)    => { if (typeof sb.useAbility === 'function') sb.useAbility(); _postAction(sb); },
+  power:    (sb)    => {
+    const G = sb.__G, p = G.player;
+    if (p && p.civ && p.civ.id === 'jupiteriens') {
+      // Forge Orbitale : choisir une lune joviène Nv.1 connectée (pas de modale headless) → repli auto sur la 1re.
+      const el = (p.colonies || []).filter(c => ['io', 'europe', 'ganymede', 'callisto'].includes(c.nodeId) && c.level === 1 && c.connected);
+      if (el.length && typeof sb._forgeUpgrade === 'function') sb._forgeUpgrade(el[0].nodeId);
+      else if (typeof sb.useAbility === 'function') sb.useAbility(); // journalise « aucune lune améliorable »
+    } else if (typeof sb.useAbility === 'function') sb.useAbility();
+    _postAction(sb);
+  },
   // Appel générique SUR LISTE BLANCHE de TOUTES les fonctions d'action du jeu (cartes civiques/générales
   // dont gouvernement & Extraction d'He3, calmer une tension, Forge Orbitale, accord commercial…).
   // Le moteur re-valide tout (coûts, AC, déjà pris…). C'est le pont unique : toute nouvelle action du

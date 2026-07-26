@@ -164,6 +164,15 @@ function handle(m){
       else if (_errCb){ _errCb(m.msg); }
       else status('⚠️ '+m.msg);
       break;
+    case 'game_ended':
+      // partie quittée/terminée par un joueur → on libère tout et on revient au lobby (fix #3)
+      STATE.started=false; STATE._myTurn=false; STATE._confirmPending=false;
+      STATE.game=null; STATE.myCiv=null;
+      try{ localStorage.removeItem('sc_ws_game'); }catch(e){}
+      hideWaitBlock(); hideConfirmBar(); turnBar(false); closeDecision();
+      status(m.by && m.by!==STATE.user ? (m.by+' a quitté — retour au lobby') : 'Partie quittée.');
+      screenLobby();
+      break;
     case 'pong': break;
   }
 }
@@ -331,11 +340,26 @@ function showNotice(m){
   // panneau séparé du panneau de décision (une décision peut être ouverte en même temps)
   let p=document.getElementById('sc-notice');
   if(!p){ injectStyles(); p=el('<div id="sc-notice" style="position:fixed;top:44px;left:50%;transform:translateX(-50%);z-index:8700;background:#101a30;border:2px solid #3a6abf;border-radius:12px;padding:12px 16px;width:min(92vw,420px);color:#dce8ff;font-family:system-ui;box-shadow:0 10px 30px rgba(0,0,0,.5)"></div>'); document.body.appendChild(p); }
-  p.innerHTML = '<b>'+title+'</b><div style="margin-top:6px;line-height:1.35;font-size:.9em">'+body+'</div>';
+  // Avis IMPORTANTS (résultat de combat, résultat d'événement — ex. « tu gagnes X VP ») : PERSISTANTS,
+  // il faut cliquer « ✓ Continuer » pour les fermer (fix #10 : ne passent plus trop vite). Les autres
+  // (annonces, fin de tour) s'auto-referment.
+  const important = (k==='war_result' || k==='event_result');
+  // Événements : gros emoji centré + titre centré, façon vraie modale d'événement du jeu.
+  const evEmoji = ((k==='event_result'||k==='event_announce') && o.event && o.event.emoji) ? o.event.emoji : '';
+  const evName = (o.event && o.event.name) ? o.event.name : '';
+  const evLead = (k==='event_announce') ? 'Événement à venir' : 'Événement';
+  const head = evEmoji
+    ? '<div style="font-size:2.4em;text-align:center;line-height:1">'+evEmoji+'</div>'
+      +'<div style="text-align:center;font-size:.72em;color:#8fb0e0;letter-spacing:.05em;text-transform:uppercase">'+evLead+'</div>'
+      +'<div style="text-align:center;font-weight:700;margin-top:1px">'+evName+'</div>'
+    : '<b>'+title+'</b>';
+  const align = evEmoji ? 'text-align:center;' : '';
+  p.innerHTML = head + '<div style="margin-top:6px;line-height:1.35;font-size:.9em;'+align+'">'+body+'</div>'
+    + (important ? '<button style="margin-top:10px;width:100%;padding:8px;background:#2f6fd0;color:#fff;border:0;border-radius:8px;font-weight:700;cursor:pointer">✓ Continuer</button>' : '');
   p.style.display='block';
   clearTimeout(p._timer);
-  p._timer = setTimeout(()=>{ p.style.display='none'; }, (k==='war_result'||k==='event_result') ? 6500 : 3500);
-  p.onclick = ()=>{ p.style.display='none'; };
+  if(important){ p.onclick = ()=>{ p.style.display='none'; }; }
+  else { p.onclick = ()=>{ p.style.display='none'; }; p._timer = setTimeout(()=>{ p.style.display='none'; }, 3500); }
 }
 
 // ───────────────────────── Mon tour d'action (v2.1 : vraies actions de plateau) ─────────────────────────
@@ -469,7 +493,12 @@ function installIntercepts(){
     if(typeof orig!=='function' || orig._scWrapped) continue;
     (function(fn, orig){
       const w=function(){
-        if(STATE.started && STATE._myTurn){
+        if(STATE.started){
+          if(STATE._confirmPending){ return; }            // une action est en attente de Valider/Annuler
+          if(!STATE._myTurn){ notYourTurnToast(); return; } // #6 : pas ton tour → bloquer CETTE action, rien d'autre
+          // Forge Orbitale (Jupitériens) : le pouvoir ouvre une modale de CHOIX de lune → on la laisse
+          // s'ouvrir localement (orig) ; le clic sur la lune appellera _forgeUpgrade (intercepté → envoi).
+          if(fn==='useAbility'){ const me=myNation(); if(me && me.civ && me.civ.id==='jupiteriens'){ return orig.apply(this, arguments); } }
           const action=INTENT_MAP[fn](Array.prototype.slice.call(arguments));
           if(!action) return; // interception annulée (ex. modale d'attaque vide)
           if(fn==='doEstablishRoute'){
@@ -492,6 +521,21 @@ function installIntercepts(){
     if(typeof window.scArmConfirm==='function' && !window.scArmConfirm._scOff){ const o=window.scArmConfirm; window.scArmConfirm=function(){ if(STATE.started) return; return o.apply(this,arguments); }; window.scArmConfirm._scOff=true; }
     if(typeof window._scGuard==='function' && !window._scGuard._scOff){ const g=window._scGuard; window._scGuard=function(){ if(STATE.started) return false; return g.apply(this,arguments); }; window._scGuard._scOff=true; }
     if(typeof window.saveUndo==='function' && !window.saveUndo._scOff){ const s=window.saveUndo; window.saveUndo=function(){ if(STATE.started) return; return s.apply(this,arguments); }; window.saveUndo._scOff=true; }
+    // « Recommencer à zéro » (journal) EN LIGNE → quitter proprement la partie serveur (fix #3) au lieu de
+    // recharger la page (qui ré-embarquait dans la partie fantôme). Ramène au lobby (création d'une partie).
+    if(typeof window.scAbandonGame==='function' && !window.scAbandonGame._scOff){
+      const o=window.scAbandonGame;
+      window.scAbandonGame=function(){
+        if(STATE.started || (STATE.game&&STATE.game.code)){
+          if(!confirm('Quitter cette partie en ligne et revenir au menu ? La partie sera terminée pour tous les joueurs.')) return;
+          try{ localStorage.removeItem('sc_ws_game'); }catch(e){}
+          send({t:'leave'});
+          return;
+        }
+        return o.apply(this,arguments);
+      };
+      window.scAbandonGame._scOff=true;
+    }
     // Rappel de pouvoir gratuit : en ligne, « Utiliser » → intention power (useAbility est déjà intercepté),
     // « Passer le tour » → intention pass (au lieu du passTurnIL local).
     if(typeof window._scAbilityReminderSkip==='function' && !window._scAbilityReminderSkip._scOff){
@@ -671,8 +715,19 @@ function overlay(inner){
 function hideOverlay(){ const ov=document.getElementById('sc-ov'); if(ov) ov.style.display='none'; }
 function status(txt){ let b=document.getElementById('sc-status'); if(!b){ injectStyles(); b=el('<div id="sc-status"></div>'); document.body.appendChild(b);} b.textContent=txt; b.style.display='block'; }
 function hideStatus(){ const b=document.getElementById('sc-status'); if(b) b.style.display='none'; }
-function showWaitBlock(){ let b=document.getElementById('sc-waitblock'); if(!b){ b=el('<div id="sc-waitblock" style="position:fixed;inset:0;z-index:6000;background:transparent;cursor:progress"></div>'); document.body.appendChild(b);} b.style.display='block'; }
+// #6 : plus de voile plein écran qui bloque TOUT. On laisse le joueur regarder librement (carte, journal,
+// empire, diplo, détail des techs, survol des ressources). Seules les ACTIONS CONCRÈTES sont bloquées
+// (via les interceptions, message « pas ton tour »). showWaitBlock ne fait plus qu'afficher un statut discret.
+function showWaitBlock(){ /* volontairement non bloquant — voir intercepts */ }
 function hideWaitBlock(){ const b=document.getElementById('sc-waitblock'); if(b) b.style.display='none'; }
+let _notYourTurnTs=0;
+function notYourTurnToast(){
+  const now=Date.now(); if(now-_notYourTurnTs<1500) return; _notYourTurnTs=now;
+  let p=document.getElementById('sc-nyt');
+  if(!p){ injectStyles(); p=el('<div id="sc-nyt" style="position:fixed;top:78px;left:50%;transform:translateX(-50%);z-index:8690;background:#2a1e0e;border:2px solid #c08a30;border-radius:12px;padding:9px 14px;color:#ffe6c0;font:600 .86em system-ui;box-shadow:0 10px 30px rgba(0,0,0,.5)"></div>'); document.body.appendChild(p); p.onclick=()=>p.style.display='none'; }
+  p.textContent='⏳ Ce n\'est pas ton tour — tu peux regarder le plateau, la carte, le journal, l\'empire, la diplo (mais pas jouer une action).';
+  p.style.display='block'; clearTimeout(p._t); p._t=setTimeout(()=>{p.style.display='none';},2500);
+}
 
 // ── Connexion / inscription (pseudo, pas email — comptes du serveur live) ──
 function screenAuth(mode){
@@ -718,7 +773,7 @@ function screenLobby(){
     const code=document.getElementById('sc-code').value.trim().toUpperCase();
     if(code) send({t:'join', code});
   };
-  document.getElementById('sc-logout').onclick = ()=>{ STATE.user=null; STATE.token=null; try{localStorage.removeItem('sc_ws_token');}catch(e){} screenAuth('login'); };
+  document.getElementById('sc-logout').onclick = ()=>{ try{ if(STATE.game&&STATE.game.code) send({t:'leave'}); }catch(e){} STATE.user=null; STATE.token=null; STATE.game=null; try{localStorage.removeItem('sc_ws_token'); localStorage.removeItem('sc_ws_game');}catch(e){} screenAuth('login'); };
   document.getElementById('sc-close').onclick = ()=>{ _errCb=null; hideOverlay(); };
 }
 function screenCreate(){
@@ -770,7 +825,7 @@ function renderWait(){
     <button class="sec" id="sc-leave">Quitter</button>`);
   _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
   if(STATE.isHost){ const b=document.getElementById('sc-start'); if(b) b.onclick=()=>send({t:'start'}); }
-  document.getElementById('sc-leave').onclick = ()=> screenLobby();
+  document.getElementById('sc-leave').onclick = ()=>{ try{ send({t:'leave'}); }catch(e){} screenLobby(); };
 }
 
 // ── Panneau de décision générique (contrat de réponses = celui des modales du jeu) ──
@@ -813,15 +868,35 @@ function askLocalDecision(pending){
       return;
     }
     if(k==='war_combat'){
-      const max=o.maxTokens!=null?o.maxTokens:(o.max!=null?o.max:5);
-      body+=`<div>${o.body||o.title||'Engage tes jetons de force.'}</div>
-        <input type="range" id="sc-d" min="0" max="${max}" value="${Math.min(1,max)}" style="width:100%">
-        <div>Jetons : <b id="sc-dv">${Math.min(1,max)}</b></div>
-        <button class="opt" id="sc-ok">⚔️ Engager</button>`;
-      decisionPanel(body);
-      const sl=document.getElementById('sc-d'), dv=document.getElementById('sc-dv');
-      sl.oninput=()=>dv.textContent=sl.value;
-      document.getElementById('sc-ok').onclick=()=>done({tokens:parseInt(sl.value)||0});
+      const maxF=o.myForce||0;
+      const cols=o.cols||[]; const canHold=!!o.canHold; const threat=o.aiThreat;
+      const tokenPick=(title,hint,onOk)=>{ // sous-écran : choisir les jetons engagés
+        decisionPanel('<h2>'+title+'</h2>'+(hint?'<div class="muted" style="margin-bottom:6px">'+hint+'</div>':'')
+          +'<div>Jetons engagés : <b id="sc-wcv">'+Math.min(1,maxF)+'</b> / '+maxF+'</div>'
+          +'<input type="range" id="sc-wc" min="0" max="'+maxF+'" value="'+Math.min(1,maxF)+'" style="width:100%">'
+          +'<button class="opt" id="sc-wcok">✓ Engager</button><button class="opt" id="sc-wcback">↩ Retour</button>');
+        const sl=document.getElementById('sc-wc'), dv=document.getElementById('sc-wcv'); if(sl)sl.oninput=()=>dv.textContent=sl.value;
+        document.getElementById('sc-wcok').onclick=()=>onOk(parseInt(sl.value)||0);
+        document.getElementById('sc-wcback').onclick=()=>main();
+      };
+      const main=()=>{
+        let b='<h2>⚔️ Combat de guerre — '+(o.enemyName||'ennemi')+'</h2>';
+        b+='<div class="muted" style="margin-bottom:8px">Tes jetons Force engageables : <b>'+maxF+'</b> · Tour de guerre restant : '+(o.warTurnsLeft||'?')+'</div>';
+        if(threat) b+='<div style="background:#2a1200;border:1px solid #cc6622;border-radius:8px;padding:7px 10px;margin-bottom:8px;color:#ffcfa0;font-size:.85em">🛡️ L\'ennemi menace : <b>'+(threat.type==='colony'?'🏙️ ':'🛤️ ')+threat.name+'</b>. Tu peux <b>défendre</b>.</div>';
+        // Attaquer une colonie ennemie
+        if(cols.length){
+          b+='<div style="font-weight:700;color:#ff9966;margin:4px 0 3px">⚔️ Attaquer une colonie</div>';
+          b+=cols.map((c,i)=>'<button class="opt" data-col="'+i+'"'+(maxF<1?' disabled style="opacity:.45"':'')+'>'+(c.isFocus?'🎯 ':'')+(c.emoji||'')+' <b>'+c.name+'</b> Nv.'+c.level+(c.isHome?' 🏠 QG':'')+' <span class="muted">('+c.dist+' nœud'+(c.dist>1?'s':'')+')</span>'+(c.isFocus?' <span style="color:#ffcc66">— gagne = capture !</span>':'')+'</button>').join('');
+        } else b+='<div class="muted">Aucune colonie ennemie à portée.</div>';
+        // Défendre / Tenir
+        if(threat) b+='<button class="opt" id="sc-wc-def" style="border-color:#cc6622">🛡️ Défendre (choisir jetons)</button>';
+        if(canHold) b+='<button class="opt" id="sc-wc-hold" style="border-color:#4488cc">🕊️ Tenir position (ne rien engager)</button>';
+        decisionPanel(b);
+        document.querySelectorAll('#sc-decision .opt[data-col]').forEach(btn=>{ if(btn.disabled)return; btn.onclick=()=>{ const c=cols[parseInt(btn.getAttribute('data-col'))]; tokenPick('⚔️ Attaquer '+c.name, 'Force ennemie inconnue (garnison + défense). Engage assez pour gagner.', (t)=>done({action:'attack', node:c.node, tokens:t})); }; });
+        const dfn=document.getElementById('sc-wc-def'); if(dfn) dfn.onclick=()=>tokenPick('🛡️ Défense', 'Jetons engagés en défense de tes colonies.', (t)=>done({action:'defend', tokens:t}));
+        const hld=document.getElementById('sc-wc-hold'); if(hld) hld.onclick=()=>done({action:'hold'});
+      };
+      main();
       return;
     }
     if(k==='peace_offer'){
@@ -839,10 +914,37 @@ function askLocalDecision(pending){
       document.getElementById('sc-acc').onclick=()=>done({war:false});
       document.getElementById('sc-ref').onclick=()=>done({war:true}); return;
     }
+    if(k==='human_dyson'){ body='<h2>⚡ Sphère de Dyson adverse</h2>'+`<div>${o.builderName||'Un joueur'} a bâti la Sphère de Dyson (monopole énergétique). Accepte (+3⚡/tour) ou refuse (= guerre).</div>
+        <button class="opt" id="sc-acc">🤝 Accepter le monopole</button><button class="opt" id="sc-ref">⚔️ Refuser (guerre)</button>`;
+      decisionPanel(body);
+      document.getElementById('sc-acc').onclick=()=>done({war:false});
+      document.getElementById('sc-ref').onclick=()=>done({war:true}); return;
+    }
     if(k==='dyson_build'){ body+=`<button class="opt" id="sc-f">Forcer (guerre aux refusants)</button><button class="opt" id="sc-r">Renoncer</button>`;
       decisionPanel(body); document.getElementById('sc-f').onclick=()=>done({force:true}); document.getElementById('sc-r').onclick=()=>done({force:false}); return; }
     if(k==='accord_confirm'){ body+=`<div>Accord avec ${o.withName||''} sur ${o.nodeName||''} ?</div><button class="opt" id="sc-y">Confirmer</button><button class="opt" id="sc-n">Annuler</button>`;
       decisionPanel(body); document.getElementById('sc-y').onclick=()=>done({confirm:true}); document.getElementById('sc-n').onclick=()=>done({confirm:false}); return; }
+    if(k==='event_comm'){ // Événement Accords Commerciaux : choisir UNE nation (accord gratuit +3 VP, met fin à une guerre) ou passer
+      const cands=o.cands||[];
+      let b='<h2>🤝 Accords Commerciaux</h2><div class="muted" style="margin-bottom:8px">Accord <b>gratuit</b> : +3 VP chacun, met fin à une guerre. Un leader trop en avance peut refuser.</div>';
+      if(!cands.length) b+='<div class="muted" style="margin-bottom:6px">Toutes les nations ont déjà un accord avec toi.</div>';
+      else b+=cands.map((c,i)=>'<button class="opt" data-comm="'+i+'">'+(c.emoji||'')+' <b>'+c.name+'</b>'+(c.war?' <span style="color:#ff7766">⚔️ en guerre</span>':'')+(c.info?'<br><span class="muted">'+c.info+'</span>':'')+'</button>').join('');
+      b+='<button class="opt" id="sc-comm-pass" style="background:#2a2f45">Passer (aucun accord)</button>';
+      decisionPanel(b);
+      document.querySelectorAll('#sc-decision .opt[data-comm]').forEach(btn=>{ btn.onclick=()=>done({aiId:cands[parseInt(btn.getAttribute('data-comm'))].id}); });
+      document.getElementById('sc-comm-pass').onclick=()=>done({aiId:null});
+      return;
+    }
+    if(k==='event_diplo'){ // Événement Accords Diplomatiques : sélectionner plusieurs pactes (6 matériaux chacun, +2 énergie si guerre)
+      const rows=o.rows||[]; const sel={};
+      let b='<h2>🕊️ Accords Diplomatiques</h2><div class="muted" style="margin-bottom:8px">Pacte de non-agression 4 tours. 6🔩 chacun (6🔩+2⚡ si en guerre → l\'annule). +1 moral/pacte, tension 0. Tu as '+(o.mat||0)+'🔩 '+(o.energy||0)+'⚡.</div>';
+      b+=rows.map((r,i)=>'<label class="opt" style="display:block;text-align:left;cursor:pointer"><input type="checkbox" data-diplo="'+i+'" style="margin-right:8px">'+(r.emoji||'')+' <b>'+r.name+'</b> — 4 tours · '+(r.war?'6🔩+2⚡ <span style="color:#ff7766">annule la guerre</span>':'6🔩')+(r.info?'<br><span class="muted" style="margin-left:24px">'+r.info+'</span>':'')+'</label>').join('');
+      b+='<button class="opt" id="sc-diplo-ok">Conclure les pactes sélectionnés</button><button class="opt" id="sc-diplo-none" style="background:#2a2f45">Aucun pacte</button>';
+      decisionPanel(b);
+      document.getElementById('sc-diplo-ok').onclick=()=>{ const chosen=[]; document.querySelectorAll('#sc-decision input[data-diplo]').forEach(cb=>{ if(cb.checked)chosen.push(rows[parseInt(cb.getAttribute('data-diplo'))].id); }); done({selected:chosen}); };
+      document.getElementById('sc-diplo-none').onclick=()=>done({selected:[]});
+      return;
+    }
     // Génériques à options (agenda, strategy, invest1/2, espionage, extrasolar, empath_copy…)
     const opts=o.options||[];
     if(!opts.length){ decisionPanel(body+'<button class="opt" id="sc-ok">Continuer</button>'); document.getElementById('sc-ok').onclick=()=>done({}); return; }
