@@ -7509,22 +7509,10 @@ window.addEventListener('error',function(ev){
 })();
 // Sauvegarde auto de la partie en cours + bouton « Reprendre » après un refresh (ne perds plus ta partie).
 setInterval(function(){try{if(typeof scSaveGame==='function')scSaveGame();}catch(e){}},2000);
-window.addEventListener('load',function(){try{
-  if(window.SC_TUTO)return; // pas dans le tutoriel
-  if(!localStorage.getItem('sc_save'))return;
-  var c=document.createElement('div');c.id='sc-resume-btn';
-  c.style.cssText='position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:2147483600;width:min(330px,92vw);border-radius:12px;overflow:hidden;border:2px solid #4a9eff;box-shadow:0 6px 22px rgba(0,0,0,.55);font-family:system-ui,sans-serif';
-  var topb=document.createElement('div');
-  topb.style.cssText='background:#14559e;color:#eaf4ff;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px 14px;font-size:clamp(17px,4.6vw,21px);font-weight:800;cursor:pointer';
-  topb.textContent='▶ Reprendre la partie';
-  topb.onclick=function(){if(typeof scResumeGame==='function')scResumeGame();};
-  var botb=document.createElement('div');
-  botb.style.cssText='background:#b85e1c;color:#ffe4c4;text-align:center;padding:6px 4px;font-size:clamp(10px,2.9vw,11.5px);font-weight:700;letter-spacing:1.5px;white-space:nowrap;cursor:pointer;border-top:1px solid rgba(0,0,0,.3)';
-  botb.textContent='ABANDONNER PARTIE EN COURS ?';
-  botb.onclick=function(){if(typeof scAbandonGame==='function')scAbandonGame();};
-  c.appendChild(topb);c.appendChild(botb);
-  document.body.appendChild(c);
-}catch(e){}});
+// Bandeau bleu « ▶ Reprendre la partie / ABANDONNER PARTIE EN COURS ? » RETIRÉ (demande de Marc) :
+// positionné en haut avec z-index maximal, il RECOUVRAIT la barre du jeu (#top-bar : ressources + capacité
+// de nation). Il apparaissait aussi sur l'ancien site solo (solar.guerir.ch) via ce même index.html.
+// L'auto-sauvegarde (scSaveGame) reste active ; on ne montre simplement plus ce bandeau par-dessus le jeu.
 </script>
 <script>
 /* PWA : enregistrement du service worker (installable + hors-ligne).
