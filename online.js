@@ -239,12 +239,99 @@ function onDecision(pending){
   if(pending.kind==='strategy' && showStrategyReal(pending)){ STATE._realDecide=finish; return; }
   if(pending.kind==='invest1' && showInvestReal(pending,1)){ STATE._realDecide=finish; return; }
   if(pending.kind==='invest2' && showInvestReal(pending,2)){ STATE._realDecide=finish; return; }
-  // sinon : panneau générique (agenda, événements, guerre, etc.)
+  if(pending.kind==='peace_offer' && showPeaceReal(pending)){ STATE._realDecide=finish; return; }
+  if((pending.kind==='ai_dyson'||pending.kind==='human_dyson'||pending.kind==='dyson_build') && showDysonReal(pending)){ STATE._realDecide=finish; return; }
+  if(pending.kind==='accord_confirm' && showAccordReal(pending)){ STATE._realDecide=finish; return; }
+  if(pending.kind==='espionage' && showOptsReal(pending,'espionage-modal','espionage-branch-opts','branch')){ STATE._realDecide=finish; return; }
+  if(pending.kind==='empath_copy' && showOptsReal(pending,'empath-copy-modal','empath-copy-opts','cardId',true)){ STATE._realDecide=finish; return; }
+  // Événements interactifs : VRAIES fenêtres du jeu (les overrides _evCommPick/_evDiploConfirm envoient la réponse).
+  if(pending.kind==='event_comm' && typeof window.showCommEventModal==='function'){ window._scDiploSel={}; STATE._realDecide=finish; try{ showCommEventModal(function(){}); return; }catch(e){ STATE._realDecide=null; } }
+  if(pending.kind==='event_diplo' && typeof window.showDiploEventModal==='function'){ window._scDiploSel={}; STATE._realDecide=finish; try{ showDiploEventModal(function(){}); return; }catch(e){ STATE._realDecide=null; } }
+  // sinon : panneau générique (restylé au look natif) pour le reste (war_combat, defense, extrasolar, strategy_calm)
   askLocalDecision(pending).then(finish).catch(()=>{ STATE._answering = false; });
 }
 
 // ── Rendu dans les VRAIES modales du jeu (réutilise le DOM + les classes CSS d'index.html) ──
 // Retourne true si la modale existe (sinon repli sur le panneau générique).
+// VRAIE modale Sphère de Dyson (#dyson-modal) réutilisée : accepter/refuser (ai/human_dyson) ou forcer/renoncer (dyson_build).
+function showDysonReal(pending){
+  const o=pending.payload||{}, k=pending.kind;
+  const m=document.getElementById('dyson-modal'); if(!m) return false;
+  const title=document.getElementById('dyson-title'), sub=document.getElementById('dyson-sub'), nations=document.getElementById('dyson-nations'), actions=document.getElementById('dyson-actions');
+  if(!actions) return false;
+  const go=(ans)=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide(ans); };
+  if(nations)nations.innerHTML='';
+  if(k==='ai_dyson'||k==='human_dyson'){
+    const who=(window._scPseudo&&window._scPseudo[o.builder])||o.builderName||'Une nation';
+    if(title)title.innerHTML='⚡ '+who+' a construit la Sphère de Dyson !';
+    if(sub)sub.innerHTML='Monopole énergétique adverse. Accepte (+3<i class=ri-energy></i>/tour) ou refuse (= guerre).';
+    actions.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="eot-btn" id="scd-acc" style="flex:1;margin-top:0;background:#0e2a18;border-color:#3a8a5a;color:#9fe8b8">🤝 Accepter le monopole</button><button class="eot-btn" id="scd-ref" style="flex:1;margin-top:0;background:linear-gradient(135deg,#8a2222,#5a0a0a);border-color:#cc4444;color:#ffcccc">⚔️ Refuser — guerre</button></div>';
+    m.classList.remove('hidden');
+    document.getElementById('scd-acc').onclick=()=>go({war:false});
+    document.getElementById('scd-ref').onclick=()=>go({war:true});
+    return true;
+  }
+  if(k==='dyson_build'){
+    const ref=o.refusing||[];
+    if(title)title.innerHTML='⚡ Sphère de Dyson construite !';
+    if(sub)sub.innerHTML=ref.length?('Des nations refusent le monopole — forcer déclenche la guerre contre elles, ou renonce.'):'Toutes les nations acceptent le monopole énergétique.';
+    actions.innerHTML=ref.length
+      ? '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="eot-btn" id="scd-f" style="flex:1;margin-top:0;background:linear-gradient(135deg,#8a2222,#5a0a0a);border-color:#cc4444;color:#ffcccc"><i class=ri-energy></i> Forcer — guerre</button><button class="eot-btn" id="scd-r" style="flex:1;margin-top:0;background:#14182e;border-color:#5a6a8a;color:#aab8d8">↩️ Renoncer</button></div>'
+      : '<button class="eot-btn" id="scd-f">Continuer</button>';
+    m.classList.remove('hidden');
+    const f=document.getElementById('scd-f'); if(f)f.onclick=()=>go({force:true});
+    const r=document.getElementById('scd-r'); if(r)r.onclick=()=>go({force:false});
+    return true;
+  }
+  return false;
+}
+// VRAIE modale Accord commercial (#accord-modal).
+function showAccordReal(pending){
+  const o=pending.payload||{};
+  const m=document.getElementById('accord-modal'); if(!m) return false;
+  const body=document.getElementById('accord-body'); const conf=document.getElementById('accord-confirm');
+  if(!body||!conf) return false;
+  body.innerHTML='Conclure un accord commercial avec <b>'+(o.withName||'cette nation')+'</b>'+(o.nodeName?(' sur <b>'+o.nodeName+'</b>'):'')+' ? (+3 VP chacun, met fin à une guerre)';
+  const go=(ans)=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide(ans); };
+  conf.onclick=()=>go({confirm:true});
+  const cancel=m.querySelector('button.npop-btn'); if(cancel)cancel.onclick=()=>go({confirm:false});
+  m.classList.remove('hidden');
+  return true;
+}
+// VRAIE modale à liste d'options (#espionage-modal / #empath-copy-modal) : espionnage (branche) / télépathie (carte).
+function showOptsReal(pending, modalId, contId, key, allowNone){
+  const o=pending.payload||{}, opts=o.options||[];
+  const m=document.getElementById(modalId), cont=document.getElementById(contId); if(!m||!cont) return false;
+  const go=(ans)=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide(ans); };
+  cont.innerHTML=opts.map((op,i)=>'<button class="inv-opt" data-i="'+i+'" style="cursor:pointer"><div class="inv-opt-name">'+(op.emoji||'')+' '+(op.name||op.id||op.branch)+'</div>'+(op.desc?'<div class="inv-opt-benefit">'+op.desc+'</div>':'')+'</button>').join('');
+  cont.querySelectorAll('.inv-opt[data-i]').forEach(b=>{ b.onclick=()=>{ const op=opts[parseInt(b.getAttribute('data-i'))]; const ans={}; ans[key]=(op[key]!==undefined?op[key]:(op.id!==undefined?op.id:op.branch)); go(ans); }; });
+  m.classList.remove('hidden');
+  return true;
+}
+// VRAIE modale de paix (#peace-modal) : offre de ressources +/− + Proposer la paix / Se battre.
+function showPeaceReal(pending){
+  const o=pending.payload||{};
+  const m=document.getElementById('peace-modal'); if(!m) return false;
+  let G=null; try{G=scGetG();}catch(e){}
+  const me=(typeof myNation==='function'&&myNation())||(G&&G.player); if(!me) return false;
+  const all=G?[G.player].concat(G.ais||[]):[];
+  const atk=all.find(n=>n&&n.civ&&n.civ.id===o.attacker);
+  const atkName=(window._scPseudo&&window._scPseudo[o.attacker])||o.attackerName||(atk?atk.civ.name:'Ennemi');
+  if(G)G._peaceOffer={materials:0,energy:0,science:0};
+  const set=(id,html)=>{const e=document.getElementById(id);if(e)e.innerHTML=html;};
+  set('pm-combatants','<b>'+(me.civ.emoji||'')+' '+me.civ.name+'</b><span style="color:#556;font-size:.9em"> ⚔️ contre ⚔️ </span><b>'+(atk?atk.civ.emoji:'')+' '+atkName+'</b>');
+  set('pm-declaredby', o.declaredBy==='player'?'Guerre déclarée par toi — l\'adversaire répond.':('Guerre déclarée par '+atkName+'.'));
+  const vy=(o.vpYou&&o.vpYou.total!==undefined)?o.vpYou.total:(o.vpYou||0);
+  const ve=(o.vpEnemy&&o.vpEnemy.total!==undefined)?o.vpEnemy.total:(o.vpEnemy||0);
+  set('pm-context','VP — Toi : <b>'+vy+'</b> | Adversaire : <b>'+ve+'</b><br>Offre des ressources pour tenter la paix, ou refuse et combats.');
+  if(typeof _updatePeaceDisplay==='function'){try{_updatePeaceDisplay();}catch(e){}}
+  const close=()=>{ m.classList.add('hidden'); m.style.display='none'; };
+  const btns=m.querySelectorAll('.atk-btns button');
+  if(btns[0])btns[0].onclick=function(){ const off=(G&&G._peaceOffer)||{materials:0,energy:0,science:0}; close(); if(STATE._realDecide)STATE._realDecide({accept:true,offer:off}); };
+  if(btns[1])btns[1].onclick=function(){ close(); if(STATE._realDecide)STATE._realDecide({accept:false}); };
+  m.style.display='flex'; m.classList.remove('hidden');
+  return true;
+}
 function showAgendaReal(pending){
   const o=pending.payload||{}, opts=o.options||[];
   const modal=document.getElementById('agenda-sel-modal'), cont=document.getElementById('agsel-agendas'), ctx=document.getElementById('agsel-context');
@@ -327,9 +414,34 @@ function showLogToast(txts){
   p._timer=setTimeout(()=>{ p.style.display='none'; p._buf=[]; }, 5000);
 }
 
+// Affiche la VRAIE modale d'événement du jeu (#event-modal / #event-announce-modal) au lieu d'un bandeau.
+// Retourne true si la modale existe (sinon repli sur le bandeau). Restaure le visuel d'origine des événements.
+function showEventReal(o, isAnnounce){
+  const ev=o.event||{};
+  if(isAnnounce){
+    const m=document.getElementById('event-announce-modal'); if(!m) return false;
+    const em=document.getElementById('ea-emoji'), nm=document.getElementById('ea-name'), ds=document.getElementById('ea-desc');
+    if(em)em.textContent=ev.emoji||'⭐'; if(nm)nm.textContent=ev.name||'Événement'; if(ds)ds.innerHTML=ev.preview||'';
+    const b=m.querySelector('.ea-btn'); if(b)b.onclick=()=>m.classList.add('hidden');
+    m.classList.remove('hidden'); return true;
+  }
+  const m=document.getElementById('event-modal'); if(!m) return false;
+  const card=document.getElementById('evm-card'); if(card)card.className='evt-card'+(ev.type?(' '+ev.type):'');
+  const em=document.getElementById('evm-emoji'), bd=document.getElementById('evm-badge'), nm=document.getElementById('evm-name'), rs=document.getElementById('evm-result'), cq=document.getElementById('evm-consequence');
+  const T={competition:'COMPÉTITION',menace:'MENACE',opportunite:'OPPORTUNITÉ'};
+  if(em)em.textContent=ev.emoji||'🎯';
+  if(bd){bd.textContent=T[ev.type]||'ÉVÉNEMENT';bd.style.background=ev.type==='menace'?'#3a1a08':ev.type==='competition'?'#3a0808':'#0a2a18';bd.style.color=ev.type==='menace'?'#ffbb77':ev.type==='competition'?'#ff7777':'#88e8b0';}
+  if(nm)nm.textContent=ev.name||'Événement';
+  if(rs)rs.innerHTML=o.msg||'—';
+  if(cq)cq.classList.add('hidden');
+  const b=m.querySelector('.evm-btn'); if(b)b.onclick=()=>m.classList.add('hidden');
+  m.classList.remove('hidden'); return true;
+}
 // ───────────────────────── Notices (résultats de combat / événements / fin de tour) ─────────────────────────
 function showNotice(m){
   const o = m.payload || {}, k = m.kind;
+  // ÉVÉNEMENTS : afficher la VRAIE fenêtre du jeu (visuel d'origine) plutôt qu'un bandeau minimal.
+  if((k==='event_result'||k==='event_announce') && showEventReal(o, k==='event_announce')) return;
   let title='', body='';
   if(k==='war_result'){ title=o.title||'⚔️ Combat'; body=(o.body||'')+(o.result&&o.result.txt?'<br><br><b>'+o.result.txt+'</b>':''); }
   else if(k==='event_result'){ title='🎯 Événement'+(o.event?' — '+(o.event.emoji||'')+' '+o.event.name:''); body=o.msg||''; }
@@ -549,6 +661,16 @@ function installIntercepts(){
       window._scAbilityReminderSkip=function(){ if(STATE.started){ try{ if(window._scCloseAbilityReminder)_scCloseAbilityReminder(); }catch(e){} sendAction({type:'pass'}); return; } return o.apply(this,arguments); };
       window._scAbilityReminderSkip._scOff=true;
     }
+    // Événements INTERACTIFS : on réutilise les VRAIES fenêtres du jeu (showCommEventModal / showDiploEventModal).
+    // Leurs fonctions d'application sont overridées → en ligne elles ENVOIENT la réponse au lieu d'appliquer localement.
+    if(typeof window._evCommPick==='function' && !window._evCommPick._scOff){ const o=window._evCommPick;
+      window._evCommPick=function(aiId){ if(STATE.started&&STATE._realDecide){ try{if(window._evCloseOverlay)_evCloseOverlay();}catch(e){} const f=STATE._realDecide;STATE._realDecide=null;f({aiId:aiId||null}); return; } return o.apply(this,arguments); }; window._evCommPick._scOff=true; }
+    if(typeof window._evDiploToggle==='function' && !window._evDiploToggle._scOff){ const o=window._evDiploToggle;
+      window._evDiploToggle=function(id,on){ if(STATE.started){ window._scDiploSel=window._scDiploSel||{}; window._scDiploSel[id]=on; } return o.apply(this,arguments); }; window._evDiploToggle._scOff=true; }
+    if(typeof window._evDiploConfirm==='function' && !window._evDiploConfirm._scOff){ const o=window._evDiploConfirm;
+      window._evDiploConfirm=function(){ if(STATE.started&&STATE._realDecide){ const s=window._scDiploSel||{}; const sel=Object.keys(s).filter(k=>s[k]); try{if(window._evCloseOverlay)_evCloseOverlay();}catch(e){} const f=STATE._realDecide;STATE._realDecide=null;f({selected:sel}); return; } return o.apply(this,arguments); }; window._evDiploConfirm._scOff=true; }
+    if(typeof window._evDiploNone==='function' && !window._evDiploNone._scOff){ const o=window._evDiploNone;
+      window._evDiploNone=function(){ if(STATE.started&&STATE._realDecide){ try{if(window._evCloseOverlay)_evCloseOverlay();}catch(e){} const f=STATE._realDecide;STATE._realDecide=null;f({selected:[]}); return; } return o.apply(this,arguments); }; window._evDiploNone._scOff=true; }
     // VRAIES modales stratégie / investissement : quand une décision en ligne est en cours
     // (STATE._realDecide posé), les boutons de validation ENVOIENT la réponse au serveur au lieu
     // d'appliquer localement. Hors décision en ligne → comportement solo d'origine.
@@ -695,11 +817,14 @@ function injectStyles(){
   #sc-ov .muted{color:#7187b4;font-size:.82em}
   #sc-ov .row{display:flex;gap:8px}#sc-ov .row>*{flex:1}
   #sc-status{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:8500;background:#0d1426cc;border:1px solid #26406e;border-radius:10px;padding:6px 14px;color:#bcd3ff;font:600 .82em system-ui;backdrop-filter:blur(4px)}
-  #sc-decision{position:fixed;inset:0;z-index:8800;background:rgba(4,6,18,.45);display:flex;align-items:center;justify-content:center}
-  #sc-decision .card{background:#101a30;border:2px solid #3a6abf;border-radius:14px;padding:20px;width:min(92vw,440px);max-height:84vh;overflow:auto}
-  #sc-decision .muted{color:#7187b4;font-size:.82em}
-  #sc-decision .opt{display:block;width:100%;text-align:left;margin:6px 0;padding:10px 12px;border-radius:9px;border:1px solid #2c4a7e;background:#0a1326;color:#dce8ff;cursor:pointer}
-  #sc-decision .opt:hover{border-color:#5a8ad0;background:#13213c}`;
+  /* Look NATIF du jeu (carte sombre, bordure violette, police du jeu), inscrit dans la BANDE CENTRALE
+     (entre les barres haut/bas) — restaure l'apparence d'origine au lieu du panneau bleu minimaliste. */
+  #sc-decision{position:fixed;left:0;right:0;top:var(--topband,0);bottom:var(--botband,0);z-index:375;background:rgba(4,4,18,.92);backdrop-filter:blur(6px);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:8px}
+  #sc-decision .card{background:#0c0c24;border:2px solid #5a1a7a;border-radius:16px;padding:22px 26px;width:min(94vw,440px);max-height:none;margin:auto;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.92);color:#e6ecff;font-family:system-ui,sans-serif;text-align:center;box-sizing:border-box}
+  #sc-decision h2{color:#fff;font-size:1.3em;margin:0 0 14px;font-weight:700}
+  #sc-decision .muted{color:#9fb0d0;font-size:.82em}
+  #sc-decision .opt{display:block;width:100%;text-align:left;margin:7px 0;padding:11px 13px;border-radius:9px;border:1px solid #2a3a6a;background:#141a30;color:#dce8ff;cursor:pointer;font-size:.92em}
+  #sc-decision .opt:hover{border-color:#7a4aaa;background:#1c2340}`;
   document.head.appendChild(s);
 }
 function overlay(inner){

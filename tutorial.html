@@ -6996,19 +6996,31 @@ function confirmAttack(){
   addLog('⚔️ Coût combat : −'+sent+'<i class=ri-materials></i> −'+sent+'<i class=ri-energy></i> ('+sent+' jeton(s) envoyé(s))','dim');
   G.player.forceCooldown.push({count:sent,returnTurn:getCooldownTurn(G.player)});
   G.player.spentThisTurn+=1+sent;
-  // IA défend : elle alloue entre effAtk-1 et effAtk+2 de manière aléatoire
+  // Défense IA DÉTERMINISTE (plus d'aléatoire) : garnison de base (1) + ce que l'IA peut PAYER (1🪨+1⚡/jeton).
   const atkAi=G.ais.find(ai=>ai.colonies.find(c=>c.nodeId===_attackTargetNode))||G.ais[0];
-  const aiDefMax=Math.min(atkAi?atkAi.forceTokens:0,effAtk+3);
-  const aiDef=1/*garnison de base*/+Math.max(0,Math.floor(Math.random()*(aiDefMax+1)));
-  // Approximation montrée à l'attaquant (non implémentée ici car IA défend auto)
+  const aiAfford=atkAi?Math.max(0,Math.min(atkAi.forceTokens||0,atkAi.res.materials||0,atkAi.res.energy||0)):0;
+  const aiDef=1/*garnison de base*/+aiAfford;
+  if(atkAi&&aiAfford>0&&typeof applyCombatEngage==='function')applyCombatEngage(atkAi,aiAfford,effAtk<=aiDef); // l'IA paie sa défense engagée
   let resultMsg='';let resultCls='';
   if(effAtk>aiDef){
-    // Victoire — défenseur perd la colonie
+    // VICTOIRE — CAPTURE de la colonie (elle change de propriétaire), PAS une simple destruction (bug : en ligne
+    // le serveur passait par ici et « détruisait » sans te donner la colonie → tes captures ne tenaient jamais).
     const col=atkAi?atkAi.colonies.find(c=>c.nodeId===_attackTargetNode||c.nodeId===node.id):null;
-    if(col&&atkAi){atkAi.colonies=atkAi.colonies.filter(c=>c.nodeId!==col.nodeId);resultMsg='✅ Victoire ! Colonie '+node.name+' détruite.';resultCls='gold';}
+    if(col&&atkAi){
+      const newLvl=Math.max(1,(col.level||1)-1);
+      atkAi.colonies=atkAi.colonies.filter(c=>c.nodeId!==col.nodeId);
+      atkAi.forceTokens=Math.max(0,(atkAi.forceTokens||0)-1); // jeton de garnison détruit dans la défense
+      atkAi.res.morale=Math.max(0,(atkAi.res.morale||0)-1);
+      updateConnections(atkAi);
+      const connP=(typeof checkConnected==='function')?checkConnected(col.nodeId,G.player):true;
+      if(!G.player.colonies.some(c=>c.nodeId===col.nodeId))G.player.colonies.push({nodeId:col.nodeId,level:newLvl,connected:connP,_conquest:3});
+      updateConnections(G.player);
+      G.player.tempVP=(G.player.tempVP||0)+2;
+      resultMsg='🏴 Victoire ! Tu CAPTURES '+node.name+' (Nv.'+newLvl+') — elle est à toi ! (+2 VP)';resultCls='gold';
+      addLog('🏴 '+node.name+' CAPTURÉE sur '+atkAi.civ.emoji+' '+atkAi.civ.name+' ! (Nv.'+newLvl+', '+effAtk+'⚔️ vs '+aiDef+'🛡️)','gold');
+    }
     else{resultMsg='✅ Victoire ! Zone sécurisée.';resultCls='gold';}
     G.warRisk=Math.min(10,G.warRisk+5);
-    addLog('⚔️ Attaque sur '+node.name+' — Victoire ('+effAtk+' vs '+aiDef+')','gold');
   } else if(aiDef===effAtk){
     resultMsg='🛡️ Attaque repoussée — égalité ('+effAtk+' vs '+aiDef+').';resultCls='red';
     addLog('⚔️ Attaque sur '+node.name+' repoussée.','red');
