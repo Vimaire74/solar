@@ -618,20 +618,12 @@ function askRouteToken(action){
 }
 // Barre de tour discrète (en haut) : le plateau reste visible et cliquable.
 function turnBar(show){
-  let b=document.getElementById('sc-turnbar');
-  if(!b){
-    injectStyles();
-    b=el('<div id="sc-turnbar" style="position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:8600;background:rgba(16,42,98,.96);border:1px solid #3a6abf;border-top:0;border-radius:0 0 10px 10px;padding:6px 12px;color:#dce8ff;font:600 .82em system-ui;display:flex;gap:8px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.5)"></div>');
-    b.innerHTML='🎮 <b>À toi de jouer</b> — utilise le plateau'
-      +' <button id="sc-tb-menu" style="background:#16223c;color:#9fb6e6;border:0;border-radius:7px;padding:5px 10px;cursor:pointer">☰ Menu</button>'
-      +' <button id="sc-tb-ai" style="background:#16223c;color:#9fb6e6;border:0;border-radius:7px;padding:5px 10px;cursor:pointer">🤖 IA</button>'
-      +' <button id="sc-tb-pass" style="background:#2f6fd0;color:#fff;border:0;border-radius:7px;padding:5px 10px;cursor:pointer">⏭ Passer</button>';
-    document.body.appendChild(b);
-    document.getElementById('sc-tb-menu').onclick=()=>actionMenu();
-    document.getElementById('sc-tb-ai').onclick=()=>{ STATE._myTurn=false; turnBar(false); window._scOnPass=null; closeDecision(); send({t:'auto'}); showWaitBlock(); };
-    document.getElementById('sc-tb-pass').onclick=()=>sendAction({type:'pass'});
-  }
-  b.style.display = show?'flex':'none';
+  // Barre bleue « 🎮 À toi de jouer — Menu / IA / Passer » RETIRÉE (demande de Marc) : positionnée en haut,
+  // elle recouvrait la barre du jeu (#top-bar : ressources + bouton Capacité). Elle était REDONDANTE :
+  //  - « Passer » se fait par le bouton « Fin de Tour » natif du jeu (window._scOnPass, cf. onMyActionTurn) ;
+  //  - c'est déjà la disparition du bandeau d'attente (showWaitBlock/hideWaitBlock) qui indique que c'est ton tour.
+  // On ne crée plus la barre ; on retire un résidu éventuel.
+  const b=document.getElementById('sc-turnbar'); if(b)b.remove();
 }
 function onMyActionTurn(){
   STATE._myTurn = true;
