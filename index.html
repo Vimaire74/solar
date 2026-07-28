@@ -4491,10 +4491,26 @@ function triggerGuereeForcee(offendedSide,targetAi){
       (aiAllRoutes.length?aiAllRoutes.map((r,i)=>{const prot=(r.tokens||0)>=1;const need=prot?2:1;const can=(G.player.forceTokens||0)>=need;return `<div class="fw-choice" onclick="forcedWarChoiceRoute(${i})" style="${can?'':'opacity:.5'}">${prot?'🛡️':'🔓'} Attaquer route ${NODES[r.from]?.name||r.from}→${NODES[r.to]?.name||r.to} — ${need} jeton${need>1?'s':''}</div>`;}).join(''):'<div style="color:#5a6a8a;font-size:.82em">Aucune route ennemie.</div>')+
       (nearestAiCol?`<div class="fw-choice" onclick="forcedWarChoiceColony('${nearestAiCol.col.nodeId}')">🏗️ Attaquer colonie la plus proche : ${NODES[nearestAiCol.col.nodeId]?.name}</div>`:'');
     if(!aiAllRoutes.length&&!nearestAiCol)choicesHtml+='<div style="color:#5a6a8a;font-size:.82em;margin-top:6px">Aucune colonie ennemie accessible non plus (leur planète mère est imprenable).</div><div class="fw-choice" onclick="forcedWarNoTarget()">✖️ Passer — aucune cible, la pression populaire retombe</div>';
+    G._forcedWarPending=true; // sérialiser : attendre le choix avant processAllWars
+    if(_decisionActive()){ // EN LIGNE : router le choix vers le joueur (sinon la modale ne s'affiche jamais côté serveur headless)
+      const _rts=aiAllRoutes.map(function(r,i){return {i:i, name:(NODES[r.from]?.name||r.from)+'→'+(NODES[r.to]?.name||r.to), need:((r.tokens||0)>=1?2:1), prot:((r.tokens||0)>=1)};});
+      _emitDecision('forced_war', G.player,
+        {enemy:fwAi.civ.id, enemyName:fwAi.civ.name, routes:_rts,
+         colTarget:(nearestAiCol?nearestAiCol.col.nodeId:null), colName:(nearestAiCol?(NODES[nearestAiCol.col.nodeId]?.name||nearestAiCol.col.nodeId):null),
+         myForce:(G.player.forceTokens||0)},
+        function(ans){
+          try{
+            if(ans&&ans.peace)forcedWarDemandPeace();
+            else if(ans&&typeof ans.route==='number')forcedWarChoiceRoute(ans.route);
+            else if(ans&&ans.colony)forcedWarChoiceColony(ans.colony);
+            else forcedWarNoTarget();
+          }catch(e){ try{forcedWarNoTarget();}catch(_){} }
+        });
+      return;
+    }
     document.getElementById('fw-title').textContent='⚔️ Guerre Populaire contre '+fwAi.civ.emoji+' '+fwAi.civ.name+' !';
     document.getElementById('fw-desc').innerHTML='Tension à 10 envers '+fwAi.civ.emoji+' '+fwAi.civ.name+' : attaque une de ses routes ou colonies maintenant.';
     document.getElementById('fw-choices').innerHTML=choicesHtml;
-    G._forcedWarPending=true; // sérialiser : attendre le choix avant processAllWars
     document.getElementById('forced-war-modal').classList.remove('hidden');
   }else{
     // IA offensée : attaque auto la route la plus gênante ou colonie la plus proche
@@ -6569,6 +6585,10 @@ function warAttackRoute(idx){
 }
 function showRouteCaptureModal(route, prot){
   const rn=(NODES[route.from]?.name||route.from)+' → '+(NODES[route.to]?.name||route.to);
+  if(_decisionActive()){ // EN LIGNE : router le choix récupérer/détruire (sinon la modale ne s'affiche jamais côté serveur)
+    _emitDecision('route_capture', G.player, {from:route.from, to:route.to, name:rn, prot:!!prot}, function(ans){ routeCaptureChoice(!!(ans&&ans.capture)); });
+    return;
+  }
   document.getElementById('rcm-title').textContent='🛤️ '+rn;
   document.getElementById('rcm-desc').innerHTML=prot
     ?'Tu as <b>brisé la protection</b> ennemie (son jeton est détruit). <b>2 jetons engagés : 1 part en récupération.</b> Que faire de la route ?'

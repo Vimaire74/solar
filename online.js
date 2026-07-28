@@ -241,6 +241,8 @@ function onDecision(pending){
   if(pending.kind==='invest2' && showInvestReal(pending,2)){ STATE._realDecide=finish; return; }
   if(pending.kind==='peace_offer' && showPeaceReal(pending)){ STATE._realDecide=finish; return; }
   if((pending.kind==='ai_dyson'||pending.kind==='human_dyson'||pending.kind==='dyson_build') && showDysonReal(pending)){ STATE._realDecide=finish; return; }
+  if(pending.kind==='forced_war' && showForcedWarReal(pending)){ STATE._realDecide=finish; return; }
+  if(pending.kind==='route_capture' && showRouteCaptureReal(pending)){ STATE._realDecide=finish; return; }
   if(pending.kind==='accord_confirm' && showAccordReal(pending)){ STATE._realDecide=finish; return; }
   if(pending.kind==='espionage' && showOptsReal(pending,'espionage-modal','espionage-branch-opts','branch')){ STATE._realDecide=finish; return; }
   if(pending.kind==='empath_copy' && showOptsReal(pending,'empath-copy-modal','empath-copy-opts','cardId',true)){ STATE._realDecide=finish; return; }
@@ -284,6 +286,42 @@ function showDysonReal(pending){
     return true;
   }
   return false;
+}
+// VRAIE modale Route conquise (#route-capture-modal) — récupérer/détruire. Était en DOM direct, jamais routée.
+function showRouteCaptureReal(pending){
+  const o=pending.payload||{};
+  const m=document.getElementById('route-capture-modal'); if(!m) return false;
+  const t=document.getElementById('rcm-title'), d=document.getElementById('rcm-desc'), keep=document.getElementById('rcm-keep');
+  if(t)t.textContent='🛤️ '+(o.name||'');
+  if(d)d.innerHTML=o.prot?'Tu as <b>brisé la protection</b> ennemie (jeton détruit). 2 jetons engagés : 1 part en récupération. Que faire de la route ?':'Route ennemie <b>non protégée</b>, prise sans coût. Que faire ?';
+  const go=(ans)=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide(ans); };
+  const btns=m.querySelectorAll('.atk-btns button');
+  if(btns[0])btns[0].onclick=()=>go({capture:true});
+  if(btns[1])btns[1].onclick=()=>go({capture:false});
+  m.classList.remove('hidden');
+  return true;
+}
+// VRAIE modale Guerre Populaire Forcée (#forced-war-modal) — était affichée en DOM direct, jamais routée en ligne.
+function showForcedWarReal(pending){
+  const o=pending.payload||{};
+  const m=document.getElementById('forced-war-modal'); if(!m) return false;
+  const title=document.getElementById('fw-title'), desc=document.getElementById('fw-desc'), choices=document.getElementById('fw-choices');
+  if(!choices) return false;
+  const enemy=(window._scPseudo&&window._scPseudo[o.enemy])||o.enemyName||'l\'ennemi';
+  if(title)title.textContent='⚔️ Guerre Populaire contre '+enemy+' !';
+  if(desc)desc.innerHTML='Tension à 10 : le peuple exige que tu attaques <b>'+enemy+'</b> maintenant.';
+  const go=(ans)=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide(ans); };
+  let html='<div class="fw-choice" id="fw-peace">🕊️ Exiger la paix (tribut si ennemi faible, sinon la guerre continue)</div>';
+  (o.routes||[]).forEach(r=>{ const can=(o.myForce||0)>=r.need; html+='<div class="fw-choice" data-rt="'+r.i+'" style="'+(can?'':'opacity:.5')+'">'+(r.prot?'🛡️':'🔓')+' Attaquer route '+r.name+' — '+r.need+' jeton'+(r.need>1?'s':'')+'</div>'; });
+  if(o.colTarget)html+='<div class="fw-choice" id="fw-col">🏗️ Attaquer colonie la plus proche : '+(o.colName||o.colTarget)+'</div>';
+  if(!(o.routes||[]).length && !o.colTarget)html+='<div class="fw-choice" id="fw-none">✖️ Passer — aucune cible, la pression populaire retombe</div>';
+  choices.innerHTML=html;
+  const pe=document.getElementById('fw-peace'); if(pe)pe.onclick=()=>go({peace:true});
+  choices.querySelectorAll('.fw-choice[data-rt]').forEach(el=>{ el.onclick=()=>go({route:parseInt(el.getAttribute('data-rt'))}); });
+  const col=document.getElementById('fw-col'); if(col)col.onclick=()=>go({colony:o.colTarget});
+  const none=document.getElementById('fw-none'); if(none)none.onclick=()=>go({});
+  m.classList.remove('hidden');
+  return true;
 }
 // VRAIE modale Accord commercial (#accord-modal).
 function showAccordReal(pending){
