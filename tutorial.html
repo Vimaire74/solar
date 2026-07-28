@@ -3162,8 +3162,9 @@ function endTurn(){
       _applyMoraleFlags();const revs=doRevenues();const maint=doMaintenance();_emitNetRevenueLog(maint);
       refillGeneralRiver();
       if(G.curEvent){const evMsg=G.curEvent.resolve(G);if(evMsg)addLog('🎯 ÉVÉNEMENT '+G.curEvent.emoji+' '+G.curEvent.name+' : '+evMsg,'gold');if(evMsg)_journalAuto(G.player.civ.name,'Événement : '+G.curEvent.name,evMsg);G._pendingEvModal={ev:G.curEvent,msg:evMsg};}
-      enforceCaps();
-      showEOTModal(maint,revs,null,null);
+      // ORDRE (Marc) : l'événement de FIN DE TOUR (et son action si accord commercial/diplomatique) s'affiche
+      // AVANT le bilan de fin de tour. Le plafonnement des ressources est déplacé au DÉBUT du tour suivant (continueAfterEOT).
+      _resolveEndTurnEvent(function(){ showEOTModal(maint,revs,null,null); });
     };
     const _afterWars=()=>processAllWars(()=>finishTurn());
     const _proceed=()=>{if(G._aiDysonBuilt){const _dysAi=G._aiDysonBuilt;G._aiDysonBuilt=null;showAiDysonModal(_dysAi,_afterWars);}else _afterWars();};
@@ -3171,23 +3172,25 @@ function endTurn(){
     else _proceed();
   },150);
 }
+// Résout l'événement de FIN DE TOUR (résultat OU action interactive accord commercial/diplomatique) puis done().
+// Appelé dans finishTurn AVANT le bilan de fin de tour, pour respecter l'ordre voulu par Marc.
+function _resolveEndTurnEvent(done){
+  if(!G._pendingEvModal){ if(done)done(); return; }
+  const _pe=G._pendingEvModal;G._pendingEvModal=null;const ev=_pe.ev,msg=_pe.msg;
+  _evModalCb=done;
+  if(ev.interactive&&msg===null&&typeof showEventChoiceModal==='function'){
+    if(_decisionActive()){ _evModalCb=null; _runInteractiveEventAllHumans(ev, done); } // EN LIGNE : CHAQUE humain fait SES propres accords
+    else showEventChoiceModal(ev,function(){const c=_evModalCb;_evModalCb=null;if(c)c();});
+  }
+  else showEventModal(ev,msg); // sa fermeture (ou l'ack de la notice en ligne) appelle _evModalCb (=done)
+}
 function continueAfterEOT(){
   document.getElementById('eot-modal').classList.add('hidden');
-  const proceed=()=>{
-    if(G.turn>=G.maxTurns)doEndGame();
-    else if(G.turn===2&&!G.playerInvest){showInvestmentModal();}   // niv.1 : choix fin T2, effet T3→T5
-    else if(G.turn===6&&!G.playerInvest2){showInvestmentModal2();} // niv.2 : choix fin T6, effet T7→T9
-    else{G.turn++;runStrategyDraft();}
-  };
-  if(G._pendingEvModal){
-    const{ev,msg}=G._pendingEvModal;G._pendingEvModal=null;
-    _evModalCb=proceed;
-    if(ev.interactive&&msg===null&&typeof showEventChoiceModal==='function'){
-      if(_decisionActive()){ _evModalCb=null; _runInteractiveEventAllHumans(ev, proceed); } // EN LIGNE : CHAQUE humain fait SES propres accords
-      else showEventChoiceModal(ev,function(){const c=_evModalCb;_evModalCb=null;if(c)c();});
-    }
-    else showEventModal(ev,msg);
-  }else proceed();
+  enforceCaps(); // DÉBUT DU TOUR SUIVANT : ressources plafonnées à leur maximum (12⚡ / 20🪨 / 10🔬 / 10🙂)
+  if(G.turn>=G.maxTurns)doEndGame();
+  else if(G.turn===2&&!G.playerInvest){showInvestmentModal();}   // niv.1 : choix fin T2, effet T3→T5
+  else if(G.turn===6&&!G.playerInvest2){showInvestmentModal2();} // niv.2 : choix fin T6, effet T7→T9
+  else{G.turn++;runStrategyDraft();}
 }
 // EN LIGNE : un événement interactif (accords commerciaux/diplomatiques) est proposé à CHAQUE humain, l'un
 // après l'autre, en « activant » sa nation (G.player) le temps de sa décision. Les tensions passent par

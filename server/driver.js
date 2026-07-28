@@ -258,9 +258,9 @@ class GameDriver {
   // raid, attaque, accord, gestion de jeton (aléa/irréversible ou négociation).
   _isConfirmable(action){
     if(!action || !action.type) return false;
-    // 'power' RETIRÉ des annulables : un pouvoir comme Surtension change le nombre d'AC → on veut garder
-    // la main immédiatement après (voir act), pas un cycle Valider/Annuler ni une rotation inutile.
-    if(['colonize','route','upgrade','buyTech'].includes(action.type)) return true;
+    // 'power' est annulable (demande de Marc : Valider/Annuler après un pouvoir gratuit). La rotation de main
+    // est gérée par commit() qui GARDE la main si le pouvoir laisse de l'AC (pas de bug Surtension).
+    if(['colonize','route','upgrade','buyTech','power'].includes(action.type)) return true;
     if(action.type==='call' && ['buyGeneral','buyMarket','doUpgrade','buyTech'].includes(action.fn)) return true;
     return false;
   }
@@ -308,7 +308,7 @@ class GameDriver {
     if(confirmable){
       // Rejet = l'action n'a rien fait (vrais mots de refus, PAS un simple ⚠️ d'info type « colonie éloignée »).
       const rejected = this._lastActionLog.some(x=>/pas assez|impossible|déjà|non adjacent|invalide|refuse|besoin/i.test(String(x)));
-      if(!rejected){ this._hold={civId, snap}; return {kind:'confirm', civId}; }
+      if(!rejected){ this._hold={civId, snap, actionType:(action&&action.type)}; return {kind:'confirm', civId}; }
     }
     // POUVOIR qui laisse de l'AC (ex. Surtension +1 AC) → le joueur GARDE la main : pas de rotation vers
     // un joueur qui a déjà passé, il enchaîne directement sa/ses action(s) (bug #4).
@@ -323,8 +323,12 @@ class GameDriver {
   }
   // Valider une action tenue : on la fige et on continue (passe la main si plus d'AC ni pouvoir).
   commit(civId){
+    const heldType = (this._hold && this._hold.civId===civId) ? this._hold.actionType : null;
     if(this._hold && this._hold.civId===civId) this._hold=null;
     const nat=this.nation(civId); this.activate(civId);
+    // POUVOIR gratuit qui laisse de l'AC (ex. Surtension +1 AC) → après validation, le joueur GARDE la main
+    // et enchaîne (pas de rotation vers un autre joueur). Évite la réapparition du bug #4.
+    if(heldType==='power' && nat && nat.acLeft>0){ return this.pump(); }
     const keepForPower = nat && nat.acLeft<=0 && this._freePowerAvailable(nat);
     if(nat && nat.acLeft<=0 && !keepForPower) nat._passedRound=true;
     this._advanceActor();

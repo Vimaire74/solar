@@ -637,6 +637,17 @@ const INTENT_MAP = {
     try{ if(window.cancelAttack) window.cancelAttack(); }catch(e){}
     if(!node) return null; // rien à envoyer
     return {type:'attack', node, tokens};
+  },
+  // CRITIQUE : l'assaut du PLATEAU passe par la modale de COMBAT DE GUERRE (confirmWarCombat), pas l'ancienne
+  // modale d'attaque. Sans cette interception, la capture ne se faisait QUE sur l'écran du joueur (jamais envoyée
+  // au serveur) → la colonie « repartait » à la resynchro suivante. On envoie l'attaque au serveur (qui capture).
+  confirmWarCombat: ()=>{
+    let node=null, tokens=1;
+    try{ node=_warAttackColonyTarget; }catch(e){}
+    try{ const sl=document.getElementById('wcm-slider'); if(sl)tokens=parseInt(sl.value)||1; }catch(e){}
+    try{ const m=document.getElementById('war-combat-modal'); if(m)m.classList.add('hidden'); }catch(e){}
+    if(!node) return null; // pas de cible colonie (ex. défense/tenir) → laisser le flux normal
+    return {type:'attack', node, tokens:Math.max(1,tokens)};
   }
 };
 function installIntercepts(){
