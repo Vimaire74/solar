@@ -147,7 +147,7 @@ function handle(m){
       STATE._myTurn=false; turnBar(false);
       try{ localStorage.removeItem('sc_ws_game'); }catch(e){}
       reqState(true);
-      showFinal(m.scores||[]);
+      showFinal(m.scores||[], {dateFr:m.dateFr, code:m.code});
       break;
     case 'error':
       console.warn('[SC] serveur:', m.msg);
@@ -955,17 +955,25 @@ function screenAuth(mode){
   let savedUser=''; try{ savedUser=localStorage.getItem('sc_ws_user')||''; }catch(e){}
   overlay(`
     <h2>${isReg?'Créer un compte':'Connexion'} — Solar Conquest</h2>
-    <input id="sc-u" type="text" placeholder="Pseudo (3-20 lettres/chiffres)" autocomplete="username" value="${savedUser}">
-    <input id="sc-p" type="password" placeholder="Mot de passe (min. 6)" autocomplete="${isReg?'new-password':'current-password'}">
+    <input id="sc-u" type="email" inputmode="email" placeholder="Ton adresse email" autocomplete="email" value="${savedUser}">
+    <div style="position:relative">
+      <input id="sc-p" type="password" placeholder="Mot de passe (min. 6)" autocomplete="${isReg?'new-password':'current-password'}" style="padding-right:44px">
+      <button type="button" id="sc-eye" title="Afficher / masquer le mot de passe" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#8fb0e0;font-size:1.1em;cursor:pointer;padding:4px 8px">👁</button>
+    </div>
+    <div class="muted" style="font-size:.78em;margin:2px 0 6px">Ton email sert d'identifiant et reçoit les scores de fin de partie.</div>
     <div class="err" id="sc-err"></div>
     <button class="pri" id="sc-go">${isReg?'Créer le compte':'Se connecter'}</button>
     <button class="sec" id="sc-alt">${isReg?"J'ai déjà un compte":'Créer un compte'}</button>
     <button class="sec" id="sc-close">↩ Retour au jeu solo</button>
   `);
   _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
+  // Œil : afficher / masquer le mot de passe
+  {const eye=document.getElementById('sc-eye'), pw=document.getElementById('sc-p');
+   if(eye&&pw)eye.onclick=()=>{ const show=pw.type==='password'; pw.type=show?'text':'password'; eye.textContent=show?'🙈':'👁'; pw.focus(); };}
   document.getElementById('sc-close').onclick = ()=>{ _errCb=null; hideOverlay(); };
   document.getElementById('sc-go').onclick = ()=>{
     const user=document.getElementById('sc-u').value.trim(), pass=document.getElementById('sc-p').value;
+    if(!/^[^@\s]+@[^@\s.]+\.[a-z]{2,}$/i.test(user)){ _errCb('Entre une adresse email valide (ex. prenom@domaine.ch)'); return; }
     STATE._pendingPass = pass;
     STATE._afterLogin = ()=>{ _errCb=null; screenLobby(); };
     send(isReg ? {t:'register', user, pass} : {t:'login', user, pass});
@@ -1202,12 +1210,43 @@ function revealGameUI(){
   try { if(window.initTechResize) window.initTechResize(); } catch(e){}
   try { if(window.installBackGuard) window.installBackGuard(); } catch(e){}
 }
-function showFinal(scores){
+function showFinal(scores, info){
   hideWaitBlock(); closeDecision();
-  const rows = scores.map((s,i)=>`<div>${i+1}. ${civLabel(s.civId)} <b>${s.name!==undefined?'':''}</b> — ${s.vp} VP</div>`).join('');
-  overlay(`<h2>🏆 Fin de partie</h2>${rows||'<div class="muted">Scores indisponibles.</div>'}
-    <button class="pri" id="sc-again">↩ Retour au lobby</button>`);
+  // CLASSEMENT DÉTAILLÉ par nation (rétabli) + date de fin + lien « Signaler un bug ».
+  const med=['🥇','🥈','🥉'];
+  const rows=(scores||[]).map((s,i)=>{
+    const who=(window._scPseudo&&window._scPseudo[s.civId])?(' <span class="muted">('+window._scPseudo[s.civId]+')</span>'):'';
+    const mine=(s.civId===STATE.myCiv)?';border-color:#5a8ad0':'';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:5px 0;padding:8px 11px;border:1px solid #2a3a6a;border-radius:9px;background:#141a30'+mine+'">'
+      +'<span>'+(med[i]||('&nbsp;'+(i+1)+'.'))+' <b>'+civLabel(s.civId)+'</b>'+who+'</span>'
+      +'<b style="color:#ffd34d">'+s.vp+' VP</b></div>';
+  }).join('');
+  const when=(info&&info.dateFr)?('<div class="muted" style="margin-bottom:8px">Partie '+(info.code||'')+' — terminée le '+info.dateFr+'</div>'):'';
+  overlay('<h2>🏆 Fin de partie</h2>'+when+(rows||'<div class="muted">Scores indisponibles.</div>')
+    +'<div class="muted" style="margin-top:8px;font-size:.8em">Le classement t\'est aussi envoyé par email.</div>'
+    +'<button class="pri" id="sc-again">↩ Retour au lobby</button>'
+    +'<button class="sec" id="sc-bug">🐞 Signaler un bug</button>');
   document.getElementById('sc-again').onclick = ()=> screenLobby();
+  document.getElementById('sc-bug').onclick = ()=> showBugReport(scores, info);
+}
+// Fenêtre « Signaler un bug » : le texte est conservé dans le log de la partie (visible dans /stats) et
+// envoyé par email à l'administrateur.
+function showBugReport(scores, info){
+  overlay('<h2>🐞 Signaler un bug</h2>'
+    +'<div class="muted" style="margin-bottom:6px">Décris ce qui s\'est mal passé (ce que tu faisais, ce que tu attendais, ce qui est arrivé). Ton message est joint au journal de cette partie.</div>'
+    +'<textarea id="sc-bugtxt" rows="7" style="width:100%;box-sizing:border-box;padding:9px 11px;border-radius:8px;border:1px solid #2c4a7e;background:#091020;color:#dce8ff;font:inherit" placeholder="Ex. : après avoir capturé Titan, la colonie est revenue aux Ceinturiens au tour suivant…"></textarea>'
+    +'<div class="err" id="sc-err"></div>'
+    +'<button class="pri" id="sc-bugsend">Envoyer</button>'
+    +'<button class="sec" id="sc-bugback">↩ Retour</button>');
+  document.getElementById('sc-bugback').onclick = ()=> showFinal(scores, info);
+  document.getElementById('sc-bugsend').onclick = ()=>{
+    const t=document.getElementById('sc-bugtxt').value.trim();
+    if(!t){ const e=document.getElementById('sc-err'); if(e)e.textContent='Écris quelques mots avant d\'envoyer.'; return; }
+    send({t:'bug_report', text:t});
+    overlay('<h2>🐞 Merci !</h2><div class="muted">Ton signalement a été enregistré avec le journal de la partie.</div>'
+      +'<button class="pri" id="sc-again2">↩ Retour au lobby</button>');
+    document.getElementById('sc-again2').onclick = ()=> screenLobby();
+  };
 }
 
 // ───────────────────────── Reprise du formulaire d'accueil du jeu ─────────────────────────

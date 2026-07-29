@@ -47,6 +47,70 @@ function safeEncode(root) {
 function J(obj) { return JSON.stringify(safeEncode(obj)); }
 
 /* ============ comptes (fichier JSON + scrypt, pas de mot de passe en clair) ============ */
+/* ─────────────── EMAIL + ARCHIVES DE PARTIES ───────────────
+   Email : nodemailer SI les variables SMTP_* sont fournies (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS,
+   MAIL_FROM). Sinon on n'échoue PAS : tout message est écrit dans data/outbox.log et reste visible dans
+   /stats → aucune information perdue, et l'envoi démarre dès que les identifiants sont configurés. */
+const ADMIN_MAIL = process.env.ADMIN_MAIL || 'marc@guerir.ch';
+const OUTBOX = path.join(DATA, 'outbox.log');
+let _transport = null;
+try {
+  if (process.env.SMTP_HOST) {
+    const nodemailer = require('nodemailer');
+    _transport = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: String(process.env.SMTP_SECURE || '') === '1',
+      auth: (process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined)
+    });
+  }
+} catch (e) { console.error('nodemailer indisponible (emails journalisés seulement):', e.message); }
+function frDate(ts) { // date + heure au format FRANÇAIS (jj/mm/aaaa hh:mm)
+  try { return new Date(ts).toLocaleString('fr-FR', { timeZone: 'Europe/Zurich', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+  catch (e) { return new Date(ts).toISOString(); }
+}
+function sendMail(to, subject, text) {
+  const line = '\n===== ' + frDate(Date.now()) + ' — À: ' + to + ' — ' + subject + ' =====\n' + text + '\n';
+  try { fs.appendFileSync(OUTBOX, line); } catch (e) {}
+  if (!_transport) return;
+  _transport.sendMail({ from: process.env.MAIL_FROM || 'solar@solar-game.com', to, subject, text })
+    .catch(e => console.error('sendMail:', e.message));
+}
+// Archives : 10 dernières parties PAR JOUEUR (scores + journal complet + bugs signalés).
+const ARCH_DIR = path.join(DATA, 'archives');
+fs.mkdirSync(ARCH_DIR, { recursive: true });
+function archFile(user) { return path.join(ARCH_DIR, encodeURIComponent(String(user)) + '.json'); }
+function readArch(user) { try { return JSON.parse(fs.readFileSync(archFile(user), 'utf8')); } catch (e) { return []; } }
+function writeArch(user, list) {
+  try { fs.writeFileSync(archFile(user), JSON.stringify(list.slice(0, 10), null, 1)); } // 10 parties max, plus récente en tête
+  catch (e) { console.error('writeArch:', e.message); }
+}
+function archiveGame(g) {
+  let scores = [], journal = [], turn = null;
+  try {
+    const sb = g.driver.sb, G = g.driver.state();
+    turn = G.turn;
+    scores = [G.player, ...G.ais].map(p => ({ civId: p.civ.id, name: p.civ.name, vp: sb.calcVP(p).total }))
+      .sort((a, b) => b.vp - a.vp);
+    journal = (G.log || []).slice(0, 400).map(l => plainText((l && l.msg) || l)).reverse();
+  } catch (e) {}
+  const endedAt = Date.now();
+  const humans = g.seats.filter(s => !s.ai && s.user);
+  const entry = {
+    code: g.code, endedAt, dateFr: frDate(endedAt), turn,
+    joueurs: g.seats.map(s => ({ civ: s.civId, ai: !!s.ai, user: s.user || null })),
+    scores, journal, bugs: (g._bugs || [])
+  };
+  const tableau = scores.map((s, i) => '  ' + (i + 1) + '. ' + s.name + ' — ' + s.vp + ' VP').join('\n');
+  for (const s of humans) {
+    const list = readArch(s.user); list.unshift(entry); writeArch(s.user, list);
+    sendMail(s.user, 'Solar Conquest — fin de partie ' + g.code + ' (' + entry.dateFr + ')',
+      'Partie ' + g.code + ' terminée le ' + entry.dateFr + '.\n\nSCORES :\n' + tableau + '\n\nMerci d\'avoir joué !');
+  }
+  sendMail(ADMIN_MAIL, 'Solar Conquest — partie terminée ' + g.code,
+    'Partie ' + g.code + ' — ' + entry.dateFr + '\nJoueurs : ' + entry.joueurs.map(j => j.civ + (j.user ? ('=' + j.user) : '(IA)')).join(', ') + '\n\nSCORES :\n' + tableau);
+  return entry;
+}
 const USERS_FILE = path.join(DATA, 'users.json');
 let users = {};
 try { users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')); } catch (e) {}
@@ -159,7 +223,11 @@ function route(g, r) {
       scores = [G.player, ...G.ais].map(p => ({ civId: p.civ.id, name: p.civ.name, vp: sb.calcVP(p).total }))
         .sort((a, b) => b.vp - a.vp);
     } catch (e) {}
-    broadcast(g, { t: 'over', scores });
+    // ARCHIVE de fin de partie : scores par nation + journal complet + bugs → 10 dernières parties par joueur,
+    // + email des scores à chaque joueur humain et à l'admin. Visible ensuite dans /stats.
+    let _entry = null;
+    try { if (!g._archived) { _entry = archiveGame(g); g._archived = true; } } catch (e) { console.error('archiveGame:', e.message); }
+    broadcast(g, { t: 'over', scores, dateFr: _entry ? _entry.dateFr : frDate(Date.now()), code: g.code });
     snapshot(g);
     return;
   }
@@ -192,6 +260,37 @@ const server = http.createServer((req, res) => {
       const user = require('./bot.js').spawnBot(PORT, code, { civId, fast });
       res.end(JSON.stringify({ ok: true, user, msg: 'Le bot rejoint la partie ' + code + ' (il prend un siège humain libre).' }));
     } catch (e) { res.end(JSON.stringify({ ok: false, msg: e.message })); }
+    return;
+  }
+  if (req.url === '/stats' || req.url.indexOf('/stats?') === 0) {
+    // STATS : 10 dernières parties PAR JOUEUR — date/heure FR, scores par nation, bugs signalés, journal complet.
+    // Texte brut → sélectionnable/copiable pour me l'envoyer.
+    const out = [];
+    out.push('SOLAR CONQUEST — STATISTIQUES  (généré le ' + frDate(Date.now()) + ')');
+    out.push('Joueurs inscrits : ' + Object.keys(users).length);
+    for (const u of Object.keys(users)) out.push('  · ' + u + ' — inscrit le ' + frDate(users[u].created || Date.now()));
+    let files = []; try { files = fs.readdirSync(ARCH_DIR).filter(f => f.endsWith('.json')); } catch (e) {}
+    for (const f of files) {
+      const user = decodeURIComponent(f.replace(/\.json$/, ''));
+      const list = readArch(user);
+      out.push('\n' + '='.repeat(70) + '\nJOUEUR : ' + user + '  (' + list.length + ' partie(s) conservée(s), 10 max)');
+      list.forEach((e, i) => {
+        out.push('\n--- Partie ' + (i + 1) + ' — code ' + e.code + ' — terminée le ' + e.dateFr + (e.turn ? (' — tour ' + e.turn) : '') + ' ---');
+        if (e.joueurs) out.push('Nations : ' + e.joueurs.map(j => j.civ + (j.user ? ('=' + j.user) : ' (IA)')).join(', '));
+        out.push('SCORES :');
+        (e.scores || []).forEach((s, k) => out.push('   ' + (k + 1) + '. ' + s.name + ' — ' + s.vp + ' VP'));
+        if (e.bugs && e.bugs.length) {
+          out.push('🐞 BUGS SIGNALÉS (' + e.bugs.length + ') :');
+          e.bugs.forEach(b => out.push('   [' + b.dateFr + '] ' + b.user + ' : ' + b.text));
+        }
+        out.push('JOURNAL COMPLET (' + (e.journal || []).length + ' lignes) :');
+        (e.journal || []).forEach(l => out.push('   ' + l));
+      });
+    }
+    let ob = ''; try { ob = fs.readFileSync(OUTBOX, 'utf8').slice(-4000); } catch (e) {}
+    if (ob) out.push('\n' + '='.repeat(70) + '\nDERNIERS EMAILS (journalisés' + (_transport ? ' ET envoyés' : ' — SMTP non configuré, non envoyés') + ') :\n' + ob);
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end(out.join('\n'));
     return;
   }
   if (req.url === '/debug') { // diagnostic de rodage (pas de secrets : codes + avancement)
@@ -242,12 +341,34 @@ wss.on('connection', (ws) => {
 
         case 'register': {
           const u = String(m.user || '').trim().toLowerCase();
-          if (!/^[a-z0-9_.-]{3,20}$/.test(u)) return err('pseudo invalide (3-20 car., lettres/chiffres/._-)');
+          // L'identifiant est désormais une ADRESSE EMAIL (sert aussi à envoyer les scores de fin de partie).
+          if (!/^[^@\s]+@[^@\s.]+\.[a-z]{2,}$/i.test(u)) return err('adresse email invalide (ex. prenom@domaine.ch)');
           if (!m.pass || String(m.pass).length < 6) return err('mot de passe trop court (min. 6)');
-          if (users[u]) return err('pseudo déjà pris');
+          if (users[u]) return err('cette adresse email est déjà inscrite');
           users[u] = { pass: hashPass(m.pass), created: Date.now(), tier: 1 }; // tier = niveau d'abonnement (1 gratuit)
           saveUsers();
+          sendMail(ADMIN_MAIL, 'Solar Conquest — nouvelle inscription : ' + u,
+            'Nouveau joueur inscrit le ' + frDate(Date.now()) + '\nEmail : ' + u + '\nTotal joueurs : ' + Object.keys(users).length);
           sendTo(ws, { t: 'registered', user: u });
+          break;
+        }
+
+        case 'bug_report': { // {t:'bug_report', text} — signalé depuis l'écran de fin de partie
+          const txt = String(m.text || '').slice(0, 4000).trim();
+          if (!txt) return err('rapport vide');
+          const who = sess.user || 'anonyme';
+          const g = (sess.game && games.get(sess.game)) || null;
+          const rec = { at: Date.now(), dateFr: frDate(Date.now()), user: who, text: txt };
+          if (g) { g._bugs = (g._bugs || []); g._bugs.push(rec); }
+          // Rattacher aussi à la partie DÉJÀ archivée du joueur (la plus récente), pour le retrouver dans /stats.
+          try {
+            const list = readArch(who);
+            if (list.length) { list[0].bugs = (list[0].bugs || []).concat([rec]); writeArch(who, list); }
+            else writeArch(who, [{ code: g ? g.code : '—', endedAt: rec.at, dateFr: rec.dateFr, scores: [], journal: [], bugs: [rec] }]);
+          } catch (e) {}
+          sendMail(ADMIN_MAIL, '🐞 Solar Conquest — BUG signalé par ' + who,
+            'Le ' + rec.dateFr + '\nJoueur : ' + who + '\nPartie : ' + (g ? g.code : '—') + '\n\n--- Message ---\n' + txt);
+          sendTo(ws, { t: 'notice', kind: 'info', payload: { msg: 'Merci ! Ton signalement a été transmis.' } });
           break;
         }
 
