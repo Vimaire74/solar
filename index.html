@@ -2737,7 +2737,15 @@ function _applyStratTo(nat,card){
   if(card.acBonus||card.spec||card.combatBonus||card.upkeepDiscount){
     nat.stratBonus={acBonus:card.acBonus||0,spec:card.spec||null,combatBonus:card.combatBonus||0,upkeepDiscount:card.upkeepDiscount||0};
     // L'AC est déjà calculé avant le draft → on ajoute ici le bonus AC de la carte Stratégie choisie.
-    if(card.acBonus){nat.acLeft=(nat.acLeft||0)+card.acBonus;nat.acMax=(nat.acMax||0)+card.acBonus;}
+    // PLAFOND 5 AC : startTurn applique Math.min(5,calcAC) mais ce bonus s'ajoutait APRÈS → on pouvait monter à 6.
+    // On replafonne donc ici aussi (le gain réel peut être 0 si on est déjà au maximum).
+    if(card.acBonus){
+      const _before=nat.acMax||0;
+      nat.acMax=Math.min(5,_before+card.acBonus);
+      const _gain=nat.acMax-_before;                 // ce qui a VRAIMENT été accordé (0 si déjà à 5)
+      nat.acLeft=Math.min(nat.acMax,(nat.acLeft||0)+_gain);
+      if(_gain<=0&&nat===G.player)addLog('⚠️ Déjà au maximum de 5 AC — le bonus de la carte Stratégie ne s\'applique pas.','dim');
+    }
   }else nat.stratBonus=null;
   addLog((nat===G.player?'🎯 Stratégie : ':'🎯 '+nat.civ.emoji+' '+nat.civ.name+' — Stratégie : ')+card.name+' — '+card.desc, nat===G.player?'gold':'dim');
   return false;
@@ -2894,7 +2902,18 @@ function processAllWars(onDone){
       // Modèle « assaut » : pas de combat automatique en fin de tour. LIBRE CHOIX au joueur : faire la paix ou poursuivre.
       showPeaceOfferModal(false,(peaceResult)=>{
         if(peaceResult==='PEACE'){const er=endWar(war.aiId);showWarModal('🕊️ Paix avec '+warEnName,'La guerre se termine par accord diplomatique.',er||{txt:'Paix conclue.',cls:'win'});_warModalCb=()=>processOngoing(idx+1);return;}
-        maybeAiAssaultPlayer(warEnemy,()=>processOngoing(idx+1)); // poursuite : l'IA qui maintient la guerre lance un assaut (avec fenêtre de défense)
+        // POURSUITE DE LA GUERRE : le joueur choisit D'ABORD son assaut (colonie/route/tenir) via la vraie
+        // fenêtre de combat — avant, on passait directement à l'assaut ennemi (guerre « occultée », bug Marc).
+        const _aiTurnThen=()=>maybeAiAssaultPlayer(warEnemy,()=>processOngoing(idx+1));
+        showWarCombatModal((committed)=>{
+          // ROUTE_ATTACK / STANDOFF / DEFEND : déjà résolus par leur propre flux → on enchaîne sur l'ennemi.
+          if(committed===undefined||committed===null||typeof committed==='string'){ _aiTurnThen(); return; }
+          const res=resolveWarCombat(committed);
+          showWarModal('⚔️ Combat contre '+warEnName,
+            res?('Puissance — Toi : <strong>'+res.pPow+'</strong> | '+warEnName+' : <strong>'+res.aPow+'</strong>'):'',
+            res?{txt:res.txt,cls:res.cls}:null);
+          _warModalCb=_aiTurnThen;
+        });
       });
       return;
     }
@@ -5594,7 +5613,7 @@ function renderWarRisk(){
   const pirateEl=document.getElementById('pirate-status');if(!pirateEl)return;
   if(!npcPiratesActive()){pirateEl.innerHTML='';return;}
   const pirProb=Math.min(100,Math.round((0.10+G.turn*0.10)*100));
-  let phtml='☠️ Pirates (base: Triton) — Risque ce tour : <strong style="color:#ff8888">'+pirProb+'%</strong>';
+  let phtml='☠️ Pirates — Risque ce tour sur tes <strong>routes non protégées</strong> : <strong style="color:#ff8888">'+pirProb+'%</strong>';
   if(getIntelLevel(G.player)>=1)phtml+=' — <span style="color:#aaa;font-size:.88em">Prochain tour : '+(Math.min(100,pirProb+10))+'%</span>';
   pirateEl.innerHTML=phtml;
 }
@@ -5621,14 +5640,9 @@ function renderSystemMap(){
   // (Attaque de route par clic sur la carte retirée : peu lisible. On attaque les routes via la fenêtre de combat ou la guerre populaire forcée.)
   // Pirates NPC (masqué si l'une des factions joue Pirates)
   const pg=document.getElementById('pirates-g');pg.innerHTML='';
-  if(npcPiratesActive()){
-    // Pirates v6 : base fixe = Triton, risque probabiliste par tour
-    const triton=NODES['triton'];
-    if(triton){
-      const pirProb=Math.min(100,Math.round((0.10+G.turn*0.10)*100));
-      pg.innerHTML+=`<circle cx="${triton.x}" cy="${triton.y}" r="${(triton.r||5)+14}" fill="#ff0000" fill-opacity=".12" stroke="#ff4444" stroke-width="1.5" stroke-dasharray="3,2"/><text x="${triton.x}" y="${triton.y+(triton.r||5)+24}" text-anchor="middle" font-size="8" fill="#ff6666">☠️ Pirates (${pirProb}%)</text>`;
-    }
-  }
+  // PIRATES : plus AUCUN marqueur/avancée sur la carte (demande de Marc — l'indication ne voulait rien dire).
+  // Les pirates restent un facteur de HASARD : risque croissant avec les tours, ils pillent UNIQUEMENT les
+  // routes non protégées (jamais les colonies, sauf événement dédié). Voir advancePirates().
   // Nodes
   const ng=document.getElementById('nodes-g');ng.innerHTML='';
   ng.innerHTML='';/* soleil dessiné retiré : fourni par l'image de fond (lueur à gauche) */
@@ -6772,7 +6786,7 @@ function showEOTModal(maint,revs,warCombat,warEnd){
     </div>`;
   }
   // Pirate forecast (masqué si l'une des factions joue Pirates)
-  if(npcPiratesActive()){const nxtProb=Math.min(100,Math.round((0.10+(G.turn+1)*0.10)*100));html+=`<div class="eot-section"><h4 style="color:#ff8888">☠️ Pirates (Triton)</h4><div class="eot-item" style="color:#ff8888"><span class="eot-icon">☠️</span><span class="eot-name">Risque d'attaque au prochain tour : ${nxtProb}%</span></div></div>`;}
+  if(npcPiratesActive()){const nxtProb=Math.min(100,Math.round((0.10+(G.turn+1)*0.10)*100));html+=`<div class="eot-section"><h4 style="color:#ff8888">☠️ Pirates</h4><div class="eot-item" style="color:#ff8888"><span class="eot-icon">☠️</span><span class="eot-name">Risque sur les routes non protégées au prochain tour : ${nxtProb}%</span></div></div>`;}
   document.getElementById('eot-body').innerHTML=html;
   document.getElementById('eot-modal').classList.remove('hidden');
 }

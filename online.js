@@ -241,6 +241,8 @@ function onDecision(pending){
   if(pending.kind==='invest2' && showInvestReal(pending,2)){ STATE._realDecide=finish; return; }
   if(pending.kind==='peace_offer' && showPeaceReal(pending)){ STATE._realDecide=finish; return; }
   if((pending.kind==='ai_dyson'||pending.kind==='human_dyson'||pending.kind==='dyson_build') && showDysonReal(pending)){ STATE._realDecide=finish; return; }
+  if(pending.kind==='war_result' && showWarResultReal(pending)){ STATE._realDecide=finish; return; }
+  if(pending.kind==='event_result' && showEventResultBlocking(pending)){ STATE._realDecide=finish; return; }
   if(pending.kind==='forced_war' && showForcedWarReal(pending)){ STATE._realDecide=finish; return; }
   if(pending.kind==='route_capture' && showRouteCaptureReal(pending)){ STATE._realDecide=finish; return; }
   if(pending.kind==='accord_confirm' && showAccordReal(pending)){ STATE._realDecide=finish; return; }
@@ -286,6 +288,31 @@ function showDysonReal(pending){
     return true;
   }
   return false;
+}
+// VRAIE fenêtre de RÉSULTAT DE COMBAT (#war-modal) — statique, se ferme sur « Continuer » (qui envoie l'ack).
+function showWarResultReal(pending){
+  const o=pending.payload||{};
+  const m=document.getElementById('war-modal'); if(!m) return false;
+  const t=document.getElementById('wm-title'), b=document.getElementById('wm-body'), r=document.getElementById('wm-result');
+  if(t)t.textContent=o.title||'⚔️ Combat';
+  if(b)b.innerHTML=o.body||'';
+  if(r){ const res=o.result||null;
+    if(res&&res.txt){ r.textContent=res.txt; r.className='war-result '+(res.cls||''); r.classList.remove('hidden'); }
+    else r.classList.add('hidden');
+  }
+  const go=()=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide({}); };
+  const btn=m.querySelector('.war-btn'); if(btn)btn.onclick=go;
+  m.classList.remove('hidden');
+  return true;
+}
+// VRAIE fenêtre de RÉSULTAT D'ÉVÉNEMENT (#event-modal) en mode BLOQUANT : « Continuer » envoie l'ack.
+function showEventResultBlocking(pending){
+  const o=pending.payload||{};
+  if(!showEventReal(o,false)) return false;
+  const m=document.getElementById('event-modal');
+  const btn=m?m.querySelector('.evm-btn'):null;
+  if(btn)btn.onclick=()=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide({}); };
+  return true;
 }
 // VRAIE modale Route conquise (#route-capture-modal) — récupérer/détruire. Était en DOM direct, jamais routée.
 function showRouteCaptureReal(pending){
@@ -438,11 +465,18 @@ function showResultToast(lines){
   p.innerHTML='<div style="font-weight:800;margin-bottom:3px">✅ Résultat de ton action</div>'+lines.map(t=>'• '+t).join('<br>');
   p.style.display='block';
   clearTimeout(p._timer);
-  p._timer=setTimeout(()=>{ p.style.display='none'; }, 6000);
+  // Le TIEN d'abord et 1 seconde plus court (6 s → 5 s) ; les toasts des autres s'affichent APRÈS (cf. showLogToast).
+  const DUR=5000;
+  window._scGreenUntil=Date.now()+DUR;
+  p._timer=setTimeout(()=>{ p.style.display='none'; window._scGreenUntil=0; }, DUR);
 }
 
 // ── Pop-up rouge : ce que font les AUTRES (bot, IA) pendant la partie ──
 function showLogToast(txts){
+  // SÉQUENÇAGE : si le toast VERT (ta nation) est encore affiché, on diffère celui des autres nations
+  // au lieu de le superposer (les deux étaient au même endroit → chevauchement).
+  const wait=(window._scGreenUntil||0)-Date.now();
+  if(wait>0){ setTimeout(()=>{ try{ showLogToast(txts); }catch(e){} }, wait+120); return; }
   let p=document.getElementById('sc-logtoast');
   if(!p){ injectStyles(); p=el('<div id="sc-logtoast" style="position:fixed;top:78px;left:50%;transform:translateX(-50%);z-index:8650;background:#2a0e14;border:2px solid #c0392b;border-radius:12px;padding:10px 14px;width:min(92vw,430px);color:#ffd7d0;font:600 .85em system-ui;box-shadow:0 10px 30px rgba(0,0,0,.55);line-height:1.4"></div>'); document.body.appendChild(p); p.onclick=()=>{ p.style.display='none'; }; }
   p._buf=(p._buf||[]).concat(txts).slice(-4); // les 4 dernières lignes
@@ -783,7 +817,7 @@ function installIntercepts(){
 function askRouteToken(action){
   decisionPanel(`<h2>🛤️ Protéger la route ?</h2><div class="muted">Un jeton maintient la connexion et repousse les pirates.</div>
     <button class="opt" id="sc-t1">⚔️ Oui, déployer 1 jeton</button>
-    <button class="opt" id="sc-t0">Non, route passive</button>`);
+    <button class="opt" id="sc-t0">Non, laisser sans protection militaire</button>`);
   document.getElementById('sc-t1').onclick=()=>{ action.token=true; sendAction(action); };
   document.getElementById('sc-t0').onclick=()=>{ action.token=false; sendAction(action); };
 }
@@ -839,7 +873,7 @@ function actionMenu(){
     if(!hasTok) return sendAction({type:'route', from:it.from, to:it.to, token:false});
     decisionPanel(`<h2>${it.label}</h2><div class="muted">Protéger la route avec un jeton de force ?</div>
       <button class="opt" id="sc-t1">⚔️ Oui, déployer 1 jeton</button>
-      <button class="opt" id="sc-t0">Non, route passive</button>`);
+      <button class="opt" id="sc-t0">Non, laisser sans protection militaire</button>`);
     document.getElementById('sc-t1').onclick=()=>sendAction({type:'route', from:it.from, to:it.to, token:true});
     document.getElementById('sc-t0').onclick=()=>sendAction({type:'route', from:it.from, to:it.to, token:false});
   }));

@@ -184,7 +184,10 @@ class GameDriver {
     return G;
   }
 
-  _isNotice(p){ return !!(p && (p.notice || ['war_result','event_result','event_announce','eot'].includes(p.kind))); }
+  // Notices BLOQUANTES : le joueur doit cliquer « Continuer » (fenêtre statique). Sinon le pump acquittait
+  // tout de suite → les fenêtres « tu as gagné/perdu » et « résultat d'événement » passaient inaperçues.
+  _isBlockingNotice(p){ return !!(p && ['war_result','event_result'].includes(p.kind)); }
+  _isNotice(p){ return !!(p && (p.notice || ['war_result','event_result','event_announce','eot'].includes(p.kind))) && !this._isBlockingNotice(p); }
   _gameOver(){ const G=this.sb.__G; return G.phase==='over' || G.turn>G.maxTurns; }
 
   // Acteur courant de la phase d'actions (round-robin sur G._order, en sautant ceux qui ont passé).
@@ -218,6 +221,12 @@ class GameDriver {
     while(guard++ < 200000){
       if(G._pending){
         if(this._isNotice(G._pending)){ const id=G._pending.id; this.sb.resolveDecision(id,{}); continue; } // acquitte l'info → enchaîne
+        // Notice BLOQUANTE sans destinataire (ex. résultat d'événement, nation=null) → l'adresser à un HUMAIN
+        // (sinon personne ne peut cliquer « Continuer » et la partie se figerait).
+        if(this._isBlockingNotice(G._pending) && !G._pending.nation){
+          const h=this.roster.find(n=>n && !n._isAI);
+          G._pending.nation = h ? h.civ.id : this.primaryId;
+        }
         return {kind:'decision', pending:G._pending}; // décision d'un humain : attendre le client
       }
       if(this._gameOver()) return {kind:'over'};

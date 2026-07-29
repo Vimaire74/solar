@@ -103,6 +103,17 @@ function autoAnswer(pending) {
   return {};
 }
 
+// Les ressources du jeu sont des BALISES <i class=ri-...> : les supprimer bêtement effaçait le butin
+// (« Raid ! + » / « Commerce avec les pirates : → + » sans rien). On les convertit en emoji AVANT de nettoyer.
+function plainText(s) {
+  return String(s == null ? '' : s)
+    .replace(/<i\s+class=["']?ri-energy["']?\s*><\/i>/gi, '⚡')
+    .replace(/<i\s+class=["']?ri-materials["']?\s*><\/i>/gi, '🪨')
+    .replace(/<i\s+class=["']?ri-science["']?\s*><\/i>/gi, '🔬')
+    .replace(/<i\s+class=["']?ri-morale["']?\s*><\/i>/gi, '🙂')
+    .replace(/<[^>]+>/g, '')
+    .trim();
+}
 function clearTimer(g) { if (g.timer) { clearTimeout(g.timer); g.timer = null; } }
 const RECONNECT_GRACE_MS = parseInt(process.env.RECONNECT_GRACE_MS || '30000', 10);
 function armTimer(g, civId, fn) {
@@ -203,7 +214,7 @@ const server = http.createServer((req, res) => {
         wars = (G.wars || []).map(w => ({ entre: (w.a || '?') + '↔' + (w.b || w.aiId || '?'), aiId: w.aiId,
           reconqCible: w.aiRecaptureTarget || null, toursRestants: w.turnsLeft, live: !!w.live, wins: w.wins, agresseurIA: !!w.aiAggressor, aFrappeCeTour: !!w._aiAssaultedThisTurn }));
         // journal COMPLET (jusqu'à 200 lignes), remis dans l'ordre chronologique
-        journal = (G.log || []).slice(0, 200).map(l => String((l && l.msg) || l).replace(/<[^>]+>/g, '').slice(0, 180)).reverse();
+        journal = (G.log || []).slice(0, 200).map(l => plainText((l && l.msg) || l).slice(0, 180)).reverse();
         // trace de guerre dédiée (capture/reprise/combat/défense) — sous-ensemble du journal filtré
         warTrace = journal.filter(l => /captur|reprend|assaut|combat|défense|defense|guerre|paix|pill|raid|jeton/i.test(l));
       } catch (e) {}
@@ -349,7 +360,7 @@ wss.on('connection', (ws) => {
             const rr = g.driver.act(s.civId, m.action || { type: 'pass' });
             const act = m.action || {};
             if (act.type && act.type !== 'pass') {
-              const lines = (g.driver._lastActionLog || []).map(x => String(x).replace(/<[^>]+>/g, '').trim()).filter(Boolean);
+              const lines = (g.driver._lastActionLog || []).map(x => plainText(x)).filter(Boolean);
               const warn = lines.filter(x => /⚠️|pas assez|impossible|déjà|non adjacent|invalide|refuse/i.test(x));
               if (warn.length) sendTo(ws, { t: 'notice', kind: 'info', payload: { msg: warn[0] } });
               else if (lines.length) sendTo(ws, { t: 'notice', kind: 'result', payload: { lines: lines.slice(-4) } });
