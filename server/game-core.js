@@ -97,12 +97,30 @@ const ACTIONS = {
   upgrade:  (sb, a) => { sb.doUpgrade(a.node); _postAction(sb); },
   buyTech:  (sb, a) => { sb.buyTech(a.card); _postAction(sb); },
   raid:     (sb, a) => { if (a.target && typeof sb.doRaidTarget === 'function') sb.doRaidTarget(a.target, a.node || null); else sb.doRaid(); _postAction(sb); },
-  attack:   (sb, a) => { // on PILOTE la vraie modale (règles du jeu, rien de réécrit) : min/coût de trajet posés par showAttackModal
-    sb.showAttackModal(a.node);
-    const sl = sb.document.getElementById('atk-slider');
-    const min = parseInt(sl.min) || 1, max = parseInt(sl.max) || min;
-    sl.value = String(Math.max(min, Math.min(max, parseInt(a.tokens) || min)));
-    sb.confirmAttack();
+  attack:   (sb, a) => {
+    // Assaut du PLATEAU : on résout avec le MÊME modèle que la modale de combat (resolveWarCombat) — jetons
+    // engagés vs défense affichée, PAS l'ancien confirmAttack (coût de trajet). Ainsi l'affichage ne ment plus.
+    const G = sb.__G, p = G.player, node = a.node;
+    if (!node) { _postAction(sb); return; }
+    const owner = (typeof sb.getNodeOwnerAI === 'function') ? sb.getNodeOwnerAI(node)
+                : (G.ais || []).find(x => x.colonies.some(c => c.nodeId === node));
+    if (!owner) { _postAction(sb); return; }
+    // Guerre avec le propriétaire (déclarée si besoin) + cible de capture.
+    let war = (G.wars || []).find(w => w.a === owner.civ.id || w.b === owner.civ.id);
+    if (!war && typeof sb.declareWar === 'function') {
+      try { sb.declareWar('Assaut sur ' + node + ' !', 'player', owner.civ.id); } catch (e) {}
+      war = (G.wars || []).find(w => w.a === owner.civ.id || w.b === owner.civ.id);
+    }
+    G.warWith = owner.civ.id;
+    if (war) { war.live = true; war.justDeclared = false; war.turnsLeft = 99; }
+    vm.runInContext('_warAttackColonyTarget=' + JSON.stringify(node), sb);
+    // Défense IA DÉTERMINISTE = ce qu'elle peut payer (exactement ce que la modale affiche comme défense utilisable).
+    G._aiWarCommitted = Math.max(0, Math.min(owner.forceTokens || 0, owner.res.materials || 0, owner.res.energy || 0));
+    if (p && (p.acLeft || 0) > 0) p.acLeft -= 1; // l'assaut coûte 1 AC
+    p._attacksThisTurn = (p._attacksThisTurn || 0) + 1;
+    const tokens = Math.max(1, parseInt(a.tokens) || 1);
+    try { if (typeof sb.resolveWarCombat === 'function') sb.resolveWarCombat(tokens); } catch (e) {}
+    if (war) war.aiRecaptureTarget = null; // pas de reprise auto invisible (défense de fin de tour est routée)
     _postAction(sb);
   },
   power:    (sb)    => {
