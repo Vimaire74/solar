@@ -243,6 +243,7 @@ function onDecision(pending){
   if((pending.kind==='ai_dyson'||pending.kind==='human_dyson'||pending.kind==='dyson_build') && showDysonReal(pending)){ STATE._realDecide=finish; return; }
   if(pending.kind==='war_result' && showWarResultReal(pending)){ STATE._realDecide=finish; return; }
   if(pending.kind==='event_result' && showEventResultBlocking(pending)){ STATE._realDecide=finish; return; }
+  if(pending.kind==='event_announce' && showEventAnnounceBlocking(pending)){ STATE._realDecide=finish; return; }
   if(pending.kind==='forced_war' && showForcedWarReal(pending)){ STATE._realDecide=finish; return; }
   if(pending.kind==='route_capture' && showRouteCaptureReal(pending)){ STATE._realDecide=finish; return; }
   if(pending.kind==='accord_confirm' && showAccordReal(pending)){ STATE._realDecide=finish; return; }
@@ -311,6 +312,15 @@ function showEventResultBlocking(pending){
   if(!showEventReal(o,false)) return false;
   const m=document.getElementById('event-modal');
   const btn=m?m.querySelector('.evm-btn'):null;
+  if(btn)btn.onclick=()=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide({}); };
+  return true;
+}
+// ANNONCE de l'événement du prochain tour (#event-announce-modal), à VALIDER (« Compris → »).
+function showEventAnnounceBlocking(pending){
+  const o=pending.payload||{};
+  if(!showEventReal(o,true)) return false;
+  const m=document.getElementById('event-announce-modal');
+  const btn=m?m.querySelector('.ea-btn'):null;
   if(btn)btn.onclick=()=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide({}); };
   return true;
 }
@@ -459,6 +469,10 @@ function showInvestReal(pending, lvl){
 
 // ── Pop-up VERTE : résultat de TON action (raid volé, combat gagné/perdu, colonie prise/capturée…) ──
 function showResultToast(lines){
+  // RETIRÉ (demande de Marc) : plus de fenêtre VERTE récapitulant l'action qu'on vient de faire — trop d'infos
+  // affichées. On garde la barre de VALIDATION (Valider/Annuler) et les fenêtres ROUGES (actions des autres).
+  return;
+  /* eslint-disable no-unreachable */
   if(!lines || !lines.length) return;
   let p=document.getElementById('sc-resulttoast');
   if(!p){ injectStyles(); p=el('<div id="sc-resulttoast" style="position:fixed;top:78px;left:50%;transform:translateX(-50%);z-index:8680;background:#0e2a16;border:2px solid #2e9e57;border-radius:12px;padding:10px 14px;width:min(92vw,430px);color:#d0ffdc;font:600 .88em system-ui;box-shadow:0 10px 30px rgba(0,0,0,.55);line-height:1.4"></div>'); document.body.appendChild(p); p.onclick=()=>{ p.style.display='none'; }; }

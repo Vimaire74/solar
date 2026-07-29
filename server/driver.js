@@ -186,7 +186,7 @@ class GameDriver {
 
   // Notices BLOQUANTES : le joueur doit cliquer « Continuer » (fenêtre statique). Sinon le pump acquittait
   // tout de suite → les fenêtres « tu as gagné/perdu » et « résultat d'événement » passaient inaperçues.
-  _isBlockingNotice(p){ return !!(p && ['war_result','event_result'].includes(p.kind)); }
+  _isBlockingNotice(p){ return !!(p && ['war_result','event_result','event_announce'].includes(p.kind)); }
   _isNotice(p){ return !!(p && (p.notice || ['war_result','event_result','event_announce','eot'].includes(p.kind))) && !this._isBlockingNotice(p); }
   _gameOver(){ const G=this.sb.__G; return G.phase==='over' || G.turn>G.maxTurns; }
 
