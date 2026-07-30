@@ -73,7 +73,7 @@ function sendMail(to, subject, text) {
   const line = '\n===== ' + frDate(Date.now()) + ' — À: ' + to + ' — ' + subject + ' =====\n' + text + '\n';
   try { fs.appendFileSync(OUTBOX, line); } catch (e) {}
   if (!_transport) return;
-  _transport.sendMail({ from: process.env.MAIL_FROM || 'solar@solar-game.com', to, subject, text })
+  _transport.sendMail({ from: process.env.MAIL_FROM || 'Solar <contact@solar-game.com>', to, subject, text })
     .catch(e => console.error('sendMail:', e.message));
 }
 // Archives : 10 dernières parties PAR JOUEUR (scores + journal complet + bugs signalés).
@@ -104,10 +104,10 @@ function archiveGame(g) {
   const tableau = scores.map((s, i) => '  ' + (i + 1) + '. ' + s.name + ' — ' + s.vp + ' VP').join('\n');
   for (const s of humans) {
     const list = readArch(s.user); list.unshift(entry); writeArch(s.user, list);
-    sendMail(s.user, 'Solar Conquest — fin de partie ' + g.code + ' (' + entry.dateFr + ')',
+    sendMail(s.user, 'Solar — fin de partie ' + g.code + ' (' + entry.dateFr + ')',
       'Partie ' + g.code + ' terminée le ' + entry.dateFr + '.\n\nSCORES :\n' + tableau + '\n\nMerci d\'avoir joué !');
   }
-  sendMail(ADMIN_MAIL, 'Solar Conquest — partie terminée ' + g.code,
+  sendMail(ADMIN_MAIL, 'Solar — partie terminée ' + g.code,
     'Partie ' + g.code + ' — ' + entry.dateFr + '\nJoueurs : ' + entry.joueurs.map(j => j.civ + (j.user ? ('=' + j.user) : '(IA)')).join(', ') + '\n\nSCORES :\n' + tableau);
   return entry;
 }
@@ -266,7 +266,7 @@ const server = http.createServer((req, res) => {
     // STATS : 10 dernières parties PAR JOUEUR — date/heure FR, scores par nation, bugs signalés, journal complet.
     // Texte brut → sélectionnable/copiable pour me l'envoyer.
     const out = [];
-    out.push('SOLAR CONQUEST — STATISTIQUES  (généré le ' + frDate(Date.now()) + ')');
+    out.push('SOLAR — STATISTIQUES  (généré le ' + frDate(Date.now()) + ')');
     out.push('Joueurs inscrits : ' + Object.keys(users).length);
     for (const u of Object.keys(users)) out.push('  · ' + u + ' — inscrit le ' + frDate(users[u].created || Date.now()));
     let files = []; try { files = fs.readdirSync(ARCH_DIR).filter(f => f.endsWith('.json')); } catch (e) {}
@@ -347,7 +347,7 @@ wss.on('connection', (ws) => {
           if (users[u]) return err('cette adresse email est déjà inscrite');
           users[u] = { pass: hashPass(m.pass), created: Date.now(), tier: 1 }; // tier = niveau d'abonnement (1 gratuit)
           saveUsers();
-          sendMail(ADMIN_MAIL, 'Solar Conquest — nouvelle inscription : ' + u,
+          sendMail(ADMIN_MAIL, 'Solar — nouvelle inscription : ' + u,
             'Nouveau joueur inscrit le ' + frDate(Date.now()) + '\nEmail : ' + u + '\nTotal joueurs : ' + Object.keys(users).length);
           sendTo(ws, { t: 'registered', user: u });
           break;

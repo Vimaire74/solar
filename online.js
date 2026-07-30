@@ -528,6 +528,10 @@ function showNotice(m){
   const o = m.payload || {}, k = m.kind;
   // ÉVÉNEMENTS : afficher la VRAIE fenêtre du jeu (visuel d'origine) plutôt qu'un bandeau minimal.
   if((k==='event_result'||k==='event_announce') && showEventReal(o, k==='event_announce')) return;
+  // FENÊTRES BLEUES SUPPRIMÉES (demande de Marc) : le bandeau bleu #sc-notice se superposait sans arrêt.
+  // On garde UNIQUEMENT les fenêtres ROUGES (showLogToast = ce que font les autres nations) et les vraies
+  // modales du jeu. Les infos restantes (eot/info) partent dans le journal, pas en pop-up.
+  if(k==='eot'||k==='info'||k==='result') return;
   let title='', body='';
   if(k==='war_result'){ title=o.title||'⚔️ Combat'; body=(o.body||'')+(o.result&&o.result.txt?'<br><br><b>'+o.result.txt+'</b>':''); }
   else if(k==='event_result'){ title='🎯 Événement'+(o.event?' — '+(o.event.emoji||'')+' '+o.event.name:''); body=o.msg||''; }
@@ -850,15 +854,20 @@ function onMyActionTurn(){
   reqState(true);                                   // état frais → plateau à jour
   window._scOnPass = ()=> sendAction({type:'pass'}); // le bouton « Fin de Tour » du jeu = passer
   turnBar(true);
-  // Si je n'ai plus d'AC mais mon POUVOIR GRATUIT est encore dispo → rappel (comme en solo),
-  // au lieu de finir le tour sans l'avoir proposé. Le serveur m'a laissé la main exprès pour ça.
+  // RAPPEL DU POUVOIR GRATUIT — déclenché quand il te reste **1 AC** (donc AVANT ta dernière action),
+  // pendant ta phase de jeu où tu peux encore l'utiliser. Avant, il se déclenchait à 0 AC, c'est-à-dire
+  // au basculement en fin de tour : il venait alors s'intercaler entre les fenêtres de guerre (bug Marc).
+  // Une seule fois par tour (STATE._abilityHintTurn).
   setTimeout(()=>{
     try{
       if(!STATE._myTurn) return;
-      const me=myNation();
-      if(me && me.acLeft<=0 && typeof _scAbilityAvailable==='function' && _scAbilityAvailable()){
-        if(typeof _scShowAbilityReminder==='function') _scShowAbilityReminder();
-      }
+      const me=myNation(); if(!me) return;
+      const G=scGetG(); const turn=(G&&G.turn)||0;
+      if(STATE._abilityHintTurn===turn) return;              // déjà proposé ce tour
+      if(typeof _scAbilityAvailable!=='function' || !_scAbilityAvailable()) return;
+      if((me.acLeft||0)!==1) return;                          // uniquement au dernier AC
+      STATE._abilityHintTurn=turn;
+      if(typeof _scShowAbilityReminder==='function') _scShowAbilityReminder();
     }catch(e){}
   }, 400);
 }

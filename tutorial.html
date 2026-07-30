@@ -1318,7 +1318,7 @@ const CARDS_POOL=[
    effect:'Routes −1<i class=ri-materials></i>',spec:'route_disc',
    cost:{science:2,energy:1},vp:1},
   {id:'nav2',branch:'navigation',tier:2,type:'technology',name:'IA de Navigation',emoji:'🧠',
-   effect:'+2 jetons Force. Coût guerre ÷2.',spec:'nav2_war',forceBonus:2,
+   effect:'+2 jetons Force. Coût de guerre ÷2 (division exacte : si le nombre de jetons engagés est impair, la demi-part est prélevée sur l\'<i class=ri-energy></i> — ex. 5 jetons = 2<i class=ri-materials></i> et 3<i class=ri-energy></i>).',spec:'nav2_war',forceBonus:2,
    cost:{science:4,energy:1},vp:3},
   {id:'hyper3',branch:'navigation',tier:3,type:'technology',name:'Hyperpropulsion',emoji:'🌀',
    effect:'+5 Gov. Routes sans entretien. +3 jetons.',spec:'route_force_free',govPts:5,forceBonus:3,
@@ -2903,6 +2903,17 @@ function processAllWars(onDone){
     if(idx>=ongoing.length){processFresh(0);return;}
     const war=ongoing[idx];
     if(!G.wars.find(w=>w.aiId===war.aiId)){processOngoing(idx+1);return;}
+    // NATION SANS COLONIE = vaincue → elle devient VASSALE et la guerre s'ARRÊTE (sinon la partie se bloquait :
+    // on proposait un combat contre une nation qui n'a plus rien à défendre).
+    {const _van=G.ais.find(a=>a.civ.id===war.aiId);
+     if(_van&&(!_van.colonies||_van.colonies.length===0)){
+       const _n=_van.civ.emoji+' '+_van.civ.name;
+       endWar(war.aiId);
+       addLog('🏳️ '+_n+' n\'a plus aucune colonie — nation ASSERVIE (vassale). La guerre prend fin.','gold');
+       showWarModal('🏳️ '+_n+' asservi !','Cette nation n\'a plus aucune colonie : elle devient ta <strong>vassale</strong>.<br><br>La guerre prend fin.',{txt:'Victoire totale.',cls:'win'});
+       _warModalCb=()=>processOngoing(idx+1);
+       return;
+     }}
     G.warWith=war.aiId;G.warTurnsLeft=war.turnsLeft;G.warWins=war.wins;
     const warEnemy=G.ais.find(a=>a.civ.id===war.aiId)||G.ais[0];
     const warEnName=warEnemy?(warEnemy.civ.emoji+' '+warEnemy.civ.name):'IA';
@@ -2915,7 +2926,7 @@ function processAllWars(onDone){
         const _aiTurnThen=()=>maybeAiAssaultPlayer(warEnemy,()=>processOngoing(idx+1));
         showWarCombatModal((committed)=>{
           // ROUTE_ATTACK / STANDOFF / DEFEND : déjà résolus par leur propre flux → on enchaîne sur l'ennemi.
-          if(committed===undefined||committed===null||typeof committed==='string'){ _aiTurnThen(); return; }
+          if(committed===undefined||committed===null||typeof committed==='string'||(committed|0)<=0){ addLog('🛡️ Tu tiens ta position — aucun assaut ce tour.','dim'); _aiTurnThen(); return; } // 0 jeton = TENIR (pas un combat perdu d'avance)
           const res=resolveWarCombat(committed);
           showWarModal('⚔️ Combat contre '+warEnName,
             res?('Puissance — Toi : <strong>'+res.pPow+'</strong> | '+warEnName+' : <strong>'+res.aPow+'</strong>'):'',
@@ -2992,7 +3003,7 @@ function processAllWars(onDone){
       // Avant : simple message d'info puis passage au tour suivant, sans jamais de fenêtre de combat (bug Marc).
       _warModalCb=()=>{
         showWarCombatModal((committed)=>{
-          if(committed===undefined||committed===null||typeof committed==='string'){ processFresh(idx+1); return; }
+          if(committed===undefined||committed===null||typeof committed==='string'||(committed|0)<=0){ addLog('🛡️ Tu tiens ta position — aucun assaut ce tour.','dim'); processFresh(idx+1); return; } // 0 jeton = TENIR
           const res=resolveWarCombat(committed);
           showWarModal('⚔️ Combat contre '+warEnName,
             res?('Puissance — Toi : <strong>'+res.pPow+'</strong> | '+warEnName+' : <strong>'+res.aPow+'</strong>'):'',
@@ -3172,9 +3183,13 @@ function runEndOfRound(){
   advancePirates(); updateWarRisk(); updateTension();
   const finishTurn=()=>{ _applyMoraleFlags(); const revs=doRevenues(); const maint=doMaintenance(); _emitNetRevenueLog(maint); refillGeneralRiver();
     if(G.curEvent){ const evMsg=G.curEvent.resolve(G); if(evMsg)addLog('🎯 ÉVÉNEMENT '+G.curEvent.emoji+' '+G.curEvent.name+' : '+evMsg,'gold'); if(evMsg)_journalAuto(G.player.civ.name,'Événement : '+G.curEvent.name,evMsg);G._pendingEvModal={ev:G.curEvent,msg:evMsg}; }
-    enforceCaps();
     G._lastEOT={maint,revs}; // mémorisé pour ré-affichage sûr en cas de reprise
-    showEOTModal(maint,revs,null,null); };
+    // ORDRE (Marc) : l'ÉVÉNEMENT de fin de tour — son RÉSULTAT à valider, ou son ACTION (accords commerciaux /
+    // diplomatiques) — est présenté AVANT le bilan de fin de tour. Le plafonnement des ressources se fait au
+    // DÉBUT du tour suivant (continueAfterEOT).
+    // ⚠️ C'EST LE CHEMIN DU SERVEUR : runEndOfRound a sa PROPRE copie de finishTurn. Sans cet appel, les
+    // événements n'étaient jamais affichés en ligne (seule la version solo d'endTurn avait été branchée).
+    _resolveEndTurnEvent(function(){ showEOTModal(maint,revs,null,null); }); };
   const afterWars=()=>processAllWars(()=>finishTurn());
   // Une IA a construit la Sphère de Dyson ce tour → demander au joueur : accepter le monopole ou déclarer la guerre.
   if(G._aiDysonBuilt){const _dysAi=G._aiDysonBuilt;G._aiDysonBuilt=null;showAiDysonModal(_dysAi,afterWars);}
@@ -3215,12 +3230,23 @@ function endTurn(){
 function _resolveEndTurnEvent(done){
   if(!G._pendingEvModal){ if(done)done(); return; }
   const _pe=G._pendingEvModal;G._pendingEvModal=null;const ev=_pe.ev,msg=_pe.msg;
-  _evModalCb=done;
-  if(ev.interactive&&msg===null&&typeof showEventChoiceModal==='function'){
+  // Étape 2 : le CHOIX interactif (accords commerciaux / diplomatiques).
+  // ⚠️ Avant, ce choix était conditionné à `msg===null` — or _evCommResolve/_evDiploResolve renvoient TOUJOURS
+  // un message → la fenêtre de choix ne s'ouvrait JAMAIS (code mort). On se base donc sur `ev.interactive`.
+  const _askChoice=function(){
+    if(!(ev.interactive&&typeof showEventChoiceModal==='function'))return false;
     if(_decisionActive()){ _evModalCb=null; _runInteractiveEventAllHumans(ev, done); } // EN LIGNE : CHAQUE humain fait SES propres accords
     else showEventChoiceModal(ev,function(){const c=_evModalCb;_evModalCb=null;if(c)c();});
+    return true;
+  };
+  // Étape 1 : le RÉSULTAT de l'événement, à VALIDER par le joueur ; ensuite seulement le choix éventuel.
+  if(msg!==null&&msg!==undefined&&msg!==''){
+    _evModalCb=function(){ if(!_askChoice()){ if(done)done(); } };
+    showEventModal(ev,msg);
+    return;
   }
-  else showEventModal(ev,msg); // sa fermeture (ou l'ack de la notice en ligne) appelle _evModalCb (=done)
+  _evModalCb=done;
+  if(!_askChoice()){ if(done)done(); }
 }
 function continueAfterEOT(){
   document.getElementById('eot-modal').classList.add('hidden');
@@ -4200,10 +4226,14 @@ function playerAssaultColony(nodeId,enemyAI){
 // la moitié est détruite définitivement, le reste revient après récupération.
 function applyCombatEngage(p,e,won){
   e=Math.max(0,e|0); if(e<=0||!p)return;
-  // IA de Navigation (nav2_war) : COÛT en ressources ÷2 (arrondi bas). Les jetons immobilisés restent identiques.
-  const rc=(typeof hasSpec==='function'&&hasSpec(p,'nav2_war'))?Math.floor(e/2):e;
-  p.res.materials=Math.max(0,(p.res.materials||0)-rc);
-  p.res.energy=Math.max(0,(p.res.energy||0)-rc);
+  // IA de Navigation (nav2_war) : COÛT de guerre divisé par 2 EXACTEMENT. Quand le nombre de jetons est
+  // IMPAIR, la demi-part est toujours prélevée sur l'ÉNERGIE (ex. 5 jetons → 2🪨 et 3⚡).
+  // Les jetons immobilisés, eux, restent identiques.
+  const _half=(typeof hasSpec==='function'&&hasSpec(p,'nav2_war'));
+  const rcM=_half?Math.floor(e/2):e;   // matériaux : arrondi BAS
+  const rcE=_half?Math.ceil(e/2):e;    // énergie   : arrondi HAUT (porte la demie)
+  p.res.materials=Math.max(0,(p.res.materials||0)-rcM);
+  p.res.energy=Math.max(0,(p.res.energy||0)-rcE);
   p.forceTokens=Math.max(0,(p.forceTokens||0)-e);      // tous les engagés quittent temporairement le pool
   if(!p.forceCooldown)p.forceCooldown=[];
   if(won){
@@ -4667,7 +4697,12 @@ function resolveWarCombat(playerCommitted){
   aiEngaged=Math.min(aiEngaged,warEnemy.forceTokens||0,warEnemy.res.materials||0,warEnemy.res.energy||0); // ne peut engager que ce qu'il peut PAYER (1🪨+1⚡/jeton)
   const _aiCru=cruiserAvailable(warEnemy)&&cruiserAfford(warEnemy); // l'IA déploie son Supercroiseur en défense si possédé et payable
   if(_aiCru){warEnemy.res.materials=Math.max(0,(warEnemy.res.materials||0)-5);warEnemy.res.energy=Math.max(0,(warEnemy.res.energy||0)-5);addLog('⚓ '+warEnemy.civ.emoji+' '+warEnemy.civ.name+' déploie son Supercroiseur en défense (+'+(warEnemy.cruiserPower||5)+'⚔️).','dim');}
-  const aPow=aiEngaged+aEmpathBonus+(_aiCru?(warEnemy.cruiserPower||5):0)+1/*garnison de base de la colonie IA défendue*/;
+  // COLONIE MÈRE (règle Marc) : la capitale est automatiquement défendue par 10 jetons de la nation.
+  // Elle reste donc prenable, mais au prix d'un vrai assaut (avant : imprenable « en théorie », en pratique
+  // capturée pour 1 jeton → nation à 0 colonie et partie bloquée).
+  const _homeDef=(_warAttackColonyTarget&&warEnemy&&_warAttackColonyTarget===warEnemy.civ.home)?10:0;
+  if(_homeDef)addLog('🏛️ Capitale '+(NODES[_warAttackColonyTarget]?.name||'')+' : défense automatique de 10 jetons.','dim');
+  const aPow=aiEngaged+aEmpathBonus+(_aiCru?(warEnemy.cruiserPower||5):0)+1/*garnison de base de la colonie IA défendue*/+_homeDef;
   G._aiWarCommitted=undefined;
   // Coût + récupération SYMÉTRIQUES (attaque ET défense) : 1<i class=ri-materials></i> +1<i class=ri-energy></i> par jeton engagé, jetons immobilisés (récupération / moitié perdue si défaite).
   const pWin=pPow>aPow,aWin=aPow>pPow;
@@ -4820,6 +4855,23 @@ function aiBuyMilitary(ai,card){
 }
 function doAITurn(aiPlayer,oneShot){
   const ai=aiPlayer;G.aiActions=[];G._raidsThisTurn=[];ai._warConserve=false;ai._warRecapture=null;ai._warAggressor=false;ai._enemy=_aiResolveTarget(ai);ai._pForceEst=perceivedForce(ai,ai._enemy).val;
+  // ── RÉSERVE DE GUERRE (point d'entrée) ──────────────────────────────────────────────────────────────
+  // Un joueur humain en guerre ne dépense pas sa dernière énergie : il garde de quoi ENGAGER ses jetons
+  // (1🪨 +1⚡ par jeton). Avant, l'IA finissait à 0⚡ et se laissait conquérir sans résistance.
+  // On coupe TOUTE dépense discrétionnaire dès que la trésorerie tombe au niveau de la réserve.
+  {const _w=(typeof _warOf==='function')?_warOf(ai.civ.id):null;
+   if(_w){
+     const _resv=Math.max(2,Math.min(6,ai.forceTokens||0));
+     const _liq=Math.min(ai.res.materials||0, ai.res.energy||0);
+     // +3 de marge : une seule action peut coûter jusqu'à ~3 ressources, sans quoi l'IA passerait
+     // SOUS la réserve d'un coup (elle s'arrête donc un cran plus tôt).
+     if(_liq<=_resv+3){
+       ai._hoarding=true;                       // thésaurise ce tour : elle garde de quoi se défendre
+       if(oneShot){ ai.acLeft=Math.max(0,ai.acLeft-1); return false; }
+       ai.acLeft=0; return;
+     }
+   }
+   ai._hoarding=false;}
   // ── Suivi des coûts IA : snapshot avant chaque action, diff après, enregistré au journal ──
   function _aiSnapRes(){return{energy:ai.res.energy||0,materials:ai.res.materials||0,science:ai.res.science||0,morale:ai.res.morale||0,force:ai.forceTokens||0};}
   function _aiRec(bAc,bRes,fromIdx){
@@ -5080,7 +5132,9 @@ function doAITurn(aiPlayer,oneShot){
       // poursuivre, avec sa fenêtre d'attaque).
       if(_e && _e._isAI===false){
         ai._wantsPeace=true;
-        addLog('🕊️ '+ai.civ.emoji+' '+ai.civ.name+' cherche la paix — à toi de décider en fin de tour.','dim');
+        // Ne pas afficher ce message si « ai » est en fait la nation du JOUEUR (repli auto après déconnexion) :
+        // on lisait « 🌍 Terriens cherche la paix » alors que Terriens, c'est le joueur lui-même.
+        if(ai._isAI!==false)addLog('🕊️ '+ai.civ.emoji+' '+ai.civ.name+' cherche la paix — à toi de décider en fin de tour.','dim');
         return;
       }
       if(typeof endWar==='function')endWar(ai.civ.id);
@@ -5358,9 +5412,22 @@ function doAITurn(aiPlayer,oneShot){
     civic:tryCivic, military:tryMilitary,
     raid:tryRaid, raidAI:tryRaidAI, assaultAI:tryAssaultAI
   };
+  // RÉSERVE DE GUERRE (comportement d'un joueur humain) : quand elle est EN GUERRE, l'IA ne dépense plus
+  // jusqu'à zéro — elle garde de quoi PAYER sa défense (1🪨 +1⚡ par jeton engagé). Avant, elle finissait
+  // à 0⚡ et se faisait conquérir sans opposer la moindre résistance.
+  function _warReserve(){
+    if(!_warOf(ai.civ.id))return 0;                    // pas en guerre → pas de réserve
+    return Math.max(2,Math.min(6,ai.forceTokens||0));  // de quoi engager ses jetons (plafonné)
+  }
+  function _belowReserve(){
+    const r=_warReserve(); if(!r)return false;
+    return Math.min(ai.res.materials||0, ai.res.energy||0) <= r;
+  }
   function chooseAndAct(){
     // Reconnecter une colonie isolée reste toujours le réflexe prioritaire.
     if(ai.colonies.some(c=>!c.connected&&c.nodeId!==ai.civ.home)&&tryRoute())return true;
+    // En guerre et trésorerie basse → on THÉSAURISE (on ne dépense pas ce qui servira à se défendre).
+    if(_belowReserve())return false;
     const U=actionUtilities();
     const ranked=Object.keys(U).filter(k=>U[k]>0).sort((a,b)=>U[b]-U[a]);
     for(const k of ranked){ if(execMap[k]&&execMap[k]()) return true; }
