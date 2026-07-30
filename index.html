@@ -1565,23 +1565,23 @@ const CIVIC_MARKET=[
 /* Gagnant d'un événement : meilleur sur la CONDITION ; égalité départagée par VP le plus bas, puis le plus de jetons Force. */
 function _evWinner(statFn){const allP=allPlayers();let w=allP[0];for(const p of allP){const s=statFn(p),bs=statFn(w);if(s>bs)w=p;else if(s===bs&&p!==w){const dv=calcVP(p).total-calcVP(w).total;if(dv<0||(dv===0&&p.forceTokens>w.forceTokens))w=p;}}return w;}
 const EVENTS=[
-  {id:'ruee',type:'competition',name:'Ruée Minière',emoji:'⛏️',preview:'La nation avec le plus de colonies gagne +6 VP (égalité à 2 : les deux ; 3+ : personne).',
+  {id:'ruee',type:'competition',name:'Ruée Minière',emoji:'⛏️',preview:'La nation avec le plus de colonies gagne +6 VP. Si égalité en première place : les deux, si plus d\'égalités personne.',
    resolve(G){const h=_evTop(function(p){return p.colonies.length;});return 'Ruée Minière — '+_evAwardVP(h,6);}},
   {id:'storm',type:'menace',name:'Tempêtes Solaires',emoji:'🌩️',preview:'Sans IA Défensive, chaque nation perd 1 jeton Force, 1 route et 2<i class=ri-materials></i>.',
    resolve(G){let n=0;const pProt=hasSpec(G.player,'storm_immune');for(const p of allPlayers()){if(hasSpec(p,'storm_immune'))continue;p.forceTokens=Math.max(0,(p.forceTokens||0)-1);if(p.routes&&p.routes.length){p.routes.pop();updateConnections(p);}p.res.materials=Math.max(0,(p.res.materials||0)-2);n++;}return (pProt?'Tu as réussi à te protéger. ':'')+'Tempêtes Solaires — '+n+' nation(s) touchée(s) : −1 jeton, −1 route, −2<i class=ri-materials></i>.';}},
-  {id:'pirates',type:'menace',name:'Prolifération des pirates',emoji:'☠️',preview:'Les pirates frappent les routes de la nation la plus riche en <i class=ri-materials></i> : non protégées détruites ; protégées 50% de chance mais 2 perdues au maximum.',
+  {id:'pirates',type:'menace',name:'Prolifération des pirates',emoji:'☠️',preview:'Les pirates frappent les routes de la nation la plus riche en <i class=ri-materials></i> : les routes sans jeton sont détruites ; celles avec ont 50% de chance d\'être perdues, mais 2 au maximum.',
    resolve(G){const h=_evTop(function(p){return p.res.materials||0;});if(h.length!==1)return 'Prolifération des pirates — aucune cible claire.';const tgt=h[0];let unp=0,prot=0;const keep=[];for(const r of tgt.routes){if((r.tokens||0)>0){/* protégée : 50% chacune, MAX 2 perdues */ if(prot<2&&Math.random()<0.5){tgt.forceCooldown.push({count:r.tokens,returnTurn:getCooldownTurn(tgt)});prot++;}else keep.push(r);}else unp++;/* non protégée : détruite */}tgt.routes=keep;updateConnections(tgt);return 'Prolifération des pirates — '+_evName(tgt)+' perd '+(unp+prot)+' route(s) : '+unp+' non protégée(s) détruite(s)'+(prot?', '+prot+' protégée(s) pillée(s) (max 2 — jetons en récupération)':'')+'. Protège-toi avec l\'IA Défensive ou le Réseau Orbital.';}},
-  {id:'sci',type:'competition',name:'Conférence Scientifique Solaire',emoji:'🔬',preview:'La nation avec la plus grosse production de <i class=ri-science></i> gagne +6 VP.',
+  {id:'sci',type:'competition',name:'Conférence Scientifique Solaire',emoji:'🔬',preview:'La nation avec la plus grande production de <i class=ri-science></i> gagne +6 VP.',
    resolve(G){const h=_evTop(_sciProd);return 'Conférence Scientifique — '+_evAwardVP(h,6);}},
   {id:'tech',type:'competition',name:'Développement Technologique',emoji:'⚗️',preview:'La nation avec le plus de technologies de niveau 2 et 3 gagne +6 VP.',
    resolve(G){const h=_evTop(function(p){return p.cards.filter(function(c){return c.branch&&c.tier>=2;}).length;});return 'Développement Technologique — '+_evAwardVP(h,6);}},
-  {id:'attract',type:'opportunite',name:'Civilisation la plus attractive',emoji:'✨',preview:'La nation avec le plus de moral gagne +2<i class=ri-materials></i> +2<i class=ri-science></i> +3 VP (2 à égalité : les deux ; 3+ : personne).',
+  {id:'attract',type:'opportunite',name:'Civilisation la plus attractive',emoji:'✨',preview:'La nation avec le plus de moral gagne +2<i class=ri-materials></i> +2<i class=ri-science></i> +3 VP. Si égalité en première place : les deux, si plus d\'égalités personne.',
    resolve(G){const h=_evTop(function(p){return p.res.morale||0;});if(h.length===0||h.length>=3)return 'Civilisation attractive — personne (trop d\'égalités).';h.forEach(function(p){const c=getResCapFor(p);p.res.materials=Math.min(c.materials,(p.res.materials||0)+2);p.res.science=Math.min(c.science,(p.res.science||0)+2);p.tempVP=(p.tempVP||0)+3;});return 'Civilisation attractive — '+h.map(_evName).join(' & ')+' → +2<i class=ri-materials></i> +2<i class=ri-science></i> +3 VP';}},
   {id:'milsup',type:'competition',name:'Suprématie Militaire',emoji:'⚔️',preview:'La nation avec le plus de jetons Force (récupération inclus) gagne +6 VP.',
    resolve(G){const h=_evTop(_forceTotal);return 'Suprématie Militaire — '+_evAwardVP(h,6);}},
   {id:'comm',type:'opportunite',name:'Accords Commerciaux',emoji:'🤝',interactive:true,preview:'Occasion de conclure un accord commercial gratuit (+3 VP par nation ; met fin à une guerre).',
    resolve(G){return _evAccordAuto('comm',G);}},
-  {id:'diplo',type:'opportunite',name:'Accords Diplomatiques',emoji:'🕊️',interactive:true,preview:'Occasion de pactes de non-agression (4 tours, 6<i class=ri-materials></i>). Tension −1 partout.',
+  {id:'diplo',type:'opportunite',name:'Accords Diplomatiques',emoji:'🕊️',interactive:true,preview:'Occasion de pactes de non-agression (durée du pacte : 4 tours, coût par nation 6<i class=ri-materials></i>). Tension −5 partout. Met fin à une guerre.',
    resolve(G){return _evAccordAuto('diplo',G);}},
   {id:'final',type:'competition',name:'Jugement Final',emoji:'🏆',preview:'Décompte final des points de victoire.',
    resolve(G){return 'Fin — calcul des scores !';}},
@@ -1601,7 +1601,9 @@ function _sciProd(p){var s=(p.rpt&&p.rpt.science)||0;for(var i=0;i<p.colonies.le
 function _evTop(statFn){const all=allPlayers();let mx=-Infinity;for(const p of all){const s=statFn(p);if(s>mx)mx=s;}if(mx<=0)return[];return all.filter(function(p){return statFn(p)===mx;});}
 function _evAwardVP(holders,vp){if(holders.length===0)return 'personne (aucune production).';if(holders.length>=3)return 'personne — trop d\'égalités ('+holders.length+' nations).';holders.forEach(function(p){p.tempVP=(p.tempVP||0)+vp;});return holders.map(_evName).join(' & ')+' → +'+vp+' VP';}
 function _evCommResolve(G){for(const ai of G.ais){setTens('player',ai.civ.id,Math.max(0,getTens('player',ai.civ.id)-2));setTens(ai.civ.id,'player',Math.max(0,getTens(ai.civ.id,'player')-2));}for(const p of allPlayers()){const c=getResCapFor(p);p.res.materials=Math.min(c.materials,(p.res.materials||0)+2);}return 'Sommet commercial — tension −2 avec chaque nation, +2<i class=ri-materials></i> pour toutes.';}
-function _evDiploResolve(G){for(const ai of G.ais){setTens('player',ai.civ.id,Math.max(0,getTens('player',ai.civ.id)-1));setTens(ai.civ.id,'player',Math.max(0,getTens(ai.civ.id,'player')-1));}for(const p of allPlayers()){const c=getResCapFor(p);p.res.morale=Math.min(c.morale,(p.res.morale||0)+1);}return 'Sommet diplomatique — tension −1 partout, +1<i class=ri-morale></i> pour toutes.';}
+// Tension −5 partout (règle Marc). Le +1<i class=ri-morale></i> n'est PAS distribué à tout le monde :
+// il est gagné UNIQUEMENT par pacte effectivement conclu (voir _evDiploConfirm) — texte uniformisé.
+function _evDiploResolve(G){for(const ai of G.ais){setTens('player',ai.civ.id,Math.max(0,getTens('player',ai.civ.id)-5));setTens(ai.civ.id,'player',Math.max(0,getTens(ai.civ.id,'player')-5));}return 'Sommet diplomatique — tension −5 partout.';}
 function buildEventSchedule(){const pool=EVENTS.filter(function(e){return e.id!=='final';}).map(function(e){return e.id;});for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));const tmp=pool[i];pool[i]=pool[j];pool[j]=tmp;}return {2:pool[0],4:pool[1],6:pool[2],8:pool[3],10:'final'};}
 function eventForTurn(tn){if(!G||!G.eventSchedule)return null;const id=G.eventSchedule[tn];return id?(EVENTS.find(function(e){return e.id===id;})||null):null;}
 /* --- Événements interactifs (accords) : menu joueur en solo ; repli auto pour IA/headless/en-ligne --- */
@@ -1642,7 +1644,7 @@ function showCommEventModal(onDone){
     const vp=calcVP(ai).total;const pf=perceivedForce(G.player,ai);const war=G.wars&&G.wars.find(function(w){return w.aiId===ai.civ.id;});
     return '<button onclick="_evCommPick(\''+ai.civ.id+'\')" style="display:block;width:100%;text-align:left;margin:5px 0;padding:9px 11px;background:#141a30;border:1px solid #2a3a6a;border-radius:8px;color:#cfe0ff;cursor:pointer">'+ai.civ.emoji+' <b>'+ai.civ.name+'</b>'+(war?' <span style="color:#ff7766">⚔️ en guerre</span>':'')+'<br><span style="font-size:.82em;color:#9fb4d6">'+_evAiInfo(ai)+'</span></button>';
   }).join('');
-  _evOverlay('<div style="font-size:2.2em;text-align:center">🤝</div><div style="text-align:center;font-weight:700;margin-bottom:4px">Accords Commerciaux</div><div style="color:#9fb4d6;font-size:.82em;text-align:center;margin-bottom:10px">Accord <b>gratuit</b> : +3 VP chacun, met fin à une guerre. Un leader trop en avance peut refuser.</div>'+_evMyStats()+opts+'<button class="ea-btn" onclick="_evCommPick(null)" style="margin-top:10px">Passer (aucun accord)</button>');
+  _evOverlay('<div style="font-size:2.2em;text-align:center">🤝</div><div style="text-align:center;font-weight:700;margin-bottom:4px">Accords Commerciaux</div><div style="color:#9fb4d6;font-size:.82em;text-align:center;margin-bottom:10px">Accord commercial <b>gratuit</b> : +3 VP pour chaque nation, met fin à une guerre si elle existe. Un leader trop en avance peut refuser.</div>'+_evMyStats()+opts+'<button class="ea-btn" onclick="_evCommPick(null)" style="margin-top:10px">Passer (aucun accord)</button>');
 }
 function _evCommPick(aiId){
   const done=_evCommDone;_evCommDone=null;_evCloseOverlay();
@@ -1671,23 +1673,23 @@ function showDiploEventModal(onDone){
   }
   const rows=G.ais.map(function(ai){
     const war=G.wars&&G.wars.find(function(w){return w.aiId===ai.civ.id;});
-    const cost=war?'6<i class=ri-materials></i> +2<i class=ri-energy></i> (annule la guerre)':'6<i class=ri-materials></i>';
+    const cost=war?'6<i class=ri-materials></i> (met fin à la guerre)':'6<i class=ri-materials></i>';
     return '<label style="display:flex;align-items:flex-start;gap:8px;margin:5px 0;padding:8px 10px;background:#141a30;border:1px solid #2a3a6a;border-radius:8px;color:#cfe0ff;cursor:pointer"><input type="checkbox" style="margin-top:3px" onchange="_evDiploToggle(\''+ai.civ.id+'\',this.checked)"> <span>'+ai.civ.emoji+' <b>'+ai.civ.name+'</b> — pacte 4 tours · '+cost+(war?' · <span style="color:#ff7766">en guerre</span>':'')+'<br><span style="font-size:.82em;color:#9fb4d6">'+_evAiInfo(ai)+'</span></span></label>';
   }).join('');
-  _evOverlay('<div style="font-size:2.2em;text-align:center">🕊️</div><div style="text-align:center;font-weight:700;margin-bottom:4px">Accords Diplomatiques</div><div style="color:#9fb4d6;font-size:.82em;text-align:center;margin-bottom:10px">Pacte de non-agression 4 tours. 6<i class=ri-materials></i> chacun (6<i class=ri-materials></i>+2<i class=ri-energy></i> si en guerre → l\'annule). +1<i class=ri-morale></i>/pacte, tension 0 avec le partenaire.</div>'+_evMyStats()+rows+'<button class="ea-btn" onclick="_evDiploConfirm()" style="margin-top:10px">Conclure les pactes sélectionnés</button><button class="ea-btn" onclick="_evDiploNone()" style="margin-top:6px;background:#2a2f45">Aucun pacte</button>');
+  _evOverlay('<div style="font-size:2.2em;text-align:center">🕊️</div><div style="text-align:center;font-weight:700;margin-bottom:4px">Accords Diplomatiques</div><div style="color:#9fb4d6;font-size:.82em;text-align:center;margin-bottom:10px">Pacte de non-agression : 4 tours, 6<i class=ri-materials></i> par nation. Met fin à une guerre. +1<i class=ri-morale></i> par pacte conclu, tension 0 avec le partenaire.</div>'+_evMyStats()+rows+'<button class="ea-btn" onclick="_evDiploConfirm()" style="margin-top:10px">Conclure les pactes sélectionnés</button><button class="ea-btn" onclick="_evDiploNone()" style="margin-top:6px;background:#2a2f45">Aucun pacte</button>');
 }
 function _evDiploToggle(aiId,on){_evDiploSel[aiId]=on;}
 function _evDiploNone(){_evDiploSel={};_evDiploConfirm();}
 function _evDiploConfirm(){
   const done=_evDiploDone;_evDiploDone=null;
-  for(const ai of G.ais){setTens('player',ai.civ.id,Math.max(0,getTens('player',ai.civ.id)-1));setTens(ai.civ.id,'player',Math.max(0,getTens(ai.civ.id,'player')-1));}
+  for(const ai of G.ais){setTens('player',ai.civ.id,Math.max(0,getTens('player',ai.civ.id)-5));setTens(ai.civ.id,'player',Math.max(0,getTens(ai.civ.id,'player')-5));}
   let made=0;
   for(const ai of G.ais){
     if(!_evDiploSel[ai.civ.id])continue;
     const war=G.wars&&G.wars.find(function(w){return w.aiId===ai.civ.id;});
-    const needM=6,needE=war?2:0;
-    if((G.player.res.materials||0)<needM||(G.player.res.energy||0)<needE){addLog('🕊️ Pas assez de ressources pour le pacte avec '+ai.civ.name+'.','red');continue;}
-    G.player.res.materials-=needM;if(needE)G.player.res.energy-=needE;
+    const needM=6; // coût uniforme : 6 matériaux par nation (plus de surcoût énergie en cas de guerre)
+    if((G.player.res.materials||0)<needM){addLog('🕊️ Pas assez de matériaux pour le pacte avec '+ai.civ.name+' (6 requis).','red');continue;}
+    G.player.res.materials-=needM;
     if(war)_evEndWarWith(ai.civ.id,4);
     G._nonAgg=G._nonAgg||{};G._nonAgg[ai.civ.id]=G.turn+4;
     G._peaceCooldown=G._peaceCooldown||{};G._peaceCooldown[ai.civ.id]=Math.max(G._peaceCooldown[ai.civ.id]||0,G.turn+4);
@@ -1696,7 +1698,7 @@ function _evDiploConfirm(){
     addLog('🕊️ Pacte de non-agression avec '+ai.civ.emoji+' '+ai.civ.name+' (4 tours).','gold');
   }
   _evCloseOverlay();
-  if(made===0)addLog('🕊️ Sommet diplomatique : tension −1 partout (aucun pacte conclu).','dim');
+  if(made===0)addLog('🕊️ Sommet diplomatique : tension −5 partout (aucun pacte conclu).','dim');
   if(done)done();
 }
 /* ============================================================ STATE ============================================================ */
@@ -4165,7 +4167,8 @@ function breakAccordAndAttack(nodeId){
   if(p.acLeft<1){addLog('⚠️ Attaque : besoin 1 AC.','red');return;}
   if(p.forceTokens<tc){addLog('⚠️ Attaque : besoin d\'au moins '+tc+' jeton(s) Force.','red');return;}
   if(Math.min(p.res.materials||0,p.res.energy||0)<1){addLog('⚠️ Attaque : il faut du <i class=ri-materials></i> et de l\'<i class=ri-energy></i> pour engager des jetons.','red');return;}
-  if((p._attacksThisTurn||0)>=2){addLog('⚠️ Maximum 2 attaques par tour.','red');return;}
+  // LIMITE DE 2 ATTAQUES/TOUR SUPPRIMÉE (demande de Marc) : le nombre d'assauts n'est plus plafonné —
+  // il reste limité naturellement par les AC, les jetons Force et le coût en ressources de chaque combat.
   // Rupture d'accord = attaque SURPRISE : on rompt l'accord PUIS on assaille immédiatement (capture si victoire).
   G.commercialAccords=G.commercialAccords.filter(n=>n!==nodeId);
   addLog('📜 Accord sur '+node.name+' rompu — attaque surprise !','red');
@@ -4181,7 +4184,8 @@ function attackColony(nodeId){
   if(p.acLeft<1){addLog('⚠️ Assaut : besoin 1 AC.','red');return;}
   if(p.forceTokens<tc){addLog('⚠️ Assaut : besoin d’au moins '+tc+' jeton(s) Force.','red');return;}
   if(Math.min(p.res.materials||0,p.res.energy||0)<1){addLog('⚠️ Assaut : il faut du <i class=ri-materials></i> et de l’<i class=ri-energy></i> pour engager des jetons.','red');return;}
-  if((p._attacksThisTurn||0)>=2){addLog('⚠️ Maximum 2 attaques par tour.','red');return;}
+  // LIMITE DE 2 ATTAQUES/TOUR SUPPRIMÉE (demande de Marc) : le nombre d'assauts n'est plus plafonné —
+  // il reste limité naturellement par les AC, les jetons Force et le coût en ressources de chaque combat.
   p.acLeft-=1;p.spentThisTurn+=1;closePopup();
   playerAssaultColony(nodeId,_atkAI);
 }
@@ -4269,7 +4273,8 @@ function attackEnemyRoute(aiId,ri){
   if(G.phase!=='actions')return;
   const ai=G.ais.find(a=>a.civ.id===aiId);if(!ai)return;
   if(!(G.wars&&G.wars.find(w=>w.aiId===aiId))){addLog('⚠️ Il faut être en guerre avec '+ai.civ.name+' pour attaquer ses routes.','red');return;}
-  if((G.player._attacksThisTurn||0)>=2){addLog('⚠️ Maximum 2 attaques par tour.','red');return;}
+  // LIMITE DE 2 ATTAQUES/TOUR SUPPRIMÉE (demande de Marc) : le nombre d'assauts n'est plus plafonné —
+  // il reste limité naturellement par les AC, les jetons Force et le coût en ressources de chaque combat.
   if(G.player.acLeft<1){addLog('⚠️ Attaque de route : besoin 1 AC.','red');return;}
   const route=ai.routes[ri];if(!route)return;
   if(hasSpec(ai,'empath_routes')||hasSpec(ai,'ia_immune')){addLog('🛡️ Routes de '+ai.civ.name+' protégées par une tech — inattaquables.','red');return;}
@@ -4879,6 +4884,14 @@ function doAITurn(aiPlayer,oneShot){
     for(const r of['energy','materials','science']){const d=(bRes[r]||0)-(ai.res[r]||0);if(d>0)cost[r]=d;}
     const df=(bRes.force||0)-(ai.forceTokens||0);if(df>0)cost.force=df;
     for(let i=fromIdx;i<G.aiActions.length;i++){const e=G.aiActions[i];if(e&&!e._rec){e._rec=true;_journalAdd(ai,e.name,acP,cost,e.desc,{war:_isWarAct(e.name)});}}
+    // TRANSPARENCE (demande de Marc) : le journal affichait les actions des IA SANS leur coût — impossible de
+    // vérifier qu'elles paient. On journalise donc ce qu'elles dépensent réellement, comme pour le joueur.
+    if(G.aiActions.length>fromIdx){
+      const parts=[];
+      for(const r of ['energy','materials','science']){ if(cost[r])parts.push('−'+cost[r]+rEmoji(r)); }
+      if(cost.force)parts.push('−'+cost.force+' jeton'+(cost.force>1?'s':'')+' Force');
+      addLog('   ↳ '+ai.civ.emoji+' '+ai.civ.name+' paie : '+(acP?acP+' AC':'0 AC')+(parts.length?(' '+parts.join(' ')):' (aucune ressource)'),'dim');
+    }
   }
   function _aiStep(fn){const bAc=ai.acLeft,bRes=_aiSnapRes(),i0=G.aiActions.length;const r=fn();_aiRec(bAc,bRes,i0);return r;}
   // ── POUVOIRS GRATUITS (0 AC, 1×/tour) — l'IA active le sien quand c'est utile et abordable (parité joueur) ──

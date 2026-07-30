@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>Solar Conquest — Règles du jeu</title>
+  <title>Solar : règles du jeu</title>
   <style>
     code{white-space: pre-wrap;}
     span.smallcaps{font-variant: small-caps;}
@@ -34,13 +34,13 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">Solar Conquest — Règles du jeu</h1>
+<h1 class="title">Solar : règles du jeu</h1>
 </header>
-<p>🚀 <strong>Solar Conquest</strong></p>
+<p>🚀 <strong>Solar</strong></p>
 <p>Règles du Jeu — Version 18</p>
 <p><em>2 à 4 joueurs (Humain vs IA) • 10 tours • Stratégie interplanétaire</em></p>
 <h2>1. Présentation</h2>
-<p>Solar Conquest est un jeu de stratégie au tour par tour se déroulant sur 10 tours. Chaque joueur dirige une civilisation spatiale cherchant à coloniser le système solaire, développer sa technologie et accumuler des Points de Victoire (VP). Le joueur avec le plus de VP à la fin du tour 10 remporte la partie.</p>
+<p>Solar est un jeu de stratégie au tour par tour se déroulant sur 10 tours. Chaque joueur dirige une civilisation spatiale cherchant à coloniser le système solaire, développer sa technologie et accumuler des Points de Victoire (VP). Le joueur avec le plus de VP à la fin du tour 10 remporte la partie.</p>
 <h2>2. Civilisations</h2>
 <p>Au début, le joueur choisit une civilisation. L'IA reçoit une civilisation aléatoire parmi les restantes. Chaque civilisation a ses ressources de départ, sa base (toujours connectée), un nombre de jetons Force initiaux, un passif permanent et une capacité active (1×/tour). La branche bonus donne −1🔬 permanent sur les cartes de cette branche.</p>
 <table>
@@ -300,7 +300,7 @@
 <tr class="even">
 <td>T2</td>
 <td>⚗️ IA de Navigation</td>
-<td>+2 jetons Force, coût guerre ÷2</td>
+<td>+2 jetons Force, coût de guerre ÷2 (division exacte : si le nombre de jetons engagés est impair, la demi-part est prélevée sur l’énergie⚡ — ex. 5 jetons = 2🪨 et 3⚡)</td>
 <td>4🔬 1⚡</td>
 <td>3</td>
 </tr>
@@ -796,6 +796,7 @@
 <p>Garnison de base : toute colonie attaquée se défend automatiquement avec 1 jeton de garnison (le jeton réservé), qui s ajoute aux jetons que le défenseur engage activement. Une colonie n est donc jamais totalement sans défense : l attaquant doit dépasser la garnison + les jetons engagés par le défenseur.</p>
 <ul>
 <li><p>Coût pour l’attaquant (garnison incluse) : lors d’un assaut, l’attaquant immobilise 1 jeton (1🪨 +1⚡, récupération 2 tours) PAR jeton adverse en défense — la garnison de base comptant toujours pour 1. Donc même une colonie « non défendue » activement coûte au moins 1 jeton à l’attaquant : il n’y a plus de capture gratuite. Le total immobilisé est plafonné au nombre de jetons réellement engagés.</p></li>
+<li><p><strong>Nombre d’assauts par tour : illimité.</strong> Il n’y a plus de plafond de 2 attaques par tour. Le nombre d’assauts que tu peux mener est limité naturellement par tes <strong>AC</strong>, tes <strong>jetons Force engageables</strong> (hors garnison) et le <strong>coût en ressources</strong> de chaque combat.</p></li>
 <li><p>Sort de la garnison : si la colonie tombe (capturée), son jeton de garnison est DÉTRUIT (il a défendu et péri) ; la réserve du défenseur diminue d’autant. Si la défense repousse l’assaut, la garnison est conservée.</p></li>
 </ul>
 <p>Pas d attaque-surprise : les longues durées de trajet entre les corps célestes rendent toute flotte détectable à l approche, donc la garnison est toujours prête. Hyperpropulsion fait exception : son bonus de jetons Force représente une vitesse de déplacement accrue (frapper plus vite, plus souvent), pas un nombre de troupes plus élevé et donc ce bonus n’est pas perdu dans une attaque ni dépensé.</p>
@@ -822,7 +823,7 @@
 </table>
 <p>Attaquer une colonie est une action (1 AC) qui déclenche un assaut résolu IMMÉDIATEMENT, le tour même (plus de combat reporté au tour suivant). Tu choisis le nombre de jetons engagés ; l’adversaire défend avec les siens. Résultats :</p>
 <ul>
-<li><p>Cibles interdites : on ne peut PAS assaillir la planète ou lune mère d<span dir="rtl">’</span>une nation (sa colonie de départ) — elle est imprenable à ce niveau de jeu. (Réservé à une éventuelle extension.)</p></li>
+<li><p>Colonie mère (capitale) : elle EST attaquable, mais elle est défendue automatiquement par <strong>10 jetons de guerre</strong> de la nation, en plus de sa garnison et des jetons que le défenseur engage. Il faut donc un assaut massif pour la prendre — et si elle tombe, elle est bel et bien conquise. Une nation qui n<span dir="rtl">’</span>a plus aucune colonie devient <strong>vassale</strong> : la guerre avec elle prend fin.</p></li>
 <li><p>Victoire de l<span dir="rtl">’</span>assaut : tu CAPTURES la colonie (elle passe sous ton contrôle, niveau −1, population hostile → malus de moral pendant 3 tours, voir §13).</p></li>
 <li><p>Les règles victoire/défaite et égalité ci dessus s’appliquent comme dans une guerre classique.</p></li>
 <li><p>Durée : la guerre dure UNE manche, puis s<span dir="rtl">’</span>arrête — SAUF si la nation qui vient d’être attaquée choisit de la poursuivre à son tour.</p></li>
@@ -873,7 +874,7 @@
 <tr class="odd">
 <td>Var.</td>
 <td>Accords commerciaux</td>
-<td>Les nations peuvent gratuitement conclure un accord commercial avec une autre nation et en tirer bénéfice. Pas de perte d’action, ni de matériaux. Les règles pour casser l’accord sont les mêmes après. Un menu s’ouvre pour pouvoir choisir avec quelle nation on souhaite un accord avec un récapitulatif des points de victoire de chaque nation et de sa force militaire estimée en jetons. Si un accord est conclu, +3 VP pour chaque nation dans l’accord. Si une guerre oppose les deux nations, un accord commercial termine la guerre immédiatement. Les IA peuvent cependant refuser un accord si le joueur est très en avance sur eux avec ses VP. A l’inverse, si elles sont très affaiblies, elles acceptent pour s’en sortir. Les bénéfices obtenus d’un accord commercial sont les mêmes que d’habitude. Le résultat doit être annoncé.</td>
+<td>Accord commercial <strong>gratuit</strong> : +3 VP pour chaque nation, et il <strong>met fin à une guerre si elle existe</strong>. Les nations peuvent conclure cet accord et en tirer bénéfice. Pas de perte d’action, ni de matériaux. Les règles pour casser l’accord sont les mêmes après. Un menu s’ouvre pour pouvoir choisir avec quelle nation on souhaite un accord avec un récapitulatif des points de victoire de chaque nation et de sa force militaire estimée en jetons. Si un accord est conclu, +3 VP pour chaque nation dans l’accord. Si une guerre oppose les deux nations, un accord commercial termine la guerre immédiatement. Les IA peuvent cependant refuser un accord si le joueur est très en avance sur eux avec ses VP. A l’inverse, si elles sont très affaiblies, elles acceptent pour s’en sortir. Les bénéfices obtenus d’un accord commercial sont les mêmes que d’habitude. Le résultat doit être annoncé.</td>
 </tr>
 <tr class="even">
 <td>Var.</td>
@@ -888,7 +889,7 @@
 <tr class="even">
 <td>Var.</td>
 <td>Accords diplomatiques</td>
-<td>Chaque nation peut conclure un accord diplomatique avec les autres nations. Celui ci garantit qu’on ne s’attaque pas pendant 4 tours. Chaque nation doit payer 6 matériaux pour conclure un seul accord avec une seule nation. Il est possible de conclure un accord avec toutes les nations. Si les deux nations sont déjà en guerre, le coût de l’accord est de 6 matériaux et 2 énergies. Si l’accord est conclu, la guerre est immédiatement annulée. Le moral d’une nation augmente de +1 coeur par accord conclu. La tension avec toutes les nations baisse de 1 grâce à cet événement. la tension avec la ou les nations avec qui un accord est conclu tombe à 0 de part et d’autre. Le résultat doit être annoncé.</td>
+<td>Chaque nation peut conclure un accord diplomatique avec les autres nations. Celui-ci garantit qu’on ne s’attaque pas pendant 4 tours. Coût : <strong>6 matériaux🪨 par nation</strong> (aucun surcoût, même en cas de guerre). Un pacte <strong>met fin à une guerre</strong> en cours avec ce partenaire, met la tension à 0 avec lui et rapporte <strong>+1 moral❤️ par pacte conclu</strong>. L’événement lui-même fait baisser la <strong>tension de 5 partout</strong>. Il est possible de conclure un accord avec toutes les nations. Si les deux nations sont déjà en guerre, le coût de l’accord est de 6 matériaux et 2 énergies. Si l’accord est conclu, la guerre est immédiatement annulée. Le moral d’une nation augmente de +1 coeur par accord conclu. La tension avec toutes les nations baisse de 1 grâce à cet événement. la tension avec la ou les nations avec qui un accord est conclu tombe à 0 de part et d’autre. Le résultat doit être annoncé.</td>
 </tr>
 <tr class="odd">
 <td>Var.</td>
@@ -1065,7 +1066,7 @@
 </tr>
 </tbody>
 </table>
-<p>Solar Conquest — Version 18 — Juillet 2026</p>
+<p>Solar — Version 18 — Juillet 2026</p>
 
 </body>
 </html>

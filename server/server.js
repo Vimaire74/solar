@@ -69,12 +69,19 @@ function frDate(ts) { // date + heure au format FRANÇAIS (jj/mm/aaaa hh:mm)
   try { return new Date(ts).toLocaleString('fr-FR', { timeZone: 'Europe/Zurich', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
   catch (e) { return new Date(ts).toISOString(); }
 }
+function isEmail(x) { return /^[^@\s]+@[^@\s.]+\.[a-z]{2,}$/i.test(String(x || '')); }
+const _mailErrors = []; // dernières erreurs d'envoi, affichées dans /stats (diagnostic sans ouvrir les logs)
+function noteMailError(msg) { _mailErrors.unshift(frDate(Date.now()) + ' — ' + msg); _mailErrors.splice(12); }
 function sendMail(to, subject, text) {
   const line = '\n===== ' + frDate(Date.now()) + ' — À: ' + to + ' — ' + subject + ' =====\n' + text + '\n';
   try { fs.appendFileSync(OUTBOX, line); } catch (e) {}
-  if (!_transport) return;
+  // Destinataire qui n'est PAS une adresse email (ancien compte créé avec un simple pseudo, avant que
+  // l'email devienne obligatoire) → on n'essaie même pas : l'envoi échouerait silencieusement.
+  if (!isEmail(to)) { noteMailError('NON ENVOYÉ à « ' + to + ' » : ce compte a un pseudo, pas une adresse email. Le joueur doit créer un compte avec son email.'); return; }
+  if (!_transport) { noteMailError('NON ENVOYÉ à ' + to + ' : SMTP non configuré (variables SMTP_* absentes).'); return; }
   _transport.sendMail({ from: process.env.MAIL_FROM || 'Solar <contact@solar-game.com>', to, subject, text })
-    .catch(e => console.error('sendMail:', e.message));
+    .then(() => {})
+    .catch(e => { console.error('sendMail:', e.message); noteMailError('ÉCHEC vers ' + to + ' : ' + e.message); });
 }
 // Archives : 10 dernières parties PAR JOUEUR (scores + journal complet + bugs signalés).
 const ARCH_DIR = path.join(DATA, 'archives');
@@ -262,6 +269,28 @@ const server = http.createServer((req, res) => {
     } catch (e) { res.end(JSON.stringify({ ok: false, msg: e.message })); }
     return;
   }
+  if (req.url.indexOf('/admin/reset') === 0) {
+    // REMISE À ZÉRO (fresh start) : supprime TOUS les comptes, archives, parties et journal d'emails.
+    // Protégé par une clé : inactif tant que la variable d'environnement ADMIN_KEY n'est pas définie.
+    const KEY = process.env.ADMIN_KEY || '';
+    const given = (req.url.split('key=')[1] || '').split('&')[0];
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    if (!KEY) { res.end('Remise à zéro DÉSACTIVÉE : définis la variable ADMIN_KEY sur le serveur, puis rappelle /admin/reset?key=TA_CLE'); return; }
+    if (given !== KEY) { res.end('Clé invalide.'); return; }
+    let nU = 0, nA = 0, nG = 0;
+    try { nU = Object.keys(users).length; users = {}; saveUsers(); } catch (e) {}
+    try { for (const f of fs.readdirSync(ARCH_DIR)) { fs.unlinkSync(path.join(ARCH_DIR, f)); nA++; } } catch (e) {}
+    try { const gd = path.join(DATA, 'games'); for (const f of fs.readdirSync(gd)) { fs.unlinkSync(path.join(gd, f)); nG++; } } catch (e) {}
+    try { fs.writeFileSync(OUTBOX, ''); } catch (e) {}
+    try { tokens.clear(); } catch (e) {}
+    try { for (const c of Array.from(games.keys())) games.delete(c); } catch (e) {}
+    _mailErrors.length = 0;
+    res.end('✅ Remise à zéro effectuée le ' + frDate(Date.now()) + '\n'
+      + '  · comptes supprimés : ' + nU + '\n  · archives supprimées : ' + nA + '\n  · parties supprimées : ' + nG + '\n'
+      + '  · journal des emails vidé, sessions et parties en cours effacées.\n\n'
+      + 'Crée maintenant ton compte avec ton ADRESSE EMAIL pour recevoir les scores.');
+    return;
+  }
   if (req.url === '/stats' || req.url.indexOf('/stats?') === 0) {
     // STATS : 10 dernières parties PAR JOUEUR — date/heure FR, scores par nation, bugs signalés, journal complet.
     // Texte brut → sélectionnable/copiable pour me l'envoyer.
@@ -287,8 +316,14 @@ const server = http.createServer((req, res) => {
         (e.journal || []).forEach(l => out.push('   ' + l));
       });
     }
+    // État réel de l'envoi + dernières ERREURS (diagnostic sans ouvrir les logs Coolify)
+    out.push('\n' + '='.repeat(70) + '\nÉTAT EMAIL : ' + (_transport ? 'SMTP configuré (' + (process.env.SMTP_HOST || '?') + ')' : 'SMTP NON configuré — aucun envoi possible'));
+    const _bad = Object.keys(users).filter(u => !isEmail(u));
+    if (_bad.length) out.push('⚠️ Comptes SANS adresse email (ils ne peuvent PAS recevoir de mail) : ' + _bad.join(', '));
+    if (_mailErrors.length) { out.push('⚠️ Derniers échecs d\'envoi :'); _mailErrors.forEach(e => out.push('   · ' + e)); }
+    else out.push('Aucun échec d\'envoi enregistré depuis le démarrage du serveur.');
     let ob = ''; try { ob = fs.readFileSync(OUTBOX, 'utf8').slice(-4000); } catch (e) {}
-    if (ob) out.push('\n' + '='.repeat(70) + '\nDERNIERS EMAILS (journalisés' + (_transport ? ' ET envoyés' : ' — SMTP non configuré, non envoyés') + ') :\n' + ob);
+    if (ob) out.push('\nDERNIERS EMAILS (journal complet des messages préparés) :\n' + ob);
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end(out.join('\n'));
     return;

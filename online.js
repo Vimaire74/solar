@@ -1163,7 +1163,7 @@ function askLocalDecision(pending){
       decisionPanel(body); document.getElementById('sc-y').onclick=()=>done({confirm:true}); document.getElementById('sc-n').onclick=()=>done({confirm:false}); return; }
     if(k==='event_comm'){ // Événement Accords Commerciaux : choisir UNE nation (accord gratuit +3 VP, met fin à une guerre) ou passer
       const cands=o.cands||[];
-      let b='<h2>🤝 Accords Commerciaux</h2><div class="muted" style="margin-bottom:8px">Accord <b>gratuit</b> : +3 VP chacun, met fin à une guerre. Un leader trop en avance peut refuser.</div>';
+      let b='<h2>🤝 Accords Commerciaux</h2><div class="muted" style="margin-bottom:8px">Accord commercial <b>gratuit</b> : +3 VP pour chaque nation, met fin à une guerre si elle existe. Un leader trop en avance peut refuser.</div>';
       if(!cands.length) b+='<div class="muted" style="margin-bottom:6px">Toutes les nations ont déjà un accord avec toi.</div>';
       else b+=cands.map((c,i)=>'<button class="opt" data-comm="'+i+'">'+(c.emoji||'')+' <b>'+c.name+'</b>'+(c.war?' <span style="color:#ff7766">⚔️ en guerre</span>':'')+(c.info?'<br><span class="muted">'+c.info+'</span>':'')+'</button>').join('');
       b+='<button class="opt" id="sc-comm-pass" style="background:#2a2f45">Passer (aucun accord)</button>';
@@ -1174,8 +1174,8 @@ function askLocalDecision(pending){
     }
     if(k==='event_diplo'){ // Événement Accords Diplomatiques : sélectionner plusieurs pactes (6 matériaux chacun, +2 énergie si guerre)
       const rows=o.rows||[]; const sel={};
-      let b='<h2>🕊️ Accords Diplomatiques</h2><div class="muted" style="margin-bottom:8px">Pacte de non-agression 4 tours. 6🔩 chacun (6🔩+2⚡ si en guerre → l\'annule). +1 moral/pacte, tension 0. Tu as '+(o.mat||0)+'🔩 '+(o.energy||0)+'⚡.</div>';
-      b+=rows.map((r,i)=>'<label class="opt" style="display:block;text-align:left;cursor:pointer"><input type="checkbox" data-diplo="'+i+'" style="margin-right:8px">'+(r.emoji||'')+' <b>'+r.name+'</b> — 4 tours · '+(r.war?'6🔩+2⚡ <span style="color:#ff7766">annule la guerre</span>':'6🔩')+(r.info?'<br><span class="muted" style="margin-left:24px">'+r.info+'</span>':'')+'</label>').join('');
+      let b='<h2>🕊️ Accords Diplomatiques</h2><div class="muted" style="margin-bottom:8px">Pacte de non-agression : 4 tours, 6🪨 par nation. Met fin à une guerre. +1🙂 par pacte conclu, tension 0 avec le partenaire. Tu as '+(o.mat||0)+'🔩 '+(o.energy||0)+'⚡.</div>';
+      b+=rows.map((r,i)=>'<label class="opt" style="display:block;text-align:left;cursor:pointer"><input type="checkbox" data-diplo="'+i+'" style="margin-right:8px">'+(r.emoji||'')+' <b>'+r.name+'</b> — 4 tours · '+(r.war?'6🪨 <span style="color:#ff7766">met fin à la guerre</span>':'6🪨')+(r.info?'<br><span class="muted" style="margin-left:24px">'+r.info+'</span>':'')+'</label>').join('');
       b+='<button class="opt" id="sc-diplo-ok">Conclure les pactes sélectionnés</button><button class="opt" id="sc-diplo-none" style="background:#2a2f45">Aucun pacte</button>';
       decisionPanel(b);
       document.getElementById('sc-diplo-ok').onclick=()=>{ const chosen=[]; document.querySelectorAll('#sc-decision input[data-diplo]').forEach(cb=>{ if(cb.checked)chosen.push(rows[parseInt(cb.getAttribute('data-diplo'))].id); }); done({selected:chosen}); };
