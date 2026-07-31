@@ -1597,6 +1597,16 @@ function engageableTokens(p){
   const garrison=(p.colonies||[]).filter(function(c){return c.connected&&c.nodeId!==p.civ.home;}).length;
   return Math.max(0,(p.forceTokens||0)-garrison);
 }
+// SOURCE UNIQUE — combien de jetons on peut PAYER (c'est CE plafond qui limite la taille d'un assaut).
+// Normal : 1🪨 +1⚡ par jeton → N ≤ min(matériaux, énergie).
+// IA de Navigation : moitié, la demie sur l'ÉNERGIE → coût(N) = ⌊N/2⌋🪨 + ⌈N/2⌉⚡
+//   (1 jeton = 1⚡ · 2 jetons = 1🪨1⚡ · 3 jetons = 1🪨2⚡ …) → N ≤ min(2×matériaux+1, 2×énergie).
+function maxAffordableTokens(p){
+  if(!p)return 0;
+  const mat=p.res.materials||0, en=p.res.energy||0;
+  if(typeof hasSpec==='function'&&hasSpec(p,'nav2_war')) return Math.max(0,Math.min(2*mat+1,2*en));
+  return Math.max(0,Math.min(mat,en));
+}
 function _sciProd(p){var s=(p.rpt&&p.rpt.science)||0;for(var i=0;i<p.colonies.length;i++){var c=p.colonies[i];if(!c.connected)continue;var n=NODES[c.nodeId];if(!n||n.decorative)continue;if((n.res||{}).science)s+=n.res.science;if(c.level>=3)s+=2;else if(c.level>=2)s+=1;}if(p.investBonus&&p.investBonus.sciBonus)s+=p.investBonus.sciBonus;return s;}
 function _evTop(statFn){const all=allPlayers();let mx=-Infinity;for(const p of all){const s=statFn(p);if(s>mx)mx=s;}if(mx<=0)return[];return all.filter(function(p){return statFn(p)===mx;});}
 function _evAwardVP(holders,vp){if(holders.length===0)return 'personne (aucune production).';if(holders.length>=3)return 'personne — trop d\'égalités ('+holders.length+' nations).';holders.forEach(function(p){p.tempVP=(p.tempVP||0)+vp;});return holders.map(_evName).join(' & ')+' → +'+vp+' VP';}
@@ -2107,18 +2117,30 @@ function _scAbilityReminderOpen(){return typeof document!=='undefined'&&!!docume
 function _scShowAbilityReminder(){
   if(typeof document==='undefined'||_scAbilityReminderOpen())return;
   const p=G.player;const name=_SC_ABNAME[p.civ.id]||'ta capacité gratuite';
+  // Le rappel apparaît maintenant quand il te reste ENCORE des actions (à 1 AC) : le bouton de refus ne doit
+  // donc PAS passer le tour — il referme simplement la fenêtre et te laisse jouer. Textes adaptés.
+  const _reste=(p.acLeft||0);
+  const _msg=_reste>0
+    ? ('Il te reste <strong>'+_reste+' AC</strong>. Utiliser <strong style="color:#ffd166">'+name+'</strong> (gratuite, 0 AC) maintenant ?')
+    : ('Tu n\'as plus d\'actions. Utiliser <strong style="color:#ffd166">'+name+'</strong> (gratuite) avant de finir le tour ?');
+  const _skip=_reste>0?'Plus tard — continuer à jouer':'Terminer le tour sans l\'utiliser';
   document.body.insertAdjacentHTML('beforeend',
     '<div id="sc-ability-reminder" style="position:fixed;inset:0;background:rgba(4,4,18,.85);z-index:620;display:flex;align-items:center;justify-content:center">'+
       '<div style="background:#0f0f2a;border:1px solid #4a9eff;border-radius:12px;padding:22px;min-width:300px;max-width:400px;text-align:center">'+
         '<div style="font-size:1.05em;font-weight:700;color:#c8d8f8;margin-bottom:8px">💫 Capacité gratuite non utilisée</div>'+
-        '<div style="font-size:.9em;color:#9fb0d0;margin-bottom:16px">Tu n\'as plus d\'actions. Utiliser <strong style="color:#ffd166">'+name+'</strong> (gratuite) avant de finir le tour ?</div>'+
+        '<div style="font-size:.9em;color:#9fb0d0;margin-bottom:16px">'+_msg+'</div>'+
         '<button onclick="_scAbilityReminderUse()" style="padding:9px 18px;margin:0 5px;background:#3ecf8e;color:#04240f;border:none;border-radius:9px;font-weight:700;cursor:pointer">💫 Utiliser</button>'+
-        '<button onclick="_scAbilityReminderSkip()" style="padding:9px 18px;margin:0 5px;background:#1a1a2a;color:#9fb0d0;border:1px solid #3a3a5a;border-radius:9px;font-weight:700;cursor:pointer">Passer le tour</button>'+
+        '<button onclick="_scAbilityReminderSkip()" style="padding:9px 18px;margin:0 5px;background:#1a1a2a;color:#9fb0d0;border:1px solid #3a3a5a;border-radius:9px;font-weight:700;cursor:pointer">'+_skip+'</button>'+
       '</div></div>');
 }
 function _scCloseAbilityReminder(){const e=document.getElementById('sc-ability-reminder');if(e)e.remove();}
 function _scAbilityReminderUse(){_scCloseAbilityReminder();useAbility();}
-function _scAbilityReminderSkip(){_scCloseAbilityReminder();if(typeof passTurnIL==='function')passTurnIL();}
+function _scAbilityReminderSkip(){
+  _scCloseAbilityReminder();
+  // S'il te reste des AC, on NE passe PAS le tour : tu continues de jouer tes actions.
+  if(G&&G.player&&(G.player.acLeft||0)>0){ if(typeof render==='function')render(); return; }
+  if(typeof passTurnIL==='function')passTurnIL();
+}
 /* ============================================================ AGENDA SELECTION ============================================================ */
 let _agendaPool=[];let _selectedAgendaId=null;
 function showAgendaSelModal(){
@@ -4694,7 +4716,11 @@ function resolveWarCombat(playerCommitted){
   const pBonus=(G.player.stratBonus&&G.player.stratBonus.combatBonus)||0;
   const pEmpathBonus=(hasSpec(G.player,'empath_routes')?2:0)+(hasSpec(G.player,'empath_tele')?2:0);
   const aEmpathBonus=(hasSpec(warEnemy,'empath_routes')?2:0)+(hasSpec(warEnemy,'empath_tele')?2:0);
-  const engagedP=(playerCommitted!==undefined)?playerCommitted:G.player.forceTokens;
+  // On ne peut engager QUE ce qu'on possède ET ce qu'on peut PAYER (1🪨 +1⚡ par jeton — règle §14).
+  // Sans ce plafond, on pouvait « engager » 15 jetons sans en avoir les moyens (bug signalé par Marc).
+  let engagedP=(playerCommitted!==undefined)?playerCommitted:G.player.forceTokens;
+  {const _cap=Math.max(0,Math.min(G.player.forceTokens||0,maxAffordableTokens(G.player)));
+   if(engagedP>_cap){ addLog('⚠️ Engagement réduit à '+_cap+' jeton(s) — tu ne peux engager que ce que tu peux PAYER.','red'); engagedP=_cap; }}
   const _cruOn=!!G._cruiserDeployed&&cruiserAvailable(G.player)&&cruiserAfford(G.player);G._cruiserDeployed=false;
   if(_cruOn){G.player.res.materials=Math.max(0,(G.player.res.materials||0)-5);G.player.res.energy=Math.max(0,(G.player.res.energy||0)-5);addLog('⚓ Supercroiseur déployé (+'+(G.player.cruiserPower||5)+'⚔️, −5<i class=ri-materials></i> −5<i class=ri-energy></i>).','gold');}
   const pPow=engagedP+pBonus+pEmpathBonus+(_cruOn?(G.player.cruiserPower||5):0); // Supercroiseur : +5 si déployé ce combat
@@ -4711,10 +4737,12 @@ function resolveWarCombat(playerCommitted){
   G._aiWarCommitted=undefined;
   // Coût + récupération SYMÉTRIQUES (attaque ET défense) : 1<i class=ri-materials></i> +1<i class=ri-energy></i> par jeton engagé, jetons immobilisés (récupération / moitié perdue si défaite).
   const pWin=pPow>aPow,aWin=aPow>pPow;
-  // Règle jetons (memo v21) : l'attaquant immobilise 1 jeton par jeton adverse en défense — GARNISON DE BASE INCLUSE (la colonie défend toujours avec 1 jeton réservé). Plafonné à ce qu'il a engagé. Plus de « capture gratuite ».
-  const _defenseFaced=aiEngaged+1; // +1 = garnison de base (jeton réservé de la colonie)
-  const _atkUsed=Math.min(engagedP,_defenseFaced);
-  if(engagedP>0)addLog('⚔️ Coût combat (toi) : '+_atkUsed+' jeton(s) immobilisé(s) — 1 par jeton adverse en défense, garnison incluse (−'+_atkUsed+'<i class=ri-materials></i> −'+_atkUsed+'<i class=ri-energy></i>)','dim');
+  // RÈGLE §14 : le coût est de 1🪨 +1⚡ PAR JETON ENGAGÉ — pas « par jeton adverse en défense ».
+  // L'ancienne formule (min(engagés, défense+1)) rendait les assauts massifs QUASI GRATUITS : engager
+  // 15 jetons contre un ennemi sans défense ne coûtait qu'1 jeton (bug signalé par Marc). Les jetons
+  // engagés quittent le pool ; en cas de VICTOIRE la moitié revient tout de suite (cf. applyCombatEngage).
+  const _atkUsed=engagedP;
+  if(engagedP>0)addLog('⚔️ Coût combat (toi) : '+_atkUsed+' jeton(s) engagé(s) — 1<i class=ri-materials></i> +1<i class=ri-energy></i> par jeton (−'+_atkUsed+'<i class=ri-materials></i> −'+_atkUsed+'<i class=ri-energy></i>)','dim');
   if(aiEngaged>0)addLog('🛡️ '+warEnemy.civ.emoji+' '+warEnemy.civ.name+' engage '+aiEngaged+' jeton(s) en défense (−'+aiEngaged+'<i class=ri-materials></i> −'+aiEngaged+'<i class=ri-energy></i>).','dim');
   if(engagedP>0)applyCombatEngage(G.player,_atkUsed,!aWin); // coût + récupération pour _atkUsed jetons (la garnison compte toujours comme défense)
   applyCombatEngage(warEnemy,aiEngaged,!pWin);
@@ -6673,7 +6701,7 @@ function _warShowAttackSlider(){
   slider.parentElement.style.display='';
   document.getElementById('wcm-power').style.display='';
   document.getElementById('war-combat-modal').querySelector('.atk-btns').style.display='';
-  const _afford=Math.min(p.res.materials||0,p.res.energy||0); // 1<i class=ri-materials></i>+1<i class=ri-energy></i> par jeton engagé
+  const _afford=maxAffordableTokens(p); // SOURCE UNIQUE : tient compte de l'IA de Navigation (coût ÷2, demie sur ⚡)
   const maxCommit=Math.max(0,Math.min(p.forceTokens-defFloor,_afford));
   slider.min=0;slider.max=maxCommit;slider.value=maxCommit;
   if(defFloor>0)document.getElementById('wcm-info').innerHTML+=

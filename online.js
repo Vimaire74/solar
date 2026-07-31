@@ -468,22 +468,9 @@ function showInvestReal(pending, lvl){
 }
 
 // ── Pop-up VERTE : résultat de TON action (raid volé, combat gagné/perdu, colonie prise/capturée…) ──
-function showResultToast(lines){
-  // RETIRÉ (demande de Marc) : plus de fenêtre VERTE récapitulant l'action qu'on vient de faire — trop d'infos
-  // affichées. On garde la barre de VALIDATION (Valider/Annuler) et les fenêtres ROUGES (actions des autres).
-  return;
-  /* eslint-disable no-unreachable */
-  if(!lines || !lines.length) return;
-  let p=document.getElementById('sc-resulttoast');
-  if(!p){ injectStyles(); p=el('<div id="sc-resulttoast" style="position:fixed;top:78px;left:50%;transform:translateX(-50%);z-index:8680;background:#0e2a16;border:2px solid #2e9e57;border-radius:12px;padding:10px 14px;width:min(92vw,430px);color:#d0ffdc;font:600 .88em system-ui;box-shadow:0 10px 30px rgba(0,0,0,.55);line-height:1.4"></div>'); document.body.appendChild(p); p.onclick=()=>{ p.style.display='none'; }; }
-  p.innerHTML='<div style="font-weight:800;margin-bottom:3px">✅ Résultat de ton action</div>'+lines.map(t=>'• '+t).join('<br>');
-  p.style.display='block';
-  clearTimeout(p._timer);
-  // Le TIEN d'abord et 1 seconde plus court (6 s → 5 s) ; les toasts des autres s'affichent APRÈS (cf. showLogToast).
-  const DUR=5000;
-  window._scGreenUntil=Date.now()+DUR;
-  p._timer=setTimeout(()=>{ p.style.display='none'; window._scGreenUntil=0; }, DUR);
-}
+// SUPPRIMÉE (demande de Marc) : fenêtre VERTE récapitulant sa propre action — redondante avec le plateau
+// et le journal. La fonction est conservée vide car le serveur peut encore émettre ce type de notice.
+function showResultToast(){ /* volontairement vide */ }
 
 // ── Pop-up rouge : ce que font les AUTRES (bot, IA) pendant la partie ──
 function showLogToast(txts){
@@ -492,7 +479,9 @@ function showLogToast(txts){
   const wait=(window._scGreenUntil||0)-Date.now();
   if(wait>0){ setTimeout(()=>{ try{ showLogToast(txts); }catch(e){} }, wait+120); return; }
   let p=document.getElementById('sc-logtoast');
-  if(!p){ injectStyles(); p=el('<div id="sc-logtoast" style="position:fixed;top:78px;left:50%;transform:translateX(-50%);z-index:8650;background:#2a0e14;border:2px solid #c0392b;border-radius:12px;padding:10px 14px;width:min(92vw,430px);color:#ffd7d0;font:600 .85em system-ui;box-shadow:0 10px 30px rgba(0,0,0,.55);line-height:1.4"></div>'); document.body.appendChild(p); p.onclick=()=>{ p.style.display='none'; }; }
+  // Seule fenêtre ajoutée CONSERVÉE (Marc : « garde celles en rouge ») = ce que font les AUTRES nations.
+  // Mise en PLEINE LARGEUR pour s'aligner sur les fenêtres du jeu (plus de bandeau étroit flottant).
+  if(!p){ injectStyles(); p=el('<div id="sc-logtoast" style="position:fixed;top:78px;left:8px;right:8px;z-index:8650;background:#2a0e14;border:2px solid #c0392b;border-radius:12px;padding:10px 14px;box-sizing:border-box;color:#ffd7d0;font:600 .85em system-ui;box-shadow:0 10px 30px rgba(0,0,0,.55);line-height:1.4"></div>'); document.body.appendChild(p); p.onclick=()=>{ p.style.display='none'; }; }
   p._buf=(p._buf||[]).concat(txts).slice(-4); // les 4 dernières lignes
   p.innerHTML=p._buf.map(t=>'• '+t).join('<br>');
   p.style.display='block';
@@ -526,44 +515,27 @@ function showEventReal(o, isAnnounce){
 // ───────────────────────── Notices (résultats de combat / événements / fin de tour) ─────────────────────────
 function showNotice(m){
   const o = m.payload || {}, k = m.kind;
-  // ÉVÉNEMENTS : afficher la VRAIE fenêtre du jeu (visuel d'origine) plutôt qu'un bandeau minimal.
-  if((k==='event_result'||k==='event_announce') && showEventReal(o, k==='event_announce')) return;
-  // FENÊTRES BLEUES SUPPRIMÉES (demande de Marc) : le bandeau bleu #sc-notice se superposait sans arrêt.
-  // On garde UNIQUEMENT les fenêtres ROUGES (showLogToast = ce que font les autres nations) et les vraies
-  // modales du jeu. Les infos restantes (eot/info) partent dans le journal, pas en pop-up.
-  if(k==='eot'||k==='info'||k==='result') return;
-  let title='', body='';
-  if(k==='war_result'){ title=o.title||'⚔️ Combat'; body=(o.body||'')+(o.result&&o.result.txt?'<br><br><b>'+o.result.txt+'</b>':''); }
-  else if(k==='event_result'){ title='🎯 Événement'+(o.event?' — '+(o.event.emoji||'')+' '+o.event.name:''); body=o.msg||''; }
-  else if(k==='event_announce'){ title='📣 Événement à venir'+(o.event?' — '+(o.event.emoji||'')+' '+o.event.name:''); body=(o.event&&o.event.preview)||''; }
-  else if(k==='eot'){ title='📊 Fin du tour '+(o.turn||''); const mt=o.maint||{}; const parts=[];
-    if(mt.energyCost) parts.push('−'+mt.energyCost+'⚡'); if(mt.matCost) parts.push('−'+mt.matCost+'🪨'); if(mt.routeEnergyCost) parts.push('routes −'+mt.routeEnergyCost+'⚡');
-    body='Entretien : '+(parts.length?parts.join(' '):'aucun')+'. Revenus appliqués.'; }
-  else if(k==='info'){ title='ℹ️'; body=o.msg||''; }
-  else { title=k; }
-  // panneau séparé du panneau de décision (une décision peut être ouverte en même temps)
-  let p=document.getElementById('sc-notice');
-  if(!p){ injectStyles(); p=el('<div id="sc-notice" style="position:fixed;top:44px;left:50%;transform:translateX(-50%);z-index:8700;background:#101a30;border:2px solid #3a6abf;border-radius:12px;padding:12px 16px;width:min(92vw,420px);color:#dce8ff;font-family:system-ui;box-shadow:0 10px 30px rgba(0,0,0,.5)"></div>'); document.body.appendChild(p); }
-  // Avis IMPORTANTS (résultat de combat, résultat d'événement — ex. « tu gagnes X VP ») : PERSISTANTS,
-  // il faut cliquer « ✓ Continuer » pour les fermer (fix #10 : ne passent plus trop vite). Les autres
-  // (annonces, fin de tour) s'auto-referment.
-  const important = (k==='war_result' || k==='event_result');
-  // Événements : gros emoji centré + titre centré, façon vraie modale d'événement du jeu.
-  const evEmoji = ((k==='event_result'||k==='event_announce') && o.event && o.event.emoji) ? o.event.emoji : '';
-  const evName = (o.event && o.event.name) ? o.event.name : '';
-  const evLead = (k==='event_announce') ? 'Événement à venir' : 'Événement';
-  const head = evEmoji
-    ? '<div style="font-size:2.4em;text-align:center;line-height:1">'+evEmoji+'</div>'
-      +'<div style="text-align:center;font-size:.72em;color:#8fb0e0;letter-spacing:.05em;text-transform:uppercase">'+evLead+'</div>'
-      +'<div style="text-align:center;font-weight:700;margin-top:1px">'+evName+'</div>'
-    : '<b>'+title+'</b>';
-  const align = evEmoji ? 'text-align:center;' : '';
-  p.innerHTML = head + '<div style="margin-top:6px;line-height:1.35;font-size:.9em;'+align+'">'+body+'</div>'
-    + (important ? '<button style="margin-top:10px;width:100%;padding:8px;background:#2f6fd0;color:#fff;border:0;border-radius:8px;font-weight:700;cursor:pointer">✓ Continuer</button>' : '');
-  p.style.display='block';
-  clearTimeout(p._timer);
-  if(important){ p.onclick = ()=>{ p.style.display='none'; }; }
-  else { p.onclick = ()=>{ p.style.display='none'; }; p._timer = setTimeout(()=>{ p.style.display='none'; }, 3500); }
+  // FENÊTRES AJOUTÉES SUPPRIMÉES (demande de Marc) : le bandeau #sc-notice (largeur réduite) faisait doublon
+  // avec les VRAIES fenêtres du jeu. On n'utilise plus QUE celles-ci :
+  //   · événement (annonce/résultat) → #event-modal / #event-announce-modal
+  //   · résultat de combat           → #war-modal
+  // Le reste (fin de tour, info, résultat d'action) part dans le JOURNAL, sans pop-up.
+  if(k==='event_result'||k==='event_announce'){ showEventReal(o, k==='event_announce'); return; }
+  if(k==='war_result'){
+    const wm=document.getElementById('war-modal');
+    if(wm){
+      const t=document.getElementById('wm-title'), b=document.getElementById('wm-body'), r=document.getElementById('wm-result');
+      if(t)t.textContent=o.title||'⚔️ Combat';
+      if(b)b.innerHTML=o.body||'';
+      if(r){ const res=o.result||null;
+        if(res&&res.txt){ r.textContent=res.txt; r.className='war-result '+(res.cls||''); r.classList.remove('hidden'); }
+        else r.classList.add('hidden'); }
+      const btn=wm.querySelector('.war-btn'); if(btn)btn.onclick=()=>wm.classList.add('hidden');
+      wm.classList.remove('hidden');
+    }
+    return;
+  }
+  // eot / info / result : rien à afficher (déjà dans le journal et sur le plateau).
 }
 
 // ───────────────────────── Mon tour d'action (v2.1 : vraies actions de plateau) ─────────────────────────
@@ -759,7 +731,18 @@ function installIntercepts(){
     // « Passer le tour » → intention pass (au lieu du passTurnIL local).
     if(typeof window._scAbilityReminderSkip==='function' && !window._scAbilityReminderSkip._scOff){
       const o=window._scAbilityReminderSkip;
-      window._scAbilityReminderSkip=function(){ if(STATE.started){ try{ if(window._scCloseAbilityReminder)_scCloseAbilityReminder(); }catch(e){} sendAction({type:'pass'}); return; } return o.apply(this,arguments); };
+      window._scAbilityReminderSkip=function(){
+        if(STATE.started){
+          try{ if(window._scCloseAbilityReminder)_scCloseAbilityReminder(); }catch(e){}
+          // BUG (Marc) : ce bouton envoyait TOUJOURS « passer », donc refuser la capacité faisait perdre les
+          // actions restantes. Le rappel apparaissant maintenant à 1 AC, on ne passe QUE si l'AC est épuisé.
+          let reste=0; try{ const me=myNation(); reste=(me&&me.acLeft)||0; }catch(e){}
+          if(reste>0) return;                    // il te reste des actions → on referme, tu continues à jouer
+          sendAction({type:'pass'});
+          return;
+        }
+        return o.apply(this,arguments);
+      };
       window._scAbilityReminderSkip._scOff=true;
     }
     // Événements INTERACTIFS : on réutilise les VRAIES fenêtres du jeu (showCommEventModal / showDiploEventModal).
@@ -951,11 +934,11 @@ function showWaitBlock(){ /* volontairement non bloquant — voir intercepts */ 
 function hideWaitBlock(){ const b=document.getElementById('sc-waitblock'); if(b) b.style.display='none'; }
 let _notYourTurnTs=0;
 function notYourTurnToast(){
+  // Fenêtre flottante SUPPRIMÉE (demande de Marc) : on utilise la ligne d'aide NATIVE du jeu (setHint),
+  // en bas du plateau — pas de pop-up en plus.
   const now=Date.now(); if(now-_notYourTurnTs<1500) return; _notYourTurnTs=now;
-  let p=document.getElementById('sc-nyt');
-  if(!p){ injectStyles(); p=el('<div id="sc-nyt" style="position:fixed;top:78px;left:50%;transform:translateX(-50%);z-index:8690;background:#2a1e0e;border:2px solid #c08a30;border-radius:12px;padding:9px 14px;color:#ffe6c0;font:600 .86em system-ui;box-shadow:0 10px 30px rgba(0,0,0,.5)"></div>'); document.body.appendChild(p); p.onclick=()=>p.style.display='none'; }
-  p.textContent='⏳ Ce n\'est pas ton tour — tu peux regarder le plateau, la carte, le journal, l\'empire, la diplo (mais pas jouer une action).';
-  p.style.display='block'; clearTimeout(p._t); p._t=setTimeout(()=>{p.style.display='none';},2500);
+  try{ const el2=document.getElementById('sc-nyt'); if(el2)el2.remove(); }catch(e){}
+  try{ if(typeof setHint==='function'){ setHint('⏳ Ce n\'est pas ton tour — tu peux consulter la carte, le journal, l\'empire et la diplomatie.'); setTimeout(()=>{ try{ setHint(''); }catch(e){} },2500); } }catch(e){}
 }
 
 // ── Connexion / inscription (pseudo, pas email — comptes du serveur live) ──
