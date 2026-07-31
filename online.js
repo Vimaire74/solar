@@ -1266,14 +1266,26 @@ function hijackBuiltinAuth(){
   try {
     const err = document.getElementById('lv-err');
     const uEl = document.getElementById('lv-user');
-    if (uEl){ uEl.placeholder='Pseudo (3-20 lettres/chiffres)'; try{ uEl.type='text'; uEl.setAttribute('autocomplete','username'); }catch(e){} }
+    // L'identifiant est une ADRESSE EMAIL (elle reçoit les scores de fin de partie).
+    if (uEl){ uEl.placeholder='Ton adresse email'; try{ uEl.type='email'; uEl.setAttribute('inputmode','email'); uEl.setAttribute('autocomplete','email'); }catch(e){} }
+    // Bouton œil : afficher / masquer le mot de passe (même confort que la fenêtre en ligne).
+    try{
+      const pEl=document.getElementById('lv-pass');
+      if(pEl && !document.getElementById('lv-eye')){
+        const b=document.createElement('button');
+        b.id='lv-eye'; b.type='button'; b.textContent='👁'; b.title='Afficher / masquer le mot de passe';
+        b.style.cssText='margin-left:-38px;background:transparent;border:0;color:#8fb0e0;font-size:1.1em;cursor:pointer;padding:4px 8px;vertical-align:middle';
+        b.onclick=function(){ const sh=pEl.type==='password'; pEl.type=sh?'text':'password'; b.textContent=sh?'🙈':'👁'; pEl.focus(); };
+        if(pEl.parentNode) pEl.parentNode.insertBefore(b, pEl.nextSibling);
+      }
+    }catch(e){}
     window.lvSubmit = function(){
       const u=(document.getElementById('lv-user')||{}).value||'', p=(document.getElementById('lv-pass')||{}).value||'';
       if (err) err.textContent='';
-      let user=u.trim().toLowerCase();
-      if (user.indexOf('@')!==-1) user=user.split('@')[0];      // tolère un email : on prend la partie avant @
-      user=user.replace(/[^a-z0-9_.-]/g,'').slice(0,20);
-      if (user.length<3){ if(err) err.textContent='Pseudo trop court (min. 3 caractères).'; return; }
+      // ⚠️ AVANT : on coupait l'email avant le « @ » (héritage des pseudos) → le serveur recevait « marc »
+      // et refusait l'inscription en réclamant une adresse email. On envoie désormais l'adresse COMPLÈTE.
+      const user=u.trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s.]+\.[a-z]{2,}$/i.test(user)){ if(err) err.textContent='Entre une adresse email valide (ex. prenom@domaine.ch).'; return; }
       if (p.length<6){ if(err) err.textContent='Mot de passe trop court (min. 6).'; return; }
       let reg=false; try{ reg=(typeof _lvMode!=='undefined' && _lvMode==='register'); }catch(e){}
       _errCb = (msg)=>{ if(err) err.textContent=msg; };

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Solar Conquest — Mobile</title>
+<title>Solar</title>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Solar Conquest">
+<meta name="apple-mobile-web-app-title" content="Solar">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;height:calc(var(--vh,1vh)*100);height:100dvh;overflow:hidden}
@@ -711,7 +711,7 @@ body{font-size:16px;}
 #sc-online-btn{display:none!important}
 </style>
 <div id="civ-sel" class="overlay">
-  <h1>🌌 SOLAR CONQUEST</h1>
+  <h1>🌌 SOLAR</h1>
   <a class="lv-pdf" href="Solar_Conquest_Livret.pdf" target="_blank" rel="noopener">📖 Livret de règles (PDF)</a>
   <div id="lv-auth">
     <div class="lv-tabs">
@@ -5493,7 +5493,7 @@ function calcVP(p){
 // puis le calcul final des points de victoire. Émojis de guerre seulement.
 function buildJournalReport(){
   const L=[];
-  L.push('=== SOLAR CONQUEST — RAPPORT DE PARTIE ===');
+  L.push('=== SOLAR — RAPPORT DE PARTIE ===');
   try{
     L.push('Nations : '+G.player.civ.name+' (toi) vs '+G.ais.map(a=>a.civ.name).join(', '));
     if(G.phase==='over'){const pv=calcVP(G.player).total,av=Math.max(...G.ais.map(a=>calcVP(a).total));L.push('Résultat : '+(pv>=av?'VICTOIRE':'DÉFAITE')+' — '+pv+' VP contre '+av+' VP');}
@@ -5546,7 +5546,7 @@ function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,
 function buildJournalReportHTML(){
   const H=[];
   try{
-    H.push('<b>SOLAR CONQUEST — RAPPORT DE PARTIE</b>');
+    H.push('<b>SOLAR — RAPPORT DE PARTIE</b>');
     H.push('Nations : '+[G.player,...(G.ais||[])].map(p=>'<span style="color:'+p.civ.color+';font-weight:700">'+_esc(p.civ.name)+'</span>').join(', '));
     if(G.phase==='over'){const pv=calcVP(G.player).total,av=Math.max(...G.ais.map(a=>calcVP(a).total));H.push('Résultat : '+(pv>=av?'VICTOIRE':'DÉFAITE')+' — '+pv+' VP contre '+av+' VP');}
     else H.push('Partie en cours — tour '+G.turn+'/'+G.maxTurns);
@@ -5595,7 +5595,7 @@ function copyLogText(){
 }
 function emailLog(){
   const full=buildFullLog();
-  const href='mailto:?subject='+encodeURIComponent('Solar Conquest — log de partie')+'&body='+encodeURIComponent(full);
+  const href='mailto:?subject='+encodeURIComponent('Solar — log de partie')+'&body='+encodeURIComponent(full);
   if(href.length>1900)_logToast('ℹ️ Log long : l\'email peut être tronqué — préfère « Copier » si besoin.');
   try{location.href=href;}catch(e){_logToast('⚠️ Impossible d\'ouvrir l\'email');}
 }
@@ -7063,7 +7063,7 @@ function saveDebugNote(){
 }
 function exportDebugLog(){
   if(!G.debugNotes)G.debugNotes=[];
-  let out='=== SOLAR CONQUEST — LOG D\'ANALYSE ===\n';
+  let out='=== SOLAR — LOG D\'ANALYSE ===\n';
   out+='Partie : '+G.player.civ.name+' vs '+G.ais.map(a=>a.civ.name).join(', ')+'\n';
   out+='Agendas : '+G.agendas.map(a=>a.name).join(' / ')+'\n\n';
   if(G.debugNotes.length){
