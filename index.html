@@ -2194,8 +2194,11 @@ function showAgendaSelModal(){
   const evT2=eventForTurn(2);
   // Contexte : ressources + revenus + événements
   const ctx=document.getElementById('agsel-context');
-  const rLine=([r,a])=>a>0?`<span class="agsel-res">${rEmoji(r)} ${a>0?'+':''}${a}</span>`:'';
-  const gainStr=Object.entries(previewGains).filter(([,a])=>a>0).map(rLine).join('');
+  // NET (revenus − entretien colonies/routes/gouvernement) : même source que la barre du haut, sinon on
+  // affichait du BRUT et on ne voyait pas qu'on passait en négatif (remarque de l'ami de Marc).
+  const _net=(typeof _netIncome==='function')?_netIncome(p):previewGains;
+  const rLine=([r,a])=>a!==0?`<span class="agsel-res" style="color:${a<0?'#ff6b6b':'#7fe0a0'}">${rEmoji(r)} ${a>0?'+':''}${a}</span>`:'';
+  const gainStr=Object.entries(_net).filter(([,a])=>a!==0).map(rLine).join('');
   const resStr=`<i class=ri-energy></i>${p.res.energy} <i class=ri-materials></i>${p.res.materials} <i class=ri-science></i>${p.res.science} <i class=ri-morale></i>${p.res.morale}`;
   ctx.innerHTML=`
     <div class="agsel-ctx-box">
@@ -2686,6 +2689,16 @@ function dismissInvestActive(){
 // ── DRAFT DES BONUS DE DÉBUT DE TOUR (mémo #12) : pool commun limité, choix du plus faible (VP) au plus fort, égalité départagée par jetons Force ──
 function runStrategyDraft(){
   _startTurnPrep(); // revenus + AC à jour AVANT le choix des cartes Stratégie
+  // ORDRE (Marc) : l'ÉVÉNEMENT DU TOUR SUIVANT est présenté AVANT le choix des cartes Stratégie — sinon on
+  // choisit sa stratégie sans savoir ce qui arrive, ce qui vide l'annonce de son intérêt.
+  // (Avant : l'annonce était faite en fin de _startTurnBegin, donc APRÈS le draft.)
+  G.curEvent=eventForTurn(G.turn);              // se résout en fin de CE tour
+  G.nextEvent=eventForTurn(G.turn+1);           // révélé maintenant pour qu'on s'y prépare
+  G._announcedTurn=G.turn;                      // évite une seconde annonce dans _startTurnBegin
+  if(G.nextEvent){ render(); showEventAnnounce(G.nextEvent, _runStrategyDraftAfterAnnounce); return; }
+  _runStrategyDraftAfterAnnounce();
+}
+function _runStrategyDraftAfterAnnounce(){
   const nations=[G.player,...G.ais];
   const order=nations.slice().sort((a,b)=>{const va=calcVP(a),vb=calcVP(b);if(va!==vb)return va-vb;return (a.forceTokens||0)-(b.forceTokens||0);});
   const poolSize=Math.min(STRATEGY_CARDS.length, nations.length+(G.turn===1?3:2));
@@ -2938,7 +2951,10 @@ function _startTurnBegin(){
   }
   G.curEvent=eventForTurn(G.turn);              // se résout en fin de CE tour
   G.nextEvent=eventForTurn(G.turn+1);           // révélé maintenant pour qu'on s'y prépare
-  if(G.nextEvent){
+  // L'annonce a normalement DÉJÀ été faite avant le draft (runStrategyDraft). On ne la refait pas.
+  // Elle reste ici pour le cas où l'on démarre un tour SANS passer par le draft (ex. tout premier tour).
+  if(G.nextEvent && G._announcedTurn!==G.turn){
+    G._announcedTurn=G.turn;
     render(); // Mettre à jour le compteur de tour AVANT d'afficher le modal d'annonce
     showEventAnnounce(G.nextEvent,()=>{render();if(typeof showMoraleWarning==='function')showMoraleWarning();});
   } else {render();if(typeof showMoraleWarning==='function')showMoraleWarning();}
@@ -3046,6 +3062,17 @@ function processAllWars(onDone){
     if(idx>=fresh.length){onDone();return;}
     const war=fresh[idx];
     if(!G.wars.find(w=>w.aiId===war.aiId)){processFresh(idx+1);return;}
+    // Même règle que pour les guerres en cours : une nation SANS COLONIE est vaincue → vassale, guerre finie.
+    // (Manquait ici : une guerre fraîchement déclarée contre une nation déjà sans colonie ne se terminait pas.)
+    {const _van=G.ais.find(a=>a.civ.id===war.aiId);
+     if(_van&&(!_van.colonies||_van.colonies.length===0)){
+       const _n=_van.civ.emoji+' '+_van.civ.name;
+       endWar(war.aiId);
+       addLog('🏳️ '+_n+' n\'a plus aucune colonie — nation ASSERVIE (vassale). La guerre prend fin.','gold');
+       showWarModal('🏳️ '+_n+' asservi !','Cette nation n\'a plus aucune colonie : elle devient ta <strong>vassale</strong>.<br><br>La guerre prend fin.',{txt:'Victoire totale.',cls:'win'});
+       _warModalCb=()=>processFresh(idx+1);
+       return;
+     }}
     G.warWith=war.aiId;
     const warEnemy=G.ais.find(a=>a.civ.id===war.aiId)||G.ais[0];
     const warEnName=warEnemy?(warEnemy.civ.emoji+' '+warEnemy.civ.name):'IA';
@@ -4317,7 +4344,7 @@ function resolveRouteAttack(attacker,defender,route,commit){
   defender.routes=defender.routes.filter(r=>r!==route);updateConnections(defender);
   if(wasProtected){applyCombatEngage(attacker,commit,true);addLog('💥 '+atkName+' DÉTRUIT la route '+rn+' — jeton de protection brisé ; jetons engagés en récupération.',youAtk?'gold':'red');}
   else{addLog('💥 '+atkName+' DÉTRUIT la route '+rn+' — non protégée, à reconstruire ; tes jetons reviennent (pas de récupération).',youAtk?'gold':'red');}
-  if(!youAtk&&defender===G.player)_notePlayerHit((attacker.civ?attacker.civ.name:'Une nation')+' détruit ta route',rn+' est détruite'+(wasProtected?' (protection brisée)':' — à reconstruire')+'.');
+  if(!youAtk)notifyNationHit(defender,(attacker.civ?attacker.civ.name:'Une nation')+' détruit ta route',rn+' est détruite'+(wasProtected?' (protection brisée)':' — à reconstruire')+'.');
   return {destroyed:true};
 }
 function attackEnemyRoute(aiId,ri){
@@ -4369,13 +4396,13 @@ function resolveAiAssault(ai,targetId,commit){
     p.res.morale=Math.max(0,(p.res.morale||0)-1);
     addLog('🏴 '+ai.civ.emoji+' '+ai.civ.name+' REPREND '+(node?node.name:targetId)+' ! ('+aPow+'⚔️ vs '+pDef+'🛡️, Nv.'+newLvl+') — tu perds la colonie, −1<i class=ri-morale></i>','red');
     G.aiActions.push({emoji:'🏴',name:'Reprend '+(node?node.name:targetId),desc:aPow+'⚔️ vs '+pDef+'🛡️'});
-    if(p===G.player)_notePlayerHit(ai.civ.name+' prend '+(node?node.name:targetId),'Ta colonie tombe (Nv.'+newLvl+') — combat '+aPow+' contre '+pDef+'. Tu perds 1 moral.');
+    notifyNationHit(p,ai.civ.name+' prend '+(node?node.name:targetId),'Ta colonie tombe (Nv.'+newLvl+') — combat '+aPow+' contre '+pDef+'. Tu perds 1 moral.');
   }else{
     war.winsBy[p.civ.id]=(war.winsBy[p.civ.id]||0)+1;ai.res.morale=Math.max(0,(ai.res.morale||0)-1);
     if(_aiCru)ai.cruiserCooldown=getCooldownTurn(ai); // croiseur IA en réparation suite à la défaite
     addLog('🛡️ '+ai.civ.emoji+' '+ai.civ.name+' échoue à reprendre '+(node?node.name:targetId)+' ('+aPow+'⚔️ vs '+pDef+'🛡️) — assaut repoussé !','gold');
     G.aiActions.push({emoji:'🛡️',name:'Assaut repoussé : '+(node?node.name:targetId),desc:aPow+'⚔️ vs '+pDef+'🛡️'});
-    if(p===G.player)_notePlayerHit(ai.civ.name+' attaque '+(node?node.name:targetId),'Assaut repoussé ! Ta défense tient — combat '+aPow+' contre '+pDef+'.');
+    notifyNationHit(p,ai.civ.name+' attaque '+(node?node.name:targetId),'Assaut repoussé ! Ta défense tient — combat '+aPow+' contre '+pDef+'.');
   }
 }
 // ── ASSAUT IA SUR LE JOUEUR (fin de tour, quand l'IA MAINTIENT la guerre / refuse la paix) : le joueur choisit sa défense ──
@@ -4496,15 +4523,16 @@ function resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,defender){
     if(target.type==='route'){
       target.obj.tokens=0;updateConnections(p);lost='🛤️ Route '+target.name+' neutralisée — jeton de protection perdu.';
     }else{
+      // RÈGLE UNIFIÉE (Marc) : une colonie vaincue est CAPTURÉE IMMÉDIATEMENT au niveau −1, dans les DEUX
+      // SENS. Avant, seule TA colonie était d'abord « rétrogradée » (il fallait 3 assauts à l'ennemi pour
+      // prendre une colonie Nv.3, alors qu'un seul te suffisait) — asymétrie corrigée.
       const col=target.obj;
-      if((col.level||1)>1){col.level--;updateConnections(p);lost='🏙️ Colonie '+target.name+' rétrogradée au Niveau '+col.level+'.';}
-      else{
-        p.colonies=p.colonies.filter(c=>c.nodeId!==col.nodeId);updateConnections(p);
-        const conn=(typeof checkConnected==='function')?checkConnected(col.nodeId,ai):true;
-        if(!ai.colonies.some(c=>c.nodeId===col.nodeId))ai.colonies.push({nodeId:col.nodeId,level:1,connected:conn});
-        updateConnections(ai);if(war)war.aiRecaptureTarget=null;
-        lost='🏴 Colonie '+target.name+' CAPTURÉE par '+ai.civ.name+' — tu la perds !';
-      }
+      const _newLvl=Math.max(1,(col.level||1)-1);
+      p.colonies=p.colonies.filter(c=>c.nodeId!==col.nodeId);updateConnections(p);
+      const conn=(typeof checkConnected==='function')?checkConnected(col.nodeId,ai):true;
+      if(!ai.colonies.some(c=>c.nodeId===col.nodeId))ai.colonies.push({nodeId:col.nodeId,level:_newLvl,connected:conn});
+      updateConnections(ai);if(war)war.aiRecaptureTarget=null;
+      lost='🏴 Colonie '+target.name+' CAPTURÉE par '+ai.civ.name+' (Nv.'+_newLvl+') — tu la perds !';
     }
     p.res.morale=Math.max(0,(p.res.morale||0)-1);
     resultTxt='💥 Défense insuffisante ! '+pDef+'🛡️ vs '+aPow+'⚔️<br><strong style="color:#ff9977">'+lost+'</strong> (−1<i class=ri-morale></i>)';cls='loss';
@@ -5160,7 +5188,7 @@ function doAITurn(aiPlayer,oneShot){
     G._raidsThisTurn.push({civ:ai.civ,stolen:[...stolen]});
     addLog('🤖 Raid '+ai.civ.emoji+' '+ai.civ.name+' ! Tu perds '+stolen.join('')+' (risque guerre +2, tension +2)','red');
     G.aiActions.push({emoji:'⚔️',name:'Raid',desc:'Vole : '+(stolen.join('')||'rien')});
-    if(_e===G.player)_notePlayerHit(ai.civ.name+' te pille',(stolen.length?'Ils volent '+_riToText(stolen.join(' '))+'.':'Raid sans butin.')+' Risque de guerre +2, tension +2.');
+    notifyNationHit(_e,ai.civ.name+' te pille',(stolen.length?'Ils volent '+_riToText(stolen.join(' '))+'.':'Raid sans butin.')+' Risque de guerre +2, tension +2.');
     return true;
   }
 
@@ -7365,6 +7393,22 @@ function _scStuckDismiss(){_scCloseStuck();if(G){G._scStuckTries=0;G._scStuckSho
    Une autre nation t'attaque (assaut de colonie, destruction de route, raid) → on met en file
    une notification ; l'interlacé se met en pause et affiche un popup ✓ Continuer. Les actions des
    autres nations qui NE te concernent PAS continuent de défiler normalement. */
+// ANNONCE « TU AS ÉTÉ ATTAQUÉ » — adressée à la NATION VICTIME, quelle qu'elle soit.
+// Fonctionne dans les TROIS modes : solo (modale locale accumulée), et en ligne (notice BLOQUANTE routée
+// vers le joueur concerné, humain local ou distant). Une IA n'affiche rien : l'info reste dans le journal.
+// C'est la raison pour laquelle les raids subis n'étaient pas annoncés : _notePlayerHit sortait si !G._il
+// (donc toujours en mode serveur) et ne regardait que G.player, qui tourne d'une nation à l'autre.
+function notifyNationHit(victim,title,body){
+  try{
+    if(!victim)return;
+    if(victim._isAI)return;                       // IA : pas de fenêtre, tout est déjà journalisé
+    if(typeof _decisionActive==='function'&&_decisionActive()){
+      _emitNotice('raid_hit', victim, {title:title||'Attaque', body:body||''}, function(){});
+      return;
+    }
+    _notePlayerHit(title,body);                   // solo / local : comportement d'origine
+  }catch(e){}
+}
 function _notePlayerHit(title,body){
   try{
     if(!G||!G._il)return;                    // seulement en mode interlacé (partie en direct)

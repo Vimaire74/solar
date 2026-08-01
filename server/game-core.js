@@ -7,10 +7,20 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-function makeEl() {
-  return {
+// ── DOM ENREGISTREUR (option de TEST, cf. server/playthrough.js) ────────────────────────────────
+// Quand un « recorder » est fourni, chaque ouverture/fermeture de fenêtre et chaque texte affiché sont
+// consignés. Sans recorder, comportement identique à avant (stubs muets) : zéro impact en production.
+let _REC = null;
+function setRecorder(r){ _REC = r || null; }
+function makeEl(id) {
+  const el = {
+    _id: id || null,
     style: new Proxy({}, { get: () => '', set: () => true }), dataset: {}, children: [],
-    classList: { add(){}, remove(){}, toggle(){}, contains(){ return false; } },
+    classList: {
+      add(c){ if(_REC && c==='hidden' && el._id) _REC.close(el._id); },
+      remove(c){ if(_REC && c==='hidden' && el._id) _REC.open(el._id, el); },
+      toggle(){}, contains(){ return false; }
+    },
     setAttribute(){}, getAttribute(){ return null; }, removeAttribute(){}, hasAttribute(){ return false; },
     appendChild(c){ return c; }, removeChild(c){ return c; }, insertBefore(c){ return c; }, replaceChild(){},
     addEventListener(){}, removeEventListener(){}, dispatchEvent(){ return true; },
@@ -24,6 +34,7 @@ function makeEl() {
     innerHTML:'', outerHTML:'', textContent:'', value:'', disabled:false, checked:false,
     parentElement:null, parentNode:null, firstChild:null, nextSibling:null
   };
+  return el;
 }
 
 function buildSandbox() {
@@ -31,7 +42,7 @@ function buildSandbox() {
   // headless (ex. attaque : showAttackModal règle slider.min, confirmAttack le relit).
   const _els = {};
   const document = {
-    getElementById(id){ return _els[id] || (_els[id] = makeEl()); }, createElement(){ return makeEl(); },
+    getElementById(id){ return _els[id] || (_els[id] = makeEl(id)); }, createElement(){ return makeEl(); },
     createElementNS(){ return makeEl(); }, createTextNode(){ return makeEl(); },
     querySelector(){ return makeEl(); }, querySelectorAll(){ return []; },
     body: makeEl(), documentElement: makeEl(), head: makeEl(),
@@ -176,4 +187,4 @@ class Engine {
   aiAction(aiIndex) { this.sb.doAITurn(this.sb.__G.ais[aiIndex || 0], true); return this.state(); }
 }
 
-module.exports = { Engine, loadLogic };
+module.exports = { Engine, loadLogic, setRecorder };

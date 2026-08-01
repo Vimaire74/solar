@@ -187,7 +187,7 @@ class GameDriver {
   // Notices BLOQUANTES : le joueur doit cliquer « Continuer » (fenêtre statique). Sinon le pump acquittait
   // tout de suite → les fenêtres « tu as gagné/perdu » et « résultat d'événement » passaient inaperçues.
   _isBlockingNotice(p){
-    if(!p || !['war_result','event_result','event_announce'].includes(p.kind)) return false;
+    if(!p || !['war_result','event_result','event_announce','raid_hit','eot'].includes(p.kind)) return false;
     // ⚠️ JUGEMENT FINAL : sa fenêtre ne doit JAMAIS bloquer — sinon la partie ne se termine pas, les scores
     // ne sont pas calculés, l'archive et l'email ne partent jamais (bug vécu par Marc, partie figée au tour 10).
     try{ const ev=p.payload&&p.payload.event; if(ev&&ev.id==='final') return false; }catch(e){}

@@ -477,7 +477,9 @@ wss.on('connection', (ws) => {
           const empty = g.seats.filter(s => !s.ai && !s.user);
           if (empty.length) return err('sièges humains vides: ' + empty.map(s => s.civId).join(','));
           g.driver = new GameDriver(HTML);
-          g.driver.onLog = entries => broadcast(g, { t: 'log', entries });
+          // Le journal des actions part vers TOUS SAUF l'auteur de l'action : la fenêtre rouge doit
+          // montrer ce que font les AUTRES nations, pas ce que le joueur vient lui-même de faire.
+          g.driver.onLog = entries => { for (const s2 of g.seats) { if (g._actingCiv && s2.civId === g._actingCiv) continue; sendTo(s2.ws, { t: 'log', entries }); } };
           g.status = 'playing';
           broadcast(g, { t: 'started', game: gameView(g) });
           // Décisions humaines : récupérées via pump(). Notices (résultats de combat/événement/fin de tour) :
@@ -513,7 +515,9 @@ wss.on('connection', (ws) => {
           const s = seatOf(g, ws) || seatOf(g, sess.user);
           if (!g.driver || !s) return err('pas dans cette partie');
           try {
+            g._actingCiv = s.civId;                       // auteur de l'action (exclu du journal diffusé)
             const rr = g.driver.act(s.civId, m.action || { type: 'pass' });
+            g._actingCiv = null;
             const act = m.action || {};
             if (act.type && act.type !== 'pass') {
               const lines = (g.driver._lastActionLog || []).map(x => plainText(x)).filter(Boolean);

@@ -242,6 +242,8 @@ function onDecision(pending){
   if(pending.kind==='peace_offer' && showPeaceReal(pending)){ STATE._realDecide=finish; return; }
   if((pending.kind==='ai_dyson'||pending.kind==='human_dyson'||pending.kind==='dyson_build') && showDysonReal(pending)){ STATE._realDecide=finish; return; }
   if(pending.kind==='war_result' && showWarResultReal(pending)){ STATE._realDecide=finish; return; }
+  if(pending.kind==='raid_hit' && showHitReal(pending)){ STATE._realDecide=finish; return; }
+  if(pending.kind==='eot' && showEotReal(pending)){ STATE._realDecide=finish; return; }
   if(pending.kind==='event_result' && showEventResultBlocking(pending)){ STATE._realDecide=finish; return; }
   if(pending.kind==='event_announce' && showEventAnnounceBlocking(pending)){ STATE._realDecide=finish; return; }
   if(pending.kind==='forced_war' && showForcedWarReal(pending)){ STATE._realDecide=finish; return; }
@@ -289,6 +291,40 @@ function showDysonReal(pending){
     return true;
   }
   return false;
+}
+// BILAN DE FIN DE TOUR (#eot-modal) — il n'était JAMAIS affiché en ligne (acquitté d'office par le serveur),
+// alors que la séquence de tour voulue par Marc le prévoit. On affiche la vraie fenêtre du jeu.
+function showEotReal(pending){
+  const o=pending.payload||{};
+  const m=document.getElementById('eot-modal'); if(!m) return false;
+  const body=document.getElementById('eot-body');
+  const mt=o.maint||{}, rv=o.revs||{};
+  const rE=(typeof rEmoji==='function')?rEmoji:(r=>r);
+  const li=(lbl,obj,signe)=>{ const parts=[]; for(const k of ['energy','materials','science','morale']){ const v=obj&&obj[k]; if(v)parts.push(signe+v+rE(k)); }
+    return parts.length?('<div class="eot-item"><span class="eot-name">'+lbl+' : '+parts.join(' ')+'</span></div>'):''; };
+  const cout=[]; if(mt.energyCost)cout.push('−'+mt.energyCost+rE('energy')); if(mt.matCost)cout.push('−'+mt.matCost+rE('materials'));
+  if(mt.routeEnergyCost)cout.push('routes −'+mt.routeEnergyCost+rE('energy'));
+  if(body)body.innerHTML='<div class="eot-section"><h4>📊 Fin du tour '+(o.turn||'')+'</h4>'
+    +li('Revenus',rv,'+')
+    +(cout.length?('<div class="eot-item"><span class="eot-name">Entretien : '+cout.join(' ')+'</span></div>'):'<div class="eot-item"><span class="eot-name">Entretien : aucun</span></div>')
+    +'</div>';
+  const go=()=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide({}); };
+  const btn=m.querySelector('.eot-btn'); if(btn)btn.onclick=go; else { const b2=m.querySelector('button'); if(b2)b2.onclick=go; }
+  m.classList.remove('hidden');
+  return true;
+}
+// TU AS ÉTÉ ATTAQUÉ (raid, route détruite, colonie prise) : vraie fenêtre de guerre, bouton « Compris ».
+function showHitReal(pending){
+  const o=pending.payload||{};
+  const m=document.getElementById('war-modal'); if(!m) return false;
+  const t=document.getElementById('wm-title'), b=document.getElementById('wm-body'), r=document.getElementById('wm-result');
+  if(t)t.textContent=o.title||'⚔️ Tu es attaqué';
+  if(b)b.innerHTML=o.body||'';
+  if(r)r.classList.add('hidden');
+  const go=()=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide({}); };
+  const btn=m.querySelector('.war-btn'); if(btn){ btn.textContent='Compris →'; btn.onclick=go; }
+  m.classList.remove('hidden');
+  return true;
 }
 // VRAIE fenêtre de RÉSULTAT DE COMBAT (#war-modal) — statique, se ferme sur « Continuer » (qui envoie l'ack).
 function showWarResultReal(pending){
@@ -420,7 +456,9 @@ function showAgendaReal(pending){
     const evNext = (typeof eventForTurn==='function') ? eventForTurn((G.turn||1)+1) : null;
     const rE = (typeof rEmoji==='function') ? rEmoji : (r=>r);
     const resStr='<i class=ri-energy></i>'+(p.res.energy||0)+' <i class=ri-materials></i>'+(p.res.materials||0)+' <i class=ri-science></i>'+(p.res.science||0)+' <i class=ri-morale></i>'+(p.res.morale||0);
-    const gainStr=Object.keys(preview).filter(k=>preview[k]>0).map(k=>'<span class="agsel-res">'+rE(k)+' +'+preview[k]+'</span>').join('') || '—';
+    // NET (après entretien) — même source que la barre du haut ; un revenu négatif s'affiche en rouge.
+    const _net=(typeof _netIncome==='function')?_netIncome(p):preview;
+    const gainStr=Object.keys(_net).filter(k=>_net[k]!==0).map(k=>'<span class="agsel-res" style="color:'+(_net[k]<0?'#ff6b6b':'#7fe0a0')+'">'+rE(k)+' '+(_net[k]>0?'+':'')+_net[k]+'</span>').join('') || '—';
     if(ctx) ctx.innerHTML='<div class="agsel-ctx-box"><div class="agsel-ctx-label">Vos ressources</div><div class="agsel-ctx-val">'+resStr+'</div></div>'
       +'<div class="agsel-ctx-box"><div class="agsel-ctx-label">Revenus prévus/tour</div><div class="agsel-ctx-val">'+gainStr+'</div></div>'
       +'<div class="agsel-ctx-box"><div class="agsel-ctx-label">Prochain événement</div><div class="agsel-ctx-val">'+(evNext?(evNext.emoji+' '+evNext.preview):'Aucun')+'</div></div>';
