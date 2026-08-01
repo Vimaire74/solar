@@ -1574,7 +1574,8 @@ const EVENTS=[
   {id:'storm',type:'menace',name:'Tempêtes Solaires',emoji:'🌩️',preview:'Sans IA Défensive, chaque nation perd 1 jeton Force, 1 route et 2<i class=ri-materials></i>.',
    resolve(G){let n=0;const pProt=hasSpec(G.player,'storm_immune');for(const p of allPlayers()){if(hasSpec(p,'storm_immune'))continue;p.forceTokens=Math.max(0,(p.forceTokens||0)-1);if(p.routes&&p.routes.length){p.routes.pop();updateConnections(p);}p.res.materials=Math.max(0,(p.res.materials||0)-2);n++;}return (pProt?'Tu as réussi à te protéger. ':'')+'Tempêtes Solaires — '+n+' nation(s) touchée(s) : −1 jeton, −1 route, −2<i class=ri-materials></i>.';}},
   {id:'pirates',type:'menace',name:'Prolifération des pirates',emoji:'☠️',preview:'Les pirates frappent les routes de la nation la plus riche en <i class=ri-materials></i> : les routes sans jeton sont détruites ; celles avec ont 50% de chance d\'être perdues, mais 2 au maximum.',
-   resolve(G){const h=_evTop(function(p){return p.res.materials||0;});if(h.length!==1)return 'Prolifération des pirates — aucune cible claire.';const tgt=h[0];let unp=0,prot=0;const keep=[];for(const r of tgt.routes){if((r.tokens||0)>0){/* protégée : 50% chacune, MAX 2 perdues */ if(prot<2&&Math.random()<0.5){tgt.forceCooldown.push({count:r.tokens,returnTurn:getCooldownTurn(tgt)});prot++;}else keep.push(r);}else unp++;/* non protégée : détruite */}tgt.routes=keep;updateConnections(tgt);return 'Prolifération des pirates — '+_evName(tgt)+' perd '+(unp+prot)+' route(s) : '+unp+' non protégée(s) détruite(s)'+(prot?', '+prot+' protégée(s) pillée(s) (max 2 — jetons en récupération)':'')+'. Protège-toi avec l\'IA Défensive ou le Réseau Orbital.';}},
+   resolve(G){const h=_evTop(function(p){return p.res.materials||0;});if(h.length!==1)return 'Prolifération des pirates — aucune cible claire.';const tgt=h[0];let unp=0,prot=0;const keep=[];for(const r of tgt.routes){if((r.tokens||0)>0){/* protégée : 50% chacune, MAX 2 perdues */ if(prot<2&&Math.random()<0.5){tgt.forceCooldown.push({count:r.tokens,returnTurn:getCooldownTurn(tgt)});prot++;}else keep.push(r);}else unp++;/* non protégée : détruite */}tgt.routes=keep;updateConnections(tgt);if((unp+prot)===0)return 'Prolifération des pirates — '+_evName(tgt)+' est la nation la plus riche en <i class=ri-materials></i> et devient la cible des pirates, mais AUCUNE route n\'est perdue.';
+    return 'Prolifération des pirates — '+_evName(tgt)+' est visé (nation la plus riche en <i class=ri-materials></i>) et perd '+(unp+prot)+' route(s) : '+unp+' sans jeton détruite(s)'+(prot?', '+prot+' protégée(s) pillée(s) (max 2 — jetons en récupération)':'')+'.';}},
   {id:'sci',type:'competition',name:'Conférence Scientifique Solaire',emoji:'🔬',preview:'La nation avec la plus grande production de <i class=ri-science></i> gagne +6 VP.',
    resolve(G){const h=_evTop(_sciProd);return 'Conférence Scientifique — '+_evAwardVP(h,6);}},
   {id:'tech',type:'competition',name:'Développement Technologique',emoji:'⚗️',preview:'La nation avec le plus de technologies de niveau 2 et 3 gagne +6 VP.',
@@ -1591,7 +1592,8 @@ const EVENTS=[
    resolve(G){return 'Fin — calcul des scores !';}},
 ];
 /* --- Refonte v18 : événements tirés au hasard, 1 par tour pair (T2/T4/T6/T8), révélés au tour précédent. T10 = Jugement Final. --- */
-function _evName(p){return p===G.player?'Toi':p.civ.emoji+' '+p.civ.name;}
+// Toujours NOMMER la nation : « Toi » seul était ambigu (on ne savait pas si on gagnait ou perdait).
+function _evName(p){return p.civ.emoji+' '+p.civ.name+((typeof G!=='undefined'&&G&&p===G.player)?' (toi)':'');}
 function _forceTotal(p){return (p.forceTokens||0)+((p.forceCooldown||[]).reduce(function(s,c){return s+(c.count||0);},0));}
 // SOURCE UNIQUE : jetons Force réellement ENGAGEABLES (guerre / raid) = réserve − garnison obligatoire
 // (1 jeton réservé par colonie connectée hors base). Les jetons posés sur les routes et ceux en récupération

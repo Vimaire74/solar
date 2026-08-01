@@ -1,4 +1,8 @@
-/* Solar Conquest — couche EN LIGNE v2 : client WebSocket du SERVEUR AUTORITAIRE.
+/* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
+   Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
+   des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
+const SOLAR_BUILD_JS = '2026-08-01 · v4.9';
+/* Solar — couche EN LIGNE v2 : client WebSocket du SERVEUR AUTORITAIRE.
    Remplace l'ancienne couche PHP/polling (archivée dans server/php/online.js).
    À servir à la racine du site : index.html contient déjà <script src="online.js"></script> (optionnel —
    si ce fichier manque, le solo fonctionne normalement).
@@ -304,10 +308,15 @@ function showEotReal(pending){
     return parts.length?('<div class="eot-item"><span class="eot-name">'+lbl+' : '+parts.join(' ')+'</span></div>'):''; };
   const cout=[]; if(mt.energyCost)cout.push('−'+mt.energyCost+rE('energy')); if(mt.matCost)cout.push('−'+mt.matCost+rE('materials'));
   if(mt.routeEnergyCost)cout.push('routes −'+mt.routeEnergyCost+rE('energy'));
-  if(body)body.innerHTML='<div class="eot-section"><h4>📊 Fin du tour '+(o.turn||'')+'</h4>'
+  const ti=document.getElementById('eot-title'); if(ti)ti.textContent='📊 Bilan du Tour '+(o.turn||'');
+  // Le serveur envoie le bilan COMPLET (construit par buildEOTBody dans index.html) : actions du tour,
+  // entretien détaillé, revenus, une section par nation, guerre, pillages, pirates. On l'injecte tel quel
+  // dans la vraie fenêtre — bilan rigoureusement identique au solo. Le résumé court ci-dessous ne sert
+  // que de filet si un serveur plus ancien n'envoie pas le HTML.
+  if(body)body.innerHTML = o.html || ('<div class="eot-section"><h4>📊 Fin du tour '+(o.turn||'')+'</h4>'
     +li('Revenus',rv,'+')
     +(cout.length?('<div class="eot-item"><span class="eot-name">Entretien : '+cout.join(' ')+'</span></div>'):'<div class="eot-item"><span class="eot-name">Entretien : aucun</span></div>')
-    +'</div>';
+    +'</div>');
   const go=()=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide({}); };
   const btn=m.querySelector('.eot-btn'); if(btn)btn.onclick=go; else { const b2=m.querySelector('button'); if(b2)b2.onclick=go; }
   m.classList.remove('hidden');
@@ -979,12 +988,21 @@ function notYourTurnToast(){
   try{ if(typeof setHint==='function'){ setHint('⏳ Ce n\'est pas ton tour — tu peux consulter la carte, le journal, l\'empire et la diplomatie.'); setTimeout(()=>{ try{ setHint(''); }catch(e){} },2500); } }catch(e){}
 }
 
+// Étiquette de version affichée sur l'écran de connexion. Si index.html et online.js portent des
+// builds différents, on affiche les DEUX en rouge : c'est le signe d'un upload partiel ou d'un cache.
+function _buildLabel(){
+  const h=(typeof window!=='undefined'&&window.SOLAR_BUILD_HTML)||null;
+  const j=SOLAR_BUILD_JS;
+  if(!h) return 'Version '+j+' <span style="color:#ff8a8a">(jeu : version inconnue — index.html non à jour)</span>';
+  if(h===j) return 'Version '+h;
+  return '<span style="color:#ff8a8a">Versions incohérentes — jeu : '+h+' · en ligne : '+j+'</span>';
+}
 // ── Connexion / inscription (pseudo, pas email — comptes du serveur live) ──
 function screenAuth(mode){
   const isReg = mode==='register';
   let savedUser=''; try{ savedUser=localStorage.getItem('sc_ws_user')||''; }catch(e){}
   overlay(`
-    <h2>${isReg?'Créer un compte':'Connexion'} — Solar Conquest</h2>
+    <h2>${isReg?'Créer un compte':'Connexion'} — Solar</h2>
     <input id="sc-u" type="email" inputmode="email" placeholder="Ton adresse email" autocomplete="email" value="${savedUser}">
     <div style="position:relative">
       <input id="sc-p" type="password" placeholder="Mot de passe (min. 6)" autocomplete="${isReg?'new-password':'current-password'}" style="padding-right:44px">
@@ -995,6 +1013,7 @@ function screenAuth(mode){
     <button class="pri" id="sc-go">${isReg?'Créer le compte':'Se connecter'}</button>
     <button class="sec" id="sc-alt">${isReg?"J'ai déjà un compte":'Créer un compte'}</button>
     <button class="sec" id="sc-close">↩ Retour au jeu solo</button>
+    <div class="muted" style="font-size:.72em;opacity:.7;margin-top:9px;text-align:center">${_buildLabel()}</div>
   `);
   _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
   // Œil : afficher / masquer le mot de passe

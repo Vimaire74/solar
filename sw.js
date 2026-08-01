@@ -1,4 +1,4 @@
-/* Solar Conquest — Service Worker (PWA installée sur téléphone) — v2 durcie.
+/* Solar — Service Worker (PWA installée sur téléphone) — v2 durcie.
    Objectifs (demande de Marc) : l'app installée doit être AUSSI efficace que le navigateur.
    - RENDU TOUJOURS À JOUR : le HTML et le JS (index.html, online.js) sont servis NETWORK-FIRST
      → dès que tu es en ligne, tu as la dernière version déployée (jamais coincé sur du vieux cache).

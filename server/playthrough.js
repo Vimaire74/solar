@@ -46,6 +46,12 @@ function plain(x) {
 const T = [];                       // transcription
 let step = 0;
 const line = (s) => T.push(s);
+/* Rend lisible un HTML de fenêtre (icônes → emoji, une ligne par bloc) pour pouvoir RELIRE les textes. */
+const htmlToText = (h) => String(h)
+  .replace(/<i class=ri-(\w+)><\/i>/g, (m, r) => ({energy:'⚡',materials:'🪨',science:'🔬',morale:'❤️'}[r] || r))
+  .replace(/<h4[^>]*>/g, '\n■ ').replace(/<\/(div|h4)>/g, '\n')
+  .replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ')
+  .split('\n').map(s => s.trim()).filter(Boolean).join('\n');
 const head = (s) => { T.push(''); T.push('── ' + s); };
 
 /* Fenêtres du JEU (index.html) réellement ouvertes/fermées */
@@ -145,6 +151,16 @@ while (guard++ < 4000) {
     step++;
     head('#' + step + ' · ' + dumpTurn(G) + ' · DÉCISION « ' + p.kind +' » → ' + (who || '???'));
     if (!who) problems.push('décision ' + p.kind + ' sans destinataire (risque de blocage)');
+    // Bilan de fin de tour : on RELIT son contenu réel (c'est le HTML que le client injecte tel quel).
+    if (p.kind === 'eot') {
+      const h = (p.payload && p.payload.html) || '';
+      if (!h) problems.push('bilan de fin de tour envoyé VIDE (le client afficherait un résumé dégradé)');
+      else {
+        for (const l of htmlToText(h).split('\n')) line('   │ ' + l);
+        for (const sec of ['Actions ce tour', 'Entretien', 'Revenus'])
+          if (h.indexOf(sec) === -1) problems.push('bilan de fin de tour : section « ' + sec + ' » manquante');
+      }
+    }
     const before = openedWindows.length;
     const ans = answerFor(p);
     line('   ↳ réponse : ' + JSON.stringify(ans));

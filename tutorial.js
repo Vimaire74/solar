@@ -1,5 +1,5 @@
 /* ============================================================================
-   Solar Conquest — Couche TUTORIEL (coach par-dessus le VRAI jeu).
+   Solar — Couche TUTORIEL (coach par-dessus le VRAI jeu).
    Chargée par tutorial.html À LA PLACE de online.js. Ne touche pas index.html.
    Principe : on lance une vraie partie (IA neutralisée), et une bulle "coach"
    explique chaque mécanisme au fil de ~4 tours. Chaque étape a un bouton
@@ -699,7 +699,7 @@ function showWelcome(){
   injectCSS();
   const ov=el('<div id="tuto-welcome">'+
     '<div class="big">🌌</div><h1>Apprendre à jouer</h1>'+
-    '<p><b>Solar Conquest</b> — jeu de stratégie spatiale. Ce tutoriel te fait jouer une vraie partie, guidée pas à pas sur les <b>4 premiers tours</b>.</p>'+
+    '<p><b>Solar</b> — jeu de stratégie spatiale. Ce tutoriel te fait jouer une vraie partie, guidée pas à pas sur les <b>4 premiers tours</b>.</p>'+
     '<p>À chaque étape, fais l\'action indiquée sur l\'élément <b style="color:#ffd34d">en surbrillance</b>, ou clique « Suivant » pour avancer.</p>'+
     '<button id="tuto-go">Commencer ▶</button></div>');
   document.body.appendChild(ov);

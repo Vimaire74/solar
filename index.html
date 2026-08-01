@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Solar</title>
+<!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
+     c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
+<script>window.SOLAR_BUILD_HTML='2026-08-01 · v4.9';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -1574,7 +1577,8 @@ const EVENTS=[
   {id:'storm',type:'menace',name:'Tempêtes Solaires',emoji:'🌩️',preview:'Sans IA Défensive, chaque nation perd 1 jeton Force, 1 route et 2<i class=ri-materials></i>.',
    resolve(G){let n=0;const pProt=hasSpec(G.player,'storm_immune');for(const p of allPlayers()){if(hasSpec(p,'storm_immune'))continue;p.forceTokens=Math.max(0,(p.forceTokens||0)-1);if(p.routes&&p.routes.length){p.routes.pop();updateConnections(p);}p.res.materials=Math.max(0,(p.res.materials||0)-2);n++;}return (pProt?'Tu as réussi à te protéger. ':'')+'Tempêtes Solaires — '+n+' nation(s) touchée(s) : −1 jeton, −1 route, −2<i class=ri-materials></i>.';}},
   {id:'pirates',type:'menace',name:'Prolifération des pirates',emoji:'☠️',preview:'Les pirates frappent les routes de la nation la plus riche en <i class=ri-materials></i> : les routes sans jeton sont détruites ; celles avec ont 50% de chance d\'être perdues, mais 2 au maximum.',
-   resolve(G){const h=_evTop(function(p){return p.res.materials||0;});if(h.length!==1)return 'Prolifération des pirates — aucune cible claire.';const tgt=h[0];let unp=0,prot=0;const keep=[];for(const r of tgt.routes){if((r.tokens||0)>0){/* protégée : 50% chacune, MAX 2 perdues */ if(prot<2&&Math.random()<0.5){tgt.forceCooldown.push({count:r.tokens,returnTurn:getCooldownTurn(tgt)});prot++;}else keep.push(r);}else unp++;/* non protégée : détruite */}tgt.routes=keep;updateConnections(tgt);return 'Prolifération des pirates — '+_evName(tgt)+' perd '+(unp+prot)+' route(s) : '+unp+' non protégée(s) détruite(s)'+(prot?', '+prot+' protégée(s) pillée(s) (max 2 — jetons en récupération)':'')+'. Protège-toi avec l\'IA Défensive ou le Réseau Orbital.';}},
+   resolve(G){const h=_evTop(function(p){return p.res.materials||0;});if(h.length!==1)return 'Prolifération des pirates — aucune cible claire.';const tgt=h[0];let unp=0,prot=0;const keep=[];for(const r of tgt.routes){if((r.tokens||0)>0){/* protégée : 50% chacune, MAX 2 perdues */ if(prot<2&&Math.random()<0.5){tgt.forceCooldown.push({count:r.tokens,returnTurn:getCooldownTurn(tgt)});prot++;}else keep.push(r);}else unp++;/* non protégée : détruite */}tgt.routes=keep;updateConnections(tgt);if((unp+prot)===0)return 'Prolifération des pirates — '+_evName(tgt)+' est la nation la plus riche en <i class=ri-materials></i> et devient la cible des pirates, mais AUCUNE route n\'est perdue.';
+    return 'Prolifération des pirates — '+_evName(tgt)+' est visé (nation la plus riche en <i class=ri-materials></i>) et perd '+(unp+prot)+' route(s) : '+unp+' sans jeton détruite(s)'+(prot?', '+prot+' protégée(s) pillée(s) (max 2 — jetons en récupération)':'')+'.';}},
   {id:'sci',type:'competition',name:'Conférence Scientifique Solaire',emoji:'🔬',preview:'La nation avec la plus grande production de <i class=ri-science></i> gagne +6 VP.',
    resolve(G){const h=_evTop(_sciProd);return 'Conférence Scientifique — '+_evAwardVP(h,6);}},
   {id:'tech',type:'competition',name:'Développement Technologique',emoji:'⚗️',preview:'La nation avec le plus de technologies de niveau 2 et 3 gagne +6 VP.',
@@ -1591,7 +1595,8 @@ const EVENTS=[
    resolve(G){return 'Fin — calcul des scores !';}},
 ];
 /* --- Refonte v18 : événements tirés au hasard, 1 par tour pair (T2/T4/T6/T8), révélés au tour précédent. T10 = Jugement Final. --- */
-function _evName(p){return p===G.player?'Toi':p.civ.emoji+' '+p.civ.name;}
+// Toujours NOMMER la nation : « Toi » seul était ambigu (on ne savait pas si on gagnait ou perdait).
+function _evName(p){return p.civ.emoji+' '+p.civ.name+((typeof G!=='undefined'&&G&&p===G.player)?' (toi)':'');}
 function _forceTotal(p){return (p.forceTokens||0)+((p.forceCooldown||[]).reduce(function(s,c){return s+(c.count||0);},0));}
 // SOURCE UNIQUE : jetons Force réellement ENGAGEABLES (guerre / raid) = réserve − garnison obligatoire
 // (1 jeton réservé par colonie connectée hors base). Les jetons posés sur les routes et ceux en récupération
@@ -3111,7 +3116,7 @@ function startInterleaved(){
   G._il=true;
   G._order=allPlayers().slice();
   for(let i=G._order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[G._order[i],G._order[j]]=[G._order[j],G._order[i]];}
-  for(const p of allPlayers()){ p._passedRound=false; p._aiSetupDone=false; p._turnActions=[]; }
+  for(const p of allPlayers()){ p._passedRound=false; p._aiSetupDone=false; p._turnActions=[]; p._raidsThisTurn=[]; }
   G._ilIdx=0; G._humanActive=false; G._ilLines=[]; G._ilMarkEntry=(G.log&&G.log[0])||null; G._turnMarkEntry=(G.log&&G.log[0])||null;
   if(_decisionActive()){ G._il=false; G._serverActionPhase=true; return; } // SERVEUR : le driver pilote la phase d'actions (pas l'interleave solo)
   addLog('━ Initiative : '+G._order.map(p=>p===G.player?'Toi':p.civ.name).join(' › ')+' ━','dim');
@@ -3536,7 +3541,16 @@ function revenueBreakdownHTML(p){
   h+='<div style="color:#7fe0a0;margin-bottom:2px;font-weight:600">Sources</div>';
   h+=inc.length?inc.map(l=>'<div>'+l+'</div>').join(''):'<div style="color:#7a88a8">Aucune colonie connectée.</div>';
   if(mal.length){h+='<div style="color:#ff9a8a;margin:6px 0 2px;font-weight:600">Entretien / malus</div>';h+=mal.map(l=>'<div style="color:#ffb3a3">'+l+'</div>').join('');}
-  h+='<div style="border-top:1px solid #2a3a5a;margin-top:6px;padding-top:4px;font-weight:700;color:#dfe8ff">Revenu net (avant entretien) : '+fmt(g)+'</div>';
+  /* Total : on affiche le BRUT (somme des sources) puis le vrai NET, entretien déduit.
+     Le net vient de _netIncome() — la même fonction que la barre du haut et le menu Empire,
+     pour qu'il n'existe qu'un seul calcul de revenu net dans tout le jeu. */
+  const _netTip=(typeof _netIncome==='function')?_netIncome(p):g;
+  /* Le net doit rester lisible même à 0 ou en négatif : on affiche toute ressource
+     présente dans le brut OU dans le net (sinon une déduction qui ramène à 0 disparaît). */
+  const fmtNet=(o,ref)=>['materials','energy','science','morale'].filter(r=>o[r]||ref[r])
+    .map(r=>'<span style="color:'+((o[r]||0)<0?'#ff6b6b':(o[r]||0)>0?'#7fe0a0':'#8898b8')+'">'+((o[r]||0)>0?'+':'')+(o[r]||0)+E[r]+'</span>').join(' ')||'—';
+  h+='<div style="border-top:1px solid #2a3a5a;margin-top:6px;padding-top:4px;color:#9fb0d0">Total brut (avant entretien) : '+fmt(g)+'</div>';
+  h+='<div style="font-weight:700;color:#dfe8ff">Revenu net (entretien déduit) : '+fmtNet(_netTip,g)+'</div>';
   return h;
 }
 // Revenu NET estimé du prochain end-of-turn, PAR ressource (revenus BRUTS − entretien colonies/routes/gouv,
@@ -5186,6 +5200,8 @@ function doAITurn(aiPlayer,oneShot){
     addTens(_e.civ.id,ai.civ.id,2); // l'ennemi (humain) est en colère contre cette IA
     if(!G._raidsThisTurn)G._raidsThisTurn=[];
     G._raidsThisTurn.push({civ:ai.civ,stolen:[...stolen]});
+    if(!_e._raidsThisTurn)_e._raidsThisTurn=[]; // journal propre à la victime (bilan multijoueur)
+    _e._raidsThisTurn.push({civ:ai.civ,stolen:[...stolen]});
     addLog('🤖 Raid '+ai.civ.emoji+' '+ai.civ.name+' ! Tu perds '+stolen.join('')+' (risque guerre +2, tension +2)','red');
     G.aiActions.push({emoji:'⚔️',name:'Raid',desc:'Vole : '+(stolen.join('')||'rien')});
     notifyNationHit(_e,ai.civ.name+' te pille',(stolen.length?'Ils volent '+_riToText(stolen.join(' '))+'.':'Raid sans butin.')+' Risque de guerre +2, tension +2.');
@@ -5770,8 +5786,8 @@ function renderTopBar(){
     `</span>`;
   document.getElementById('turn-disp').textContent='Tour '+G.turn+'/'+G.maxTurns;
   document.getElementById('phase-disp').textContent={actions:'⚡ Actions',ai:'🤖 IA joue…',over:'Terminé'}[G.phase]||'';
-  const _netTop=_netIncome(p);
-  document.getElementById('top-res').innerHTML=[['energy','<i class=ri-energy></i>','energy'],['materials','<i class=ri-materials></i>','materials'],['science','<i class=ri-science></i>','science'],['morale','<i class=ri-morale></i>','morale']].map(([r,e,cls])=>`<div class="tres res-tag ${cls}"><span class="tv">${p.res[r]||0}</span>${e}${_netBadge(_netTop[r]||0)}</div>`).join('')+`<div class="tres res-tag" style="background:#221a05;border-color:#6b5600;color:#ffd34d" title="Points de victoire estimés">🏆<span class="tv" style="color:#ffd34d;margin-left:3px">${calcVP(p).total}</span></div>`+`<div class="tres res-tag" style="background:#2a0a0a;border:1px solid #7a2a2a" title="Jetons Force ENGAGEABLES (net) — utilisables en guerre ou pour un raid. Exclut la garnison des colonies, les jetons posés sur les routes et ceux en récupération."><span class="tv" style="color:#ff9999;min-width:0">${engageableTokens(p)}</span><span style="display:inline-block;width:.72em;height:.72em;background:#e33;border-radius:2px;margin-left:4px;vertical-align:-1px"></span></div>`;
+  /* NB : #top-res est rendu par uiFillIncome() (appelée plus bas) — un seul rendu, sinon le second
+     écrase silencieusement le premier (c'est ce qui rendait le revenu net invisible pendant des jours). */
   _wireRevTip();
   document.getElementById('ac-disp').textContent=p.acLeft+'/'+p.acMax+' AC';
   document.getElementById('gov-disp').textContent='🏛️ Nv.'+p.gov_level+' ('+p.gov_pts+'pts)';
@@ -6405,7 +6421,7 @@ function _normCost(cost){
   return out;
 }
 function _isWarAct(name){return /guerre|assaut|capture|pill|raid|repouss|attaque|reprend|combat|paix|cessez/i.test(String(name||''));}
-function addAction(emoji,name,acPaid,resPaid,gainDesc){if(!G.turnActions)G.turnActions=[];G.turnActions.push({emoji,name,acPaid:acPaid||0,resPaid:resPaid||{},gainDesc:gainDesc||''});if(G){G._scStuckTries=0;try{G._journal=G._journal||[];G._journal.push({turn:G.turn||0,nat:(G.player&&G.player.civ&&G.player.civ.name)||'Toi',name:name,ac:acPaid||0,cost:_normCost(resPaid),gain:_riToText(gainDesc),war:_isWarAct(name),auto:false});}catch(e){}}showToast(emoji,name,acPaid,resPaid,gainDesc);if(G&&G._il){G._ilPassTries=0;setTimeout(_ilMaybePass,60);}}
+function addAction(emoji,name,acPaid,resPaid,gainDesc){if(!G.turnActions)G.turnActions=[];const _entry={emoji,name,acPaid:acPaid||0,resPaid:resPaid||{},gainDesc:gainDesc||''};G.turnActions.push(_entry);if(G.player){if(!G.player._turnActions)G.player._turnActions=[];G.player._turnActions.push(_entry);}/* journal par nation : indispensable au bilan en multijoueur */if(G){G._scStuckTries=0;try{G._journal=G._journal||[];G._journal.push({turn:G.turn||0,nat:(G.player&&G.player.civ&&G.player.civ.name)||'Toi',name:name,ac:acPaid||0,cost:_normCost(resPaid),gain:_riToText(gainDesc),war:_isWarAct(name),auto:false});}catch(e){}}showToast(emoji,name,acPaid,resPaid,gainDesc);if(G&&G._il){G._ilPassTries=0;setTimeout(_ilMaybePass,60);}}
 function showToast(emoji,name,acPaid,resPaid,gainDesc){
   const el=document.getElementById('action-toast');if(!el)return;
   const paid=[];if(acPaid)paid.push(acPaid+' AC');for(const[r,a]of Object.entries(resPaid||{}))if(a>0)paid.push(a+rEmoji(r));
@@ -6947,17 +6963,19 @@ function confirmWarDefense(){
   document.getElementById('war-combat-modal').classList.add('hidden');
   if(_warCombatCb){const cb=_warCombatCb;_warCombatCb=null;cb('DEFEND:'+committed);}
 }
-function showEOTModal(maint,revs,warCombat,warEnd){
-  if(_decisionActive()){ // mode serveur : bilan à l'humain actif ; la suite enchaîne via continueAfterEOT
-    _emitNotice('eot', G.player, {turn:G.turn, maint:maint||null, revs:revs||null},
-      ()=>{ if(typeof continueAfterEOT==='function')continueAfterEOT(); });
-    return;
-  }
-  if(typeof _ilHide==='function')_ilHide();
-  document.getElementById('eot-title').textContent='📊 Bilan du Tour '+G.turn;
+/* Corps du bilan de fin de tour. Fonction PURE (aucun accès DOM) : le solo l'injecte
+   directement, le mode serveur l'envoie au client qui l'injecte dans la même fenêtre.
+   Ainsi le bilan est rigoureusement identique en solo, en réseau et en multijoueur. */
+function buildEOTBody(maint,revs,warCombat,warEnd){
+  maint=maint||{};
+  const _srv=(typeof _decisionActive==='function')&&_decisionActive();
+  // En mode serveur G.turnActions/G._raidsThisTurn sont globaux (toutes nations confondues) :
+  // on lit les journaux propres à la nation active.
+  const _myActs=_srv?(G.player._turnActions||[]):(G.turnActions||[]);
+  const _myRaids=_srv?(G.player._raidsThisTurn||[]):(G._raidsThisTurn||[]);
   let html='';
   html+='<div class="eot-section"><h4><i class=ri-energy></i> Actions ce tour</h4>';
-  if(G.turnActions&&G.turnActions.length>0){for(const act of G.turnActions){const paid=[];if(act.acPaid)paid.push(act.acPaid+' AC');for(const[r,a]of Object.entries(act.resPaid||{}))if(a>0)paid.push(a+rEmoji(r));html+=`<div class="eot-item"><span class="eot-icon">${act.emoji}</span><span class="eot-name">${act.name}</span>${paid.length?`<span class="eot-paid">−${paid.join(' ')}</span>`:''}${act.gainDesc?`<span class="eot-gain">${act.gainDesc}</span>`:''}</div>`;}}else html+='<div class="eot-empty">Aucune action.</div>';
+  if(_myActs.length>0){for(const act of _myActs){const paid=[];if(act.acPaid)paid.push(act.acPaid+' AC');for(const[r,a]of Object.entries(act.resPaid||{}))if(a>0)paid.push(a+rEmoji(r));html+=`<div class="eot-item"><span class="eot-icon">${act.emoji}</span><span class="eot-name">${act.name}</span>${paid.length?`<span class="eot-paid">−${paid.join(' ')}</span>`:''}${act.gainDesc?`<span class="eot-gain">${act.gainDesc}</span>`:''}</div>`;}}else html+='<div class="eot-empty">Aucune action.</div>';
   html+='</div>';
   // (Bloc « Autres nations ce tour » melange supprime : detail par nation plus bas, une section par nation.)
   html+='<div class="eot-section"><h4>🔧 Entretien</h4>';
@@ -6980,10 +6998,10 @@ function showEOTModal(maint,revs,warCombat,warEnd){
   }
   if(warCombat){const bc=warCombat.cls==='win'?'#44aa44':warCombat.cls==='loss'?'#aa4444':'#aaaa44';html+=`<div class="eot-section" style="border:1px solid ${bc}30;border-radius:6px;padding:8px;margin-bottom:14px"><h4 style="color:${bc}">⚔️ Guerre</h4><div class="eot-item" style="color:${bc}"><span class="eot-icon">⚔️</span><span class="eot-name">${warCombat.txt}</span></div>${warEnd?`<div class="eot-item"><span class="eot-icon">🏳️</span><span class="eot-name">${warEnd.txt}</span></div>`:G.warState==='active'?`<div class="eot-item"><span class="eot-icon">🔔</span><span class="eot-name" style="color:#ffaa44">${G.warTurnsLeft} tour(s) restant(s)</span></div>`:''}</div>`;}
   // Section raids reçus ce tour
-  if(G._raidsThisTurn&&G._raidsThisTurn.length>0){
-    const totalStolen=G._raidsThisTurn.flatMap(r=>r.stolen);
-    const civName=G._raidsThisTurn[0].civ.emoji+' '+G._raidsThisTurn[0].civ.name;
-    const raidCount=G._raidsThisTurn.length;
+  if(_myRaids&&_myRaids.length>0){
+    const totalStolen=_myRaids.flatMap(r=>r.stolen);
+    const civName=_myRaids[0].civ.emoji+' '+_myRaids[0].civ.name;
+    const raidCount=_myRaids.length;
     html+=`<div class="eot-section" style="border:1px solid #aa333330;border-radius:6px;padding:8px;margin-bottom:14px">
       <h4 style="color:#ff8888">⚔️ Pillage subi</h4>
       <div class="eot-item" style="color:#ff8888">
@@ -6999,7 +7017,19 @@ function showEOTModal(maint,revs,warCombat,warEnd){
   }
   // Pirate forecast (masqué si l'une des factions joue Pirates)
   if(npcPiratesActive()){const nxtProb=Math.min(100,Math.round((0.10+(G.turn+1)*0.10)*100));html+=`<div class="eot-section"><h4 style="color:#ff8888">☠️ Pirates</h4><div class="eot-item" style="color:#ff8888"><span class="eot-icon">☠️</span><span class="eot-name">Risque sur les routes non protégées au prochain tour : ${nxtProb}%</span></div></div>`;}
-  document.getElementById('eot-body').innerHTML=html;
+  return html;
+}
+function showEOTModal(maint,revs,warCombat,warEnd){
+  if(_decisionActive()){ // mode serveur : on envoie le bilan COMPLET (même HTML qu'en solo) ; la suite enchaîne via continueAfterEOT
+    let _html='';
+    try{ _html=buildEOTBody(maint,revs,warCombat,warEnd); }catch(e){ _html=''; }
+    _emitNotice('eot', G.player, {turn:G.turn, html:_html, maint:maint||null, revs:revs||null},
+      ()=>{ if(typeof continueAfterEOT==='function')continueAfterEOT(); });
+    return;
+  }
+  if(typeof _ilHide==='function')_ilHide();
+  document.getElementById('eot-title').textContent='📊 Bilan du Tour '+G.turn;
+  document.getElementById('eot-body').innerHTML=buildEOTBody(maint,revs,warCombat,warEnd);
   document.getElementById('eot-modal').classList.remove('hidden');
 }
 function showEventModal(ev,msg){
@@ -7746,7 +7776,10 @@ function uiIncome(p){
 }
 function uiFillIncome(){
   if(!G||!G.player)return;
-  var p=G.player;var g=uiIncome(p);
+  /* SOURCE UNIQUE du revenu affiché : _netIncome() = revenus BRUTS − entretien (colonies, routes,
+     gouvernement), règles de moral incluses. Surtout ne PAS revenir à uiIncome() (revenu brut) :
+     cette fonction est le dernier rendu de #top-res, elle écrase tout ce qui a été écrit avant. */
+  var p=G.player;var g=(typeof _netIncome==='function')?_netIncome(p):uiIncome(p);
   var res=[['energy','<i class=ri-energy></i>','energy'],['materials','<i class=ri-materials></i>','materials'],['science','<i class=ri-science></i>','science'],['morale','<i class=ri-morale></i>','morale']];
   var el=document.getElementById('top-res');
   if(el){
@@ -7757,7 +7790,7 @@ function uiFillIncome(){
         '<span class="ti" style="color:'+icol+'">('+sign+inc+'/t)</span></div>';
     }).join('')
       +'<div class="tres res-tag vp-tag" style="background:#221a05;border-color:#6b5600;color:#ffd34d" title="Score VP estimé">🏆<span class="tv" style="color:#ffd34d;margin-left:3px">'+calcVP(p).total+'</span></div>'
-      +'<div class="tres res-tag" style="background:#2a0a0a;border:1px solid #7a2a2a" title="Jetons Force en réserve"><span class="tv" style="color:#ff9999;min-width:0">'+(p.forceTokens||0)+'</span><span style="display:inline-block;width:.72em;height:.72em;background:#e33;border-radius:2px;margin-left:4px;vertical-align:-1px"></span></div>';
+      +'<div class="tres res-tag" style="background:#2a0a0a;border:1px solid #7a2a2a" title="Jetons Force ENGAGEABLES (net) — utilisables en guerre ou pour un raid. Exclut la garnison des colonies, les jetons posés sur les routes et ceux en récupération."><span class="tv" style="color:#ff9999;min-width:0">'+((typeof engageableTokens==='function')?engageableTokens(p):(p.forceTokens||0))+'</span><span style="display:inline-block;width:.72em;height:.72em;background:#e33;border-radius:2px;margin-left:4px;vertical-align:-1px"></span></div>';
   }
   _wireRevTip();
   var ti=document.getElementById('top-income');
