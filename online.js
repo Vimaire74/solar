@@ -1049,15 +1049,13 @@ function renderWait(){
 }
 
 // ── Panneau de décision générique (contrat de réponses = celui des modales du jeu) ──
-// Chaque panneau a un bouton « 👁 Voir le plateau » : il replie le panneau (le plateau devient
-// visible et consultable), et une pastille « ▶ Reprendre » le rouvre. Le fond est peu opaque.
+// Le bouton « 👁 Voir le plateau » a été RETIRÉ (demande de Marc) : c'était un ajout de la version en ligne,
+// absent du jeu d'origine. Les fenêtres se comportent désormais comme celles du jeu (on répond, elles se ferment).
 function decisionPanel(html){
   let p=document.getElementById('sc-decision');
   if(!p){ injectStyles(); p=el('<div id="sc-decision"></div>'); document.body.appendChild(p); }
-  p.innerHTML='<div class="card"><button id="sc-peek" style="float:right;background:#16223c;color:#9fb6e6;border:0;border-radius:7px;padding:5px 9px;cursor:pointer;font-size:.78em">👁 Voir le plateau</button>'+html+'</div>';
+  p.innerHTML='<div class="card">'+html+'</div>';
   p.style.display='flex';
-  const peek=document.getElementById('sc-peek');
-  if(peek) peek.onclick=()=>{ p.style.display='none'; showResumeChip(); };
   hideResumeChip();
   return p;
 }
@@ -1076,15 +1074,25 @@ function askLocalDecision(pending){
     const TITLES={agenda:'Choisis ton agenda secret',strategy:'Carte Stratégie',strategy_calm:'Calmer une tension',invest1:'Investissement (Niv.1)',invest2:'Investissement (Niv.2)',espionage:'Espionnage : branche à copier',extrasolar:'Exploration extra-solaire',empath_copy:'Télépathie : carte à copier',ai_dyson:'Sphère de Dyson adverse',dyson_build:'Ta Sphère de Dyson',peace_offer:'Offre de paix',war_combat:'Combat',accord_confirm:'Accord commercial',defense:'Défense !'};
     let body='<h2>'+(TITLES[k]||k)+'</h2>';
     if(k==='defense'){
+      // CHOIX TACTIQUE DE DÉFENSE : combien de jetons engager (0 = ne pas défendre) + Supercroiseur éventuel.
       const max=o.maxDef||0;
-      body+=`<div>${o.attackerName||o.attacker} t'assaille (${o.target?o.target.name:''}). Force ~${o.threat}.</div>
-        <input type="range" id="sc-d" min="0" max="${max}" value="${Math.min(2,max)}" style="width:100%">
-        <div>Défense : <b id="sc-dv">${Math.min(2,max)}</b> jeton(s)</div>
-        <button class="opt" id="sc-ok">Défendre</button>`;
+      const who=(window._scPseudo&&window._scPseudo[o.attacker])||o.attackerName||o.attacker;
+      const cible=o.target?((o.target.type==='route'?'🛤️ route ':'🏙️ ')+o.target.name):'tes positions';
+      const cc=o.cruiserCost||{materials:5,energy:5};
+      body='<h2>🛡️ Défense !</h2>'
+        +'<div style="margin-bottom:8px"><b>'+who+'</b> assaille <b>'+cible+'</b>.<br>'
+        +'<span class="muted">Force de l\'assaut : ~'+(o.threat||0)+'⚔️ · tes jetons engageables : '+max+' (1🪨 +1⚡ chacun)</span></div>'
+        +'<input type="range" id="sc-d" min="0" max="'+max+'" value="'+Math.min(2,max)+'" style="width:100%">'
+        +'<div style="margin:4px 0 8px">Défense : <b id="sc-dv">'+Math.min(2,max)+'</b> jeton(s)</div>'
+        +(o.cruiser?('<label class="opt" style="display:block;text-align:left;cursor:pointer"><input type="checkbox" id="sc-cru" style="margin-right:8px">⚓ Déployer le <b>Supercroiseur</b> (+'+(o.cruiserPower||5)+'⚔️, −'+cc.materials+'🪨 −'+cc.energy+'⚡)</label>'):'')
+        +'<button class="opt" id="sc-ok">🛡️ Défendre</button>'
+        +'<button class="opt" id="sc-none" style="background:#2a2f45">La colonie se défend toute seule avec ses jetons (1 pour une colonie, 10 pour la base de ta nation)</button>';
       decisionPanel(body);
       const sl=document.getElementById('sc-d'), dv=document.getElementById('sc-dv');
-      sl.oninput=()=>dv.textContent=sl.value;
-      document.getElementById('sc-ok').onclick=()=>done({defTokens:parseInt(sl.value)||0});
+      if(sl)sl.oninput=()=>{ dv.textContent=sl.value; };
+      const cru=()=>{ const c=document.getElementById('sc-cru'); return !!(c&&c.checked); };
+      document.getElementById('sc-ok').onclick=()=>done({defTokens:parseInt(sl.value)||0, cruiser:cru()});
+      document.getElementById('sc-none').onclick=()=>done({defTokens:0, cruiser:false});
       return;
     }
     if(k==='war_combat'){

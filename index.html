@@ -491,7 +491,9 @@ body{max-width:480px;margin:0 auto;height:100dvh;height:100vh;position:relative;
 .mtab.active{color:#4a9eff;border-bottom-color:#4a9eff;background:#0d1430;}
 .mtab .mtab-badge{position:absolute;}
 #m-content{flex:1;min-height:0;overflow:hidden;position:relative;}
-.m-panel{position:absolute;inset:0;overflow-y:auto;display:none;}
+/* padding-bottom : sans lui, le DERNIER bloc d'un panneau (ex. la 2e nation dans Empire, le bas de
+   Diplomatie) restait masqué sous la barre du bas et le défilement ne descendait pas plus loin. */
+.m-panel{position:absolute;inset:0;overflow-y:auto;display:none;padding-bottom:96px;-webkit-overflow-scrolling:touch;}
 .m-panel.active{display:block;}
 
 /* ---------- Onglet Carte ---------- */
@@ -508,7 +510,9 @@ body{max-width:480px;margin:0 auto;height:100dvh;height:100vh;position:relative;
 .panel-nav{display:none!important;}
 #panel-label{display:none!important;}
 /* Barre de zoom horizontale, discrète, sous la carte (~5 % ; la carte garde ~95 %) */
-.map-zoom{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:10px;flex:0 0 auto;padding:4px 0 5px;}
+/* Zoom carte : FLOTTANT au-dessus de la carte (avant : en flux sous la carte → invisible sur mobile,
+   impossible de dézoomer pour atteindre les nœuds du bas comme Triton). */
+.map-zoom{position:fixed;right:10px;bottom:calc(var(--botband,84px) + 10px);z-index:200;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:8px;padding:5px 8px;background:rgba(8,10,28,.86);border:1px solid #2a3a6a;border-radius:10px;backdrop-filter:blur(4px);box-shadow:0 4px 14px rgba(0,0,0,.5);}
 .map-zoom .mz-lbl{font-size:.72em;color:#7a88aa;min-width:32px;text-align:center;font-weight:700;}
 .map-zoom button{width:26px;height:26px;border-radius:6px;background:rgba(10,12,34,.9);border:1px solid #2a3a6a;color:#9cc2ff;font-size:.95em;line-height:1;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .map-zoom button:active{background:#1a2a5a;}
@@ -1952,7 +1956,28 @@ function getCooldownTurn(p){
 }
 // Supercroiseur : disponible si possédé et hors récupération ; déployable si on peut payer 5<i class=ri-materials></i> 5<i class=ri-energy></i>
 function cruiserAvailable(p){return !!p.hasCruiser&&(!p.cruiserCooldown||G.turn>=p.cruiserCooldown);}
-function cruiserAfford(p){return Math.min(p.res.materials||0,p.res.energy||0)>=5;}
+// Coût de déploiement du Supercroiseur : 5🪨 +5⚡. Avec l'IA de Navigation (coût de guerre ÷2, la demie sur
+// l'ÉNERGIE) → ⌊5/2⌋=2🪨 et ⌈5/2⌉=3⚡. SOURCE UNIQUE, utilisée par l'affordabilité ET par la déduction.
+// GARNISON AUTOMATIQUE d'une colonie (règle Marc) : elle se défend TOUJOURS seule, même si le défenseur
+// n'engage aucun jeton — 1 jeton pour une colonie ordinaire, 10 pour la BASE de la nation.
+// S'applique dans les DEUX SENS (quand tu attaques comme quand tu es attaqué). Les jetons que le défenseur
+// engage volontairement s'AJOUTENT à cette garnison.
+function garrisonOf(p,nodeId){
+  if(!p||!nodeId)return 1;
+  return (nodeId===(p.civ&&p.civ.home))?10:1;
+}
+function cruiserCost(p){
+  const half=(typeof hasSpec==='function'&&hasSpec(p,'nav2_war'));
+  return half?{materials:2,energy:3}:{materials:5,energy:5};
+}
+function cruiserAfford(p){const c=cruiserCost(p);return (p.res.materials||0)>=c.materials&&(p.res.energy||0)>=c.energy;}
+// Déduit le coût et renvoie le texte à journaliser.
+function cruiserPay(p){
+  const c=cruiserCost(p);
+  p.res.materials=Math.max(0,(p.res.materials||0)-c.materials);
+  p.res.energy=Math.max(0,(p.res.energy||0)-c.energy);
+  return '−'+c.materials+'<i class=ri-materials></i> −'+c.energy+'<i class=ri-energy></i>';
+}
 /* ============================================================ INIT ============================================================ */
 function mkPlayer(civId){
   const civ=CIVS[civId];
@@ -2945,9 +2970,13 @@ function processAllWars(onDone){
       // Modèle « assaut » : pas de combat automatique en fin de tour. LIBRE CHOIX au joueur : faire la paix ou poursuivre.
       showPeaceOfferModal(false,(peaceResult)=>{
         if(peaceResult==='PEACE'){const er=endWar(war.aiId);showWarModal('🕊️ Paix avec '+warEnName,'La guerre se termine par accord diplomatique.',er||{txt:'Paix conclue.',cls:'win'});_warModalCb=()=>processOngoing(idx+1);return;}
-        // POURSUITE DE LA GUERRE : le joueur choisit D'ABORD son assaut (colonie/route/tenir) via la vraie
-        // fenêtre de combat — avant, on passait directement à l'assaut ennemi (guerre « occultée », bug Marc).
+        // POURSUITE DE LA GUERRE. Règle (Marc) : ta fenêtre d'ASSAUT ne s'ouvre QUE si TU es l'agresseur.
+        // Si c'est l'AUTRE nation qui a déclaré la guerre, c'est ELLE qui attaque : tu n'as alors que le
+        // choix DÉFENSIF (combien de jetons engager, déployer ou non ton Supercroiseur) — ce qui permet la
+        // guerre d'usure : sur-défendre pour lui coûter ses jetons et attendre d'être en position d'attaquer.
         const _aiTurnThen=()=>maybeAiAssaultPlayer(warEnemy,()=>processOngoing(idx+1));
+        const _jeSuisAgresseur=(war.declaredBy==='player'||war.declaredBy==='dyson');
+        if(!_jeSuisAgresseur){ _aiTurnThen(); return; }
         showWarCombatModal((committed)=>{
           // ROUTE_ATTACK / STANDOFF / DEFEND : déjà résolus par leur propre flux → on enchaîne sur l'ennemi.
           if(committed===undefined||committed===null||typeof committed==='string'||(committed|0)<=0){ addLog('🛡️ Tu tiens ta position — aucun assaut ce tour.','dim'); _aiTurnThen(); return; } // 0 jeton = TENIR (pas un combat perdu d'avance)
@@ -3762,7 +3791,7 @@ function showMarketDetail(cardId){
   _techDetailId=cardId;_detailIsGeneral=false;_detailIsMarket=true;
   const cost=card.cost;
   const isGov=card.type==='government';
-  const isRepeat=!!(card.repeatable||card.calmAction);
+  const isRepeat=!!(card.repeatable||card.calmAction||card.perTurn); // perTurn = utilisable CHAQUE tour → ∞
   const isCurrentForm=isGov&&G.player.govForm===cardId;
   const blocked=isGov?isCurrentForm:(!isRepeat&&G.player._civicTaken&&G.player._civicTaken.has(cardId));
   const canBuy=G.phase==='actions'&&G.player.acLeft>=1&&!blocked&&Object.entries(cost).every(([r,a])=>(G.player.res[r]||0)>=a);
@@ -4316,12 +4345,12 @@ function resolveAiAssault(ai,targetId,commit){
   const aEmpath=(hasSpec(ai,'empath_routes')?2:0)+(hasSpec(ai,'empath_tele')?2:0);
   const pEmpath=(hasSpec(p,'empath_routes')?2:0)+(hasSpec(p,'empath_tele')?2:0);
   const _cruDef=cruiserAvailable(p)&&cruiserAfford(p); // le croiseur défend automatiquement s'il est dispo et qu'on peut payer
-  if(_cruDef){p.res.materials=Math.max(0,(p.res.materials||0)-5);p.res.energy=Math.max(0,(p.res.energy||0)-5);addLog('⚓ Supercroiseur en défense (+'+(p.cruiserPower||5)+'⚔️, −5<i class=ri-materials></i> −5<i class=ri-energy></i>).','gold');}
+  if(_cruDef){const _cc=cruiserPay(p);addLog('⚓ Supercroiseur en défense (+'+(p.cruiserPower||5)+'⚔️, '+_cc+').','gold');}
   // Défense : on n'engage que les jetons qu'on peut PAYER (1<i class=ri-materials></i>+1<i class=ri-energy></i> chacun) — règle stricte.
   const dCommit=Math.max(0,Math.min(p.forceTokens||0,p.res.materials||0,p.res.energy||0));
-  const pDef=dCommit+pEmpath+(_cruDef?(p.cruiserPower||5):0)+1/*garnison de base : la colonie défend toujours avec 1 jeton réservé*/;
+  const pDef=dCommit+pEmpath+(_cruDef?(p.cruiserPower||5):0)+garrisonOf(p,targetId); // garnison auto : 1 colonie / 10 base
   const _aiCru=cruiserAvailable(ai)&&cruiserAfford(ai); // l'IA déploie son Supercroiseur si elle le possède et peut payer
-  if(_aiCru){ai.res.materials=Math.max(0,(ai.res.materials||0)-5);ai.res.energy=Math.max(0,(ai.res.energy||0)-5);addLog('⚓ '+ai.civ.emoji+' '+ai.civ.name+' déploie son Supercroiseur (+'+(ai.cruiserPower||5)+'⚔️).','dim');}
+  if(_aiCru){const _cc=cruiserPay(ai);addLog('⚓ '+ai.civ.emoji+' '+ai.civ.name+' déploie son Supercroiseur (+'+(ai.cruiserPower||5)+'⚔️, '+_cc+').','dim');}
   const aPow=commit+aEmpath+((ai.stratBonus&&ai.stratBonus.combatBonus)||0)+(_aiCru?(ai.cruiserPower||5):0);
   ai.acLeft=Math.max(0,ai.acLeft-1);ai.spentThisTurn+=1+commit;
   const _aiWins=aPow>pDef;
@@ -4392,12 +4421,20 @@ function _aadUpd(v){document.getElementById('aad-val').textContent=v;document.ge
 function showAiAssaultDefenseModal(ai,target,aiCommit,done,defender){
   const p=defender||G.player;
   const shownThreat=(getIntelLevel(p)>=2)?(aiCommit+'⚔️'):('≈'+aiCommit+'⚔️ (estimé)');
-  const maxDef=Math.max(0,Math.min(p.forceTokens||0,p.res.materials||0,p.res.energy||0)); // limité à ce qu'on peut payer (1🪨+1⚡/jeton)
+  const maxDef=Math.max(0,Math.min(p.forceTokens||0,maxAffordableTokens(p))); // limité à ce qu'on peut PAYER
   if(_isRemote(p)||_decisionActive()){ // en ligne : router la défense vers le joueur (éventuellement DISTANT) assailli
+    // CHOIX TACTIQUE (Marc) : le défenseur voit la cible et décide combien de jetons engager — et s'il déploie
+    // son SUPERCROISEUR (s'il le possède et peut le payer ; demi-tarif avec l'IA de Navigation : 2🪨 +3⚡).
+    const _cruOk=(typeof cruiserAvailable==='function'&&cruiserAvailable(p)&&typeof cruiserAfford==='function'&&cruiserAfford(p));
+    const _cruC=(typeof cruiserCost==='function')?cruiserCost(p):{materials:5,energy:5};
     (_isRemote(p)?_emitRemote:_emitDecision)('defense', p,
-      {attacker:ai.civ.id, attackerName:ai.civ.name, target:{type:target.type,name:target.name}, threat:aiCommit, maxDef},
+      {attacker:ai.civ.id, attackerName:ai.civ.name, target:{type:target.type,name:target.name}, threat:aiCommit, maxDef,
+       cruiser:_cruOk, cruiserPower:(p.cruiserPower||5), cruiserCost:_cruC,
+       myTokens:(p.forceTokens||0), myMat:(p.res.materials||0), myEnergy:(p.res.energy||0)},
       null,
-      (ans)=>{ let def=Math.max(0,Math.min(maxDef,(ans&&ans.defTokens)||0)); resolveAiAssaultOnPlayer(ai,target,aiCommit,def,done,p); });
+      (ans)=>{ let def=Math.max(0,Math.min(maxDef,(ans&&ans.defTokens)||0));
+               G._defCruiserChoice=!!(ans&&ans.cruiser&&_cruOk);
+               resolveAiAssaultOnPlayer(ai,target,aiCommit,def,done,p); });
     return;
   }
   const pEmp=(hasSpec(p,'empath_routes')?2:0)+(hasSpec(p,'empath_tele')?2:0);
@@ -4432,11 +4469,14 @@ function resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,defender){
   const p=defender||G.player;const war=_warBetween(ai.civ.id,p.civ.id)||_warOf(ai.civ.id);
   const pEmp=(hasSpec(p,'empath_routes')?2:0)+(hasSpec(p,'empath_tele')?2:0);
   const aEmp=(hasSpec(ai,'empath_routes')?2:0)+(hasSpec(ai,'empath_tele')?2:0);
-  const cruDef=defTokens>0&&cruiserAvailable(p)&&cruiserAfford(p);
-  if(cruDef){p.res.materials=Math.max(0,p.res.materials-5);p.res.energy=Math.max(0,p.res.energy-5);addLog('⚓ Supercroiseur en défense (+'+(p.cruiserPower||5)+'⚔️, −5<i class=ri-materials></i> −5<i class=ri-energy></i>).','gold');}
-  const pDef=defTokens+pEmp+(cruDef?(p.cruiserPower||5):0)+1/*garnison de base*/;
+  // Le Supercroiseur ne se déploie plus tout seul : en ligne c'est le CHOIX du défenseur (G._defCruiserChoice).
+  // En solo, comportement d'origine conservé (auto s'il défend avec au moins 1 jeton).
+  const _cruChoice=G._defCruiserChoice; G._defCruiserChoice=undefined;
+  const cruDef=(_cruChoice!==undefined ? !!_cruChoice : (defTokens>0))&&cruiserAvailable(p)&&cruiserAfford(p);
+  if(cruDef){const _cc=cruiserPay(p);addLog('⚓ Supercroiseur en défense (+'+(p.cruiserPower||5)+'⚔️, '+_cc+').','gold');}
+  const pDef=defTokens+pEmp+(cruDef?(p.cruiserPower||5):0)+((target&&target.type==='colony'&&target.obj)?garrisonOf(p,target.obj.nodeId):1); // garnison auto : 1 colonie / 10 base
   const _aiCru=cruiserAvailable(ai)&&cruiserAfford(ai);
-  if(_aiCru){ai.res.materials=Math.max(0,(ai.res.materials||0)-5);ai.res.energy=Math.max(0,(ai.res.energy||0)-5);addLog('⚓ '+ai.civ.emoji+' '+ai.civ.name+' déploie son Supercroiseur (+'+(ai.cruiserPower||5)+'⚔️).','dim');}
+  if(_aiCru){const _cc=cruiserPay(ai);addLog('⚓ '+ai.civ.emoji+' '+ai.civ.name+' déploie son Supercroiseur (+'+(ai.cruiserPower||5)+'⚔️, '+_cc+').','dim');}
   const aPow=aiCommit+aEmp+((ai.stratBonus&&ai.stratBonus.combatBonus)||0)+(_aiCru?(ai.cruiserPower||5):0);
   // Coût + récupération SYMÉTRIQUES : l'attaquant IA paie/récupération ses jetons ; si tu repousses l'assaut, l'IA en perd la MOITIÉ définitivement (défendre fait perdre des jetons à l'ennemi). Le défenseur paie ce qu'il engage.
   applyCombatEngage(ai,aiCommit,aPow>pDef); // l'attaquant paie TOUJOURS ses jetons engagés (même si tu ne défends pas) — sinon capture GRATUITE
@@ -4722,18 +4762,18 @@ function resolveWarCombat(playerCommitted){
   {const _cap=Math.max(0,Math.min(G.player.forceTokens||0,maxAffordableTokens(G.player)));
    if(engagedP>_cap){ addLog('⚠️ Engagement réduit à '+_cap+' jeton(s) — tu ne peux engager que ce que tu peux PAYER.','red'); engagedP=_cap; }}
   const _cruOn=!!G._cruiserDeployed&&cruiserAvailable(G.player)&&cruiserAfford(G.player);G._cruiserDeployed=false;
-  if(_cruOn){G.player.res.materials=Math.max(0,(G.player.res.materials||0)-5);G.player.res.energy=Math.max(0,(G.player.res.energy||0)-5);addLog('⚓ Supercroiseur déployé (+'+(G.player.cruiserPower||5)+'⚔️, −5<i class=ri-materials></i> −5<i class=ri-energy></i>).','gold');}
+  if(_cruOn){const _cc=cruiserPay(G.player);addLog('⚓ Supercroiseur déployé (+'+(G.player.cruiserPower||5)+'⚔️, '+_cc+').','gold');}
   const pPow=engagedP+pBonus+pEmpathBonus+(_cruOn?(G.player.cruiserPower||5):0); // Supercroiseur : +5 si déployé ce combat
   let aiEngaged=(G._aiWarCommitted!==undefined)?G._aiWarCommitted:Math.ceil((warEnemy.forceTokens||0)*0.7);
   aiEngaged=Math.min(aiEngaged,warEnemy.forceTokens||0,warEnemy.res.materials||0,warEnemy.res.energy||0); // ne peut engager que ce qu'il peut PAYER (1🪨+1⚡/jeton)
   const _aiCru=cruiserAvailable(warEnemy)&&cruiserAfford(warEnemy); // l'IA déploie son Supercroiseur en défense si possédé et payable
-  if(_aiCru){warEnemy.res.materials=Math.max(0,(warEnemy.res.materials||0)-5);warEnemy.res.energy=Math.max(0,(warEnemy.res.energy||0)-5);addLog('⚓ '+warEnemy.civ.emoji+' '+warEnemy.civ.name+' déploie son Supercroiseur en défense (+'+(warEnemy.cruiserPower||5)+'⚔️).','dim');}
+  if(_aiCru){const _cc=cruiserPay(warEnemy);addLog('⚓ '+warEnemy.civ.emoji+' '+warEnemy.civ.name+' déploie son Supercroiseur en défense (+'+(warEnemy.cruiserPower||5)+'⚔️, '+_cc+').','dim');}
   // COLONIE MÈRE (règle Marc) : la capitale est automatiquement défendue par 10 jetons de la nation.
   // Elle reste donc prenable, mais au prix d'un vrai assaut (avant : imprenable « en théorie », en pratique
   // capturée pour 1 jeton → nation à 0 colonie et partie bloquée).
   const _homeDef=(_warAttackColonyTarget&&warEnemy&&_warAttackColonyTarget===warEnemy.civ.home)?10:0;
   if(_homeDef)addLog('🏛️ Capitale '+(NODES[_warAttackColonyTarget]?.name||'')+' : défense automatique de 10 jetons.','dim');
-  const aPow=aiEngaged+aEmpathBonus+(_aiCru?(warEnemy.cruiserPower||5):0)+1/*garnison de base de la colonie IA défendue*/+_homeDef;
+  const aPow=aiEngaged+aEmpathBonus+(_aiCru?(warEnemy.cruiserPower||5):0)+garrisonOf(warEnemy,_warAttackColonyTarget); // garnison auto : 1 colonie / 10 base
   G._aiWarCommitted=undefined;
   // Coût + récupération SYMÉTRIQUES (attaque ET défense) : 1<i class=ri-materials></i> +1<i class=ri-energy></i> par jeton engagé, jetons immobilisés (récupération / moitié perdue si défaite).
   const pWin=pPow>aPow,aWin=aPow>pPow;
@@ -6085,14 +6125,16 @@ function renderTechTree(){
   // ── Marché Civique (cartes répétables, coût <i class=ri-materials></i>) ──
   html+=`<div class="gen-row" id="sec-civ" style="border-top:2px solid #2a3a5a;padding-top:3px">
     <div class="gen-label" style="color:#88c8ff;font-size:.56em">💼<span style="display:${compact?'none':'inline'};margin-left:2px">Éco &amp; Société</span></div>`;
-  const _civTop=['cm_explore','cm_forages']; // Extraction d'He3 & Capture d'astéroïdes en 1er (plus faciles à trouver)
+  // Cartes répétables mises EN TÊTE de la rivière (les plus utilisées, donc les plus faciles à trouver) :
+  // Extraction d'He3, Capture d'astéroïdes, puis Investissement dans la Recherche (demande de Marc).
+  const _civTop=['cm_explore','cm_forages','cm_research'];
   const cmSocial=CIVIC_MARKET.filter(c=>c.type==='social')
     .sort((a,b)=>(_civTop.indexOf(a.id)<0?99:_civTop.indexOf(a.id))-(_civTop.indexOf(b.id)<0?99:_civTop.indexOf(b.id)));
   const cmGov=CIVIC_MARKET.filter(c=>c.type==='government');
   for(const subGroup of[cmSocial,cmGov]){
     for(const card of subGroup){
       const isGov=card.type==='government';
-      const isRepeat=!!(card.repeatable||card.calmAction);
+      const isRepeat=!!(card.repeatable||card.calmAction||card.perTurn); // perTurn = utilisable CHAQUE tour → ∞
       const isCurrentForm=isGov&&G.player.govForm===card.id;
       const taken=isGov?false:(!isRepeat&&G.civicTaken.has(card.id)); // bloqué : 1× social déjà pris
       const cost=card.cost;const canBuy=!taken&&!isCurrentForm&&G.phase==='actions'&&G.player.acLeft>=1&&Object.entries(cost).every(([r,a])=>(G.player.res[r]||0)>=a);
@@ -6139,7 +6181,7 @@ function renderTechTree(){
       } else {
         r+=`<div class="gcard${mine?' gc-mine':''}" onclick="showGeneralDetail('${card.id}')" style="border-top:2px solid ${border};cursor:pointer;opacity:${taken?.4:1}">
           <div class="gc-header"><span class="gc-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2">${card.name}</span></div>
-          <div class="gc-art" style="${CARD_ART.has(card.id)?`background:#0a0a18 url('assets/cards/${card.id}.png') center/cover no-repeat`:`background:${artBg}`}">${CARD_ART.has(card.id)?'':card.emoji}${card.repeatable?'<span style="position:absolute;top:1px;right:3px;font-size:.55em;color:#ffaa44">∞</span>':''}</div>
+          <div class="gc-art" style="${CARD_ART.has(card.id)?`background:#0a0a18 url('assets/cards/${card.id}.png') center/cover no-repeat`:`background:${artBg}`}">${CARD_ART.has(card.id)?'':card.emoji}${(card.repeatable||card.perTurn)?'<span style="position:absolute;top:1px;right:3px;font-size:.55em;color:#ffaa44">∞</span>':''}</div>
           <div class="gc-body"><div class="tc-effect" style="color:#8898b8">${card.effect}</div>
           <div class="gc-cost">${taken?'<span style="color:#ff6060;font-size:.8em">Acquis</span>':!_reqOk?'<span style="color:#cc7744;font-size:.72em">🔒 '+(CARDS_POOL.find(c=>c.id===card.reqCard)?.name||'tech requise')+'</span>':canBuy?'<span class="res-tag energy" style="font-size:.85em">'+_acN+'AC</span> '+costHtmlStr:'<span style="color:#5a6a8a">'+_acN+'AC '+Object.entries(cost).map(([res,a])=>rLabel(res)+' '+a).join(' ')+'</span>'}</div></div>
         </div>`;
@@ -6681,6 +6723,11 @@ function _warShowAttackSlider(){
   const aiTok=ai?ai.forceTokens:0;
   // Défense RÉELLEMENT engageable par l'IA = ce qu'elle peut PAYER (1🪨+1⚡/jeton). Déterministe → l'affichage ne ment pas.
   const usableDef=ai?Math.min(aiTok,ai.res.materials||0,ai.res.energy||0):0;
+  // Bonus de défense GRATUITS de l'ennemi (ne coûtent ni énergie ni matériaux) : Empathes et Supercroiseur.
+  // Ils étaient absents de l'affichage → on pouvait perdre « 4 contre 5 » face à une nation à 0⚡ sans comprendre.
+  const _freeDef=ai?(((typeof hasSpec==='function'&&hasSpec(ai,'empath_routes'))?2:0)
+                    +((typeof hasSpec==='function'&&hasSpec(ai,'empath_tele'))?2:0)
+                    +((typeof cruiserAvailable==='function'&&cruiserAvailable(ai)&&typeof cruiserAfford==='function'&&cruiserAfford(ai))?(ai.cruiserPower||5):0)):0;
   const aiCommitted=usableDef; // l'IA engagera ce qu'elle peut payer (la garnison +1 est ajoutée au combat)
   G._aiWarCommitted=aiCommitted;
   const stratBonus=(p.stratBonus&&p.stratBonus.combatBonus)||0;
@@ -6695,7 +6742,8 @@ function _warShowAttackSlider(){
     'Tes jetons engageables : <strong>'+engageable+'</strong> <span style="color:#7880a0;font-size:.8em">('+(p.forceTokens||0)+' au total · '+defFloor+' réservé(s) en garnison)</span>'+
     (stratBonus?'<br>Bonus stratégie : <strong>+'+stratBonus+'</strong>':'')+
     '<br><span style="color:#7880a0;font-size:.82em">'+(intel>=2
-      ? ('🛰️ Défense ennemie utilisable : <strong>'+(usableDef+1)+'</strong> jeton(s) (garnison incluse — renseignement précis)')
+      ? ('🛰️ Défense ennemie totale : <strong>'+(usableDef+1+_freeDef)+'</strong> '
+       +'<span style="color:#8fb0d8">('+usableDef+' jeton(s) payable(s) + 1 garnison'+(_freeDef?(' + '+_freeDef+' bonus gratuits : Empathes/croiseur'):'')+')</span>')
       : ('🌫️ Force ennemie totale : <strong>~'+aiTok+'</strong> jeton(s) (±1) — part utilisable inconnue sans renseignement'))+'</span>';
   const slider=document.getElementById('wcm-slider');
   slider.parentElement.style.display='';

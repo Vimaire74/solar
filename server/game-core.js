@@ -119,8 +119,21 @@ const ACTIONS = {
     if (p && (p.acLeft || 0) > 0) p.acLeft -= 1; // l'assaut coûte 1 AC
     p._attacksThisTurn = (p._attacksThisTurn || 0) + 1;
     const tokens = Math.max(1, parseInt(a.tokens) || 1);
-    try { if (typeof sb.resolveWarCombat === 'function') sb.resolveWarCombat(tokens); } catch (e) {}
+    let res = null;
+    try { if (typeof sb.resolveWarCombat === 'function') res = sb.resolveWarCombat(tokens); } catch (e) {}
     if (war) war.aiRecaptureTarget = null; // pas de reprise auto invisible (défense de fin de tour est routée)
+    // FENÊTRE DE RÉSULTAT (Marc : « quand je conquiers, rien ne me dit que j'ai gagné/perdu »).
+    // Le chemin SERVEUR résolvait le combat sans jamais afficher le verdict. On émet donc la vraie fenêtre
+    // de guerre (#war-modal côté client) avec le détail des puissances et le sort de la colonie.
+    try {
+      if (typeof sb.showWarModal === 'function') {
+        const nm = (sb.NODES && sb.NODES[node] && sb.NODES[node].name) || node;
+        const enemyName = owner.civ.name;
+        sb.showWarModal('⚔️ Assaut sur ' + nm,
+          res ? ('Puissance — Toi : <strong>' + res.pPow + '</strong> | ' + enemyName + ' : <strong>' + res.aPow + '</strong>') : '',
+          res ? { txt: res.txt, cls: res.cls } : null);
+      }
+    } catch (e) {}
     _postAction(sb);
   },
   power:    (sb)    => {

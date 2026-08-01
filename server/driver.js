@@ -186,7 +186,14 @@ class GameDriver {
 
   // Notices BLOQUANTES : le joueur doit cliquer « Continuer » (fenêtre statique). Sinon le pump acquittait
   // tout de suite → les fenêtres « tu as gagné/perdu » et « résultat d'événement » passaient inaperçues.
-  _isBlockingNotice(p){ return !!(p && ['war_result','event_result','event_announce'].includes(p.kind)); }
+  _isBlockingNotice(p){
+    if(!p || !['war_result','event_result','event_announce'].includes(p.kind)) return false;
+    // ⚠️ JUGEMENT FINAL : sa fenêtre ne doit JAMAIS bloquer — sinon la partie ne se termine pas, les scores
+    // ne sont pas calculés, l'archive et l'email ne partent jamais (bug vécu par Marc, partie figée au tour 10).
+    try{ const ev=p.payload&&p.payload.event; if(ev&&ev.id==='final') return false; }catch(e){}
+    try{ const G=this.sb.__G; if(G && (G.phase==='over' || G.turn>G.maxTurns)) return false; }catch(e){}
+    return true;
+  }
   _isNotice(p){ return !!(p && (p.notice || ['war_result','event_result','event_announce','eot'].includes(p.kind))) && !this._isBlockingNotice(p); }
   _gameOver(){ const G=this.sb.__G; return G.phase==='over' || G.turn>G.maxTurns; }
 
@@ -325,8 +332,10 @@ class GameDriver {
       return this.pump(); // _currentActor renverra la même nation (pointeur non avancé)
     }
     // Sinon : commit direct. Passer la nation sauf si pouvoir gratuit encore dispo.
-    const keepForPower = !nat._isAI && (!action || action.type!=='pass') && nat.acLeft<=0 && this._freePowerAvailable(nat);
-    if(!action || action.type==='pass' || (nat.acLeft<=0 && !keepForPower)) nat._passedRound=true;
+    // Le rappel du pouvoir gratuit est désormais proposé à 1 AC RESTANT (côté client), donc on ne RETIENT
+    // PLUS la main du joueur à 0 AC : sinon le tour n'avançait plus tant qu'il n'avait pas utilisé ce pouvoir
+    // (bug vécu par Marc : obligé de l'activer pour débloquer la partie).
+    if(!action || action.type==='pass' || nat.acLeft<=0) nat._passedRound=true;
     this._advanceActor();
     return this.pump();
   }
@@ -338,8 +347,7 @@ class GameDriver {
     // POUVOIR gratuit qui laisse de l'AC (ex. Surtension +1 AC) → après validation, le joueur GARDE la main
     // et enchaîne (pas de rotation vers un autre joueur). Évite la réapparition du bug #4.
     if(heldType==='power' && nat && nat.acLeft>0){ return this.pump(); }
-    const keepForPower = nat && nat.acLeft<=0 && this._freePowerAvailable(nat);
-    if(nat && nat.acLeft<=0 && !keepForPower) nat._passedRound=true;
+    if(nat && nat.acLeft<=0) nat._passedRound=true; // idem : plus de blocage pour le pouvoir gratuit
     this._advanceActor();
     return this.pump();
   }
