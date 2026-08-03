@@ -130,6 +130,9 @@ const ACTIONS = {
     if (p && (p.acLeft || 0) > 0) p.acLeft -= 1; // l'assaut coûte 1 AC
     p._attacksThisTurn = (p._attacksThisTurn || 0) + 1;
     const tokens = Math.max(1, parseInt(a.tokens) || 1);
+    // Supercroiseur : le drapeau est posé par la modale SOLO ; sur le chemin serveur il doit venir
+    // de l'action, sinon il est silencieusement ignoré (le joueur le déploie et rien ne se passe).
+    try { G._cruiserDeployed = !!a.cruiser && sb.cruiserAvailable(p) && sb.cruiserAfford(p); } catch (e) { G._cruiserDeployed = false; }
     let res = null;
     try { if (typeof sb.resolveWarCombat === 'function') res = sb.resolveWarCombat(tokens); } catch (e) {}
     if (war) war.aiRecaptureTarget = null; // pas de reprise auto invisible (défense de fin de tour est routée)

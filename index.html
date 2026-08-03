@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-03 · v5.2';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-03 · v5.4';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -6716,14 +6716,29 @@ function showWarCombatModal(cb){
       isHome:(_ai&&c.nodeId===_ai.civ.home), isFocus:(c.nodeId===_focus),
       dist:Math.min.apply(null,_p.colonies.map(pc=>getNodeDistance(pc.nodeId,c.nodeId)))}));
     const _routes=_ai?_ai.routes.map((r,i)=>({i, from:r.from, to:r.to, name:(NODES[r.from]?.name||r.from)+'→'+(NODES[r.to]?.name||r.to), protected:(r.tokens||0)>=1, cost:(r.tokens||0)>=1?2:1})):[];
+    /* PLAFOND D'ENGAGEMENT ANNONCÉ AU CLIENT. Le moteur n'accepte que `min(jetons, payables)`
+       (1🪨+1⚡ par jeton) : si la fenêtre proposait davantage, l'engagement était rogné en silence
+       et le joueur croyait avoir engagé plus qu'il n'a réellement engagé. On envoie donc le VRAI
+       plafond, et le client borne son curseur dessus — ce qui est proposé est ce qui est appliqué. */
+    const _maxEng=Math.max(0,Math.min(_p.forceTokens||0,(typeof maxAffordableTokens==='function')?maxAffordableTokens(_p):(_p.forceTokens||0)));
+    /* SUPERCROISEUR : en ligne il n'était JAMAIS pris en compte. `G._cruiserDeployed` est un drapeau
+       posé par la modale SOLO ; la réponse réseau ne le transportait pas, donc le serveur résolvait
+       toujours le combat sans lui (bug de Marc : 10 jetons + supercroiseur contre une capitale à 10
+       → « Égalité » au lieu d'une victoire). On l'expose et on le reçoit. */
+    const _cruHas=(typeof cruiserAvailable==='function')&&cruiserAvailable(_p);
+    const _cruOk=_cruHas&&(typeof cruiserAfford==='function')&&cruiserAfford(_p);
     _emitDecision('war_combat', _p,
       {enemy:(_ai?_ai.civ.id:null), enemyName:(_ai?_ai.civ.name:'IA'), warTurnsLeft:G.warTurnsLeft, myForce:_p.forceTokens||0,
+       maxEngage:_maxEng,
+       cruiser:{has:!!_cruHas, afford:!!_cruOk, power:(_p.cruiserPower||5)},
        canHold:((G._warDeclaredBy||'other')!=='player'),
        cols:_cols, routes:_routes,
        aiThreat:(G._aiWarStance==='attack'&&G._aiWarTarget)?{type:G._aiWarTarget.type, name:G._aiWarTarget.name}:null},
       null,
       (ans)=>{ const cb2=_warCombatCb;_warCombatCb=null;G._warChoiceCb=null; if(!cb2)return;
         const act=ans&&ans.action;
+        // Le supercroiseur doit être armé AVANT resolveWarCombat (qui lit puis remet à zéro le drapeau).
+        G._cruiserDeployed=!!(ans&&ans.cruiser)&&_cruHas&&(typeof cruiserAfford==='function')&&cruiserAfford(_p);
         if(act==='hold')cb2('STANDOFF');
         else if(act==='defend')cb2('DEFEND:'+Math.max(0,(ans.tokens|0)));
         else if(act==='attack'){ if(ans.node)_warAttackColonyTarget=ans.node; cb2(Math.max(0,(ans.tokens|0))); } // ← CIBLE routée → capture

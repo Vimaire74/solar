@@ -332,13 +332,16 @@ const STEPS=[
   tx:"D'abord, choisis ton <b>AGENDA SECRET</b> : un objectif caché (ex. avoir X colonies) qui rapporte des VP en fin de partie. <b>Clique sur un agenda</b> dans la fenêtre, puis sur <b>Valider et continuer</b> (ça confirme pour toi).",
   hint:'Choisis un agenda, puis Valider'},
 
- {lab:'Carte Stratégie', glow:'strategy-modal', pos:'top', confirm:confirmStrategy, sync:'strategy',
-  tx:"Chaque tour tu tires une <b>CARTE STRATÉGIE</b> : un bonus temporaire (ressources, AC, force…). <b>Clique sur une carte</b> pour la choisir — le tour démarre aussitôt. Tu peux aussi cliquer <b>« Valider et continuer »</b> (ça choisit pour toi).",
-  hint:'Choisis une carte, ou Valider et continuer'},
-
+ /* ⚠️ ORDRE : l'ANNONCE D'ÉVÉNEMENT vient AVANT le tirage de la carte Stratégie depuis la v4.8 —
+    c'est volontaire (connaître l'événement à venir donne son intérêt au choix de la carte).
+    Les deux étapes ont donc été interverties. Contrôlé par `node server/tutorial-sync.js`. */
  {lab:'Événements', glow:'event-announce-modal', confirm:confirmEventAnnounce, sync:'event',
-  tx:"Un <b>ÉVÉNEMENT</b> a lieu <b>tous les 2 tours</b> (fin des tours 2, 4, 6, 8). Bonne nouvelle : il t'est <b>annoncé le tour d'avant</b> — c'est la fenêtre affichée — pour que tu t'y prépares. Son <b>effet et son évaluation</b> se produisent à la <b>fin du tour pair</b> (fin du tour 2, puis 4…). Lis-le, puis clique Valider et continuer.",
+  tx:"Un <b>ÉVÉNEMENT</b> a lieu <b>tous les 2 tours</b> (fin des tours 2, 4, 6, 8). Bonne nouvelle : il t'est <b>annoncé à l'avance</b> — c'est la fenêtre affichée — pour que tu t'y prépares. Son <b>effet et son évaluation</b> se produisent à la <b>fin du tour pair</b> (fin du tour 2, puis 4…). Lis-le, puis clique Valider et continuer : tu choisiras ta carte Stratégie juste après, en connaissance de cause.",
   hint:'Lis l\'événement, puis Valider'},
+
+ {lab:'Carte Stratégie', glow:'strategy-modal', pos:'top', confirm:confirmStrategy, sync:'strategy',
+  tx:"Maintenant que tu sais ce qui arrive, tire ta <b>CARTE STRATÉGIE</b> : un bonus temporaire (ressources, AC, force…). C'est pour cela que l'événement t'est annoncé <b>avant</b> — choisis la carte qui te prépare le mieux. <b>Clique sur une carte</b> pour la choisir — le tour démarre aussitôt. Tu peux aussi cliquer <b>« Valider et continuer »</b> (ça choisit pour toi).",
+  hint:'Choisis une carte, ou Valider et continuer'},
 
  {lab:'Tes ressources', glow:'top-bar', onShow:boostForTutorial,
   tx:"Te voilà en jeu. En haut : ⚡énergie, 🪨matériaux, 🔬savoir, ❤️moral, tes <b>AC</b> (actions par tour) et tes <b>🏆 VP</b>. Chaque action coûte des AC et des ressources. <i>Pour ce tutoriel, je t'ai donné <b>5 AC et des ressources au maximum</b> afin que tu puisses tout essayer sans manquer — on parlera de la gestion des ressources et des AC plus tard.</i>"},

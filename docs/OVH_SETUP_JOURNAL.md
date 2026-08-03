@@ -463,6 +463,88 @@ J'avais tout mis dans le second. C'est **exactement le même piège** que le rev
 Deux jours perdus sur le revenu, un déploiement pour rien sur la version : c'est la même erreur.
 
 
+## ✅ v5.3 — supercroiseur ignoré en ligne + IA « qui ne font rien » au bilan (2026-08-03, partie 6DA8)
+
+### 🔴 Le Supercroiseur n'était JAMAIS pris en compte en ligne
+Marc assaille la capitale martienne Phobos, engage ses jetons **et son Supercroiseur** → « ⚔️ Égalité ».
+- **Cause** : `G._cruiserDeployed` est un drapeau posé par la **modale SOLO**. La réponse réseau
+  (`{action, node, tokens}`) ne le transportait pas, et le panneau générique ne proposait même pas
+  le déploiement. Le moteur résolvait donc **toujours** le combat sans le croiseur.
+- **Corrigé** : le payload `war_combat` expose `cruiser:{has, afford, power}` ; le client affiche une
+  case « ⚓ Déployer le Supercroiseur (+5⚔️) » et renvoie `cruiser:true` ; le gestionnaire de réponse
+  arme `G._cruiserDeployed` AVANT `resolveWarCombat`. Idem sur le chemin `ACTIONS.attack` de
+  `game-core.js` (assaut depuis le plateau), qui l'ignorait aussi.
+- **Reproduit puis vérifié** sur le cas exact de Marc (10 jetons vs capitale à 10 jetons de garnison) :
+  **avant → « Égalité », 10 contre 10 ; après → « Victoire, tu CAPTURES Phobos », 15 contre 10.**
+
+### ⚠️ Engagement rogné en silence
+Le moteur plafonne l'engagement à `min(jetons possédés, jetons PAYABLES)` (1🪨+1⚡ par jeton), mais la
+fenêtre proposait un curseur allant jusqu'aux jetons **possédés**. Le joueur pouvait donc croire avoir
+engagé 15 jetons quand le moteur n'en retenait que ce qu'il pouvait payer. Le payload envoie désormais
+`maxEngage` (le vrai plafond), le curseur s'y borne, et un avertissement explique la limite :
+*« Tu possèdes N jeton(s) mais ne peux en payer que M »*. **Ce qui est proposé est ce qui est appliqué.**
+La fenêtre signale aussi qu'une CAPITALE est défendue d'office par 10 jetons.
+
+### 🔴 « Les IA ne font rien » dans le bilan de fin de tour
+Le journal montrait bien les coups des IA, mais leur section du bilan affichait « Rien fait ce tour ».
+- **Cause** : la concaténation `G.aiActions → nat._turnActions` n'existait que dans `interleaveStep`,
+  le chemin **SOLO**. Le serveur appelle `doAITurn` **directement** (`driver._stepActor`) et sautait
+  donc l'étape. Encore un cas de « deux chemins pour la même chose » (cf. `ARCHITECTURE_AVENIR.md` §3).
+- **Corrigé** : nouvelle méthode `driver._aiTurn(nat)` qui joue le tour ET reporte les actions dans le
+  journal de la nation. Les 3 appels à `doAITurn` du driver passent par elle.
+- **Vérifié** : le bilan liste « Surtension », « Colonise Déimos », « Forge Orbitale »… au lieu de
+  « Rien fait ce tour ».
+
+### 📌 Demande FAITE en v5.4 (voir plus bas)
+**Outil de resynchronisation du tutoriel.** `tutorial.html` est une copie d'`index.html` mais le
+scénario de `tutorial.js` n'est plus synchronisé avec le déroulement du jeu qui a évolué. Marc veut un
+**second programme** qui resynchronise le tutoriel après quelques mises à jour du jeu. À concevoir
+(inventaire des étapes du tutoriel vs séquence réelle des fenêtres, signalement des écarts).
+
+
+## ✅ v5.4 — outil de RESYNCHRONISATION DU TUTORIEL (2026-08-03, GO de Marc)
+
+### Le besoin
+Le jeu évolue, `tutorial.js` non. Le scénario du coach pointe vers des ÉLÉMENTS du jeu (fenêtres,
+cartes, fonctions) et suppose un ORDRE d'enchaînement. Quand `index.html` change, le tutoriel se
+désynchronise **en silence**. Marc : *« le tutorial ça va pas du tout, les enchaînements ne sont pas
+synchronisés au déroulement du jeu »*.
+
+### L'outil : `node server/tutorial-sync.js [--fix]`
+Il ne réécrit **pas** les textes pédagogiques (travail humain). Il **diagnostique** la dérive et
+régénère ce qui est mécanique. Cinq contrôles :
+1. **Identifiants DOM** — chaque `glow` / `awaitClick` / `requireChoice` existe-t-il encore ?
+2. **Cartes** — chaque `demo:{kind,id}` correspond-il encore à une carte du jeu ?
+3. **Fonctions** — chaque `window.X()` appelée par le tutoriel existe-t-elle encore ?
+4. **ORDRE RÉEL** — on joue une vraie partie et on compare la séquence des fenêtres à celle du scénario.
+5. **`tutorial.html`** — doit être une copie d'`index.html` avec `online.js` → `tutorial.js` (`--fix`).
+
+**Piège rencontré en le construisant** : impossible de dérouler une partie SOLO sans écran — les
+modales attendent un clic et la partie se fige au tour 1. On passe donc par le **pilote serveur**,
+qui répond aux fenêtres : la séquence des décisions qu'il émet EST la séquence vue par le joueur.
+Le joueur simulé doit aussi **coloniser** (pas seulement passer), sinon les fenêtres « Découverte »
+et « Jeton de route » ne s'ouvrent jamais et le contrôle les croit obsolètes à tort.
+
+### Ce qu'il a trouvé, et qui est corrigé
+```
+séquence réelle du jeu : agenda → ANNONCE ÉVÉNEMENT → STRATÉGIE → découverte → bilan …
+séquence du scénario   : agenda → STRATÉGIE → ANNONCE ÉVÉNEMENT → découverte …
+```
+Depuis la **v4.8**, l'annonce de l'événement vient **AVANT** le tirage de la carte Stratégie — c'était
+voulu (connaître l'événement donne son intérêt au choix de la carte), mais le tutoriel enseignait
+toujours l'ordre inverse. **Les deux étapes ont été interverties** et leurs textes réécrits pour
+expliquer le lien : *« Maintenant que tu sais ce qui arrive, tire ta carte Stratégie… »*.
+Après correction, la séquence du scénario suit exactement celle du jeu.
+
+Reste un point signalé « à vérifier à la main » : la fenêtre `route-token-modal` ne s'ouvre pas sur
+3 tours parce que le joueur simulé colonise mais ne construit pas de route. Limite assumée de l'outil,
+signalée en jaune et non en rouge.
+
+### Usage recommandé
+Lancer `node server/tutorial-sync.js` **après quelques mises à jour du jeu, avant de livrer un lot**.
+Rouge = à corriger, jaune = à regarder, `--fix` régénère `tutorial.html`.
+
+
 ## 📝 MÉMO (noté, NON implémenté — à faire quand Marc donne le GO)
 *Section purgée le 2026-08-03 : les entrées précédentes (libellé « route passive », Sphère de Dyson multi-nations, avancée des pirates sur la carte, événements invisibles) étaient **déjà corrigées** et n'avaient jamais été retirées d'ici — elles nous ont fait perdre du temps à tous les deux. Ne laisser ici QUE ce qui est réellement en attente.*
 

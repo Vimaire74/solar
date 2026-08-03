@@ -89,7 +89,7 @@ class GameDriver {
     const me = this.nation(id);
     const before = this.sb.__G.log ? this.sb.__G.log.length : 0;
     let acted = false;
-    try { acted = this.sb.doAITurn(me, true); }
+    try { acted = this._aiTurn(me); }
     catch(e){ me._passedRound = true; this._advance(); return {civId:id, acted:false, error:e.message.split('\n')[0]}; }
     this._emitLog(before);
     if(!acted || me.acLeft<=0) me._passedRound = true;
@@ -105,7 +105,7 @@ class GameDriver {
     const me = this.nation(id);
     const before = this.sb.__G.log ? this.sb.__G.log.length : 0;
     let acted = false;
-    try { acted = this.sb.doAITurn(me, true); }
+    try { acted = this._aiTurn(me); }
     catch(e){ me._passedRound = true; this._advance(); return {civId:id, acted:false, error:e.message.split('\n')[0]}; }
     this._emitLog(before);
     if(!acted || me.acLeft<=0) me._passedRound = true;
@@ -211,10 +211,23 @@ class GameDriver {
   }
   _advanceActor(){ const order=this.sb.__G._order||[]; if(order.length)this._aptr=(this._aptr+1)%order.length; }
 
+  /* Joue le tour d'une IA ET reporte ses actions dans SON journal de nation.
+     ⚠️ Sans ce report, le bilan de fin de tour affichait « Rien fait ce tour » pour toutes les IA
+     alors que le journal montrait bien leurs coups (bug signalé par Marc, partie 6DA8) : la
+     concaténation de `G.aiActions` vers `nat._turnActions` n'existait que dans `interleaveStep`,
+     le chemin SOLO. Le serveur, lui, appelle `doAITurn` directement — il sautait donc l'étape. */
+  _aiTurn(nat){
+    const G=this.sb.__G;
+    let acted=false;
+    try{ acted=this.sb.doAITurn(nat,true); }
+    catch(e){ throw e; }
+    try{ if(acted && G.aiActions && G.aiActions.length) nat._turnActions=(nat._turnActions||[]).concat(G.aiActions); }catch(e){}
+    return acted;
+  }
   _stepActor(nat){
     const before=this.sb.__G.log?this.sb.__G.log.length:0;
     let acted=false;
-    try{ acted=this.sb.doAITurn(nat,true); }catch(e){ nat._passedRound=true; this._advanceActor(); return; }
+    try{ acted=this._aiTurn(nat); }catch(e){ nat._passedRound=true; this._advanceActor(); return; }
     this._emitLog(before);
     if(!acted || nat.acLeft<=0) nat._passedRound=true;
     this._advanceActor();

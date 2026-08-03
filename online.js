@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-03 · v5.2';
+const SOLAR_BUILD_JS = '2026-08-03 · v5.4';
 // Exposé sur window pour que l'écran d'ACCUEIL (index.html, #lv-build) puisse comparer les deux
 // builds et signaler un upload partiel. Un `const` seul n'est pas visible depuis l'autre fichier.
 try{ window.SOLAR_BUILD_JS = SOLAR_BUILD_JS; }catch(e){}
@@ -1171,20 +1171,34 @@ function askLocalDecision(pending){
       return;
     }
     if(k==='war_combat'){
-      const maxF=o.myForce||0;
+      const force=o.myForce||0;
+      // Le curseur est borné au VRAI plafond du moteur (jetons possédés ET payables). Sinon le
+      // joueur engage 15 et le moteur n'en retient que ce qu'il peut payer, sans qu'il le voie.
+      const maxF=(o.maxEngage!==undefined)?o.maxEngage:force;
+      const cru=o.cruiser||{has:false,afford:false,power:5};
       const cols=o.cols||[]; const canHold=!!o.canHold; const threat=o.aiThreat;
-      const tokenPick=(title,hint,onOk)=>{ // sous-écran : choisir les jetons engagés
-        decisionPanel('<h2>'+title+'</h2>'+(hint?'<div class="muted" style="margin-bottom:6px">'+hint+'</div>':'')
+      const tokenPick=(title,hint,onOk)=>{ // sous-écran : choisir les jetons engagés (+ supercroiseur)
+        const limite=(maxF<force)?('<div style="color:#ffcc88;font-size:.82em;margin-bottom:4px">⚠️ Tu possèdes '+force+' jeton(s) mais ne peux en <b>payer</b> que '+maxF+' (1🪨 +1⚡ par jeton engagé).</div>'):'';
+        const cruLigne=cru.has
+          ? ('<label style="display:flex;align-items:center;gap:8px;margin:8px 0;'+(cru.afford?'':'opacity:.5')+'">'
+             +'<input type="checkbox" id="sc-cru" style="width:auto"'+(cru.afford?'':' disabled')+'>'
+             +'<span>⚓ Déployer le Supercroiseur <b>+'+(cru.power||5)+'⚔️</b>'+(cru.afford?'':' — ressources insuffisantes')+'</span></label>')
+          : '';
+        decisionPanel('<h2>'+title+'</h2>'+(hint?'<div class="muted" style="margin-bottom:6px">'+hint+'</div>':'')+limite
           +'<div>Jetons engagés : <b id="sc-wcv">'+Math.min(1,maxF)+'</b> / '+maxF+'</div>'
           +'<input type="range" id="sc-wc" min="0" max="'+maxF+'" value="'+Math.min(1,maxF)+'" style="width:100%">'
+          +cruLigne
           +'<button class="opt" id="sc-wcok">✓ Engager</button><button class="opt" id="sc-wcback">↩ Retour</button>');
         const sl=document.getElementById('sc-wc'), dv=document.getElementById('sc-wcv'); if(sl)sl.oninput=()=>dv.textContent=sl.value;
-        document.getElementById('sc-wcok').onclick=()=>onOk(parseInt(sl.value)||0);
+        document.getElementById('sc-wcok').onclick=()=>{
+          const c=document.getElementById('sc-cru');
+          onOk(parseInt(sl.value)||0, !!(c&&c.checked));
+        };
         document.getElementById('sc-wcback').onclick=()=>main();
       };
       const main=()=>{
         let b='<h2>⚔️ Combat de guerre — '+(o.enemyName||'ennemi')+'</h2>';
-        b+='<div class="muted" style="margin-bottom:8px">Tes jetons Force engageables : <b>'+maxF+'</b> · Tour de guerre restant : '+(o.warTurnsLeft||'?')+'</div>';
+        b+='<div class="muted" style="margin-bottom:8px">Jetons engageables : <b>'+maxF+'</b>'+((maxF<force)?(' <span style="color:#ffcc88">(sur '+force+' possédés — limité par tes ressources)</span>'):'')+' · Tour de guerre restant : '+(o.warTurnsLeft||'?')+'</div>';
         if(threat) b+='<div style="background:#2a1200;border:1px solid #cc6622;border-radius:8px;padding:7px 10px;margin-bottom:8px;color:#ffcfa0;font-size:.85em">🛡️ L\'ennemi menace : <b>'+(threat.type==='colony'?'🏙️ ':'🛤️ ')+threat.name+'</b>. Tu peux <b>défendre</b>.</div>';
         // Attaquer une colonie ennemie
         if(cols.length){
@@ -1195,8 +1209,8 @@ function askLocalDecision(pending){
         if(threat) b+='<button class="opt" id="sc-wc-def" style="border-color:#cc6622">🛡️ Défendre (choisir jetons)</button>';
         if(canHold) b+='<button class="opt" id="sc-wc-hold" style="border-color:#4488cc">🕊️ Tenir position (ne rien engager)</button>';
         decisionPanel(b);
-        document.querySelectorAll('#sc-decision .opt[data-col]').forEach(btn=>{ if(btn.disabled)return; btn.onclick=()=>{ const c=cols[parseInt(btn.getAttribute('data-col'))]; tokenPick('⚔️ Attaquer '+c.name, 'Force ennemie inconnue (garnison + défense). Engage assez pour gagner.', (t)=>done({action:'attack', node:c.node, tokens:t})); }; });
-        const dfn=document.getElementById('sc-wc-def'); if(dfn) dfn.onclick=()=>tokenPick('🛡️ Défense', 'Jetons engagés en défense de tes colonies.', (t)=>done({action:'defend', tokens:t}));
+        document.querySelectorAll('#sc-decision .opt[data-col]').forEach(btn=>{ if(btn.disabled)return; btn.onclick=()=>{ const c=cols[parseInt(btn.getAttribute('data-col'))]; tokenPick('⚔️ Attaquer '+c.name, (c.isHome?'🏛️ CAPITALE : défendue d\'office par 10 jetons, plus ce que l\'ennemi engage.':'Force ennemie inconnue (garnison + défense).'), (t,cr)=>done({action:'attack', node:c.node, tokens:t, cruiser:cr})); }; });
+        const dfn=document.getElementById('sc-wc-def'); if(dfn) dfn.onclick=()=>tokenPick('🛡️ Défense', 'Jetons engagés en défense de tes colonies.', (t,cr)=>done({action:'defend', tokens:t, cruiser:cr}));
         const hld=document.getElementById('sc-wc-hold'); if(hld) hld.onclick=()=>done({action:'hold'});
       };
       main();
