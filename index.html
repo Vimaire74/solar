@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-03 · v5.1';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-03 · v5.2';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -724,7 +724,16 @@ body{font-size:16px;}
 </style>
 <div id="civ-sel" class="overlay">
   <h1>🌌 SOLAR</h1>
+  <!-- ⚠️ CECI est le VRAI écran d'accueil / de connexion, celui que voit le joueur au démarrage.
+       `screenAuth()` dans online.js est un SECOND écran, visible seulement si on annule une partie.
+       Toute information destinée à l'écran de connexion doit être ajoutée ICI (piège vécu : le
+       numéro de version et le lien tutoriel avaient été mis dans online.js et n'apparaissaient pas). -->
+  <div class="lv-links" style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:2px 0 4px">
+    <a href="tutorial.html" style="color:#8fc8ff;text-decoration:none;font-size:.9em">🎓 Découvrir le jeu — tutoriel</a>
+    <a href="regles.html" style="color:#8fc8ff;text-decoration:none;font-size:.9em">📖 Règles du jeu</a>
+  </div>
   <a class="lv-pdf" href="Solar_Conquest_Livret.pdf" target="_blank" rel="noopener">📖 Livret de règles (PDF)</a>
+  <div id="lv-build" style="font-size:.72em;opacity:.7;color:#9fb0d0;margin-top:2px"></div>
   <div id="lv-auth">
     <div class="lv-tabs">
       <button type="button" id="lv-tab-login" class="lv-on" onclick="lvMode('login')">Se connecter</button>
@@ -766,6 +775,18 @@ async function lvSubmit(){
     const ob=document.getElementById('sc-online-btn');if(ob){ob.click();}else{err.textContent='Couche en ligne indisponible.';}
   }catch(e){err.textContent='Serveur injoignable (hors-ligne ?). Utilise « Jouer en solo ».';}
 }
+/* Numéro de build affiché sur l'écran d'accueil. C'est le SEUL moyen fiable de savoir quelle
+   version tourne réellement en ligne (on a perdu deux jours faute de l'avoir). Si index.html et
+   online.js portent des builds différents, on l'affiche en rouge : un seul des deux a été mis en
+   ligne (upload partiel ou cache). */
+function lvShowBuild(){
+  try{
+    const el=document.getElementById('lv-build'); if(!el)return;
+    const h=window.SOLAR_BUILD_HTML||null, j=window.SOLAR_BUILD_JS||null;
+    if(h&&j&&h!==j) el.innerHTML='<span style="color:#ff8a8a">Versions incohérentes — jeu : '+h+' · en ligne : '+j+'</span>';
+    else el.textContent='Version '+(h||'inconnue');
+  }catch(e){}
+}
 // Auto-connexion au chargement si « se souvenir de moi » était coché et la session serveur est encore valide.
 async function lvTryAutoLogin(){
   let remembered=false,su='';try{remembered=localStorage.getItem('sc_remember')==='1';su=localStorage.getItem('sc_user')||'';}catch(e){}
@@ -780,7 +801,9 @@ async function lvTryAutoLogin(){
     }else{ try{localStorage.removeItem('sc_remember');}catch(e){} } // session expirée → on oublie
   }catch(e){}
 }
-document.addEventListener('DOMContentLoaded',()=>{ setTimeout(lvTryAutoLogin,300); });
+/* ⚠️ lvShowBuild est appelé ICI et non dans lvTryAutoLogin : online.js REMPLACE window.lvTryAutoLogin,
+   donc tout appel placé dedans serait du code mort dès que la couche en ligne est chargée. */
+document.addEventListener('DOMContentLoaded',()=>{ lvShowBuild(); setTimeout(()=>{ lvShowBuild(); if(typeof lvTryAutoLogin==='function')lvTryAutoLogin(); },300); });
 function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidden');document.getElementById('lv-auth').style.display='none';document.getElementById('lv-solo-pick').scrollIntoView({behavior:'smooth'});}
 function lvRenderNations(){
   const box=document.getElementById('lv-nations');if(!box||typeof CIVS==='undefined')return;

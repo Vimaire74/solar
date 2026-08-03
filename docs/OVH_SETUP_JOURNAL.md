@@ -442,6 +442,27 @@ Trouvé par le même banc : une annonce/résultat d'événement est **globale**,
 La mise en page (largeurs, défilement, boutons hors écran), et le fait qu'il **rejoue** la logique de `server.js` au lieu de l'exécuter : si `server.js` régressait, le banc ne le verrait pas directement. Deux garde-fous statiques compensent en partie (file d'attente côté client, pas de diffusion générale des notices personnelles).
 
 
+## ✅ v5.2 — le numéro de version et le lien tutoriel étaient sur le MAUVAIS écran (2026-08-03)
+
+Marc a uploadé le lot 15 et redéployé les deux applications : **ni la version, ni le lien tutoriel** n'apparaissaient.
+
+**Cause — il existe DEUX écrans de connexion, et j'ai modifié le mauvais :**
+1. `#civ-sel` dans `index.html` (champs `lv-user` / `lv-pass`) = **le vrai écran d'accueil**, celui que le joueur voit au démarrage ;
+2. `screenAuth()` dans `online.js` = un SECOND écran, visible seulement si on **annule une partie**.
+J'avais tout mis dans le second. C'est **exactement le même piège** que le revenu net (deux fonctions écrivaient `#top-res`, la seconde écrasait la première) : je modifie un rendu sans vérifier que c'est celui que le jeu emprunte.
+
+**Corrigé** : lien tutoriel + lien règles + zone version (`#lv-build`) ajoutés dans `#civ-sel`. Un commentaire y signale explicitement l'existence du second écran, pour ne pas retomber dedans.
+
+**Deuxième piège évité de justesse** : `online.js` **REMPLACE** `window.lvTryAutoLogin`. Un appel à `lvShowBuild()` placé dedans aurait été du code mort dès que la couche en ligne est chargée. L'appel est donc fait sur `DOMContentLoaded`, puis rejoué par `online.js` après `hijackBuiltinAuth()` — c'est seulement à ce moment que `SOLAR_BUILD_JS` est connu, donc qu'une incohérence entre les deux fichiers peut être détectée. `SOLAR_BUILD_JS` est aussi exposé sur `window` (un `const` seul n'est pas visible depuis l'autre fichier).
+
+**Vérifié** en rendant l'écran d'accueil : les deux liens et la zone version sont bien présents et produisent « Version 2026-08-03 · v5.2 ».
+
+### 📌 Règle qui découle de ces deux incidents
+**Avant de modifier un affichage, chercher s'il existe un SECOND endroit qui produit la même chose**
+(`grep` sur l'identifiant DOM, sur le nom de la fonction, et vérifier si `online.js` la remplace).
+Deux jours perdus sur le revenu, un déploiement pour rien sur la version : c'est la même erreur.
+
+
 ## 📝 MÉMO (noté, NON implémenté — à faire quand Marc donne le GO)
 *Section purgée le 2026-08-03 : les entrées précédentes (libellé « route passive », Sphère de Dyson multi-nations, avancée des pirates sur la carte, événements invisibles) étaient **déjà corrigées** et n'avaient jamais été retirées d'ici — elles nous ont fait perdre du temps à tous les deux. Ne laisser ici QUE ce qui est réellement en attente.*
 

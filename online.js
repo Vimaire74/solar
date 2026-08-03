@@ -1,7 +1,10 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-03 · v5.1';
+const SOLAR_BUILD_JS = '2026-08-03 · v5.2';
+// Exposé sur window pour que l'écran d'ACCUEIL (index.html, #lv-build) puisse comparer les deux
+// builds et signaler un upload partiel. Un `const` seul n'est pas visible depuis l'autre fichier.
+try{ window.SOLAR_BUILD_JS = SOLAR_BUILD_JS; }catch(e){}
 /* Solar — couche EN LIGNE v2 : client WebSocket du SERVEUR AUTORITAIRE.
    Remplace l'ancienne couche PHP/polling (archivée dans server/php/online.js).
    À servir à la racine du site : index.html contient déjà <script src="online.js"></script> (optionnel —
@@ -1390,6 +1393,9 @@ function hijackBuiltinAuth(){
 function init(){
   injectStyles();
   hijackBuiltinAuth();
+  // Rafraîchir l'affichage de version : online.js est chargé APRÈS le premier rendu de l'accueil,
+  // c'est seulement maintenant que SOLAR_BUILD_JS est connu (et donc une éventuelle incohérence).
+  try{ if(typeof lvShowBuild==='function') lvShowBuild(); }catch(e){}
   const btn=el('<button id="sc-online-btn" style="position:fixed;bottom:12px;right:12px;z-index:8000;background:linear-gradient(135deg,#2f6fd0,#1f4fa0);color:#fff;border:0;border-radius:10px;padding:9px 14px;font:700 .85em system-ui;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.4)">🌐 Jouer en ligne</button>');
   btn.onclick = ()=>{
     let tok=null; try{ tok=localStorage.getItem('sc_ws_token'); }catch(e){}
