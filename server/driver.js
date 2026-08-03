@@ -326,11 +326,11 @@ class GameDriver {
       const rejected = this._lastActionLog.some(x=>/pas assez|impossible|déjà|non adjacent|invalide|refuse|besoin/i.test(String(x)));
       if(!rejected){ this._hold={civId, snap, actionType:(action&&action.type)}; return {kind:'confirm', civId}; }
     }
-    // POUVOIR qui laisse de l'AC (ex. Surtension +1 AC) → le joueur GARDE la main : pas de rotation vers
-    // un joueur qui a déjà passé, il enchaîne directement sa/ses action(s) (bug #4).
-    if(action && action.type==='power' && !nat._isAI && nat.acLeft>0){
-      return this.pump(); // _currentActor renverra la même nation (pointeur non avancé)
-    }
+    /* RÈGLE (Marc, 2026-08-01) : l'AC SUPPLÉMENTAIRE donné par un pouvoir (ex. Surtension martienne)
+       ne s'enchaîne PAS. Un joueur pouvait faire 3 coups d'affilée — action normale, pouvoir gratuit,
+       puis l'action offerte par ce pouvoir — pendant que les autres attendaient. La main tourne donc
+       après un pouvoir comme après n'importe quelle action ; l'AC gagné servira au prochain passage.
+       (Ceci REMPLACE volontairement l'ancien comportement « le pouvoir garde la main ».) */
     // Sinon : commit direct. Passer la nation sauf si pouvoir gratuit encore dispo.
     // Le rappel du pouvoir gratuit est désormais proposé à 1 AC RESTANT (côté client), donc on ne RETIENT
     // PLUS la main du joueur à 0 AC : sinon le tour n'avançait plus tant qu'il n'avait pas utilisé ce pouvoir
@@ -344,9 +344,8 @@ class GameDriver {
     const heldType = (this._hold && this._hold.civId===civId) ? this._hold.actionType : null;
     if(this._hold && this._hold.civId===civId) this._hold=null;
     const nat=this.nation(civId); this.activate(civId);
-    // POUVOIR gratuit qui laisse de l'AC (ex. Surtension +1 AC) → après validation, le joueur GARDE la main
-    // et enchaîne (pas de rotation vers un autre joueur). Évite la réapparition du bug #4.
-    if(heldType==='power' && nat && nat.acLeft>0){ return this.pump(); }
+    // Idem après validation d'un pouvoir : la main tourne (voir la règle expliquée dans act()).
+    void heldType;
     if(nat && nat.acLeft<=0) nat._passedRound=true; // idem : plus de blocage pour le pouvoir gratuit
     this._advanceActor();
     return this.pump();

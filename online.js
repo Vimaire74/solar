@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-01 · v4.9';
+const SOLAR_BUILD_JS = '2026-08-03 · v5.1';
 /* Solar — couche EN LIGNE v2 : client WebSocket du SERVEUR AUTORITAIRE.
    Remplace l'ancienne couche PHP/polling (archivée dans server/php/online.js).
    À servir à la racine du site : index.html contient déjà <script src="online.js"></script> (optionnel —
@@ -226,7 +226,15 @@ function refreshJournal(g){
 
 // ───────────────────────── Décisions (routées par le serveur) ─────────────────────────
 function onDecision(pending){
-  if (STATE._answering) return;
+  /* ⚠️ NE JAMAIS JETER UNE DÉCISION. Avant, un `return` sec ici faisait DISPARAÎTRE toute fenêtre
+     arrivant pendant qu'une autre attendait une réponse — c'est ainsi qu'une victoire au combat
+     obtenue juste après la Sphère de Dyson ne s'affichait pas du tout (bug signalé le 2026-08-01).
+     On les met en file : chaque fenêtre est montrée à son tour, aucune n'est perdue. */
+  if (STATE._answering){
+    STATE._queue = STATE._queue || [];
+    if(!STATE._queue.some(q=>q.id===pending.id)) STATE._queue.push(pending);
+    return;
+  }
   STATE._answering = true;
   STATE._myTurn=false; turnBar(false);
   hideWaitBlock();
@@ -237,6 +245,8 @@ function onDecision(pending){
     STATE._answering = false;
     showWaitBlock();
     status('En attente des autres joueurs…');
+    // Fenêtre suivante de la file, s'il y en a une (voir la note en tête de onDecision).
+    if(STATE._queue && STATE._queue.length){ const nx=STATE._queue.shift(); setTimeout(()=>onDecision(nx), 60); }
   };
   // VRAIES modales du jeu (même graphisme qu'en solo) pour ces décisions :
   if(pending.kind==='agenda' && showAgendaReal(pending)){ STATE._realDecide=finish; return; }
@@ -1013,6 +1023,11 @@ function screenAuth(mode){
     <button class="pri" id="sc-go">${isReg?'Créer le compte':'Se connecter'}</button>
     <button class="sec" id="sc-alt">${isReg?"J'ai déjà un compte":'Créer un compte'}</button>
     <button class="sec" id="sc-close">↩ Retour au jeu solo</button>
+    <div style="margin-top:10px;text-align:center;font-size:.85em">
+      <a href="tutorial.html" style="color:#8fc8ff;text-decoration:none">🎓 Découvrir le jeu — tutoriel</a>
+      <span style="color:#3a4a6a"> · </span>
+      <a href="regles.html" style="color:#8fc8ff;text-decoration:none">📖 Règles</a>
+    </div>
     <div class="muted" style="font-size:.72em;opacity:.7;margin-top:9px;text-align:center">${_buildLabel()}</div>
   `);
   _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
@@ -1267,6 +1282,22 @@ function revealGameUI(){
   try { if(window.initTechResize) window.initTechResize(); } catch(e){}
   try { if(window.installBackGuard) window.installBackGuard(); } catch(e){}
 }
+/* DÉCOMPTE DÉTAILLÉ DES POINTS DE VICTOIRE — mêmes postes et même ordre qu'en solo (#vp-wrap).
+   Marc : « les calculs finaux visibles dans l'ancienne version ne le sont plus ». En ligne l'écran
+   de fin ne recevait que le total ; le serveur envoie désormais tout le détail. On affiche TOUS
+   les postes, y compris ceux à 0, pour qu'on voie aussi les points qu'on n'a PAS gagnés. */
+function _vpDetailHTML(d){
+  if(!d) return '';
+  const L=[['Colonies (+1/connectée)','colVP'],['Routes (1 VP/route)','routeVP'],['Cartes','cardsVP'],
+           ['Bonus Tech (×0.5/tech)','techBonusVP'],['Bonus Revenus/tour','rptVP'],['Agendas','agendasVP'],
+           ['Événements','evtVP'],['Bonus spéciaux','extraVP']];
+  return '<div style="margin:-2px 0 9px;padding:7px 12px;border:1px solid #22305a;border-top:0;border-radius:0 0 9px 9px;background:#101528;font-size:.8em">'
+    + L.map(([lbl,k])=>{const v=d[k]||0;
+        return '<div style="display:flex;justify-content:space-between;gap:10px;padding:1px 0;color:'+(v?'#c8d8f8':'#6a7a98')+'">'
+             + '<span>'+lbl+'</span><span>'+(v>0?'+':'')+v+'</span></div>';}).join('')
+    + '<div style="display:flex;justify-content:space-between;gap:10px;margin-top:4px;padding-top:4px;border-top:1px solid #22305a;font-weight:700;color:#ffd34d">'
+    + '<span>Total</span><span>'+(d.total||0)+' VP</span></div></div>';
+}
 function showFinal(scores, info){
   hideWaitBlock(); closeDecision();
   // CLASSEMENT DÉTAILLÉ par nation (rétabli) + date de fin + lien « Signaler un bug ».
@@ -1276,7 +1307,8 @@ function showFinal(scores, info){
     const mine=(s.civId===STATE.myCiv)?';border-color:#5a8ad0':'';
     return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:5px 0;padding:8px 11px;border:1px solid #2a3a6a;border-radius:9px;background:#141a30'+mine+'">'
       +'<span>'+(med[i]||('&nbsp;'+(i+1)+'.'))+' <b>'+civLabel(s.civId)+'</b>'+who+'</span>'
-      +'<b style="color:#ffd34d">'+s.vp+' VP</b></div>';
+      +'<b style="color:#ffd34d">'+s.vp+' VP</b></div>'
+      + _vpDetailHTML(s.detail);
   }).join('');
   const when=(info&&info.dateFr)?('<div class="muted" style="margin-bottom:8px">Partie '+(info.code||'')+' — terminée le '+info.dateFr+'</div>'):'';
   overlay('<h2>🏆 Fin de partie</h2>'+when+(rows||'<div class="muted">Scores indisponibles.</div>')

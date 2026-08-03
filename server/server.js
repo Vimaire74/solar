@@ -151,6 +151,29 @@ function seatOf(g, wsOrUser) {
 function sendTo(ws, obj) { if (ws && ws.readyState === 1) { try { ws.send(J(obj)); } catch (e) {} } }
 function sendToCiv(g, civId, obj) { const s = g.seats.find(x => x.civId === civId); if (s) sendTo(s.ws, obj); }
 function broadcast(g, obj) { for (const s of g.seats) sendTo(s.ws, obj); }
+/* FENÊTRES COLLECTIVES — celles qui concernent TOUTE la table, pas une seule nation :
+     · `eot`            : le bilan de fin de tour (chacun reçoit LE SIEN, voir payload.bodies) ;
+     · `event_announce` / `event_result` : un événement frappe la partie entière.
+   Le moteur ne sait désigner qu'UN destinataire (celui qui débloquera le flux en cliquant
+   « Continuer »). Sans la diffusion ci-dessous, les AUTRES joueurs ne voyaient jamais ces
+   fenêtres — défaut invisible tant que le banc d'essai ne simulait qu'un seul humain.
+   `ownerCiv` reçoit déjà la fenêtre sous forme de décision : on ne la lui envoie pas deux fois. */
+const FENETRES_COLLECTIVES = ['eot', 'event_announce', 'event_result'];
+function sendWindowToAll(g, kind, payload, ownerCiv) {
+  if (!payload) return;
+  const bodies = payload.bodies || null;
+  for (const s of g.seats) {
+    if (s.ai || !s.ws) continue;
+    if (ownerCiv && s.civId === ownerCiv) continue;
+    if (kind === 'eot') {
+      const html = (bodies && bodies[s.civId]) || payload.html || '';
+      if (!html) continue;
+      sendTo(s.ws, { t: 'notice', kind: 'eot', payload: { turn: payload.turn, html } });
+    } else {
+      sendTo(s.ws, { t: 'notice', kind, payload });
+    }
+  }
+}
 
 function snapshot(g) {
   if (!g.driver) return;
@@ -211,6 +234,10 @@ function route(g, r) {
     const p = r.pending;
     const civ = (typeof p.nation === 'object' && p.nation) ? (p.nation.civ && p.nation.civ.id) : p.nation;
     g.lastRoute = { kind: 'decision', civId: civ, pending: { id: p.id, kind: p.kind, nation: civ, payload: p.payload } };
+    // FENÊTRES COLLECTIVES (bilan de fin de tour, annonce et résultat d'événement) : tout le monde
+    // les voit EN MÊME TEMPS. Celui qui porte la décision répond pour relancer la partie ; les autres
+    // ferment simplement la leur. Pendant le bilan de fin de tour, il n'y a plus de joueur actif.
+    if (FENETRES_COLLECTIVES.includes(p.kind)) sendWindowToAll(g, p.kind, p.payload, civ);
     sendToCiv(g, civ, { t: 'decision', pending: g.lastRoute.pending });
     broadcast(g, { t: 'waiting', civId: civ, kind: p.kind });
     armTimer(g, civ, () => { try { route(g, g.driver.answer(p.id, autoAnswer(p))); } catch (e) { console.error('auto-answer:', e.message); } });
@@ -227,8 +254,17 @@ function route(g, r) {
     let scores = [];
     try {
       const sb = g.driver.sb, G = g.driver.state();
-      scores = [G.player, ...G.ais].map(p => ({ civId: p.civ.id, name: p.civ.name, vp: sb.calcVP(p).total }))
-        .sort((a, b) => b.vp - a.vp);
+      // DÉTAIL COMPLET des points de victoire (Marc : « les calculs finaux ne sont plus visibles »).
+      // En ligne, l'écran de fin ne recevait que le total : on renvoie tout le décompte de calcVP
+      // (colonies, routes, cartes, techs, revenus, agendas, événements, bonus) pour que le client
+      // affiche EXACTEMENT le même tableau qu'en solo, ligne par ligne, y compris les postes à 0.
+      scores = [G.player, ...G.ais].map(p => {
+        const d = sb.calcVP(p) || {};
+        return { civId: p.civ.id, name: p.civ.name, emoji: p.civ.emoji || '', vp: d.total || 0, detail: {
+          colVP: d.colVP || 0, routeVP: d.routeVP || 0, cardsVP: d.cardsVP || 0, techBonusVP: d.techBonusVP || 0,
+          rptVP: d.rptVP || 0, agendasVP: d.agendasVP || 0, evtVP: d.evtVP || 0, extraVP: d.extraVP || 0,
+          total: d.total || 0 } };
+      }).sort((a, b) => b.vp - a.vp);
     } catch (e) {}
     // ARCHIVE de fin de partie : scores par nation + journal complet + bugs → 10 dernières parties par joueur,
     // + email des scores à chaque joueur humain et à l'admin. Visible ensuite dans /stats.
@@ -483,12 +519,24 @@ wss.on('connection', (ws) => {
           g.status = 'playing';
           broadcast(g, { t: 'started', game: gameView(g) });
           // Décisions humaines : récupérées via pump(). Notices (résultats de combat/événement/fin de tour) :
-          // le pump les acquitte automatiquement, mais on les DIFFUSE ici pour que les joueurs les voient.
+          // le pump les acquitte automatiquement, on les envoie ici pour que les joueurs les voient.
+          //
+          // ⚠️ ELLES NE SONT PLUS DIFFUSÉES À TOUT LE MONDE. Un `broadcast` faisait apparaître « Tu as
+          // gagné le combat » chez TOUS les humains : Laurent voyait la fenêtre de victoire de Marc,
+          // puis l'inverse (bug signalé le 2026-08-01). Une notice appartient à UNE nation : celle
+          // inscrite dans `p.nation`. On l'envoie donc au siège correspondant, et à lui seul.
+          // Exception : le BILAN DE FIN DE TOUR (`eot`) va bien à tout le monde en même temps, chacun
+          // recevant SON propre bilan (voir `payload.bodies`), parce qu'à cet instant il n'y a plus de
+          // joueur actif — c'est un temps commun.
           g.driver.boot(g.seats.map(s => ({ civId: s.civId, isAI: s.ai })), (p) => {
             try {
-              if (p && (p.notice || ['war_result', 'event_result', 'event_announce', 'eot'].includes(p.kind))) {
-                broadcast(g, { t: 'notice', kind: p.kind, payload: p.payload });
-              }
+              if (!(p && (p.notice || ['war_result', 'event_result', 'event_announce', 'eot'].includes(p.kind)))) return;
+              // Les fenêtres collectives sont distribuées par route() (une seule fois, à tous) : ne pas les doubler ici.
+              if (FENETRES_COLLECTIVES.includes(p.kind)) return;
+              const civ = (p.nation && p.nation.civ) ? p.nation.civ.id : p.nation;
+              const seat = civ ? g.seats.find(s2 => s2.civId === civ && !s2.ai) : null;
+              if (seat) sendTo(seat.ws, { t: 'notice', kind: p.kind, payload: p.payload });
+              else if (!civ) broadcast(g, { t: 'notice', kind: p.kind, payload: p.payload }); // notice sans destinataire = information générale
             } catch (e) {}
           });
           route(g, g.driver.pump());

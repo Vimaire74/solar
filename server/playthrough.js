@@ -11,6 +11,25 @@
    FENÊTRES réellement ouvertes avec leur TEXTE, et les lignes de journal.
    On la relit ligne par ligne, comme un joueur regarderait son écran.
 
+   🆕 MULTIJOUEUR À 4 HUMAINS (demande de Marc, 2026-08-03)
+   ---------------------------------------------------------------------------
+   Le banc n'installait qu'UN humain + des IA. Il était donc structurellement
+   AVEUGLE à toute une famille de bugs, ceux du DESTINATAIRE :
+     · « la fenêtre de victoire de Marc s'affiche aussi chez Laurent »
+     · « la fenêtre n'apparaît pas du tout parce qu'une autre était ouverte »
+   Avec un seul humain, aucun second joueur ne peut recevoir une fenêtre à tort,
+   et deux fenêtres ne se concurrencent jamais. Il a fallu une partie réelle pour
+   les découvrir. Le banc installe désormais 4 nations HUMAINES et REJOUE la
+   distribution du serveur (server.js) : chaque fenêtre est déposée dans la
+   BOÎTE AUX LETTRES de son destinataire, et on vérifie ensuite :
+     · qu'aucune fenêtre n'arrive chez quelqu'un à qui elle n'était pas destinée,
+     · qu'aucune fenêtre n'est émise sans destinataire (= risque de blocage),
+     · que le bilan de fin de tour arrive à TOUS et que chacun reçoit LE SIEN,
+     · que deux fenêtres ne sont pas en vol simultanément pour le même joueur
+       sans que la précédente ait été traitée (condition qui faisait disparaître
+       une fenêtre côté client avant la mise en file d'attente),
+     · qu'aucun joueur n'est privé de tour (famine).
+
    MÉTHODE (imposée par Marc) : UNE partie → on lit → on corrige → UNE autre
    partie → on lit → on corrige. Jamais 20 parties d'un coup : le but est de
    regarder ce qui s'affiche, pas d'accumuler des statistiques.
@@ -18,16 +37,30 @@
    CE QU'IL NE VOIT PAS : la mise en page (largeurs, défilement, boutons hors
    écran sur mobile). Cela demande un vrai navigateur → captures d'écran de Marc.
 
-   USAGE :  node playthrough.js [civ] [graine]
+   USAGE :  node playthrough.js [nbHumains]     (défaut 4 = multijoueur complet)
+            node playthrough.js 1               (ancien mode : 1 humain + 2 IA)
    ========================================================================== */
 'use strict';
 const path = require('path');
+const vm = require('vm');
 const { GameDriver } = require('./driver.js');
 const { setRecorder } = require('./game-core.js');
 
+/* Lit une valeur DANS le contexte du jeu. Indispensable pour tout ce qui est déclaré en `const`
+   ou `let` dans index.html (NODES, EVENTS…) : ces déclarations ne deviennent PAS des propriétés
+   du bac à sable, contrairement aux `function`. Les lire via `sb.X` renvoie `undefined` — piège
+   silencieux qui a longtemps empêché le joueur simulé de coloniser. */
+function _ctx(sb, nom) { try { return vm.runInContext(nom, sb); } catch (e) { return undefined; } }
+
 const HTML = path.join(__dirname, '..', 'index.html');
-const MY_CIV = process.argv[2] || 'terriens';
-const OTHERS = ['martiens', 'jupiteriens', 'ceinturiens'].filter(c => c !== MY_CIV).slice(0, 2);
+const ALL_CIVS = ['terriens', 'martiens', 'jupiteriens', 'ceinturiens'];
+const NB_HUMAINS = Math.max(1, Math.min(4, parseInt(process.argv[2], 10) || 4));
+// 4 humains = table complète ; en dessous, on complète avec des IA pour garder 3 nations minimum.
+const SEATS = (NB_HUMAINS === 4 ? ALL_CIVS : ALL_CIVS.slice(0, Math.max(3, NB_HUMAINS)))
+  .map((c, i) => ({ civId: c, isAI: i >= NB_HUMAINS }));
+const HUMANS = SEATS.filter(s => !s.isAI).map(s => s.civId);
+const PSEUDO = {}; HUMANS.forEach((c, i) => { PSEUDO[c] = 'Joueur ' + (i + 1) + ' (' + c + ')'; });
+const whoLabel = (c) => PSEUDO[c] || (c ? c + ' [IA]' : '???');
 
 /* ---------- nettoyage du texte affiché (icônes → emoji, balises retirées) ---------- */
 function plain(x) {
@@ -54,23 +87,73 @@ const htmlToText = (h) => String(h)
   .split('\n').map(s => s.trim()).filter(Boolean).join('\n');
 const head = (s) => { T.push(''); T.push('── ' + s); };
 
-/* Fenêtres du JEU (index.html) réellement ouvertes/fermées */
-const openedWindows = [];           // pour les vérifications de fin
+const problems = [];
+const seenKinds = new Set();
+
+/* ============================================================================
+   BOÎTES AUX LETTRES — on rejoue ici la distribution faite par server.js.
+   Toute fenêtre destinée à une nation part dans SA boîte, et seulement la sienne.
+   ========================================================================== */
+const INBOX = {};   // civId -> [ {step, kind, own} ]
+HUMANS.forEach(c => { INBOX[c] = []; });
+const enVol = new Map();   // décisions émises et pas encore répondues : id -> {kind, who}
+
+function nationIdOf(p) {
+  const n = p && p.nation;
+  return (n && typeof n === 'object' && n.civ) ? n.civ.id : (n || null);
+}
+
+/* Fenêtres COLLECTIVES : elles concernent toute la table, pas une nation.
+   Elles doivent arriver chez TOUS les humains (cf. FENETRES_COLLECTIVES dans server.js). */
+const COLLECTIVES = ['eot', 'event_announce', 'event_result'];
+
+/* Reproduit la distribution de server.js. Renvoie la liste des destinataires effectifs.
+   La corrélation se fait par IDENTIFIANT de fenêtre (pas par numéro d'étape : le moteur émet
+   la fenêtre AVANT que la boucle principale n'incrémente l'étape). */
+function distribuer(p) {
+  const kind = p.kind, cible = nationIdOf(p), id = p.id;
+  if (COLLECTIVES.includes(kind)) {
+    const bodies = (p.payload && p.payload.bodies) || null;
+    const recus = [];
+    for (const c of HUMANS) {
+      const corps = kind === 'eot' ? ((bodies && bodies[c]) || (p.payload && p.payload.html) || '') : null;
+      if (kind === 'eot' && !corps) { problems.push('bilan de fin de tour : ' + whoLabel(c) + ' ne reçoit AUCUN bilan'); continue; }
+      INBOX[c].push({ id, kind, own: corps });
+      recus.push(c);
+    }
+    // Chacun doit recevoir SON bilan : deux corps identiques = bascule de perspective ratée.
+    if (kind === 'eot' && bodies) {
+      for (let i = 0; i < recus.length; i++) for (let j = i + 1; j < recus.length; j++) {
+        const a = bodies[recus[i]], b = bodies[recus[j]];
+        if (a && b && a === b)
+          problems.push('bilan de fin de tour IDENTIQUE pour ' + whoLabel(recus[i]) + ' et ' + whoLabel(recus[j]) + ' (perspective non appliquée)');
+      }
+    }
+    return recus;
+  }
+  // Fenêtre PERSONNELLE : elle doit avoir un destinataire, et un seul.
+  if (!cible) { problems.push('fenêtre personnelle « ' + kind + ' » émise SANS destinataire (risque de blocage)'); return []; }
+  if (!INBOX[cible]) return [];   // destinée à une IA : rien à afficher
+  INBOX[cible].push({ id, kind });
+  return [cible];
+}
+
+/* ---------- Fenêtres du JEU (index.html) réellement ouvertes ---------- */
+const openedWindows = [];
 setRecorder({
   open(id, el) {
-    // on ignore le bruit : conteneurs techniques sans intérêt de lecture
-    if (/^(sc-confirm|npop|map-|tech-)/.test(id)) return;
+    if (/^(sc-confirm|npop|map-|tech-)/.test(id)) return;   // conteneurs techniques
     const txt = plain(el && (el.innerHTML || el.textContent));
     openedWindows.push(id);
     line('   🪟 FENÊTRE OUVERTE  #' + id + (txt ? ('  « ' + txt.slice(0, 160) + ' »') : '  (vide)'));
   },
-  close(id) { /* fermetures : non bruitées, on ne les lit pas */ }
+  close(id) { /* fermetures : non bruitées */ }
 });
 
 /* ---------- réponses automatiques (un « joueur » qui joue proprement) ---------- */
 function answerFor(p) {
   const k = p.kind, o = p.payload || {};
-  if (o.options && o.options.length) {                  // agenda / stratégie / invest / espionnage…
+  if (o.options && o.options.length) {
     const c = o.options[0];
     return { agendaId: c.id, cardId: c.id, branch: c.branch, node: c.node, value: c.id, targetId: c.id };
   }
@@ -97,12 +180,17 @@ function chooseAction(d, civId) {
   const sb = d.sb, G = sb.__G;
   const me = d.nation(civId); if (!me) return { type: 'pass' };
   const others = [G.player].concat(G.ais || []).filter(p => p && p.civ && p.civ.id !== civId);
-  const NODES = sb.NODES || {};
-  const payable = (typeof sb.maxAffordableTokens === 'function') ? sb.maxAffordableTokens(me) : 0;
+  // ⚠️ NODES est déclaré en `const` dans index.html : il n'est PAS une propriété du bac à sable
+  // (contrairement aux `function`). Il faut le lire dans le contexte, sinon toute la logique de
+  // colonisation échoue en silence et le joueur simulé ne fait QUE passer son tour.
+  const NODES = _ctx(sb, 'NODES') || {};
+  const maxAff = _ctx(sb, 'maxAffordableTokens');
+  const payable = (typeof maxAff === 'function') ? maxAff(me) : 0;
   const engage = Math.min(me.forceTokens || 0, payable);
 
-  // 1) ATTAQUER une colonie ennemie (hors capitale : elle demande 10+ jetons) dès qu'on peut payer 3 jetons
-  if (engage >= 3 && (me.acLeft || 0) >= 1) {
+  // 1) ATTAQUER une colonie ennemie dès qu'on peut engager 2 jetons (le minimum payable en début
+  //    de partie) — sinon aucune guerre n'a jamais lieu et les fenêtres de combat ne sont pas testées.
+  if (engage >= 2 && (me.acLeft || 0) >= 1) {
     for (const o of others) {
       const cible = (o.colonies || []).find(c => c.nodeId !== o.civ.home);
       if (cible) return { type: 'attack', node: cible.nodeId, tokens: Math.min(engage, 5) };
@@ -116,7 +204,8 @@ function chooseAction(d, civId) {
       for (const adj of ((NODES[c.nodeId] || {}).conn || [])) {
         const n = NODES[adj];
         if (!n || n.decorative || n.noColonize || pris.has(adj)) continue;
-        const cout = (typeof sb.colonizeCost === 'function') ? sb.colonizeCost(me) : { ac: 1, mat: 2, en: 1 };
+        const _cc = _ctx(sb, 'colonizeCost');
+        const cout = (typeof _cc === 'function') ? _cc(me) : { ac: 1, mat: 2, en: 1 };
         if ((me.acLeft || 0) >= cout.ac && (me.res.materials || 0) >= cout.mat && (me.res.energy || 0) >= cout.en)
           return { type: 'colonize', node: adj };
       }
@@ -127,16 +216,24 @@ function chooseAction(d, civId) {
 
 /* ---------- déroulé de LA partie ---------- */
 const d = new GameDriver(HTML);
-let lastLog = 0;
 d.onLog = (entries) => { for (const e of entries) line('   📜 ' + plain((e && e.msg) || e)); };
-
-const problems = [];
-const seenKinds = new Set();
 
 function dumpTurn(G) { return 'Tour ' + (G.turn || '?') + ' · phase ' + (G.phase || '?'); }
 
-d.boot([{ civId: MY_CIV, isAI: false }].concat(OTHERS.map(c => ({ civId: c, isAI: true }))), (p) => {
+const toursJoues = {};   // civId -> nombre de fois où la main lui est revenue
+HUMANS.forEach(c => { toursJoues[c] = 0; });
+
+d.boot(SEATS, (p) => {
   seenKinds.add(p.kind);
+  // Deux fenêtres en vol pour le MÊME joueur = le client doit les mettre en file,
+  // sans quoi la seconde écrase la première et disparaît (bug de la victoire post-Dyson).
+  const who = nationIdOf(p);
+  for (const [, v] of enVol) {
+    if (v.who && who && v.who === who)
+      line('   ⚠️  deux fenêtres en vol pour ' + whoLabel(who) + ' (« ' + v.kind + ' » puis « ' + p.kind + ' ») — la file d\'attente du client est indispensable ici');
+  }
+  if (p.id) enVol.set(p.id, { kind: p.kind, who });
+  distribuer(p);
 });
 
 let r = d.pump();
@@ -147,35 +244,46 @@ while (guard++ < 4000) {
 
   if (r.kind === 'decision') {
     const p = r.pending;
-    const who = (typeof p.nation === 'object' && p.nation) ? p.nation.civ.id : p.nation;
+    const who = nationIdOf(p);
     step++;
-    head('#' + step + ' · ' + dumpTurn(G) + ' · DÉCISION « ' + p.kind +' » → ' + (who || '???'));
+    head('#' + step + ' · ' + dumpTurn(G) + ' · FENÊTRE « ' + p.kind + ' » → ' + whoLabel(who));
     if (!who) problems.push('décision ' + p.kind + ' sans destinataire (risque de blocage)');
-    // Bilan de fin de tour : on RELIT son contenu réel (c'est le HTML que le client injecte tel quel).
+    // Qui la reçoit RÉELLEMENT (distribution serveur rejouée) — c'est ici qu'on voit une fenêtre
+    // qui partirait chez le mauvais joueur.
+    const recus = HUMANS.filter(c => INBOX[c].some(m => m.id === p.id));
+    if (recus.length) line('   📬 reçue par : ' + recus.map(whoLabel).join(' · ')
+      + (COLLECTIVES.includes(p.kind) ? '  (fenêtre collective)' : ''));
+    for (const c of recus) {
+      if (!COLLECTIVES.includes(p.kind) && c !== who)
+        problems.push('fenêtre « ' + p.kind + ' » destinée à ' + whoLabel(who) + ' mais reçue AUSSI par ' + whoLabel(c));
+    }
+    if (COLLECTIVES.includes(p.kind)) {
+      const manquants = HUMANS.filter(c => !recus.includes(c));
+      if (manquants.length) problems.push('fenêtre collective « ' + p.kind + ' » NON reçue par : ' + manquants.map(whoLabel).join(', '));
+    }
+    // Bilan de fin de tour : on RELIT le contenu réel reçu par CHAQUE joueur.
     if (p.kind === 'eot') {
-      const h = (p.payload && p.payload.html) || '';
-      if (!h) problems.push('bilan de fin de tour envoyé VIDE (le client afficherait un résumé dégradé)');
-      else {
-        for (const l of htmlToText(h).split('\n')) line('   │ ' + l);
+      for (const c of recus) {
+        const msg = INBOX[c].find(m => m.id === p.id);
+        const corps = (msg && msg.own) || '';
+        line('   ┌─ bilan de ' + whoLabel(c));
+        for (const l of htmlToText(corps).split('\n')) line('   │ ' + l);
         for (const sec of ['Actions ce tour', 'Entretien', 'Revenus'])
-          if (h.indexOf(sec) === -1) problems.push('bilan de fin de tour : section « ' + sec + ' » manquante');
+          if (corps.indexOf(sec) === -1) problems.push('bilan de ' + whoLabel(c) + ' : section « ' + sec + ' » manquante');
       }
     }
-    const before = openedWindows.length;
     const ans = answerFor(p);
     line('   ↳ réponse : ' + JSON.stringify(ans));
+    enVol.delete(p.id);
     try { r = d.answer(p.id, ans); }
     catch (e) { problems.push('réponse à ' + p.kind + ' → exception : ' + e.message); break; }
-    // NB : en mode serveur, le jeu ÉMET la décision au lieu d'ouvrir lui-même la fenêtre — c'est le client
-    // qui l'affiche. On ne signale donc PAS « aucune fenêtre » ici (ce serait un faux positif systématique) :
-    // la présence d'un vrai rendu client est vérifiée par le contrôle REAL[] en fin de partie.
-    void before;
     continue;
   }
 
   if (r.kind === 'action') {
     step++;
-    head('#' + step + ' · ' + dumpTurn(G) + ' · À MOI DE JOUER (' + r.civId + ')');
+    if (toursJoues[r.civId] !== undefined) toursJoues[r.civId]++;
+    head('#' + step + ' · ' + dumpTurn(G) + ' · À ' + whoLabel(r.civId) + ' DE JOUER');
     const act = chooseAction(d, r.civId);
     line('   ↳ action : ' + JSON.stringify(act));
     try { r = d.act(r.civId, act); }
@@ -194,6 +302,9 @@ if (guard >= 4000) problems.push('BOUCLE : la partie ne se termine jamais');
 const G = d.state();
 if (G.turn <= G.maxTurns && !(r && r.kind === 'over')) problems.push('la partie ne s\'est PAS terminée (figée au tour ' + G.turn + ')');
 
+// Aucun joueur ne doit être privé de tour (famine = un siège que la rotation saute).
+for (const c of HUMANS) if (!toursJoues[c]) problems.push(whoLabel(c) + ' n\'a JAMAIS eu la main de toute la partie');
+
 // Chaque type de décision doit avoir un rendu CLIENT dédié (sinon = panneau générique)
 const fs = require('fs');
 const online = fs.readFileSync(path.join(__dirname, '..', 'online.js'), 'utf8');
@@ -207,11 +318,17 @@ for (const k of seenKinds) {
   if (REAL[k] && online.indexOf(REAL[k]) === -1) problems.push('décision « ' + k + ' » : pas de vraie fenêtre côté client (' + REAL[k] + ' absent)');
   if (!REAL[k] && !/^(war_combat|defense|extrasolar|strategy_calm|eot)$/.test(k)) problems.push('décision « ' + k + ' » : aucune fenêtre dédiée prévue — à vérifier');
 }
+// Le client DOIT savoir empiler les fenêtres : sans file d'attente, toute fenêtre arrivant
+// pendant qu'une autre attend une réponse est perdue (bug vécu par Marc sur la Sphère de Dyson).
+if (!/STATE\._queue/.test(online)) problems.push('online.js : pas de file d\'attente des fenêtres — une fenêtre arrivant pendant une autre serait PERDUE');
 
 /* ---------- sortie ---------- */
 console.log(T.join('\n'));
 console.log('\n' + '='.repeat(72));
 console.log('RÉSUMÉ — ' + step + ' étapes · ' + openedWindows.length + ' fenêtres ouvertes · tour final ' + G.turn);
+console.log('table : ' + SEATS.map(s => s.civId + (s.isAI ? ' [IA]' : ' [humain]')).join(' · '));
+console.log('tours joués : ' + HUMANS.map(c => whoLabel(c) + ' = ' + toursJoues[c]).join(' · '));
+console.log('fenêtres reçues : ' + HUMANS.map(c => whoLabel(c) + ' = ' + INBOX[c].length).join(' · '));
 console.log('types de décisions rencontrés : ' + [...seenKinds].sort().join(', '));
 if (problems.length) {
   console.log('\n⚠️  ' + problems.length + ' PROBLÈME(S) À CORRIGER :');
