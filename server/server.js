@@ -13,7 +13,7 @@
    sur mobile, les joueurs mettent des semaines à mettre à jour. À incrémenter dès qu'un message
    change de forme (nouveau champ obligatoire, sens modifié, message retiré). */
 const PROTO_MIN = 1, PROTO_MAX = 1;
-const SERVER_BUILD = '2026-08-03 · v6.4';
+const SERVER_BUILD = '2026-08-04 · v6.6';
 const http = require('http');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -69,6 +69,19 @@ let _smtpChargementErreur = null;   // ex. « nodemailer » absent : cause TRÈS
    On DÉDUIT donc `secure` du port quand il n'est pas précisé, on aligne MAIL_FROM par défaut sur
    SMTP_USER, et on signale les incohérences au démarrage plutôt que de laisser l'envoi échouer en
    silence des jours durant. */
+/* ESPACES INVISIBLES — cause n°1 d'un « ça marche au webmail mais pas en SMTP ».
+   Un copier-coller dans Coolify ajoute très souvent une espace ou un retour à la ligne en fin de
+   valeur. Le webmail, lui, reçoit ce que Marc TAPE : il ne voit donc pas le problème. On nettoie
+   donc les extrémités — et on le DIT, parce que modifier un mot de passe en silence serait pire
+   que le bug. Les espaces INTERNES sont conservés (ils peuvent être voulus). */
+function _net(v) { return String(v === undefined || v === null ? '' : v).replace(/^[\s ]+|[\s ]+$/g, ''); }
+const SMTP_USER = _net(process.env.SMTP_USER);
+const SMTP_PASS = _net(process.env.SMTP_PASS);
+const SMTP_HOST = _net(process.env.SMTP_HOST);
+const _rogne = [];
+if (process.env.SMTP_USER !== undefined && SMTP_USER !== String(process.env.SMTP_USER)) _rogne.push('SMTP_USER');
+if (process.env.SMTP_PASS !== undefined && SMTP_PASS !== String(process.env.SMTP_PASS)) _rogne.push('SMTP_PASS');
+if (process.env.SMTP_HOST !== undefined && SMTP_HOST !== String(process.env.SMTP_HOST)) _rogne.push('SMTP_HOST');
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
 /* Le chiffrement est IMPOSÉ par le port sur les deux ports standards (RFC 8314) : 465 = TLS implicite,
    587 = STARTTLS. Un désaccord n'est jamais un choix, c'est toujours une erreur de saisie — et il est
@@ -81,16 +94,19 @@ const SMTP_SECURE = (SMTP_PORT === 465) ? true
                   : (SMTP_PORT === 587) ? false
                   : (_secureDemande === null ? false : _secureDemande);
 const _secureForce = (_secureDemande !== null && _secureDemande !== SMTP_SECURE);
-const MAIL_FROM = process.env.MAIL_FROM || (process.env.SMTP_USER ? 'Solar <' + process.env.SMTP_USER + '>' : 'Solar <contact@solar-game.com>');
+const MAIL_FROM = _net(process.env.MAIL_FROM) || (SMTP_USER ? 'Solar <' + SMTP_USER + '>' : 'Solar <contact@solar-game.com>');
 function _adresseDe(x) { const m = /<([^>]+)>/.exec(String(x || '')); return (m ? m[1] : String(x || '')).trim().toLowerCase(); }
 /* Incohérences détectables SANS envoyer : ce sont elles qui produisent le 535 / le refus de relais. */
 function smtpAvertissements() {
   const a = [];
-  if (!process.env.SMTP_HOST) { a.push('SMTP_HOST absent — aucun envoi possible, tout est seulement journalisé.'); return a; }
-  const u = String(process.env.SMTP_USER || '');
+  if (!SMTP_HOST) { a.push('SMTP_HOST absent — aucun envoi possible, tout est seulement journalisé.'); return a; }
+  const u = SMTP_USER;
   if (!u) a.push('SMTP_USER absent — OVH exige une authentification.');
   else if (!isEmail(u)) a.push('SMTP_USER = « ' + u +' » n\'est PAS une adresse complète. OVH veut `prenom@domaine.ch` — c\'est LA cause n°1 du « 535 Authentication failed ».');
-  if (!process.env.SMTP_PASS) a.push('SMTP_PASS absent.');
+  if (!SMTP_PASS) a.push('SMTP_PASS absent.');
+  if (_rogne.length) a.push('ESPACE(S) EN TROP retiré(es) dans : ' + _rogne.join(', ')
+    + '. Un copier-coller dans Coolify ajoute souvent une espace ou un retour à la ligne invisible —\n'
+    + '    c\'est LA cause d\'un mot de passe qui marche au webmail mais pas en SMTP.');
   if (_secureForce) a.push('SMTP_SECURE=' + process.env.SMTP_SECURE + ' est en désaccord avec le port ' + SMTP_PORT
     + ' → IGNORÉ, on applique le réglage imposé par le port (' + (SMTP_SECURE ? 'TLS implicite' : 'STARTTLS')
     + '). Tu peux laisser cette variable telle quelle, elle ne bloque plus rien.');
@@ -100,14 +116,14 @@ function smtpAvertissements() {
   return a;
 }
 try {
-  if (process.env.SMTP_HOST) {
+  if (SMTP_HOST) {
     const nodemailer = require('nodemailer');
     _transport = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
+      host: SMTP_HOST,
       port: SMTP_PORT,
       secure: SMTP_SECURE,
       requireTLS: !SMTP_SECURE,               // 587 : exiger STARTTLS (jamais d'authentification en clair)
-      auth: (process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined)
+      auth: (SMTP_USER ? { user: SMTP_USER, pass: SMTP_PASS } : undefined)
     });
   }
   for (const w of smtpAvertissements()) console.error('⚠️  SMTP : ' + w);
@@ -428,18 +444,42 @@ const server = http.createServer((req, res) => {
      Aucune donnée sensible n'est exposée : le mot de passe n'est jamais affiché. */
   if (req.url === '/mailtest' || req.url.indexOf('/mailtest?') === 0) {
     const q = new URL(req.url, 'http://x').searchParams;
+    /* ⚠️ PAGE PROTÉGÉE. Elle affiche l'identifiant SMTP et déclenche des connexions vers OVH :
+       laissée ouverte, n'importe qui pouvait lire la configuration et marteler le serveur de mail
+       (défaut introduit avec la page elle-même, corrigé aussitôt). */
+    const KEY_M = process.env.ADMIN_KEY || '';
+    if (!KEY_M || q.get('key') !== KEY_M) {
+      res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end(KEY_M
+        ? 'Accès refusé. Utilise /mailtest?key=TA_CLE (variable ADMIN_KEY du serveur).'
+        : 'Page désactivée : définis la variable ADMIN_KEY sur le serveur, puis appelle /mailtest?key=TA_CLE');
+      return;
+    }
     const dest = q.get('to');
+    /* Essai d'AUTRES réglages sans redéployer : chaque aller-retour Coolify coûte plusieurs minutes,
+       et il faut souvent tester plusieurs serveurs OVH (MX Plan ≠ Email Pro ≠ Exchange).
+       Le mot de passe n'est JAMAIS acceptable en paramètre d'URL — seuls l'hôte et le port. */
+    const hostAlt = q.get('host'), portAlt = parseInt(q.get('port'), 10);
     const out = [];
     out.push('SOLAR — DIAGNOSTIC EMAIL  (' + frDate(Date.now()) + ')');
     out.push('');
     out.push('CONFIGURATION EFFECTIVE');
-    out.push('  SMTP_HOST   : ' + (process.env.SMTP_HOST || '(absent)'));
+    out.push('  SMTP_HOST   : ' + (SMTP_HOST || '(absent)'));
     out.push('  SMTP_PORT   : ' + SMTP_PORT);
     out.push('  chiffrement : ' + (SMTP_SECURE ? 'SSL direct (secure=true)' : 'STARTTLS (secure=false)')
              + ' — imposé par le port ' + SMTP_PORT
              + (_secureForce ? '  [SMTP_SECURE=' + process.env.SMTP_SECURE + ' ignoré, incompatible avec ce port]' : ''));
-    out.push('  SMTP_USER   : ' + (process.env.SMTP_USER || '(absent)'));
-    out.push('  SMTP_PASS   : ' + (process.env.SMTP_PASS ? '(défini, ' + String(process.env.SMTP_PASS).length + ' caractères)' : '(ABSENT)'));
+    out.push('  SMTP_USER   : ' + (SMTP_USER || '(absent)'));
+    /* Longueur + caractères « fragiles » : si le mot de passe contient $ ` " ' \ ou une espace, il a
+       pu être MANGÉ par Coolify/Docker au passage en variable d'environnement. Comparer la longueur
+       affichée avec celle du vrai mot de passe le dit immédiatement, sans jamais l'exposer. */
+    const _pw = SMTP_PASS;
+    const _fragiles = (_pw.match(/[$`"'\\ ]/g) || []);
+    out.push('  SMTP_PASS   : ' + (_pw ? '(défini, ' + _pw.length + ' caractères'
+      + (_fragiles.length ? ' — dont ' + _fragiles.length + ' caractère(s) fragile(s) : ' + [...new Set(_fragiles)].join(' ') : '')
+      + ')' : '(ABSENT)'));
+    if (_pw) out.push('              ↑ compare cette LONGUEUR avec ton vrai mot de passe : si elle diffère,');
+    if (_pw) out.push('                c\'est Coolify qui l\'a tronqué, pas OVH qui te refuse.');
     out.push('  MAIL_FROM   : ' + MAIL_FROM);
     out.push('  ADMIN_MAIL  : ' + ADMIN_MAIL);
     out.push('');
@@ -458,12 +498,27 @@ const server = http.createServer((req, res) => {
       } else out.push('CONNEXION : impossible — SMTP_HOST n\'est pas défini.');
       return fin();
     }
+    /* Transport d'essai si un hôte/port de rechange est demandé (?host=…&port=…) — pour éprouver
+       un autre serveur OVH sans redéployer. Mêmes identifiants, seul le point d'entrée change. */
+    let _t = _transport;
+    if (hostAlt || portAlt) {
+      try {
+        const nm = require('nodemailer');
+        const h = _net(hostAlt) || SMTP_HOST;
+        const p2 = portAlt || SMTP_PORT;
+        const s2 = (p2 === 465);
+        _t = nm.createTransport({ host: h, port: p2, secure: s2, requireTLS: !s2,
+          auth: { user: SMTP_USER, pass: SMTP_PASS } });
+        out.push('ESSAI AVEC D\'AUTRES RÉGLAGES : ' + h + ':' + p2 + ' (' + (s2 ? 'SSL' : 'STARTTLS') + ')');
+        out.push('');
+      } catch (e) { out.push('essai impossible : ' + e.message); }
+    }
     out.push('CONNEXION RÉELLE AU SERVEUR');
-    _transport.verify()
+    _t.verify()
       .then(() => {
         out.push('  ✅ connexion et authentification acceptées.');
         if (!dest) { out.push('\n  (ajoute ?to=ton@email pour envoyer un message d\'essai)'); return fin(); }
-        return _transport.sendMail({ from: MAIL_FROM, to: dest, subject: 'Solar — test d\'envoi',
+        return _t.sendMail({ from: MAIL_FROM, to: dest, subject: 'Solar — test d\'envoi',
           text: 'Si tu lis ceci, la configuration SMTP fonctionne.\n\n' + frDate(Date.now()) })
           .then(info => { out.push('  ✅ message d\'essai envoyé à ' + dest + ' (id ' + (info && info.messageId) + ')'); fin(); });
       })
@@ -472,11 +527,34 @@ const server = http.createServer((req, res) => {
         if (e && e.responseCode) out.push('  code SMTP : ' + e.responseCode);
         if (e && e.response) out.push('  réponse du serveur : ' + String(e.response).slice(0, 300));
         out.push('');
-        out.push('LECTURE DU CODE');
-        out.push('  535 → identifiants refusés. Chez OVH : SMTP_USER doit être l\'ADRESSE COMPLÈTE,');
-        out.push('        et le mot de passe celui de la BOÎTE (pas celui du compte OVH).');
-        out.push('  550/553 → authentification OK mais expéditeur refusé : MAIL_FROM doit être la boîte authentifiée.');
-        out.push('  ETIMEDOUT/ECONNREFUSED → mauvais hôte ou port bloqué.');
+        /* La lecture doit correspondre à l'erreur REELLEMENT reçue : afficher l'explication du 535
+           sur une panne DNS enverrait Marc chercher au mauvais endroit. */
+        const _code = (e && e.responseCode) || 0;
+        const _msg = String((e && e.message) || '');
+        const _est535 = _code === 535 || /535/.test(_msg);
+        const _estReseau = /EAI_AGAIN|ENOTFOUND|ETIMEDOUT|ECONNREFUSED|ECONNRESET|EHOSTUNREACH/.test(_msg);
+        out.push('LECTURE DE CETTE ERREUR');
+        if (_estReseau) {
+          out.push('  Erreur RÉSEAU, pas d\'authentification : le serveur de mail n\'a pas pu être joint.');
+          out.push('  → nom d\'hôte incorrect, ou port sortant bloqué depuis le VPS.');
+          out.push('  Les identifiants ne sont donc PAS en cause ici.');
+        } else if (_est535) {
+        out.push('  535 → identifiants refusés. Si la configuration est cohérente ci-dessus, les causes');
+        out.push('        restantes sont, par ordre de fréquence :');
+        out.push('        1. « ' + (SMTP_USER||'?') + ' » est une REDIRECTION (alias), pas une vraie boîte.');
+        out.push('           Une redirection ne peut PAS s\'authentifier. À vérifier dans l\'espace OVH :');
+        out.push('           Web Cloud → E-mails → onglet « Comptes e-mail ». Si l\'adresse n\'y figure que');
+        out.push('           dans « Redirections », il faut CRÉER un compte e-mail avec cette adresse.');
+        out.push('        2. Mot de passe de la BOÎTE, pas celui du compte OVH — ce sont deux choses distinctes.');
+        out.push('        3. Mauvais serveur pour ton offre : MX Plan = ssl0.ovh.net · Email Pro / Exchange =');
+        out.push('           pro*.mail.ovh.net ou ex*.mail.ovh.net. Essaie sans redéployer :');
+        out.push('           /mailtest?key=TA_CLE&host=pro2.mail.ovh.net&port=587');
+        out.push('        4. Boîte créée il y a moins d\'une heure : OVH n\'a pas fini de la provisionner.');
+        } else if (_code === 550 || _code === 553) {
+          out.push('  Authentification acceptée, mais EXPÉDITEUR refusé : MAIL_FROM doit être la boîte authentifiée.');
+        } else {
+          out.push('  Erreur non répertoriée. Code : ' + (_code || 'aucun') + '. Envoie cette page à Claude.');
+        }
         fin();
       });
     return;

@@ -12,6 +12,9 @@
    pesée à l'aune de ce document.
 0bis. 🔨 **`docs/LOT16_CHANTIER.md`** — les chantiers préparés, découpés en « sans danger » et
    « le jeu est immobilisé ». Rien ne s'y lance sans un GO explicite de Marc, tâche par tâche.
+0ter. 📧 **Email / infrastructure** : la fiche « EMAIL — FICHE DE RÉFÉRENCE » dans
+   `OVH_SETUP_JOURNAL.md` contient les paramètres SMTP acquis et les pièges. **Ne JAMAIS
+   redemander à Marc une décision d'infrastructure déjà prise** : la chercher d'abord ici.
 1. **CE fichier** (REPRISE.md) — état global + où est quoi.
 2. `docs/MULTIJOUEUR_BUILD.md` — détail de l'architecture en ligne (si on touche au multijoueur).
 3. `docs/DEPLOIEMENT_PLESK.md` — comment c'est déployé (si on touche au serveur).

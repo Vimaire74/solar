@@ -827,6 +827,104 @@ message par défaut. Rien de cassé. Mais ce message a révélé deux vrais déf
 Deux moyens indépendants de savoir ce qui tourne réellement en ligne.
 
 
+## ✅ v6.5 — diagnostic SMTP : protégé, plus précis, testable sans redéployer (2026-08-04)
+
+Le diagnostic a livré son verdict : configuration **cohérente** (ssl0.ovh.net:465, SSL, SMTP_USER =
+adresse complète, MAIL_FROM aligné) mais **535 5.7.1 Authentication failed**. La forme est donc bonne :
+c'est OVH qui refuse les identifiants. Trois améliorations en conséquence.
+
+### 🔴 Faille que j'avais introduite : /mailtest était PUBLIQUE
+Elle affichait l'identifiant SMTP et déclenchait des connexions vers OVH — n'importe qui pouvait lire
+la configuration et marteler le serveur de mail. **Protégée par `ADMIN_KEY`** (comme `/admin/reset`) :
+`/mailtest?key=TA_CLE`. Sans clé définie, la page est désactivée.
+
+### Diagnostic plus honnête
+- **La lecture de l'erreur est désormais CONDITIONNELLE** au code réellement reçu. Avant, une panne
+  DNS affichait quand même l'explication du 535 et aurait envoyé chercher au mauvais endroit.
+  Réseau / 535 / 550-553 / inconnu ont chacun leur texte. *Vérifié avec un hôte injoignable.*
+- **Mot de passe** : la page affiche sa LONGUEUR et signale les caractères fragiles que Coolify/Docker
+  peuvent manger. Comparer la longueur avec le vrai mot de passe distingue immédiatement
+  « Coolify l'a tronqué » de « OVH me refuse ».
+- **Les 4 causes restantes du 535** sont listées par fréquence, la première étant la plus probable :
+  **l'adresse est une REDIRECTION (alias), pas une vraie boîte** — une redirection ne peut pas
+  s'authentifier. À vérifier dans Web Cloud → E-mails → onglet « Comptes e-mail ».
+
+### Essai d'autres serveurs sans redéployer
+`/mailtest?key=...&host=pro2.mail.ovh.net&port=587` teste un autre point d'entrée avec les mêmes
+identifiants. Chaque aller-retour Coolify coûte plusieurs minutes, et les offres OVH n'ont pas le même
+serveur (MX Plan = ssl0.ovh.net ; Email Pro / Exchange = pro*.mail.ovh.net ou ex*.mail.ovh.net).
+Le mot de passe n'est jamais acceptable en paramètre d'URL — seuls l'hôte et le port.
+
+
+## 📧 EMAIL — FICHE DE RÉFÉRENCE (2026-08-04) — NE PLUS JAMAIS REDEMANDER À MARC
+
+> ⚠️ Écrite après une faute de ma part : j'ai proposé à Marc un menu d'options (créer une boîte,
+> passer à MX Plan, prendre un service tiers) alors que **la boîte Zimbra était déjà décidée et
+> configurée avec lui**. Le journal disait « 1 boîte Zimbra incluse, à configurer » (2026-07-21) et
+> je n'avais **jamais écrit** la suite. Marc : *« à quoi ça sert qu'on fasse des fichiers de résumé »*.
+> Il a raison. **Toute décision d'infrastructure se consigne ICI, immédiatement.**
+
+### Ce qui est ACQUIS (ne pas rediscuter)
+- Le domaine `solar-game.com` inclut **1 boîte Zimbra gratuite** : **`contact@solar-game.com`**.
+  C'est CETTE boîte qui envoie les emails du jeu. Décision prise le 2026-07-21 avec Marc.
+- ⚠️ **Piège de lecture** : dans l'espace OVH, le service « Emails » du domaine affiche
+  `Offre : redirect` et `Quota des comptes emails : 0/0`. **Ce n'est PAS Zimbra** — c'est l'ancien
+  service de redirection du domaine. Zimbra est un **abonnement SÉPARÉ** (`…_ZIMBRA` dans la liste
+  des services). Le 0/0 ne veut donc pas dire « aucune boîte possible ».
+  *(Je m'y suis laissé prendre le 2026-08-04 et j'ai conclu à tort qu'aucune boîte n'existait.)*
+
+### Paramètres SMTP — source : documentation OVH Zimbra, mise à jour 2026-05-04
+```
+SMTP_HOST = ssl0.ovh.net          (ou smtp.mail.ovh.net — équivalents)
+SMTP_PORT = 465
+SMTP_USER = contact@solar-game.com   (adresse COMPLÈTE)
+SMTP_PASS = mot de passe DE LA BOÎTE (≠ mot de passe du compte OVH)
+SMTP_SECURE / MAIL_FROM = inutiles (déduits par le serveur depuis la v6.5)
+```
+Ces valeurs sont **confirmées correctes**. Si un 535 persiste, le problème n'est PAS le réglage.
+
+### ÉTAT CONFIRMÉ le 2026-08-04 (capture de l'espace OVH)
+`Web Cloud` → `Zimbra Mail` → onglet `Compte email` :
+```
+contact@solar-game.com   organisation TitanCorp   offre STARTER   quota 15 Gio   statut ACTIF
+(Zimbra Starter : 2 / 2 comptes utilisés — l'autre est contact@soireematch.com)
+```
+**La boîte EXISTE et est ACTIVE.** Les paramètres SMTP sont ceux prescrits par OVH. Il ne reste donc
+qu'une cause possible au 535 : **le mot de passe**.
+
+⚠️ **Webmail Zimbra = `https://webmail.mail.ovh.net/`** — PAS le lien « Roundcube » affiché sur la
+page du service `Emails` du domaine, qui appartient à l'ancien service de redirection. Se tromper de
+webmail fait croire à tort que les identifiants sont mauvais.
+
+### RÉSULTAT DU TEST WEBMAIL (2026-08-04) : le mot de passe est BON
+Marc s'est connecté à `https://webmail.mail.ovh.net/` avec `contact@solar-game.com` et le mot de
+passe saisi dans Coolify. **La connexion réussit.** Le CSV des comptes le confirme : boîte créée le
+2026-07-29, STARTER, Actif, 15 Gio.
+
+Donc : la boîte existe, le mot de passe est bon, les paramètres SMTP sont ceux prescrits par OVH.
+Le 535 ne peut alors venir que de **ce que le CONTENEUR reçoit**, différent de ce que Marc a tapé.
+
+**Cause la plus fréquente, traitée en v6.6** : un copier-coller dans Coolify ajoute une **espace ou
+un retour à la ligne invisible** en fin de valeur. Le webmail, lui, reçoit ce qui est TAPÉ — il ne
+voit donc jamais le problème, ce qui rend le bug très trompeur. `SMTP_USER`, `SMTP_PASS` et
+`SMTP_HOST` sont désormais **nettoyés aux extrémités**, et `/mailtest` **le signale** quand il a dû
+le faire (modifier un mot de passe en silence serait pire que le bug).
+*Vérifié : mot de passe avec retour à la ligne collé, puis avec espaces autour → détecté et retiré.*
+
+### LE TEST DÉCISIF, sans code et sans déploiement
+Se connecter à **`https://webmail.mail.ovh.net/`** avec `contact@solar-game.com` et le mot de passe.
+C'est exactement le même couple identifiant/mot de passe que le SMTP.
+- **La connexion échoue** → le mot de passe est faux ou n'a jamais été défini. Le réinitialiser dans
+  `Web Cloud` → `Zimbra Mail` → `Compte email` → les trois points en bout de ligne →
+  `Modifier le mot de passe`. Puis reporter le NOUVEAU mot de passe dans `SMTP_PASS` (Coolify).
+- **La connexion réussit mais le SMTP refuse** → le mot de passe a été abîmé au passage dans Coolify :
+  comparer sa LONGUEUR avec celle affichée par `/mailtest` (il indique aussi les caractères fragiles).
+
+### Autre fait d'infrastructure à ne pas perdre
+**Le port 25 sortant est bloqué sur les VPS OVH.** Sans importance ici (on utilise le 465), mais
+c'est la raison pour laquelle un futur envoi en masse passerait par un service externe.
+
+
 ## 📝 MÉMO (noté, NON implémenté — à faire quand Marc donne le GO)
 *Section purgée le 2026-08-03 : les entrées précédentes (libellé « route passive », Sphère de Dyson multi-nations, avancée des pirates sur la carte, événements invisibles) étaient **déjà corrigées** et n'avaient jamais été retirées d'ici — elles nous ont fait perdre du temps à tous les deux. Ne laisser ici QUE ce qui est réellement en attente.*
 
