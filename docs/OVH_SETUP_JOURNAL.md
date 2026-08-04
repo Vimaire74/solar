@@ -545,9 +545,298 @@ Lancer `node server/tutorial-sync.js` **après quelques mises à jour du jeu, av
 Rouge = à corriger, jaune = à regarder, `--fix` régénère `tutorial.html`.
 
 
+## ✅ v5.5 — le chien de garde « Tu sembles bloqué » coupait le tutoriel (2026-08-03)
+
+**Symptôme (capture de Marc)** : à l'étape 8/36 « Tuile Découverte », la fenêtre rouge *« ⚠️ Tu sembles
+bloqué — tu n'as plus assez de ressources »* s'affiche par-dessus l'explication du coach.
+
+**Cause** : le chien de garde universel `_armPlayerStuckWatch` (ajouté en v3.7 pour ne jamais rester
+coincé) se déclenche après **5 secondes** sans progression, quand c'est au joueur et qu'aucune modale
+n'est ouverte. Or la bulle du coach `#tuto-coach` **n'est pas une modale** au sens de ce contrôle :
+pendant que le joueur LIT, le jeu le croit bloqué. Le tutoriel impose son propre rythme et dispose
+déjà de son filet de sécurité — un bouton « Suivant » à chaque étape.
+
+**Corrigé** : nouvel indicateur `_scTutorialActive()` (`window.SC_TUTO` ou présence de `#tuto-coach`),
+consulté par les **trois** déclencheurs de cette fenêtre — `_armPlayerStuckWatch` (à l'armement ET à
+l'échéance), `_scMaybeStuck`, et `_scShowStuckModal` en dernier rempart. Vérifié sur les trois.
+
+**Au passage — un texte qui mentait** : la fenêtre affirmait *« Tu n'as plus assez de ressources »*
+même quand elle venait du simple délai d'inactivité, sans l'avoir vérifié. Elle teste désormais
+`_scCanPlayerAct()` et, si le joueur a de quoi jouer, dit la vérité : *« Rien ne s'est passé depuis un
+moment. Si tu réfléchis encore, ferme simplement cette fenêtre. »*
+
+**Note d'usage de l'outil de tutoriel** : `tutorial-sync.js` a immédiatement signalé en rouge que
+`tutorial.html` n'était plus une copie à jour d'`index.html` après cette correction — exactement son
+rôle. `--fix` l'a régénéré.
+
+
+## ✅ v5.6 — le bilan de fin de tour n'arrivait toujours pas aux autres joueurs (2026-08-03)
+
+**Symptôme (Marc, en partie)** : *« le bilan initial n'est pas visible pour tous les joueurs en même
+temps, et quand je l'ai validé, les autres ne l'ont pas vu »*.
+
+**Cause — le dernier maillon manquait.** Le serveur diffusait pourtant correctement (v5.1 :
+`sendWindowToAll`, chacun recevant SON bilan). Mais côté client, `showNotice()` se terminait par un
+commentaire explicite : *« eot / info / result : rien à afficher »*. **La notice était jetée.** Le
+serveur diffusait donc dans le vide.
+
+**Corrigé** : `showNotice()` rend désormais la fenêtre `#eot-modal` avec le corps reçu
+(`payload.html`), bouton « Fermer ». Aucune réponse n'est envoyée : seul le porteur de la décision
+relance la partie, les autres ferment leur fenêtre.
+
+### 🔁 TROISIÈME fois le même défaut — à retenir
+Revenu net (`uiFillIncome` écrasait le rendu corrigé), numéro de version et lien tutoriel (mis sur le
+mauvais écran de connexion), bilan collectif (diffusé mais jeté par le client). **À chaque fois : la
+production est correcte, le CONSOMMATEUR l'ignore.** Corollaire de la règle déjà écrite : après avoir
+branché une donnée, **vérifier que quelqu'un la consomme réellement** — pas seulement qu'elle est émise.
+
+**Garde-fou ajouté** dans `playthrough.js` : pour chaque fenêtre COLLECTIVE réellement rencontrée en
+partie, il vérifie que `showNotice()` sait la rendre, sinon il le signale en rouge. **Vérifié en
+désactivant volontairement la branche** : le banc signale bien *« showNotice() ne rend PAS la fenêtre
+collective eot — les joueurs autres que le porteur ne la verraient jamais »*, puis `online.js` a été
+restauré à l'identique.
+
+
+## ✅ v5.7 — compteurs « 1× par tour » réinitialisés pour le SEUL joueur 1 (2026-08-03)
+
+**Symptôme (Marc)** : *« le troisième joueur a pris une carte stratégie colonisation gratuite mais ça
+n'a pas marché »*. C'est l'ancien bug #8 de la partie à 2 humains, jamais reproduit jusqu'ici — le
+« troisième joueur » était l'indice manquant.
+
+**Cause** : dans `_startTurnPrep()`, plusieurs compteurs **par nation** n'étaient remis à zéro que sur
+`G.player`, alors que les voisins étaient traités par un `G.ais.forEach(...)` pour d'autres champs. En
+multijoueur, `G.player` au début de manche = la nation **primaire** : les joueurs 2, 3 et 4 n'étaient
+jamais réinitialisés. **Quatre champs concernés :**
+
+| Champ | Conséquence pour les joueurs 2/3/4 |
+|---|---|
+| `_stratColUsed` | la colonisation gratuite ne remarchait **plus jamais** après un premier usage |
+| `_milBoughtThisTurn` | une carte militaire « 1× par tour » devenait **1× par PARTIE** |
+| `stratForceBonus` | les jetons **temporaires** d'une carte Stratégie n'expiraient jamais (avantage permanent) |
+| `milLoseNext` | les renforts militaires ne se dissolvaient jamais |
+
+**Corrigé** : les quatre passent par `allPlayers()`. Les messages d'expiration nomment la nation quand
+ce n'est pas celle qui agit (sinon le journal était ambigu à 4 joueurs).
+
+**Vérifié par comparaison directe** sur une partie à 4 humains :
+```
+ancien code  : terr=ok  mart=BLOQUÉ  jupi=BLOQUÉ  cein=BLOQUÉ
+nouveau code : terr=ok  mart=ok      jupi=ok      cein=ok
+```
+et la carte se réarme bien à chaque tour pour les quatre nations.
+
+### 📌 Règle à appliquer systématiquement
+**Tout état « par tour » ou « par nation » doit passer par `allPlayers()`.** Un `G.player.X=…` isolé
+dans une routine de début/fin de manche est un bug de multijoueur en puissance. Voir
+`ARCHITECTURE_AVENIR.md` §2 : c'est encore la perspective-globale qui frappe.
+
+
+## ✅ v5.8 — un raid frappait une nation ARBITRAIRE (2026-08-03)
+
+**Symptôme (Marc)** : *« un joueur jupitérien fait un raid sur les Martiens IA et c'est chez moi, le
+Terrien, que la tension augmente »*.
+
+**Deux causes emboîtées, la seconde étant la vraie :**
+
+1. Le bouton « 💰 Raid » de la barre d'action appelait `doRaid()` — un raid **SANS cible**, qui
+   frappe `G.ais[0]`, la **première nation de la liste**. En multijoueur `G.ais` = « tout le monde
+   sauf moi » : le Jupitérien pillait donc le Terrien. Reproduit : `G.ais` = terriens, martiens →
+   `G.ais[0] = terriens`, alors que la cible voulue était martiens.
+
+2. 🔴 **`doRaidTarget()` — la version CIBLÉE — n'existait pas côté serveur.** Elle était définie dans
+   le bloc `<script>` d'INTERFACE, que `game-core.js` ne charge jamais (il ne charge que le plus gros
+   bloc). Le garde `typeof sb.doRaidTarget === 'function'` échouait donc TOUJOURS en ligne, et le
+   serveur retombait systématiquement sur le raid sans cible. **Même faille que `uiFillIncome` pour
+   le revenu net** — voir `ARCHITECTURE_AVENIR.md` §3 : « le moteur est défini par une heuristique ».
+
+**Corrigé :**
+- `doRaidTarget()` **déplacée dans le bloc moteur** → le serveur l'exécute enfin.
+- `doRaid()` ne choisit plus jamais tout seul : une seule cible possible → il la prend ; plusieurs →
+  il **DEMANDE** (nouvelle décision `raid_target`, avec la tension actuelle affichée pour chaque
+  nation). En solo, petite fenêtre de choix autonome. L'ancien comportement est conservé sous le nom
+  explicite `doRaidLegacyFirstTarget()`, marqué comme non utilisable depuis l'interface.
+- `ACTIONS.raid` (game-core) ne se rabat plus silencieusement : sans cible, il déclenche la demande.
+
+**Vérifié** : Jupitérien pillant les Martiens →
+`tension AVANT {terriens:0, martiens:0}` → `APRÈS {terriens:0, martiens:2}`. Seule la cible choisie bouge.
+
+### 📌 Ce que cet incident confirme
+C'est la **deuxième fois** qu'une fonction essentielle se révèle absente du moteur parce qu'elle vit
+dans le mauvais bloc `<script>`. La tâche **A2 du lot 16** (« déclarer explicitement le bloc moteur,
+échouer bruyamment s'il manque ») n'est pas cosmétique : elle aurait évité ces deux bugs. À faire dès
+que Marc en donne le GO — c'est une tâche de la vague A, sans danger pour une partie en cours.
+
+
+## ✅ v5.9 — accords commerciaux = PROPOSITION + VAGUE A du lot 16 (2026-08-03)
+
+### 🤝 L'accord commercial se concluait tout seul
+Marc : *« j'ai choisi le jupitérien et lui après ne voit pas ma proposition, il reçoit simplement le
+choix global ; il se trouve qu'il me choisit moi aussi et ça conclut l'accord »*.
+- **Cause** : `_evCommPick()` concluait l'accord **unilatéralement**, sans jamais consulter l'autre
+  nation. Le partenaire recevait simplement le même menu global ; l'accord ne « marchait » que si,
+  par hasard, il désignait le premier en retour.
+- **Corrigé** : le partenaire HUMAIN reçoit une vraie **DEMANDE** (`accord_request` : accepter /
+  refuser) ; rien n'est conclu avant sa réponse. Il garde ensuite son propre tour de choix parmi les
+  nations restantes. Le proposant reçoit une **notice personnelle** `accord_result` (fenêtre statique)
+  pour savoir si c'est accepté — le journal seul ne suffisait pas (« pas validé de manière évidente »).
+  Les IA répondent selon la règle existante (refus si le proposant est trop en avance et qu'elles vont bien).
+- Au passage, `_evAccordConclude(proposant, partenaire)` prend désormais les **deux nations en
+  paramètre** : la réponse peut arriver bien après, quand `G.player` a changé (§2 d'ARCHITECTURE_AVENIR).
+- **Vérifié** : rien n'est conclu avant la réponse, puis +3 VP chacun, et la notice part au proposant.
+
+### ✅ VAGUE A du lot 16 (GO de Marc) — tâches sans danger pour une partie en cours
+
+**A2 — bloc moteur déclaré explicitement.** `game-core.js` prenait « le plus gros bloc `<script>` ».
+Une sentinelle `@moteur` (encadré en tête du bloc) le désigne désormais. Surtout : au chargement, le
+serveur **vérifie que les 32 fonctions dont il a besoin sont présentes** et **échoue bruyamment** en
+listant les manquantes. *Testé en renommant `doRaidTarget` : « MOTEUR INCOMPLET — doRaidTarget ».*
+C'est le garde-fou qui aurait évité les deux bugs les plus coûteux (revenu net, raid ciblé).
+
+**A1 — protocole versionné.** Le client envoie `{t:'hello', proto, build}` à l'ouverture ; le serveur
+répond `hello_ok` ou `maj_requise` avec un message clair et un bouton « Recharger ». `SC_PROTO` (client)
+et `PROTO_MIN`/`PROTO_MAX` (serveur) sont **indépendants du numéro de build** : on corrige souvent le
+jeu sans toucher au protocole. *Testé sur le vrai serveur : proto 1 → `hello_ok` ; proto 0 → `maj_requise`.*
+Indispensable pour le mobile, où une application installée peut avoir des mois de retard.
+
+**A4 — contenu des réponses assaini.** Le serveur vérifiait QUI répond, pas CE QU'IL répond.
+`assainirReponse()` borne les nombres (les jetons au `maxEngage` que le moteur a lui-même annoncé),
+**refuse toute valeur absente de la liste proposée** (on ne devine rien, on retire), limite les chaînes
+et n'accepte qu'un niveau d'objet. *Testé : 999 jetons → 10 ; cible inventée → retirée ; types
+absurdes → filtrés ; réponse honnête → inchangée.*
+
+**A3 (banc exécutant le vrai serveur) : NON FAIT** — c'est la plus lourde des quatre. Le banc continue
+de *rejouer* la logique de `server.js` au lieu de l'exécuter.
+
+
+## ✅ v6.0 — lisibilité des cartes technologie (2026-08-03)
+
+Retours de Marc en test : *« Pris est écrit trop petit sur les tech, il faut un symbole plus visible »*
+et *« les icônes de ressources à payer, plus grandes pour que ce soit lisible »*.
+
+- **Statut de la carte** : le mot minuscule est remplacé par un **symbole large et coloré**, avec le
+  texte en info-bulle — ⛔ rouge = prise par une autre nation, ✓ vert = elle est à toi. Le badge passe
+  de `.7em` à `1.15em`, en gras, sur fond contrasté avec bordure. ⛔ est volontairement distinct du 🔒
+  déjà utilisé pour « pas encore accessible » : deux états différents, deux symboles différents.
+- **Coût** : `.tc-cost` passe à `1.32em` en gras et les icônes de ressources y sont agrandies
+  (`1.05em` → `1.3em`), avec l'alignement vertical ajusté.
+- Dans la ligne de coût, « Pris » devient « ⛔ Prise » et « ✓ Toi » devient « ✓ À toi ».
+
+📌 **Question en attente de Marc** : *« comment faire pour marquer une tech »*. Aucun système de
+marquage n'existe aujourd'hui (vérifié : aucune occurrence de favori/marque-page dans le code).
+Options soumises à Marc — à implémenter selon sa réponse.
+
+
+## ✅ v6.1 — techs bloquées REPLIÉES + diagnostic du journal partagé (2026-08-03)
+
+### Techs inaccessibles : repliées et expliquées (choix de Marc)
+Le grisage muet est remplacé par une **bande fine** qui NOMME ce qui bloque. Le jeu connaissait déjà
+trois raisons distinctes, toutes rendues par le même gris : nouvelle fonction `techLockReason()` →
+« palier T2 pas encore ouvert » / « il te faut TA T2 de cette branche » / « réservée aux Empathes ».
+La bande reste cliquable (la grande carte s'ouvre pour lire l'effet). On gagne de la hauteur et le
+joueur sait quoi faire. *Vérifié : au départ, 12 cartes repliées — 6 « palier T2 », 6 « palier T3 »,
+3 « Empathes ».*
+
+### 🔴 DIAGNOSTIC — le journal partagé est écrit à la PREMIÈRE PERSONNE
+Marc : *« la partie à 3 a été horriblement buggée »*. L'analyse des deux vidages de debug pointe une
+cause massive et jamais traitée :
+
+`server.js` diffuse le journal à **tous les joueurs SAUF l'auteur de l'action** (c'est voulu : voir ce
+que font les autres). Mais les messages sont rédigés du point de vue de celui qui agit :
+`« 😡 Ta tension vs Martiens +3 »`, `« ⚔️ Coût combat (toi) : 5 jetons »`,
+`« 🌍 Terriens (toi) est visé »`, `« 🤝 Accord commercial : +3🪨 »` (sans nation),
+`« 💰 Revenus nets… »` (sans nation), `« 💫 Commerce avec les pirates »` (sans nation).
+
+**Conséquence en partie à 3 humains** : chaque joueur reçoit un flux de « TU as fait ceci », « TA
+tension monte », pour des actions qu'il n'a pas faites. Le journal devient incompréhensible — ce qui
+correspond exactement à « horriblement buggé ». Relevé : **15 messages à la 1re personne** et
+**8 occurrences de « (toi) »**, plus une série de messages sans nation (revenus, accords, pirates).
+
+**Correction proposée (NON faite, en attente du GO de Marc)** : marquer chaque entrée de journal avec
+la nation qui l'a produite au moment de `addLog()`, puis, côté client, préfixer les entrées des AUTRES
+nations par leur nom et n'afficher les tournures « tu / ta / toi » que pour son propre journal.
+C'est un balayage large mais mécanique. Voir `ARCHITECTURE_AVENIR.md` §2 : encore la perspective globale.
+
+
+## ✅ v6.2 — SMTP : diagnostic en une page + pièges OVH détectés sans envoyer (2026-08-03)
+
+Le `535 Authentication failed` traînait depuis le 2026-07-31. Impossible pour moi de le résoudre à
+distance (je n'ai pas les identifiants), mais on peut supprimer le tâtonnement : jusqu'ici, tester un
+réglage demandait de **jouer une partie entière** pour déclencher un envoi.
+
+### Page `/mailtest` (sur live.solar-game.com)
+- `…/mailtest` → configuration effective (**mot de passe jamais affiché**, seulement sa longueur),
+  incohérences détectées, puis **connexion réelle** au serveur OVH via `transport.verify()`.
+- `…/mailtest?to=marc@guerir.ch` → envoie en plus un vrai message d'essai.
+- En cas d'échec, le **code SMTP et la réponse brute du serveur** sont affichés, avec leur lecture :
+  535 = identifiants, 550/553 = expéditeur refusé, ETIMEDOUT = hôte ou port.
+
+### Les trois pièges OVH, désormais détectés SANS rien envoyer
+1. **`SMTP_USER` doit être l'adresse COMPLÈTE** (`contact@solar-game.com`, pas `contact`) — cause n°1 du 535.
+2. **Port et chiffrement doivent s'accorder** : 465 = SSL direct, 587 = STARTTLS. `SMTP_SECURE` est
+   maintenant **déduit du port** quand la variable est vide, ce qui supprime le piège.
+3. **`MAIL_FROM` doit être la boîte authentifiée** — sinon OVH refuse de relayer (550/553). Par défaut,
+   `MAIL_FROM` vaut désormais `SMTP_USER`.
+Ces trois contrôles s'affichent aussi **au démarrage** du serveur dans les logs Coolify.
+
+### Distinction importante ajoutée
+Si `nodemailer` n'est pas chargé, `/mailtest` le dit explicitement (« ce n'est PAS un problème
+d'identifiants ») au lieu de laisser croire à une mauvaise configuration. *Vérifié : le `Dockerfile`
+fait bien `npm install --omit=dev` et `nodemailer` est en dépendance — donc sur le serveur la
+bibliothèque est présente, et le 535 est un vrai refus d'identifiants.*
+
+**Testé** en lançant le vrai serveur avec trois configurations : non configuré, les trois pièges
+réunis, et une configuration cohérente. Les avertissements attendus apparaissent dans chaque cas.
+
+
+## ✅ v6.3 — SMTP : le port impose le chiffrement, MAIL_FROM devient facultatif (2026-08-03)
+
+Retour de Marc en configurant Coolify : *« je n'ai pas de champ MAIL_FROM »* et *« il y avait une
+valeur 1 pour SMTP_SECURE, je l'ai enlevée mais quand je fais save elle revient toute seule »*.
+
+- **`SMTP_SECURE` ne peut plus nuire.** Sur les deux ports standards, le chiffrement est imposé par le
+  port (RFC 8314) : **465 = TLS implicite, 587 = STARTTLS**. Un désaccord n'est jamais un choix, c'est
+  une erreur de saisie — et ici elle était **impossible à corriger** puisque Coolify réécrit la valeur.
+  Le serveur aligne donc sur le port et **le dit** dans les logs et dans `/mailtest`, au lieu de laisser
+  une case rebelle empêcher tout envoi. `SMTP_SECURE` n'est encore respecté que sur un port exotique.
+  *NB : dans le cas de Marc (port 465), la valeur 1 était de toute façon la BONNE.*
+- **`MAIL_FROM` est facultatif** : par défaut `Solar <SMTP_USER>` — donc toujours la boîte
+  authentifiée, ce qui évite le refus de relais d'OVH. Plus besoin de créer la variable.
+
+**Vérifié en lançant le vrai serveur** : port 465 + SMTP_SECURE=1 → « configuration cohérente » ;
+port 587 + SMTP_SECURE=1 → « ignoré, on applique STARTTLS », avec le message qui dit explicitement à
+Marc qu'il peut laisser la variable telle quelle.
+
+
+## ✅ v6.4 — page d'accueil du serveur : charset + auto-diagnostic de déploiement (2026-08-03)
+
+Marc a testé `/mailtest` et obtenu : `Solar Conquest server â€” WebSocket only. GET /health`.
+**Il n'avait pas encore déployé** — la page n'existait donc pas sur le serveur, qui répondait son
+message par défaut. Rien de cassé. Mais ce message a révélé deux vrais défauts :
+
+1. **`â€”` = accent cassé.** La réponse par défaut ne déclarait **aucun charset** : le navigateur
+   lisait l'UTF-8 comme du Latin-1. Corrigé (`text/plain; charset=utf-8`), et ajouté aussi sur les
+   trois réponses JSON qui l'oubliaient.
+2. **Le message ne disait rien d'utile.** Il liste maintenant les pages disponibles, affiche la
+   **version du serveur**, et surtout précise : *« Si /mailtest renvoie cette page, c'est que cette
+   version n'est pas encore déployée. »* — la question que Marc vient de se poser trouve sa réponse
+   sur la page elle-même.
+
+*Vérifié en interrogeant le vrai serveur : en-tête correct et page lisible.*
+
+📌 **Rappel** : le serveur affiche sa version sur cette page ET répond `hello_ok {serveur}` au client.
+Deux moyens indépendants de savoir ce qui tourne réellement en ligne.
+
+
 ## 📝 MÉMO (noté, NON implémenté — à faire quand Marc donne le GO)
 *Section purgée le 2026-08-03 : les entrées précédentes (libellé « route passive », Sphère de Dyson multi-nations, avancée des pirates sur la carte, événements invisibles) étaient **déjà corrigées** et n'avaient jamais été retirées d'ici — elles nous ont fait perdre du temps à tous les deux. Ne laisser ici QUE ce qui est réellement en attente.*
 
+- **TROIS RIVIÈRES SÉPARÉES pour les cartes** (noté le 2026-08-03 pendant les tests de Marc, NON implémenté) :
+  les **technologies**, les cartes **éco & sociales** et les cartes **militaires** doivent être présentées
+  sur **trois rivières distinctes**, comme trois PAGES différentes, au lieu d'être affichées toutes à la
+  suite. Repères de départ : conteneur `#tech-tabs`, cartes tech `.tcard`, cartes générales `.gcard` dans
+  `.gen-row` (index.html). À faire : découper en trois vues navigables plutôt qu'une liste continue.
+  ⚠️ Vérifier l'impact sur le TUTORIEL (étapes « Les 3 onglets », « Actions civiles », « Actions
+  militaires » pointent sur `#tech-tabs`) → relancer `node server/tutorial-sync.js` après coup.
 - **SMTP `535 Authentication failed`** : les emails sont archivés (`data/outbox.log`, visibles dans `/stats`) mais rien ne part. Vérifier les identifiants OVH dans Coolify (`SMTP_USER` = adresse complète).
 - **IA de guerre** : elle engage tout ce qu'elle peut payer au lieu d'estimer le juste nécessaire.
 - **Bilan « Actions ce tour »** : un assaut résolu via la fenêtre de combat n'est pas inscrit dans `turnActions` — il n'apparaît donc pas dans la liste des actions du bilan (les lignes de journal, elles, sont correctes).

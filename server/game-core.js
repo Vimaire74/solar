@@ -65,12 +65,37 @@ function buildSandbox() {
   return sb;
 }
 
-// Charge UNIQUEMENT le bloc logique du jeu (le plus gros <script> sans src).
+/* Fonctions du jeu que le SERVEUR appelle. Si l'une manque après chargement, c'est qu'elle a été
+   écrite (ou déplacée) dans un bloc <script> d'interface, hors du moteur — et le serveur l'ignore
+   SILENCIEUSEMENT. Ça s'est produit deux fois, avec des conséquences invisibles en test :
+     · `uiFillIncome` (revenu net) : le correctif était du code mort pendant une semaine ;
+     · `doRaidTarget` (raid ciblé)  : le serveur retombait toujours sur un raid sans cible.
+   On vérifie donc explicitement, et on échoue BRUYAMMENT. */
+const FONCTIONS_MOTEUR_REQUISES = [
+  'initGame', 'startTurn', 'endTurn', 'runEndOfRound', 'doMaintenance', 'doRevenues', 'advancePirates',
+  'doColonize', 'doEstablishRoute', 'doUpgrade', 'buyTech', 'useAbility', 'doRaid', 'doRaidTarget',
+  'resolveWarCombat', 'declareWar', 'showWarModal', 'getNodeOwnerAI', 'doAITurn',
+  'setDecisionSink', 'resolveDecision', 'refreshWarViews', 'scSetG', 'scDeserialize', 'rehydrateState',
+  'showAgendaSelModal', 'confirmRouteToken', 'dismissDiscovery', 'cruiserAvailable', 'cruiserAfford',
+  'routeManageDeploy', 'routeManageRecall', '_forgeUpgrade'
+];
+
+/* Charge UNIQUEMENT le bloc MOTEUR du jeu.
+   ⚠️ Il est repéré par la SENTINELLE `@moteur` placée en tête du bloc dans index.html, et NON plus
+   par « le plus gros bloc <script> » : cette heuristique ne disait jamais où s'arrêtait le moteur,
+   si bien qu'une fonction pouvait vivre hors de lui sans que rien ne le signale. */
 function loadLogic(htmlPath) {
   const html = fs.readFileSync(htmlPath, 'utf8');
   const blocks = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
-  blocks.sort((a, b) => b.length - a.length);
-  const logic = blocks[0]; // le bloc logique (350 Ko)
+  const marques = blocks.filter(b => b.indexOf('@moteur') !== -1);
+  if (marques.length > 1) throw new Error('index.html : plusieurs blocs <script> portent la sentinelle @moteur — il ne doit y en avoir qu\'UN.');
+  let logic = marques[0];
+  if (!logic) {
+    // Repli explicite (et bruyant) : on prend le plus gros, mais on prévient que la sentinelle manque.
+    console.error('⚠️  index.html : sentinelle « @moteur » ABSENTE — repli sur le plus gros bloc <script>.\n' +
+                  '    Ajouter `/* @moteur */` en tête du bloc de logique pour rendre le découpage explicite.');
+    logic = blocks.slice().sort((a, b) => b.length - a.length)[0];
+  }
   const sb = buildSandbox();
   vm.createContext(sb);
   vm.runInContext(logic, sb, { timeout: 8000 });
@@ -82,6 +107,15 @@ function loadLogic(htmlPath) {
   // circulaires _enemy des vues de guerre. L'annulation n'a pas de sens en multijoueur.
   vm.runInContext("if(typeof scSaveGame==='function'){scSaveGame=function(){};}", sb);
   vm.runInContext("if(typeof saveUndo==='function'){saveUndo=function(){};}", sb);
+  /* CONTRÔLE : toutes les fonctions dont le serveur a besoin sont-elles bien DANS le moteur ?
+     Une absence ici signifie que la fonction vit dans un bloc d'interface : le serveur ne
+     l'exécutera jamais et se rabattra en silence sur un comportement dégradé. */
+  const manquantes = FONCTIONS_MOTEUR_REQUISES.filter(n => typeof sb[n] !== 'function');
+  if (manquantes.length) {
+    throw new Error('MOTEUR INCOMPLET — ces fonctions sont absentes du bloc @moteur d\'index.html :\n  · ' +
+      manquantes.join('\n  · ') +
+      '\nElles vivent probablement dans un bloc <script> d\'interface. Déplace-les dans le bloc @moteur.');
+  }
   return sb;
 }
 
@@ -107,7 +141,13 @@ const ACTIONS = {
   },
   upgrade:  (sb, a) => { sb.doUpgrade(a.node); _postAction(sb); },
   buyTech:  (sb, a) => { sb.buyTech(a.card); _postAction(sb); },
-  raid:     (sb, a) => { if (a.target && typeof sb.doRaidTarget === 'function') sb.doRaidTarget(a.target, a.node || null); else sb.doRaid(); _postAction(sb); },
+  /* Le raid EXIGE une cible explicite. Le repli `doRaid()` frappait `G.ais[0]` — une nation
+     arbitraire, jamais désignée par le joueur : en multijoueur, on pillait un joueur au hasard. */
+  raid:     (sb, a) => {
+    if (a.target && typeof sb.doRaidTarget === 'function') sb.doRaidTarget(a.target, a.node || null);
+    else if (typeof sb.doRaid === 'function') sb.doRaid();   // ouvre la demande de cible (décision)
+    _postAction(sb);
+  },
   attack:   (sb, a) => {
     // Assaut du PLATEAU : on résout avec le MÊME modèle que la modale de combat (resolveWarCombat) — jetons
     // engagés vs défense affichée, PAS l'ancien confirmAttack (coût de trajet). Ainsi l'affichage ne ment plus.

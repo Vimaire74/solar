@@ -316,11 +316,25 @@ const REAL = { agenda:'showAgendaReal', strategy:'showStrategyReal', invest1:'sh
   event_comm:'showCommEventModal', event_diplo:'showDiploEventModal' };
 for (const k of seenKinds) {
   if (REAL[k] && online.indexOf(REAL[k]) === -1) problems.push('décision « ' + k + ' » : pas de vraie fenêtre côté client (' + REAL[k] + ' absent)');
-  if (!REAL[k] && !/^(war_combat|defense|extrasolar|strategy_calm|eot)$/.test(k)) problems.push('décision « ' + k + ' » : aucune fenêtre dédiée prévue — à vérifier');
+  // `raid_target` est rendu par le panneau générique (liste d'options) : c'est voulu, pas un oubli.
+  if (!REAL[k] && !/^(war_combat|defense|extrasolar|strategy_calm|eot|raid_target|accord_request|accord_result)$/.test(k)) problems.push('décision « ' + k + ' » : aucune fenêtre dédiée prévue — à vérifier');
 }
 // Le client DOIT savoir empiler les fenêtres : sans file d'attente, toute fenêtre arrivant
 // pendant qu'une autre attend une réponse est perdue (bug vécu par Marc sur la Sphère de Dyson).
 if (!/STATE\._queue/.test(online)) problems.push('online.js : pas de file d\'attente des fenêtres — une fenêtre arrivant pendant une autre serait PERDUE');
+/* Une fenêtre COLLECTIVE part au porteur de la décision ET en NOTICE aux autres joueurs. Il faut donc
+   que `showNotice` sache la rendre, sinon le serveur diffuse dans le vide et les autres ne voient RIEN
+   (c'est exactement ce qui est arrivé au bilan de fin de tour : diffusion correcte, notice jetée). */
+{
+  const iNotice = online.indexOf('function showNotice');
+  const corpsNotice = iNotice >= 0 ? online.slice(iNotice, iNotice + 4000) : '';
+  // Notices PERSONNELLES rendues par showNotice (pas des décisions) : même exigence.
+  for (const k of COLLECTIVES.concat(['war_result','raid_hit','accord_result'])) {
+    if (!seenKinds.has(k)) continue;
+    if (!new RegExp("k===['\"]" + k + "['\"]").test(corpsNotice))
+      problems.push('online.js : showNotice() ne rend PAS la fenêtre collective « ' + k + ' » — les joueurs autres que le porteur de la décision ne la verraient jamais');
+  }
+}
 
 /* ---------- sortie ---------- */
 console.log(T.join('\n'));

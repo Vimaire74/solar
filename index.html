@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-03 · v5.4';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-03 · v6.4';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -145,13 +145,28 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
 .tc-name{font-weight:700;color:#c8d8f8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
 .tc-tier{font-size:.8em;color:#3a5a7a;font-weight:700;flex-shrink:0;margin-left:3px}
 .tc-art{height:36px;display:flex;align-items:center;justify-content:center;font-size:20px;position:relative}
-.tc-taken-badge{position:absolute;top:2px;right:3px;font-size:.7em;background:rgba(0,0,0,.5);color:#aaa;border-radius:3px;padding:1px 3px}
+/* STATUT D'UNE TECHNO — doit se lire d'un coup d'œil (retour de Marc : « Pris » était écrit trop
+   petit). Symbole large et coloré plutôt qu'un mot minuscule : ⛔ = prise par une autre nation
+   (distinct du 🔒 « pas encore accessible »), ✓ vert = elle est à toi. */
+.tc-taken-badge{position:absolute;top:2px;right:3px;font-size:1.15em;font-weight:900;line-height:1;
+  background:rgba(0,0,0,.72);border:1px solid #6a7290;color:#dfe6ff;border-radius:6px;padding:2px 6px;
+  box-shadow:0 2px 6px rgba(0,0,0,.5)}
+.tc-taken-badge.tb-mine{border-color:#4fbf62;color:#8df59d;background:rgba(6,32,10,.85)}
+.tc-taken-badge.tb-taken{border-color:#c05a5a;color:#ff9d9d;background:rgba(40,6,6,.85)}
+/* Coût d'une techno : lisible, icônes de ressources agrandies (elles font 1.05em par défaut). */
+.tc-cost{font-size:1.32em;font-weight:700;letter-spacing:.2px}
+.tc-cost .ri-energy,.tc-cost .ri-materials,.tc-cost .ri-science,.tc-cost .ri-morale{width:1.3em;height:1.3em;vertical-align:-0.28em}
 .tc-body{padding:2px 5px 4px;font-size:.59em;line-height:1.3}
 .tc-effect{color:#a4b4d4;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tc-cost{color:#ffaa44}
 .tc-lock-art{text-align:center;padding:4px 0;color:#3a3a6a;font-size:1.1em}
 .tcard-arr{color:#2a3a5a;font-size:.8em;flex-shrink:0;align-self:center}
 /* COMPACT mode cards */
+/* Carte REPLIÉE (prérequis manquant) : bande fine, lisible, qui NOMME ce qui bloque.
+   Reste cliquable — la grande carte s'ouvre pour lire l'effet complet. */
+.tcard.tc-fold{background:#141428;border-style:dashed;border-color:#5a5a80;opacity:1}
+.tcard.tc-fold .tc-name{color:#9fb0d0;font-weight:600}
+.tcard.tc-fold .tc-fold-why{font-size:.9em;color:#d8a44a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-left:6px;flex-shrink:1}
 .tcard.tc-compact{display:flex;align-items:center;padding:0;height:22px}
 .tcard.tc-compact .tc-header{flex:1;background:transparent;min-height:unset;height:100%;padding:2px 5px}
 .tcard.tc-compact .tc-art,.tcard.tc-compact .tc-body{display:none}
@@ -1263,6 +1278,21 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
   </div>
 </div>
 <script>
+/* ╔══════════════════════════════════════════════════════════════════════════════════════════╗
+   ║  @moteur  —  BLOC DE LOGIQUE DU JEU. NE PAS RENOMMER CETTE SENTINELLE.                    ║
+   ║                                                                                          ║
+   ║  server/game-core.js charge EXACTEMENT ce bloc pour faire tourner le jeu côté serveur.    ║
+   ║  Tout ce qui touche aux RÈGLES doit vivre ICI. Une fonction de règle écrite dans un autre ║
+   ║  bloc <script> serait INVISIBLE pour le serveur, qui se rabattrait en silence sur un      ║
+   ║  comportement dégradé — c'est arrivé deux fois :                                          ║
+   ║    · `uiFillIncome` (revenu net)  → le correctif est resté du code mort une semaine ;     ║
+   ║    · `doRaidTarget` (raid ciblé)  → le serveur pillait toujours une nation arbitraire.    ║
+   ║                                                                                          ║
+   ║  Les blocs HORS moteur ne doivent contenir que de l'AFFICHAGE pur (onglets, zoom,         ║
+   ║  hauteur d'écran, écran de connexion). game-core.js vérifie au chargement que toutes les  ║
+   ║  fonctions dont le serveur a besoin sont bien ici, et ÉCHOUE bruyamment sinon.            ║
+   ╚══════════════════════════════════════════════════════════════════════════════════════════╝ */
+
 /* ============================================================ DATA ============================================================ */
 const TECH_BRANCHES={
   expansion:{label:'Expansion',emoji:'🏗️',civBonus:'martiens',color:'#FF9800'},
@@ -1693,19 +1723,59 @@ function showCommEventModal(onDone){
   }).join('');
   _evOverlay('<div style="font-size:2.2em;text-align:center">🤝</div><div style="text-align:center;font-weight:700;margin-bottom:4px">Accords Commerciaux</div><div style="color:#9fb4d6;font-size:.82em;text-align:center;margin-bottom:10px">Accord commercial <b>gratuit</b> : +3 VP pour chaque nation, met fin à une guerre si elle existe. Un leader trop en avance peut refuser.</div>'+_evMyStats()+opts+'<button class="ea-btn" onclick="_evCommPick(null)" style="margin-top:10px">Passer (aucun accord)</button>');
 }
+/* Conclut effectivement l'accord entre DEUX nations explicites (aucun recours à G.player : la
+   réponse du partenaire peut arriver bien après, quand la perspective a changé). */
+function _evAccordConclude(prop,part){
+  if(!prop||!part)return;
+  const col=part.colonies.find(function(c){return c.nodeId!==part.civ.home;})||part.colonies[0];
+  if(col&&!G.commercialAccords.includes(col.nodeId))G.commercialAccords.push(col.nodeId);
+  const _w=(G.wars||[]).find(function(w){return (w.a===prop.civ.id&&w.b===part.civ.id)||(w.a===part.civ.id&&w.b===prop.civ.id);});
+  if(_w&&typeof _evEndWarWith==='function')_evEndWarWith(part.civ.id,3);
+  setTens(prop.civ.id,part.civ.id,Math.max(0,getTens(prop.civ.id,part.civ.id)-3));
+  setTens(part.civ.id,prop.civ.id,Math.max(0,getTens(part.civ.id,prop.civ.id)-3));
+  prop.tempVP=(prop.tempVP||0)+3;part.tempVP=(part.tempVP||0)+3;
+  if(typeof updateConnections==='function'){updateConnections(prop);updateConnections(part);}
+  addLog('🤝 Accord commercial conclu : '+prop.civ.emoji+' '+prop.civ.name+' ↔ '+part.civ.emoji+' '+part.civ.name+' — +3 VP chacun, tension −3.','gold');
+}
+/* ACCORD COMMERCIAL = UNE PROPOSITION, PAS UNE DÉCISION UNILATÉRALE (règle posée par Marc).
+   Avant : celui qui choisissait concluait l'accord tout seul ; l'autre ne voyait jamais de demande,
+   il recevait simplement le même menu global — l'accord ne « marchait » que si, par hasard, il
+   choisissait le premier en retour. Désormais : le partenaire HUMAIN reçoit une vraie DEMANDE
+   (accepter / refuser), et ce n'est qu'après sa réponse que l'accord est conclu. Il garde ensuite
+   son propre tour de choix parmi les nations restantes. Les IA répondent selon la règle existante
+   (refus si le proposant est trop en avance et qu'elles ne sont pas en difficulté). */
 function _evCommPick(aiId){
   const done=_evCommDone;_evCommDone=null;_evCloseOverlay();
+  const prop=G.player; // le proposant est la nation active AU MOMENT du choix : on le capture
   if(!aiId){addLog('🤝 Sommet commercial : aucun accord conclu.','dim');if(done)done();return;}
-  const ai=G.ais.find(function(a){return a.civ.id===aiId;});if(!ai){if(done)done();return;}
-  const gap=calcVP(G.player).total-calcVP(ai).total;const weak=(ai.res.morale||0)<=2||_forceTotal(ai)<3;
+  const ai=(typeof allPlayers==='function'?allPlayers():G.ais).find(function(a){return a&&a.civ&&a.civ.id===aiId;});
+  if(!ai){if(done)done();return;}
+  // Partenaire HUMAIN en ligne → on lui DEMANDE son accord.
+  if(_decisionActive()&&!ai._isAI){
+    addLog('🤝 '+prop.civ.emoji+' '+prop.civ.name+' propose un accord commercial à '+ai.civ.emoji+' '+ai.civ.name+' — en attente de sa réponse…','dim');
+    _emitDecision('accord_request', ai,
+      {title:'🤝 Proposition d\'accord commercial',
+       from:prop.civ.id, fromName:prop.civ.emoji+' '+prop.civ.name,
+       texte:prop.civ.emoji+' '+prop.civ.name+' te propose un ACCORD COMMERCIAL : +3 VP pour chacun, tension −3, et fin de la guerre entre vous s\'il y en a une.',
+       options:[{id:'yes',name:'✅ Accepter l\'accord'},{id:'no',name:'❌ Refuser'}]},
+      null,
+      function(ans){
+        const ok=!!(ans&&(ans.value==='yes'||ans.targetId==='yes'||ans.id==='yes'||ans.accept===true));
+        if(ok)_evAccordConclude(prop,ai);
+        else addLog('🤝 '+ai.civ.emoji+' '+ai.civ.name+' refuse la proposition de '+prop.civ.emoji+' '+prop.civ.name+'.','red');
+        // Le proposant doit VOIR la réponse : notice personnelle (pas un simple message de journal).
+        if(typeof _emitNotice==='function')_emitNotice('accord_result', prop,
+          {title:ok?'🤝 Accord accepté':'🤝 Accord refusé',
+           body:(ok?ai.civ.emoji+' '+ai.civ.name+' a ACCEPTÉ ton accord commercial — +3 VP chacun, tension −3.'
+                  :ai.civ.emoji+' '+ai.civ.name+' a REFUSÉ ton accord commercial.')}, function(){});
+        if(done)done();
+      });
+    return;
+  }
+  // Partenaire IA : règle existante — elle refuse si le proposant est trop en avance et qu'elle va bien.
+  const gap=calcVP(prop).total-calcVP(ai).total;const weak=(ai.res.morale||0)<=2||_forceTotal(ai)<3;
   if(!weak&&gap>=8){addLog('🤝 '+ai.civ.emoji+' '+ai.civ.name+' refuse : tu es trop en avance ('+gap+' VP).','red');if(done)done();return;}
-  const col=ai.colonies.find(function(c){return c.nodeId!==ai.civ.home;})||ai.colonies[0];
-  if(col&&!G.commercialAccords.includes(col.nodeId))G.commercialAccords.push(col.nodeId);
-  if(G.wars&&G.wars.find(function(w){return w.aiId===ai.civ.id;}))_evEndWarWith(ai.civ.id,3);
-  setTens('player',ai.civ.id,Math.max(0,getTens('player',ai.civ.id)-3));setTens(ai.civ.id,'player',Math.max(0,getTens(ai.civ.id,'player')-3));
-  G.player.tempVP=(G.player.tempVP||0)+3;ai.tempVP=(ai.tempVP||0)+3;
-  if(typeof updateConnections==='function')updateConnections(G.player);
-  addLog('🤝 Accord commercial gratuit avec '+ai.civ.emoji+' '+ai.civ.name+' — +3 VP chacun, tension −3.','gold');
+  _evAccordConclude(prop,ai);
   if(done)done();
 }
 function showDiploEventModal(onDone){
@@ -1914,6 +1984,20 @@ function calcAC(p){
   return base;
 }
 function hasSpec(p,s){return p.cards.some(c=>c.spec===s||c.spec2===s);}
+/* POURQUOI cette techno est-elle inaccessible ? Le jeu connaît trois raisons bien distinctes ;
+   les confondre dans un même grisage muet n'aidait personne (retour de Marc). Texte court, destiné
+   à la carte REPLIÉE — le détail complet reste sur la grande carte. */
+function techLockReason(card,p){
+  const pp=p||G.player;
+  if(!card||!card.branch)return null;
+  if(card.branch==='empathes'&&typeof isEmpathesAvailableFor==='function'&&!isEmpathesAvailableFor(pp))
+    return 'réservée aux Empathes';
+  if(card.tier>((G.branchTiers&&G.branchTiers[card.branch])||0)+1)
+    return 'palier T'+card.tier+' pas encore ouvert';
+  if(card.tier===3&&!pp.cards.some(function(c){return c.branch===card.branch&&c.tier===2;}))
+    return 'il te faut TA T2 de cette branche';
+  return null;
+}
 function isTechAvailable(card,p){
   if(!card.branch)return true;
   if(card.tier>(G.branchTiers[card.branch]||0)+1)return false;
@@ -2928,11 +3012,16 @@ function _startTurnPrep(){
   G._prepDoneTurn=G.turn;
   if(typeof enforceCaps==='function')enforceCaps(); // écrêtage : correction des excès du tour précédent (après entretien)
   G.phase='actions';G.turnActions=[];G.aiActions=[];G._raidsThisTurn=[];
-  G.player._milBoughtThisTurn=new Set(); // militaires : 1× par carte par tour (joueur)
+  /* ⚠️ CES COMPTEURS SONT PAR NATION — les remettre à zéro sur G.player SEUL ne réinitialisait que
+     le joueur 1 en multijoueur. Conséquences vécues : la carte « Expansion Rapide » (colonisation
+     gratuite) ne fonctionnait plus jamais pour les autres joueurs après leur première utilisation
+     (`_stratColUsed` restait à true), et une carte militaire « 1× par tour » devenait 1× par PARTIE.
+     Bug signalé par Marc pour le TROISIÈME joueur. Toujours passer par allPlayers(). */
+  allPlayers().forEach(p=>{ p._milBoughtThisTurn=new Set(); }); // militaires : 1× par carte par tour
   allPlayers().forEach(p=>{ p._civicPerTurn=new Set(); }); // civiques « 1×/tour » (ex. Investissement Recherche) — remis à zéro chaque tour, par nation
   mode=null;routeFrom=null;undoStack=[];if(typeof _scHideConfirm==='function')_scHideConfirm();G._scStuckTries=0;G._scStuckShown=false;
   G.player.abilityUsed=false;G.ais.forEach(ai=>{ai.abilityUsed=false;});
-  G.player._stratColUsed=false;
+  allPlayers().forEach(p=>{ p._stratColUsed=false; }); // colonisation gratuite (carte Stratégie) : 1× par tour, POUR CHAQUE nation
   G.player._attacksThisTurn=0;G.ais.forEach(ai=>{ai._attacksThisTurn=0;});
   if(G.player.bonusMat){G.player.res.materials+=1;G.player.bonusMat=false;addLog('🔀 Bonus : +1<i class=ri-materials></i>','green');}
   G.ais.forEach(ai=>{if(ai.bonusMat){ai.res.materials+=1;ai.bonusMat=false;}});
@@ -2944,8 +3033,14 @@ function _startTurnPrep(){
     p.forceCooldown=p.forceCooldown.filter(fc=>fc.returnTurn>G.turn);
   }
   // Retirer les jetons Force temporaires de la stratégie du tour précédent
-  if(G.player.stratForceBonus){G.player.forceTokens=Math.max(0,G.player.forceTokens-G.player.stratForceBonus);addLog('⏱️ Jetons Force temporaires expirés (−'+G.player.stratForceBonus+').','dim');G.player.stratForceBonus=0;}
-  if(G.player.milLoseNext){G.player.forceTokens=Math.max(0,G.player.forceTokens-G.player.milLoseNext);addLog('⏱️ Renforts militaires dissous (−'+G.player.milLoseNext+' jeton(s)).','dim');G.player.milLoseNext=0;}
+  /* Expiration des jetons TEMPORAIRES — également par nation : appliquée au seul G.player, les autres
+     joueurs conservaient indéfiniment les jetons d'une carte Stratégie et leurs renforts militaires
+     (avantage permanent non voulu). Le message nomme la nation quand ce n'est pas celle qui agit. */
+  allPlayers().forEach(p=>{
+    const _moi=(p===G.player), _nom=_moi?'':(p.civ.emoji+' '+p.civ.name+' : ');
+    if(p.stratForceBonus){p.forceTokens=Math.max(0,p.forceTokens-p.stratForceBonus);addLog('⏱️ '+_nom+'Jetons Force temporaires expirés (−'+p.stratForceBonus+').','dim');p.stratForceBonus=0;}
+    if(p.milLoseNext){p.forceTokens=Math.max(0,p.forceTokens-p.milLoseNext);addLog('⏱️ '+_nom+'Renforts militaires dissous (−'+p.milLoseNext+' jeton(s)).','dim');p.milLoseNext=0;}
+  });
   if(G.player.civ.id==='terriens'&&(G.player.res.morale||0)>=5)addGovPts(G.player,1);
   for(const ai of G.ais){if(ai.civ.id==='terriens'&&(ai.res.morale||0)>=5)addGovPts(ai,1);}
   if(G.player.govRpt>0)addGovPts(G.player,G.player.govRpt);
@@ -3256,13 +3351,23 @@ function _ilPhrase(nation, msg){
 // ~5 s rien n'a avancé (même tour, même position, toujours 0 issue visible : pas de modale, pas de
 // confirmation, pas de rappel de pouvoir), on affiche une sortie « Fin de tour » manuelle. Ça garantit
 // qu'on ne reste JAMAIS bloqué sans fin de tour, quelle que soit la cause (bug signalé par Marc, tour 6).
+/* Le TUTORIEL impose son propre rythme : le joueur LIT la bulle du coach, il n'est pas bloqué.
+   Or la bulle n'est pas une « modale » au sens du chien de garde → au bout de 5 secondes de lecture
+   celui-ci affichait « Tu sembles bloqué » par-dessus l'explication (bug vu par Marc à l'étape 8).
+   Le tutoriel a déjà son propre filet de sécurité : un bouton « Suivant » à chaque étape. */
+function _scTutorialActive(){
+  try{ return !!(typeof window!=='undefined' && (window.SC_TUTO || document.getElementById('tuto-coach'))); }
+  catch(e){ return false; }
+}
 function _armPlayerStuckWatch(){
   try{
     clearTimeout(G._playerStuckWatch);
+    if(_scTutorialActive())return;                            // pas de chien de garde pendant le tutoriel
     const t=G.turn, idx=G._ilIdx;
     G._playerStuckWatch=setTimeout(function(){
       try{
         if(!G||G.phase!=='actions'||!G._il||!G._humanActive)return;
+        if(_scTutorialActive())return;                        // le coach a pu démarrer entre-temps
         if(G.turn!==t||G._ilIdx!==idx)return;                 // ça a avancé → ok
         if(_scConfirmArmed)return;                            // barre Valider visible → sortie existe
         if(typeof _scAbilityReminderOpen==='function'&&_scAbilityReminderOpen())return;
@@ -4252,9 +4357,75 @@ function _forgeUpgrade(nodeId){
   scArmConfirm('💫 Forge '+NODES[nodeId].name,[{kind:'pt',icon:rEmoji('science'),val:1}]);
   render();
 }
+/* ⚠️ LE RAID DOIT AVOIR UNE CIBLE CHOISIE. Le bouton « 💰 Raid » de la barre d'action appelait un
+   raid SANS cible, qui frappait `G.ais[0]` — la première nation de la liste, c'est-à-dire une nation
+   arbitraire que le joueur n'a jamais désignée. En multijoueur `G.ais` est « tout le monde sauf moi » :
+   un Jupitérien croyant piller les Martiens pillait en réalité le Terrien, dont la tension montait
+   (bug signalé par Marc). Désormais : une seule cible possible → on la prend ; plusieurs → on DEMANDE. */
 function doRaid(){
   if(G.phase!=='actions')return;
   if(_scGuard())return;
+  const _cibles=(G.ais||[]).filter(a=>a&&a.civ);
+  if(_cibles.length===0){addLog('⚠️ Raid : aucune nation à piller.','red');return;}
+  if(_cibles.length===1){ doRaidTarget(_cibles[0].civ.id,null); return; }
+  const _opts=_cibles.map(a=>({id:a.civ.id, name:a.civ.name, emoji:a.civ.emoji,
+    label:a.civ.emoji+' '+a.civ.name+' — tension '+getTens(a.civ.id,'player')+'/10'}));
+  if(_decisionActive()){ // en ligne : la question part au joueur qui agit
+    _emitDecision('raid_target', G.player, {title:'💰 Quelle nation veux-tu piller ?', options:_opts}, null,
+      (ans)=>{ const id=(ans&&(ans.targetId||ans.value||ans.id))||null; if(id)doRaidTarget(id,null); });
+    return;
+  }
+  // Solo : petite fenêtre de choix autonome (aucune dépendance à une modale existante).
+  if(typeof document==='undefined'||document.getElementById('sc-raid-pick'))return;
+  document.body.insertAdjacentHTML('beforeend',
+    '<div id="sc-raid-pick" style="position:fixed;inset:0;background:rgba(4,4,18,.86);z-index:660;display:flex;align-items:center;justify-content:center;padding:16px">'+
+      '<div style="background:#0f0f2a;border:2px solid #cc7a22;border-radius:14px;padding:20px;max-width:400px;width:100%">'+
+        '<div style="font-weight:700;color:#ffbb66;margin-bottom:12px;text-align:center">💰 Quelle nation veux-tu piller ?</div>'+
+        _opts.map(o=>'<button onclick="_scRaidPick(\''+o.id+'\')" style="display:block;width:100%;margin:6px 0;padding:10px;background:#2a1200;border:1px solid #cc6622;color:#ffcfa0;border-radius:9px;cursor:pointer;font-weight:700">'+o.label+'</button>').join('')+
+        '<button onclick="_scRaidPick(null)" style="display:block;width:100%;margin-top:10px;padding:8px;background:#14182e;border:1px solid #3a3a5a;color:#9898b8;border-radius:9px;cursor:pointer">Annuler</button>'+
+      '</div></div>');
+}
+function _scRaidPick(id){
+  const m=document.getElementById('sc-raid-pick'); if(m)m.remove();
+  if(id)doRaidTarget(id,null);
+}
+/* ⚠️ DÉPLACÉE ICI depuis le bloc <script> d'interface. Elle en était inaccessible au SERVEUR
+   (game-core.js ne charge que le plus gros bloc) : `sb.doRaidTarget` était undefined, le serveur
+   retombait donc TOUJOURS sur le raid sans cible et pillait une nation arbitraire. */
+function doRaidTarget(aiId,nodeId){
+  try{
+    if(!G||G.phase!=='actions')return;
+    var p=G.player;
+    var tc=p.civ.id==='ceinturiens'?1:2;
+    var enCost=0;
+    var target=G.ais.find(function(a){return a.civ.id===aiId;});
+    if(!target){addLog('⚠️ Cible de raid introuvable.','red');return;}
+    if(p.acLeft<1){addLog('⚠️ Raid : besoin 1 AC.','red');return;}
+    if(p.forceTokens<tc){addLog('⚠️ Raid : besoin '+tc+' jeton(s) Force.','red');return;}
+    if(enCost>0&&(p.res.energy||0)<enCost){addLog('⚠️ Raid : besoin '+enCost+'<i class=ri-energy></i> (carburant).','red');return;}
+    undoStack=[];
+    p.acLeft-=1;p.forceTokens-=tc;p.forceCooldown.push({count:tc,returnTurn:getCooldownTurn(p)});
+    if(enCost>0)p.res.energy-=enCost;
+    p.spentThisTurn=(p.spentThisTurn||0)+1+tc+enCost;
+    var targets=['energy','materials'].filter(function(r){return (target.res[r]||0)>0;});
+    var stolen=[];
+    for(var i=0;i<2&&targets.length>0;i++){
+      var r=targets[Math.floor(Math.random()*targets.length)];
+      target.res[r]=Math.max(0,(target.res[r]||0)-1);
+      p.res[r]=(p.res[r]||0)+1;stolen.push(rEmoji(r));
+      if(target.res[r]===0)targets.splice(targets.indexOf(r),1);
+    }
+    addTens(target.civ.id,'player',2);
+    addTens('player',target.civ.id,1);
+    addLog('⚔️ Raid sur '+target.civ.emoji+' '+target.civ.name+' ! +'+(stolen.join('')||'rien')+(enCost>0?' (−1<i class=ri-energy></i>)':'')+' ('+tc+' jeton en CD, tension +2)','green');
+    addAction('💰','Raid '+target.civ.emoji,1,{},'Volé : '+(stolen.join('')||'rien'));
+    render();
+  }catch(e){console.error('doRaidTarget',e);}
+}
+
+/* Ancien raid sans cible — CONSERVÉ uniquement pour compatibilité interne (IA/scripts). Ne plus
+   l'appeler depuis l'interface : il choisit `G.ais[0]`, ce qui n'a de sens qu'à deux nations. */
+function doRaidLegacyFirstTarget(){
   const p=G.player;const tokenCost=p.civ.id==='ceinturiens'?1:2;
   const enCost=0; // v18 : raid sans coût énergie
   if(p.acLeft<1){addLog('⚠️ Raid : besoin 1 AC.','red');return;}
@@ -6186,6 +6357,16 @@ function renderTechTree(){
     for(let tier=1;tier<=3;tier++){
       const card=CARDS_POOL.find(c=>c.branch===branchId&&c.tier===tier);
       if(!card){html+=`<div class="tcard tlocked" style="opacity:.15;min-height:${compact?'22px':'68px'}"><div class="tc-header"><span class="tc-name" style="color:#3a3a6a">—</span></div></div>`;if(tier<3)html+=`<div class="tcard-arr">→</div>`;continue;}
+      /* CARTE BLOQUÉE PAR UN PRÉREQUIS → REPLIÉE (choix de Marc) : au lieu d'un grand carton grisé
+         illisible, une bande fine qui dit CE QUI MANQUE. La branche garde ses trois colonnes, on
+         gagne de la hauteur, et la raison est explicite au lieu d'être devinée. */
+      const _raisonLock=(typeof techLockReason==='function')?techLockReason(card,G.player):null;
+      if(_raisonLock&&!G.player.cards.find(c=>c.id===card.id)){
+        html+=`<div class="tcard tc-compact tc-fold" onclick="showTechDetail('${card.id}')" title="${card.name} — ${_raisonLock}" style="border-top:2px solid ${branch.color}40">
+          <div class="tc-header"><span class="tc-name">🔒 ${card.name}</span>
+          <span class="tc-fold-why">${_raisonLock}</span></div></div>`;
+        continue;
+      }
       const exclusive=isTechExclusive(card);
       const playerOwned=!!G.player.cards.find(c=>c.id===card.id);
       const aiOwned=G.ais.some(ai=>ai.cards.find(c=>c.id===card.id));
@@ -6208,8 +6389,9 @@ function renderTechTree(){
       const artBg=branch.color+'18';
       // Petites cartes : on n'affiche QUE le statut "à toi" ; le détail (quelle nation) est sur la grande carte.
       let statusBadge='';
-      if(playerOwned)statusBadge=`<span class="tc-taken-badge">✓ Toi</span>`;
-      else if(exclusiveTaken)statusBadge=`<span class="tc-taken-badge">Pris</span>`;
+      // Symbole seul (large), le mot en info-bulle : « Pris » écrit en tout petit était illisible.
+      if(playerOwned)statusBadge=`<span class="tc-taken-badge tb-mine" title="Tu possèdes cette technologie">✓</span>`;
+      else if(exclusiveTaken)statusBadge=`<span class="tc-taken-badge tb-taken" title="Déjà prise par une autre nation — plus disponible">⛔</span>`;
       const lockOverlay=!isTechAvailable(card,G.player)?`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;background:rgba(0,0,0,.18)">🔒</div>`:'';
       // Always open detail on click — no direct buy
       const onclick=`showTechDetail('${card.id}')`;
@@ -6225,8 +6407,8 @@ function renderTechTree(){
           </div></div>`;
       } else {
         let costDisplay;
-        if(playerOwned)costDisplay='<span style="color:#66cc66">✓ Toi</span>';
-        else if(exclusiveTaken)costDisplay='<span style="color:#7880a0">Pris</span>';
+        if(playerOwned)costDisplay='<span style="color:#8df59d">✓ À toi</span>';
+        else if(exclusiveTaken)costDisplay='<span style="color:#ff9d9d">⛔ Prise</span>';
         else if(!canAfford)costDisplay='<span class="res-tag energy" style="font-size:.85em;opacity:.6">'+(card.tier===3?'2':'1')+'AC</span> <span style="color:#cc8844;font-size:.82em">'+Object.entries(cost).map(([r,a])=>{const have=G.player.res[r]||0;const ok=have>=a;return`<span style="color:${ok?'#8898b8':'#ff7744'}">${a}${rEmoji(r)}</span>`;}).join(' ')+'</span>';
         else costDisplay='<span class="res-tag energy" style="font-size:.85em">'+(card.tier===3?'2':'1')+'AC</span> '+costHtmlStr;
         html+=`<div class="${cls}" onclick="${onclick}" style="border-top:2px solid ${branch.color}80;min-height:68px;cursor:pointer">
@@ -7476,6 +7658,7 @@ function _scCanPlayerAct(){
 function _scMaybeStuck(){ // à appeler quand c'est le tour du joueur
   try{
     if(!G||G.phase!=='actions'||!G.player)return;
+    if(typeof _scTutorialActive==='function'&&_scTutorialActive())return; // le coach mène le rythme
     if(_scConfirmArmed || G._scStuckShown)return;
     if(typeof _scAbilityReminderOpen==='function'&&_scAbilityReminderOpen())return;
     if(!_scCanPlayerAct()){ G._scStuckShown=true; _scShowStuckModal(); }
@@ -7512,11 +7695,18 @@ function _scWatchdogTick(){
 if(typeof window!=='undefined' && typeof document!=='undefined' && document.getElementById) setInterval(_scWatchdogTick, 2500);
 function _scShowStuckModal(){
   if(typeof document==='undefined'||!document.body||document.getElementById('sc-stuck-modal'))return;
+  if(typeof _scTutorialActive==='function'&&_scTutorialActive())return; // jamais par-dessus le tutoriel
+  /* Le texte doit dire la VÉRITÉ : le chien de garde se déclenche aussi sur une simple inactivité,
+     où le joueur a très bien pu garder des ressources. On ne parle de pénurie que si elle est avérée. */
+  const _penurie=(typeof _scCanPlayerAct==='function')?!_scCanPlayerAct():true;
+  const _txt=_penurie
+    ? "Tu n'as plus assez de ressources pour jouer une action ce tour. Que veux-tu faire ?"
+    : "Rien ne s'est passé depuis un moment. Si tu réfléchis encore, ferme simplement cette fenêtre.";
   document.body.insertAdjacentHTML('beforeend',
     '<div id="sc-stuck-modal" style="position:fixed;inset:0;background:rgba(4,4,18,.88);z-index:640;display:flex;align-items:center;justify-content:center;padding:16px">'+
       '<div style="background:#0f0f2a;border:2px solid #c85050;border-radius:14px;padding:22px;max-width:420px;text-align:center">'+
         '<div style="font-size:1.05em;font-weight:700;color:#ffd0d0;margin-bottom:10px">⚠️ Tu sembles bloqué</div>'+
-        '<div style="font-size:.9em;color:#c8d8f8;margin-bottom:18px;line-height:1.5">Tu n\'as plus assez de ressources pour jouer une action ce tour. Que veux-tu faire ?</div>'+
+        '<div style="font-size:.9em;color:#c8d8f8;margin-bottom:18px;line-height:1.5">'+_txt+'</div>'+
         '<div style="display:flex;flex-direction:column;gap:9px">'+
           '<button onclick="_scStuckPass()" style="padding:11px;background:#16401a;border:1px solid #2f6b34;color:#9ad89a;border-radius:9px;font-weight:700;cursor:pointer;font-size:.95em">⏭ Passer mes actions et finir le tour</button>'+
           '<button onclick="_scStuckRestart()" style="padding:11px;background:#4a1010;border:1px solid #c85050;color:#ffd0d0;border-radius:9px;font-weight:700;cursor:pointer;font-size:.95em">↺ Recommencer la partie du début</button>'+
@@ -7797,36 +7987,6 @@ function uiAddRoute(from,to){
 }
 
 /* --- Raid ciblé sur une colonie ennemie précise (basé sur doRaid) --- */
-function doRaidTarget(aiId,nodeId){
-  try{
-    if(!G||G.phase!=='actions')return;
-    var p=G.player;
-    var tc=p.civ.id==='ceinturiens'?1:2;
-    var enCost=0;
-    var target=G.ais.find(function(a){return a.civ.id===aiId;});
-    if(!target){addLog('⚠️ Cible de raid introuvable.','red');return;}
-    if(p.acLeft<1){addLog('⚠️ Raid : besoin 1 AC.','red');return;}
-    if(p.forceTokens<tc){addLog('⚠️ Raid : besoin '+tc+' jeton(s) Force.','red');return;}
-    if(enCost>0&&(p.res.energy||0)<enCost){addLog('⚠️ Raid : besoin '+enCost+'<i class=ri-energy></i> (carburant).','red');return;}
-    undoStack=[];
-    p.acLeft-=1;p.forceTokens-=tc;p.forceCooldown.push({count:tc,returnTurn:getCooldownTurn(p)});
-    if(enCost>0)p.res.energy-=enCost;
-    p.spentThisTurn=(p.spentThisTurn||0)+1+tc+enCost;
-    var targets=['energy','materials'].filter(function(r){return (target.res[r]||0)>0;});
-    var stolen=[];
-    for(var i=0;i<2&&targets.length>0;i++){
-      var r=targets[Math.floor(Math.random()*targets.length)];
-      target.res[r]=Math.max(0,(target.res[r]||0)-1);
-      p.res[r]=(p.res[r]||0)+1;stolen.push(rEmoji(r));
-      if(target.res[r]===0)targets.splice(targets.indexOf(r),1);
-    }
-    addTens(target.civ.id,'player',2);
-    addTens('player',target.civ.id,1);
-    addLog('⚔️ Raid sur '+target.civ.emoji+' '+target.civ.name+' ! +'+(stolen.join('')||'rien')+(enCost>0?' (−1<i class=ri-energy></i>)':'')+' ('+tc+' jeton en CD, tension +2)','green');
-    addAction('💰','Raid '+target.civ.emoji,1,{},'Volé : '+(stolen.join('')||'rien'));
-    render();
-  }catch(e){console.error('doRaidTarget',e);}
-}
 
 /* --- Aperçu des revenus par tour (sans effet de bord) --- */
 function uiIncome(p){

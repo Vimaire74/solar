@@ -17,6 +17,8 @@ peut se faire pendant que les amis de Marc testent. La **vague B** immobilise le
 
 # VAGUE A — sans danger, faisable à tout moment
 
+> **ÉTAT au 2026-08-03 : A1, A2 et A4 sont FAITS (v5.9). Reste A3.**
+
 ### A1. Numéro de version dans le protocole client/serveur
 **Pourquoi** : sur mobile, un joueur garde une vieille application des mois. Elle parlera à un
 serveur récent sans que rien ne le détecte. On vient déjà de perdre deux jours sur une question de

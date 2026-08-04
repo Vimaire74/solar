@@ -8,6 +8,12 @@
    Usage : node server.js   (PORT, GAME_HTML, DATA_DIR, AFK_MS surchargeables par variables d'env)
 */
 'use strict';
+/* VERSION DU PROTOCOLE parlé avec les clients. `PROTO_MAX` = ce que ce serveur sait faire ;
+   `PROTO_MIN` = le plus ancien client encore accepté. Élargir la fenêtre plutôt que de casser :
+   sur mobile, les joueurs mettent des semaines à mettre à jour. À incrémenter dès qu'un message
+   change de forme (nouveau champ obligatoire, sens modifié, message retiré). */
+const PROTO_MIN = 1, PROTO_MAX = 1;
+const SERVER_BUILD = '2026-08-03 · v6.4';
 const http = require('http');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -54,17 +60,61 @@ function J(obj) { return JSON.stringify(safeEncode(obj)); }
 const ADMIN_MAIL = process.env.ADMIN_MAIL || 'marc@guerir.ch';
 const OUTBOX = path.join(DATA, 'outbox.log');
 let _transport = null;
+let _smtpChargementErreur = null;   // ex. « nodemailer » absent : cause TRÈS différente d'une mauvaise config
+/* CONFIGURATION SMTP — avec détection des erreurs classiques d'OVH.
+   Le « 535 Authentication failed » vient presque toujours de l'une de ces trois causes :
+     1. SMTP_USER n'est PAS l'adresse complète (OVH exige `prenom@domaine.ch`, pas `prenom`) ;
+     2. le port et le chiffrement ne s'accordent pas (465 = SSL direct, 587 = STARTTLS) ;
+     3. MAIL_FROM diffère de la boîte authentifiée → OVH refuse de relayer.
+   On DÉDUIT donc `secure` du port quand il n'est pas précisé, on aligne MAIL_FROM par défaut sur
+   SMTP_USER, et on signale les incohérences au démarrage plutôt que de laisser l'envoi échouer en
+   silence des jours durant. */
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
+/* Le chiffrement est IMPOSÉ par le port sur les deux ports standards (RFC 8314) : 465 = TLS implicite,
+   587 = STARTTLS. Un désaccord n'est jamais un choix, c'est toujours une erreur de saisie — et il est
+   parfois impossible à corriger dans l'interface (Coolify remet la valeur précédente quand on vide le
+   champ, constaté par Marc). On aligne donc sur le port et on le DIT dans les logs, plutôt que de
+   laisser une case rebelle empêcher tout envoi. SMTP_SECURE n'est respecté que sur un port exotique. */
+const _secureDemande = (process.env.SMTP_SECURE === undefined || process.env.SMTP_SECURE === '')
+  ? null : (String(process.env.SMTP_SECURE) === '1');
+const SMTP_SECURE = (SMTP_PORT === 465) ? true
+                  : (SMTP_PORT === 587) ? false
+                  : (_secureDemande === null ? false : _secureDemande);
+const _secureForce = (_secureDemande !== null && _secureDemande !== SMTP_SECURE);
+const MAIL_FROM = process.env.MAIL_FROM || (process.env.SMTP_USER ? 'Solar <' + process.env.SMTP_USER + '>' : 'Solar <contact@solar-game.com>');
+function _adresseDe(x) { const m = /<([^>]+)>/.exec(String(x || '')); return (m ? m[1] : String(x || '')).trim().toLowerCase(); }
+/* Incohérences détectables SANS envoyer : ce sont elles qui produisent le 535 / le refus de relais. */
+function smtpAvertissements() {
+  const a = [];
+  if (!process.env.SMTP_HOST) { a.push('SMTP_HOST absent — aucun envoi possible, tout est seulement journalisé.'); return a; }
+  const u = String(process.env.SMTP_USER || '');
+  if (!u) a.push('SMTP_USER absent — OVH exige une authentification.');
+  else if (!isEmail(u)) a.push('SMTP_USER = « ' + u +' » n\'est PAS une adresse complète. OVH veut `prenom@domaine.ch` — c\'est LA cause n°1 du « 535 Authentication failed ».');
+  if (!process.env.SMTP_PASS) a.push('SMTP_PASS absent.');
+  if (_secureForce) a.push('SMTP_SECURE=' + process.env.SMTP_SECURE + ' est en désaccord avec le port ' + SMTP_PORT
+    + ' → IGNORÉ, on applique le réglage imposé par le port (' + (SMTP_SECURE ? 'TLS implicite' : 'STARTTLS')
+    + '). Tu peux laisser cette variable telle quelle, elle ne bloque plus rien.');
+  if (SMTP_PORT !== 465 && SMTP_PORT !== 587) a.push('port ' + SMTP_PORT + ' inhabituel : chez OVH, utilise 465 (SSL) ou 587 (STARTTLS).');
+  if (u && isEmail(u) && _adresseDe(MAIL_FROM) !== u.toLowerCase())
+    a.push('MAIL_FROM (« ' + _adresseDe(MAIL_FROM) + ' ») diffère de la boîte authentifiée (« ' + u.toLowerCase() + ' ») — OVH refuse de relayer une adresse d\'expéditeur qui n\'est pas la sienne.');
+  return a;
+}
 try {
   if (process.env.SMTP_HOST) {
     const nodemailer = require('nodemailer');
     _transport = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587', 10),
-      secure: String(process.env.SMTP_SECURE || '') === '1',
+      port: SMTP_PORT,
+      secure: SMTP_SECURE,
+      requireTLS: !SMTP_SECURE,               // 587 : exiger STARTTLS (jamais d'authentification en clair)
       auth: (process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined)
     });
   }
-} catch (e) { console.error('nodemailer indisponible (emails journalisés seulement):', e.message); }
+  for (const w of smtpAvertissements()) console.error('⚠️  SMTP : ' + w);
+} catch (e) {
+  _smtpChargementErreur = e.message;
+  console.error('⚠️  SMTP : nodemailer indisponible (emails journalisés seulement) — ' + e.message);
+}
 function frDate(ts) { // date + heure au format FRANÇAIS (jj/mm/aaaa hh:mm)
   try { return new Date(ts).toLocaleString('fr-FR', { timeZone: 'Europe/Zurich', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
   catch (e) { return new Date(ts).toISOString(); }
@@ -79,7 +129,7 @@ function sendMail(to, subject, text) {
   // l'email devienne obligatoire) → on n'essaie même pas : l'envoi échouerait silencieusement.
   if (!isEmail(to)) { noteMailError('NON ENVOYÉ à « ' + to + ' » : ce compte a un pseudo, pas une adresse email. Le joueur doit créer un compte avec son email.'); return; }
   if (!_transport) { noteMailError('NON ENVOYÉ à ' + to + ' : SMTP non configuré (variables SMTP_* absentes).'); return; }
-  _transport.sendMail({ from: process.env.MAIL_FROM || 'Solar <contact@solar-game.com>', to, subject, text })
+  _transport.sendMail({ from: MAIL_FROM, to, subject, text })
     .then(() => {})
     .catch(e => { console.error('sendMail:', e.message); noteMailError('ÉCHEC vers ' + to + ' : ' + e.message); });
 }
@@ -225,6 +275,48 @@ function armTimer(g, civId, fn) {
 }
 
 /* Le cœur : appliquer le résultat de pump() → router vers les clients. */
+/* ASSAINISSEMENT DES RÉPONSES CLIENT (vague A du lot 16).
+   Le serveur vérifiait déjà QUI répond (le siège doit être le destinataire de la décision), mais pas
+   CE QU'IL répond. Un client modifié pouvait engager 999 jetons, désigner une cible absente de la
+   liste proposée, ou renvoyer un type inattendu. Le moteur reste l'autorité finale (il replafonne),
+   mais on refuse ici ce qui n'a aucun sens — défense en profondeur, indispensable avant d'ouvrir le
+   multijoueur à des inconnus.
+   Principe : on ne « devine » rien. Les nombres sont bornés, et toute valeur censée venir d'une
+   LISTE proposée doit s'y trouver ; sinon on la retire plutôt que de l'inventer. */
+function assainirReponse(g, pending, ans) {
+  if (!ans || typeof ans !== 'object' || Array.isArray(ans)) return {};
+  const out = {};
+  const payload = pending.payload || {};
+  const idsProposes = new Set();
+  for (const liste of [payload.options, payload.cands, payload.cols, payload.routes]) {
+    if (Array.isArray(liste)) for (const o of liste) { if (o && o.id) idsProposes.add(String(o.id)); if (o && o.node) idsProposes.add(String(o.node)); }
+  }
+  // Plafond de jetons : ce que le moteur a lui-même annoncé comme engageable.
+  const maxJetons = Math.max(0, parseInt(payload.maxEngage !== undefined ? payload.maxEngage
+                                        : (payload.maxDef !== undefined ? payload.maxDef : payload.myForce), 10) || 0);
+  for (const [k, v] of Object.entries(ans)) {
+    if (typeof v === 'number' || (typeof v === 'string' && /^-?\d+$/.test(v))) {
+      let n = parseInt(v, 10); if (!isFinite(n)) continue;
+      if (k === 'tokens' || k === 'defTokens') n = Math.max(0, Math.min(n, maxJetons));
+      else n = Math.max(-9999, Math.min(9999, n));
+      out[k] = n;
+    } else if (typeof v === 'boolean') out[k] = v;
+    else if (typeof v === 'string') {
+      const s = v.slice(0, 64);
+      // Un identifiant de choix doit provenir de la liste proposée (quand il y en a une).
+      if (idsProposes.size && /^(id|value|targetId|cardId|agendaId|node|branch|aiId|target)$/.test(k) && !idsProposes.has(s)) continue;
+      out[k] = s;
+    } else if (Array.isArray(v)) out[k] = v.slice(0, 12).filter(x => typeof x === 'string').map(x => x.slice(0, 64));
+    else if (v && typeof v === 'object') { // une seule profondeur (ex. offre de paix {materials,energy,science})
+      if (k === 'tokens' || k === 'defTokens') continue; // un nombre de jetons n'est JAMAIS un objet
+      const sub = {};
+      for (const [k2, v2] of Object.entries(v)) if (typeof v2 === 'number' && isFinite(v2)) sub[k2] = Math.max(0, Math.min(999, Math.floor(v2)));
+      out[k] = sub;
+    }
+  }
+  return out;
+}
+
 function route(g, r) {
   clearTimer(g);
   snapshot(g);
@@ -291,13 +383,13 @@ function recover(g, tag, e) {
 
 /* ============ HTTP (health) + WebSocket ============ */
 const server = http.createServer((req, res) => {
-  if (req.url === '/health') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true,"games":' + games.size + '}'); return; }
+  if (req.url === '/health') { res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); res.end('{"ok":true,"games":' + games.size + '}'); return; }
   if (req.url && req.url.indexOf('/bot') === 0) { // inviter le bot « Claude » : /bot?code=XXXX[&civ=martiens]
     let code = '', civId;
     let fast = false;
     try { const u = new URL(req.url, 'http://x'); code = (u.searchParams.get('code') || '').toUpperCase(); civId = u.searchParams.get('civ') || undefined; fast = u.searchParams.get('fast') === '1'; } catch (e) {}
     const g = games.get(code);
-    res.writeHead(g ? 200 : 404, { 'Content-Type': 'application/json' });
+    res.writeHead(g ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
     if (!g) { res.end('{"ok":false,"msg":"partie introuvable (code ?)"}'); return; }
     try {
       const user = require('./bot.js').spawnBot(PORT, code, { civId, fast });
@@ -325,6 +417,68 @@ const server = http.createServer((req, res) => {
       + '  · comptes supprimés : ' + nU + '\n  · archives supprimées : ' + nA + '\n  · parties supprimées : ' + nG + '\n'
       + '  · journal des emails vidé, sessions et parties en cours effacées.\n\n'
       + 'Crée maintenant ton compte avec ton ADRESSE EMAIL pour recevoir les scores.');
+    return;
+  }
+  /* ───────── /mailtest — DIAGNOSTIC SMTP ─────────────────────────────────────────────────────
+     Sans cette page, vérifier un réglage d'email demandait de jouer une partie entière pour
+     déclencher un envoi. Ici : configuration effective (mot de passe masqué), incohérences
+     détectées, test de connexion RÉEL au serveur OVH, et envoi d'essai facultatif.
+       /mailtest              → configuration + avertissements + verify()
+       /mailtest?to=x@y.ch    → en plus, envoie un vrai message d'essai à cette adresse
+     Aucune donnée sensible n'est exposée : le mot de passe n'est jamais affiché. */
+  if (req.url === '/mailtest' || req.url.indexOf('/mailtest?') === 0) {
+    const q = new URL(req.url, 'http://x').searchParams;
+    const dest = q.get('to');
+    const out = [];
+    out.push('SOLAR — DIAGNOSTIC EMAIL  (' + frDate(Date.now()) + ')');
+    out.push('');
+    out.push('CONFIGURATION EFFECTIVE');
+    out.push('  SMTP_HOST   : ' + (process.env.SMTP_HOST || '(absent)'));
+    out.push('  SMTP_PORT   : ' + SMTP_PORT);
+    out.push('  chiffrement : ' + (SMTP_SECURE ? 'SSL direct (secure=true)' : 'STARTTLS (secure=false)')
+             + ' — imposé par le port ' + SMTP_PORT
+             + (_secureForce ? '  [SMTP_SECURE=' + process.env.SMTP_SECURE + ' ignoré, incompatible avec ce port]' : ''));
+    out.push('  SMTP_USER   : ' + (process.env.SMTP_USER || '(absent)'));
+    out.push('  SMTP_PASS   : ' + (process.env.SMTP_PASS ? '(défini, ' + String(process.env.SMTP_PASS).length + ' caractères)' : '(ABSENT)'));
+    out.push('  MAIL_FROM   : ' + MAIL_FROM);
+    out.push('  ADMIN_MAIL  : ' + ADMIN_MAIL);
+    out.push('');
+    const av = smtpAvertissements();
+    out.push('INCOHÉRENCES DÉTECTÉES SANS ENVOYER');
+    if (!av.length) out.push('  aucune — la configuration est cohérente.');
+    else av.forEach((w, i) => out.push('  ' + (i + 1) + '. ' + w));
+    out.push('');
+    const fin = () => { res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end(out.join('\n')); };
+    if (!_transport) {
+      if (_smtpChargementErreur) {
+        out.push('CONNEXION : impossible — la bibliothèque d\'envoi n\'a pas pu être chargée :');
+        out.push('  ' + _smtpChargementErreur);
+        out.push('  → sur le serveur : `npm install` dans le dossier server/ puis redéployer.');
+        out.push('  (Ce n\'est PAS un problème d\'identifiants : aucun envoi n\'est même tenté.)');
+      } else out.push('CONNEXION : impossible — SMTP_HOST n\'est pas défini.');
+      return fin();
+    }
+    out.push('CONNEXION RÉELLE AU SERVEUR');
+    _transport.verify()
+      .then(() => {
+        out.push('  ✅ connexion et authentification acceptées.');
+        if (!dest) { out.push('\n  (ajoute ?to=ton@email pour envoyer un message d\'essai)'); return fin(); }
+        return _transport.sendMail({ from: MAIL_FROM, to: dest, subject: 'Solar — test d\'envoi',
+          text: 'Si tu lis ceci, la configuration SMTP fonctionne.\n\n' + frDate(Date.now()) })
+          .then(info => { out.push('  ✅ message d\'essai envoyé à ' + dest + ' (id ' + (info && info.messageId) + ')'); fin(); });
+      })
+      .catch(e => {
+        out.push('  ❌ ÉCHEC : ' + e.message);
+        if (e && e.responseCode) out.push('  code SMTP : ' + e.responseCode);
+        if (e && e.response) out.push('  réponse du serveur : ' + String(e.response).slice(0, 300));
+        out.push('');
+        out.push('LECTURE DU CODE');
+        out.push('  535 → identifiants refusés. Chez OVH : SMTP_USER doit être l\'ADRESSE COMPLÈTE,');
+        out.push('        et le mot de passe celui de la BOÎTE (pas celui du compte OVH).');
+        out.push('  550/553 → authentification OK mais expéditeur refusé : MAIL_FROM doit être la boîte authentifiée.');
+        out.push('  ETIMEDOUT/ECONNREFUSED → mauvais hôte ou port bloqué.');
+        fin();
+      });
     return;
   }
   if (req.url === '/stats' || req.url.indexOf('/stats?') === 0) {
@@ -392,9 +546,18 @@ const server = http.createServer((req, res) => {
                  seats: g.seats.map(s => ({ civ: s.civId, ai: s.ai, user: s.user, on: !!(s.ws && s.ws.readyState === 1) })),
                  nations, wars, warTrace, journal });
     }
-    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(out)); return;
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(out)); return;
   }
-  res.writeHead(404); res.end('Solar Conquest server — WebSocket only. GET /health');
+  /* Réponse par défaut. ⚠️ Le charset est OBLIGATOIRE : sans lui, le navigateur lit l'UTF-8 comme
+     du Latin-1 et le tiret cadratin s'affiche « â€” » (constaté par Marc). Même règle partout. */
+  res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+  res.end('Solar — serveur de jeu (WebSocket).\n\n'
+    + 'Pages disponibles :\n'
+    + '  /health    état du serveur\n'
+    + '  /stats     parties archivées et journaux\n'
+    + '  /mailtest  diagnostic de l\'envoi d\'emails\n\n'
+    + 'Version : ' + SERVER_BUILD + '\n'
+    + "Si /mailtest renvoie cette page, c'est que cette version n'est pas encore déployée.\n");
 });
 const wss = new WebSocketServer({ server });
 
@@ -552,7 +715,7 @@ wss.on('connection', (ws) => {
           if (!p || p.id !== m.id) return err('décision périmée', { id: m.id });
           const civ = (typeof p.nation === 'object' && p.nation) ? (p.nation.civ && p.nation.civ.id) : p.nation;
           if (civ !== s.civId) return err('cette décision n\'est pas pour toi');
-          try { route(g, g.driver.answer(m.id, m.ans || {})); }
+          try { route(g, g.driver.answer(m.id, assainirReponse(g, p, m.ans || {}))); }
           catch (e) { err(e.message.split('\n')[0]); recover(g, 'answer', e); }
           break;
         }
@@ -672,6 +835,26 @@ wss.on('connection', (ws) => {
 
         case 'game_info': { if (!requireGame()) break; sendTo(ws, { t: 'game', game: gameView(games.get(sess.game)) }); break; }
         case 'ping': sendTo(ws, { t: 'pong' }); break;
+
+        /* POIGNÉE DE MAIN VERSIONNÉE (premier message du client).
+           Sur mobile, une application installée peut avoir des mois de retard : sans ce contrôle
+           elle parlerait à un serveur récent et produirait des symptômes incompréhensibles. On
+           répond alors « maj_requise » plutôt que de laisser la partie dérailler.
+           NB : un client ANCIEN n'envoie pas 'hello' du tout — on reste tolérant (proto 1 supposé),
+           mais dès qu'un proto ≥ 2 existera, l'absence de hello devra être refusée. */
+        case 'hello': {
+          const proto = parseInt(m.proto, 10) || 0;
+          sess.proto = proto; sess.build = String(m.build || '?').slice(0, 40);
+          if (proto < PROTO_MIN || proto > PROTO_MAX) {
+            sendTo(ws, { t: 'maj_requise', serveur: PROTO_MAX, client: proto,
+              msg: proto < PROTO_MIN
+                ? 'Ta version du jeu est trop ancienne pour ce serveur. Recharge la page (ou mets à jour l\'application).'
+                : 'Ce serveur est plus ancien que ta version du jeu. Réessaie plus tard.' });
+            break;
+          }
+          sendTo(ws, { t: 'hello_ok', proto: PROTO_MAX, serveur: SERVER_BUILD });
+          break;
+        }
         default: err('message inconnu: ' + m.t);
       }
     } catch (e) {

@@ -1,7 +1,12 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-03 · v5.4';
+const SOLAR_BUILD_JS = '2026-08-03 · v6.4';
+/* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
+   (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
+   FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :
+   on corrige souvent le jeu sans toucher au protocole. */
+const SC_PROTO = 1;
 // Exposé sur window pour que l'écran d'ACCUEIL (index.html, #lv-build) puisse comparer les deux
 // builds et signaler un upload partiel. Un `const` seul n'est pas visible depuis l'autre fichier.
 try{ window.SOLAR_BUILD_JS = SOLAR_BUILD_JS; }catch(e){}
@@ -39,6 +44,11 @@ function connect(onReady){
     hideStatus();
     clearInterval(STATE._pingTimer);
     STATE._pingTimer = setInterval(()=>send({t:'ping'}), 25000);
+    /* POIGNÉE DE MAIN VERSIONNÉE. Indispensable pour l'application mobile : un joueur garde une
+       vieille version installée pendant des mois et parlerait à un serveur récent sans que rien ne
+       le détecte — on se retrouverait à chercher un bug de jeu là où il n'y a qu'un décalage de
+       version. Le serveur répond « maj_requise » si le protocole ne correspond plus. */
+    send({t:'hello', proto:SC_PROTO, build:SOLAR_BUILD_JS});
     // reprise de session : token puis re-join automatique de la partie en cours
     if (STATE.token) send({t:'token', token:STATE.token});
     if (onReady) onReady();
@@ -155,6 +165,15 @@ function handle(m){
       try{ localStorage.removeItem('sc_ws_game'); }catch(e){}
       reqState(true);
       showFinal(m.scores||[], {dateFr:m.dateFr, code:m.code});
+      break;
+    case 'hello_ok': break;   // protocole compatible : rien à signaler
+    case 'maj_requise':       // versions incompatibles : le dire clairement plutôt que de dérailler
+      status('');
+      overlay('<h2>🔄 Mise à jour nécessaire</h2>'
+        +'<div class="muted" style="margin:8px 0;line-height:1.5">'+(m.msg||'Ta version du jeu ne correspond plus à celle du serveur.')+'</div>'
+        +'<div class="muted" style="font-size:.8em">Protocole — toi : '+(m.client!==undefined?m.client:'?')+' · serveur : '+(m.serveur!==undefined?m.serveur:'?')+'</div>'
+        +'<button class="pri" id="sc-reload">↻ Recharger la page</button>');
+      { const b=document.getElementById('sc-reload'); if(b)b.onclick=()=>location.reload(true); }
       break;
     case 'error':
       console.warn('[SC] serveur:', m.msg);
@@ -595,7 +614,39 @@ function showNotice(m){
     }
     return;
   }
-  // eot / info / result : rien à afficher (déjà dans le journal et sur le plateau).
+  /* BILAN DE FIN DE TOUR reçu en NOTICE = je ne suis pas celui qui porte la décision, mais le bilan
+     me concerne quand même : à la fin d'une manche il n'y a plus de joueur actif, tout le monde doit
+     voir LE SIEN en même temps (règle posée par Marc). Le serveur envoie à chacun son propre corps
+     (`payload.html`, construit par buildEOTBody dans la perspective de sa nation).
+     ⚠️ Cette branche manquait : le serveur diffusait correctement, mais le client jetait la notice —
+     d'où « le bilan n'est pas visible pour tous, et quand je valide les autres ne l'ont pas vu ».
+     Ici PAS de réponse à envoyer : seul le porteur de la décision relance la partie ; les autres
+     ferment simplement leur fenêtre. */
+  if(k==='eot'){
+    const em=document.getElementById('eot-modal'); if(!em) return;
+    const ti=document.getElementById('eot-title'); if(ti)ti.textContent='📊 Bilan du Tour '+(o.turn||'');
+    const body=document.getElementById('eot-body'); if(body)body.innerHTML=o.html||'';
+    const go=()=>em.classList.add('hidden');
+    const btn=em.querySelector('.eot-btn'); if(btn){ btn.textContent='Fermer'; btn.onclick=go; }
+    else { const b2=em.querySelector('button'); if(b2)b2.onclick=go; }
+    em.classList.remove('hidden');
+    return;
+  }
+  /* RÉPONSE À MA PROPOSITION D'ACCORD COMMERCIAL — notice PERSONNELLE au proposant.
+     Sans ce rendu, il ne saurait pas si son partenaire a accepté (le journal seul ne suffit pas :
+     Marc « les accords ne sont pas validés de manière évidente »). Réutilise la fenêtre de guerre,
+     statique, fermée par le bouton. */
+  if(k==='accord_result'){
+    const wm=document.getElementById('war-modal'); if(!wm) return;
+    const t=document.getElementById('wm-title'), b=document.getElementById('wm-body'), r=document.getElementById('wm-result');
+    if(t)t.textContent=o.title||'🤝 Accord commercial';
+    if(b)b.innerHTML=o.body||'';
+    if(r)r.classList.add('hidden');
+    const btn=wm.querySelector('.war-btn'); if(btn){ btn.textContent='Compris →'; btn.onclick=()=>wm.classList.add('hidden'); }
+    wm.classList.remove('hidden');
+    return;
+  }
+  // info / result : rien à afficher (déjà dans le journal et sur le plateau).
 }
 
 // ───────────────────────── Mon tour d'action (v2.1 : vraies actions de plateau) ─────────────────────────
@@ -1146,7 +1197,7 @@ function askLocalDecision(pending){
   return new Promise(resolve=>{
     const o=pending.payload||{}; const k=pending.kind;
     const done=(ans)=>{ closeDecision(); resolve(ans); };
-    const TITLES={agenda:'Choisis ton agenda secret',strategy:'Carte Stratégie',strategy_calm:'Calmer une tension',invest1:'Investissement (Niv.1)',invest2:'Investissement (Niv.2)',espionage:'Espionnage : branche à copier',extrasolar:'Exploration extra-solaire',empath_copy:'Télépathie : carte à copier',ai_dyson:'Sphère de Dyson adverse',dyson_build:'Ta Sphère de Dyson',peace_offer:'Offre de paix',war_combat:'Combat',accord_confirm:'Accord commercial',defense:'Défense !'};
+    const TITLES={raid_target:'💰 Quelle nation piller ?',accord_request:'🤝 Proposition d\'accord commercial',agenda:'Choisis ton agenda secret',strategy:'Carte Stratégie',strategy_calm:'Calmer une tension',invest1:'Investissement (Niv.1)',invest2:'Investissement (Niv.2)',espionage:'Espionnage : branche à copier',extrasolar:'Exploration extra-solaire',empath_copy:'Télépathie : carte à copier',ai_dyson:'Sphère de Dyson adverse',dyson_build:'Ta Sphère de Dyson',peace_offer:'Offre de paix',war_combat:'Combat',accord_confirm:'Accord commercial',defense:'Défense !'};
     let body='<h2>'+(TITLES[k]||k)+'</h2>';
     if(k==='defense'){
       // CHOIX TACTIQUE DE DÉFENSE : combien de jetons engager (0 = ne pas défendre) + Supercroiseur éventuel.
