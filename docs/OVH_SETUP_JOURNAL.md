@@ -1087,13 +1087,6 @@ repart · tutorial-sync **0 désynchronisation** (reste le point jaune connu sur
 ## 📝 MÉMO (noté, NON implémenté — à faire quand Marc donne le GO)
 *Section purgée le 2026-08-03 : les entrées précédentes (libellé « route passive », Sphère de Dyson multi-nations, avancée des pirates sur la carte, événements invisibles) étaient **déjà corrigées** et n'avaient jamais été retirées d'ici — elles nous ont fait perdre du temps à tous les deux. Ne laisser ici QUE ce qui est réellement en attente.*
 
-- **TROIS RIVIÈRES SÉPARÉES pour les cartes** (noté le 2026-08-03 pendant les tests de Marc, NON implémenté) :
-  les **technologies**, les cartes **éco & sociales** et les cartes **militaires** doivent être présentées
-  sur **trois rivières distinctes**, comme trois PAGES différentes, au lieu d'être affichées toutes à la
-  suite. Repères de départ : conteneur `#tech-tabs`, cartes tech `.tcard`, cartes générales `.gcard` dans
-  `.gen-row` (index.html). À faire : découper en trois vues navigables plutôt qu'une liste continue.
-  ⚠️ Vérifier l'impact sur le TUTORIEL (étapes « Les 3 onglets », « Actions civiles », « Actions
-  militaires » pointent sur `#tech-tabs`) → relancer `node server/tutorial-sync.js` après coup.
 - ~~SMTP `535`~~ → **RÉSOLU le 2026-08-04** (v6.6/v6.9). Cause : caractères actifs (`\` et `` ` ``) dans le mot de passe, mangés par Coolify. Voir la fiche « EMAIL — FICHE DE RÉFÉRENCE » plus haut. Envoi de bout en bout vérifié.
 - **IA de guerre** : elle engage tout ce qu'elle peut payer au lieu d'estimer le juste nécessaire.
 - **Bilan « Actions ce tour »** : un assaut résolu via la fenêtre de combat n'est pas inscrit dans `turnActions` — il n'apparaît donc pas dans la liste des actions du bilan (les lignes de journal, elles, sont correctes).
@@ -1170,3 +1163,49 @@ travail, où `moteur.js` est évidemment là.*
   (le contexte de build DOIT être la racine du dépôt, sinon `moteur.js` est hors de portée du COPY)
 - Volume **/data** : contient les comptes, les jetons **et depuis la v7.4 les PARTIES EN COURS**
   (`/data/games/`). **Ne jamais le vider à un redéploiement.**
+
+## ✅ 2026-08-07 — Trois rivières distinctes, et la carte cornée (v7.5)
+
+### Trois rivières = trois pages
+Les trois boutons `#tech-tabs` ne faisaient que **faire défiler** vers une ancre : on voyait toujours
+un bout des autres familles de cartes, et sur mobile on se perdait. Ce sont maintenant trois **vues**
+(`riv-tech`, `riv-civ`, `riv-mil`) dont une seule est affichée ; `techRiviere()` change de page.
+Les identifiants `sec-civ` et `sec-mil` sont **conservés** — le tutoriel pointe dessus.
+La page regardée n'est PAS rangée dans `G` : ce n'est pas un état de partie. Elle repart sur
+« Techs » au rechargement, et c'est le comportement voulu.
+
+⚠️ `_appliquerRiviere()` est rappelé **après chaque rendu** de l'arbre : sans lui, `renderTechTree()`
+réécrit le HTML et les trois rivières redeviennent toutes visibles.
+
+**Tutoriel adapté** : ses démonstrations faisaient `techScrollTo(ancre)`, ce qui ne suffit plus. Un
+`tutoRiviere(sec)` ouvre d'abord la bonne rivière, puis fait défiler jusqu'à la carte.
+`node server/tutorial-sync.js` relancé : 0 désynchronisation (reste le point jaune connu sur
+`route-token-modal`).
+
+### La carte cornée — j'avais mal compris « replier »
+Marc : *« quand tu parlais de bout corné je pensais que tu allais corner simplement le coin de la
+carte tech à droite comme on marque une page dans un livre en repliant le coin sur un petit bout »*.
+
+J'avais replié **la carte entière** en une bande fine. Ce n'était pas l'idée : il fallait replier
+**le coin**. La carte reste donc entière et lisible — illustration, effet, coût — et un triangle en
+haut à droite marque « celle-ci, tu ne peux pas encore ». La raison précise reste dans l'info-bulle
+et sur la grande carte.
+
+Le coin est fait de deux triangles : la partie manquante de la carte (fond sombre) et le dos du
+papier replié (plus clair), ce qui donne le relief. Réduit de 15 à 9 px en mode compact, où la carte
+ne fait que 22 px de haut.
+
+### Icônes de ressources agrandies (même livraison)
+Demande de Marc : « les images de ressources un peu plus gros ». Elles sont dessinées en fond d'un
+`<i>` vide, donc dimensionnées en `em` : elles suivent le texte qui les entoure.
+
+| Où | Avant | Après |
+|---|---|---|
+| Partout (taille de base) | 1,05 em | **1,25 em** |
+| Coût d'une techno (`.tc-cost`) | 1,3 em | **1,55 em** |
+| Coût des cartes éco/soc et militaires (`.gc-cost`) | *taille de base* | **1,55 em** |
+| Fenêtre de détail d'une carte (`.td-cost-row`) | *taille de base* | **1,5 em** |
+
+Les deux dernières lignes étaient restées à la taille de base alors que c'est **la même
+information** — ce qu'il faut payer. `vertical-align` a été ajusté à chaque fois : sans ça, une
+icône plus grande flotte au-dessus de la ligne de base au lieu de s'y asseoir.

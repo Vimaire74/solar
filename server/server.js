@@ -13,7 +13,7 @@
    sur mobile, les joueurs mettent des semaines à mettre à jour. À incrémenter dès qu'un message
    change de forme (nouveau champ obligatoire, sens modifié, message retiré). */
 const PROTO_MIN = 1, PROTO_MAX = 1;
-const SERVER_BUILD = '2026-08-07 · v7.4';
+const SERVER_BUILD = '2026-08-07 · v7.5';
 const http = require('http');
 const crypto = require('crypto');
 const fs = require('fs');

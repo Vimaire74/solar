@@ -260,9 +260,17 @@ function runRiverDemo(cb){
   (function step(){
     if(i>=secs.length){ if(cb)cb(); return; }
     const sec=secs[i][0], wait=secs[i][1]; i++;
-    try{ if(window.techScrollTo)window.techScrollTo(sec); }catch(e){}
+    tutoRiviere(sec);
     setTimeout(step, wait);
   })();
+}
+/* Les trois familles de cartes sont TROIS RIVIÈRES distinctes depuis le 2026-08-07 : faire défiler
+   vers une ancre ne suffit plus, il faut CHANGER DE PAGE. On garde `techScrollTo` en second temps
+   pour amener la carte à l'écran à l'intérieur de la rivière choisie. */
+function tutoRiviere(sec){
+  const nom = sec==='sec-civ' ? 'civ' : sec==='sec-mil' ? 'mil' : 'tech';
+  try{ if(window.techRiviere)window.techRiviere(nom); }catch(e){}
+  try{ if(window.techScrollTo)window.techScrollTo(sec); }catch(e){}
 }
 function cursorClick(elm, cb, hold){
   if(_cursorEl){ _cursorEl.classList.remove('click'); void _cursorEl.offsetWidth; _cursorEl.classList.add('click'); }
@@ -277,8 +285,8 @@ function cineDemo(kind,id,cb){
   const g=G(); if(g&&g.player&&g.player.acLeft<6)g.player.acLeft=8; // garantit l'AC pour la démo
   hideCoach();
   const sec = kind==='market'?'sec-civ':kind==='gen'?'sec-mil':'top';
-  // 1. la rivière défile vers la bonne section (programmatique → fiable, pas de calibrage)
-  try{ if(window.techScrollTo)window.techScrollTo(sec); }catch(e){}
+  // 1. on ouvre la BONNE RIVIÈRE (trois pages distinctes), puis on y fait défiler jusqu'à la carte
+  tutoRiviere(sec);
   setTimeout(function(){
     const card=findCardEl(id); if(card)card.scrollIntoView({behavior:'smooth',block:'center'});
     setTimeout(function(){

@@ -5511,10 +5511,36 @@ function techScrollTo(id){
   const bR=b.getBoundingClientRect(),eR=el.getBoundingClientRect();
   b.scrollTo({top:b.scrollTop+(eR.top-bR.top)-4,behavior:'smooth'});
 }
+/* ============================================================================
+   LES TROIS RIVIÈRES — technologies · éco & société · militaire
+   ----------------------------------------------------------------------------
+   Demande de Marc (notée le 2026-08-03, faite le 2026-08-07) : les trois familles
+   de cartes doivent être TROIS PAGES distinctes, pas une liste continue. Avant,
+   les trois boutons ne faisaient que FAIRE DÉFILER vers une ancre : on voyait donc
+   toujours un bout des autres, et sur mobile on se perdait.
+   Maintenant chaque rivière est une vue ; les boutons changent de page.
+   ⚠️ Les identifiants `sec-civ` et `sec-mil` sont CONSERVÉS : le tutoriel pointe
+   dessus (étapes « Les 3 onglets », « Actions civiles », « Actions militaires »).
+   La préférence n'est pas rangée dans `G` : ce n'est pas un état de partie, juste
+   la page qu'on regarde. Elle repart sur « Techs » au rechargement, et c'est bien. */
+let _riviereActive='tech';
+function techRiviere(nom){
+  _riviereActive=(nom==='civ'||nom==='mil')?nom:'tech';
+  _appliquerRiviere();
+}
+function _appliquerRiviere(){
+  for(const r of ['tech','civ','mil']){
+    const el=document.getElementById('riv-'+r);
+    if(el) el.style.display=(r===_riviereActive)?'':'none';
+    const b=document.getElementById('riv-btn-'+r);
+    if(b){ b.style.opacity=(r===_riviereActive)?'1':'.45'; b.style.outline=(r===_riviereActive)?'2px solid #ffffff55':'none'; }
+  }
+  const body=document.getElementById('tech-body'); if(body) body.scrollTop=0;
+}
 function renderTechTree(){
   const body=document.getElementById('tech-body');
   const compact=getTechAreaMode()==='compact';
-  let html='';
+  let html='<div id="riv-tech">';
   for(const[branchId,branch]of Object.entries(TECH_BRANCHES)){
     // Branche Empathes : visible seulement si Union Sacrée a été jouée
     if(branchId==='empathes'&&!G.empathesFounder)continue;
@@ -5523,16 +5549,14 @@ function renderTechTree(){
     for(let tier=1;tier<=3;tier++){
       const card=CARDS_POOL.find(c=>c.branch===branchId&&c.tier===tier);
       if(!card){html+=`<div class="tcard tlocked" style="opacity:.15;min-height:${compact?'22px':'68px'}"><div class="tc-header"><span class="tc-name" style="color:#3a3a6a">—</span></div></div>`;if(tier<3)html+=`<div class="tcard-arr">→</div>`;continue;}
-      /* CARTE BLOQUÉE PAR UN PRÉREQUIS → REPLIÉE (choix de Marc) : au lieu d'un grand carton grisé
-         illisible, une bande fine qui dit CE QUI MANQUE. La branche garde ses trois colonnes, on
-         gagne de la hauteur, et la raison est explicite au lieu d'être devinée. */
+      /* CARTE BLOQUÉE PAR UN PRÉREQUIS → COIN CORNÉ (demande de Marc, 2026-08-07).
+         La carte reste ENTIÈRE : on ne replie plus rien, on ne cache rien. Un coin replié en haut à
+         droite, comme on marque une page dans un livre, dit « celle-ci, tu ne peux pas encore ».
+         La raison précise est dans l'info-bulle et sur la grande carte.
+         (Version précédente : la carte était réduite à une bande fine. C'était une autre idée que
+         celle de Marc — « replier » voulait dire corner le coin, pas replier la carte.) */
       const _raisonLock=(typeof techLockReason==='function')?techLockReason(card,G.player):null;
-      if(_raisonLock&&!G.player.cards.find(c=>c.id===card.id)){
-        html+=`<div class="tcard tc-compact tc-fold" onclick="showTechDetail('${card.id}')" title="${card.name} — ${_raisonLock}" style="border-top:2px solid ${branch.color}40">
-          <div class="tc-header"><span class="tc-name">🔒 ${card.name}</span>
-          <span class="tc-fold-why">${_raisonLock}</span></div></div>`;
-        continue;
-      }
+      const _cornee=!!(_raisonLock&&!G.player.cards.find(c=>c.id===card.id));
       const exclusive=isTechExclusive(card);
       const playerOwned=!!G.player.cards.find(c=>c.id===card.id);
       const aiOwned=G.ais.some(ai=>ai.cards.find(c=>c.id===card.id));
@@ -5552,6 +5576,7 @@ function renderTechTree(){
       if(isBonus&&!unavailForPlayer&&canAfford)cls+=' tbonus';
       if(compact)cls+=' tc-compact';
       if(playerOwned)cls+=' tc-mine';
+      if(_cornee)cls+=' tc-corne';
       const artBg=branch.color+'18';
       // Petites cartes : on n'affiche QUE le statut "à toi" ; le détail (quelle nation) est sur la grande carte.
       let statusBadge='';
@@ -5565,7 +5590,7 @@ function renderTechTree(){
         const acLabel=card.tier===3?'2AC':'1AC';
         const costStr=Object.entries(cost).map(([r,a])=>'-'+a+rEmoji(r)).join(' ');
         const compactStatus=playerOwned?'<span style="color:#66cc66">✓</span>'+(!exclusive&&aiOwned?`<span style="color:#9080c0">+${_aiEmoji}</span>`:''):exclusiveTaken?'<span style="color:#7880a0">🤖</span>':!exclusive&&aiOwned?`<span style="color:#9080c0;font-size:.85em">${_aiEmoji}+</span><span class="res-tag energy" style="font-size:.9em">${acLabel}</span> `+costStr:'<span class="res-tag energy" style="font-size:.9em">'+acLabel+'</span> '+costStr;
-        html+=`<div class="${cls}" onclick="${onclick}" onmouseleave="hideCardPreview()" style="border-top:2px solid ${branch.color}80">
+        html+=`<div class="${cls}"${_cornee?` title="${card.name} — ${_raisonLock}"`:''} onclick="${onclick}" onmouseleave="hideCardPreview()" style="border-top:2px solid ${branch.color}80">
           <div class="tc-header">
             <span class="tc-name">${card.emoji} ${card.name}</span>
             <span class="tc-tier">T${tier}</span>
@@ -5577,7 +5602,7 @@ function renderTechTree(){
         else if(exclusiveTaken)costDisplay='<span style="color:#ff9d9d">⛔ Prise</span>';
         else if(!canAfford)costDisplay='<span class="res-tag energy" style="font-size:.85em;opacity:.6">'+(card.tier===3?'2':'1')+'AC</span> <span style="color:#cc8844;font-size:.82em">'+Object.entries(cost).map(([r,a])=>{const have=G.player.res[r]||0;const ok=have>=a;return`<span style="color:${ok?'#8898b8':'#ff7744'}">${a}${rEmoji(r)}</span>`;}).join(' ')+'</span>';
         else costDisplay='<span class="res-tag energy" style="font-size:.85em">'+(card.tier===3?'2':'1')+'AC</span> '+costHtmlStr;
-        html+=`<div class="${cls}" onclick="${onclick}" style="border-top:2px solid ${branch.color}80;min-height:68px;cursor:pointer">
+        html+=`<div class="${cls}"${_cornee?` title="${card.name} — ${_raisonLock}"`:''} onclick="${onclick}" style="border-top:2px solid ${branch.color}80;min-height:68px;cursor:pointer">
           <div class="tc-header"><span class="tc-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2">${card.name}</span><span class="tc-tier">T${tier}</span></div>
           <div class="tc-art${CARD_ART.has(card.id)?' tc-illus':''}" style="${CARD_ART.has(card.id)?`background-image:url('assets/cards/${card.id}.png')`:`background:${artBg}`}">${CARD_ART.has(card.id)?'':card.emoji}${statusBadge}${lockOverlay}</div>
           <div class="tc-body">
@@ -5590,7 +5615,9 @@ function renderTechTree(){
     }
     html+=`</div></div>`;
   }
-  // ── Marché Civique (cartes répétables, coût <i class=ri-materials></i>) ──
+  html+='</div>';   // ← fin de la rivière TECHNOLOGIES
+  // ── RIVIÈRE ÉCO & SOCIÉTÉ — Marché Civique (cartes répétables, coût <i class=ri-materials></i>) ──
+  html+='<div id="riv-civ" style="display:none">';
   html+=`<div class="gen-row" id="sec-civ" style="border-top:2px solid #2a3a5a;padding-top:3px">
     <div class="gen-label" style="color:#88c8ff;font-size:.56em">💼<span style="display:${compact?'none':'inline'};margin-left:2px">Éco &amp; Société</span></div>`;
   // Cartes répétables mises EN TÊTE de la rivière (les plus utilisées, donc les plus faciles à trouver) :
@@ -5657,8 +5684,12 @@ function renderTechTree(){
     }
     r+=`</div>`;return r;
   }
-  html+='<div id="sec-mil"></div>'+renderNonBranchRow('⚔️ Militaire',milCards,6);
+  html+='</div>';   // ← fin de la rivière ÉCO & SOCIÉTÉ
+  // ── RIVIÈRE MILITAIRE ──
+  html+='<div id="riv-mil" style="display:none"><div id="sec-mil"></div>'
+      + renderNonBranchRow('⚔️ Militaire',milCards,6) + '</div>';
   body.innerHTML=html;
+  _appliquerRiviere();   // ⚠️ après chaque rendu : sinon on retombe sur les trois rivières visibles
   const unlocked=Object.values(G.branchTiers).filter(t=>t>0).length;
   document.getElementById('branch-progress-summary').textContent=unlocked+'/6 branches';
 }
