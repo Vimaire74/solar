@@ -32,7 +32,7 @@ function client(name, role) { // role: 'host' | 'guest'
     switch (m.t) {
       case 'registered': send({ t: 'login', user: name, pass: 'test-123456' }); break;
       case 'error':
-        if (/déjà pris/.test(m.msg)) { send({ t: 'login', user: name, pass: 'test-123456' }); break; }
+        if (/déjà pris|déjà inscrite/.test(m.msg)) { send({ t: 'login', user: name, pass: 'test-123456' }); break; }
         errors.push(name + ': ' + m.msg);
         break;
       case 'logged':
@@ -65,10 +65,13 @@ function client(name, role) { // role: 'host' | 'guest'
   return ws;
 }
 
-client('testhote', 'host');
-client('testinvite', 'guest');
+/* Les comptes sont identifiés par une ADRESSE EMAIL depuis le passage aux comptes serveur :
+   les anciens pseudos « testhote » / « testinvite » étaient refusés à l'inscription, et le test
+   restait muet jusqu'au timeout — il ne testait plus rien depuis ce changement. */
+client('testhote@test.local', 'host');
+client('testinvite@test.local', 'guest');
 
-const guard = setTimeout(() => { console.log('❌ TIMEOUT (120s) — over:' + overCount, 'décisions:' + decisions, 'actions:' + actions, errors); process.exit(1); }, 120000);
+const guard = setTimeout(() => { console.log('❌ TIMEOUT (60s) — over:' + overCount, 'décisions:' + decisions, 'actions:' + actions, errors); process.exit(1); }, 60000);
 const check = setInterval(() => {
   if (overCount >= 2) {
     clearTimeout(guard); clearInterval(check);

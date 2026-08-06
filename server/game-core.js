@@ -77,24 +77,37 @@ const FONCTIONS_MOTEUR_REQUISES = [
   'resolveWarCombat', 'declareWar', 'showWarModal', 'getNodeOwnerAI', 'doAITurn',
   'setDecisionSink', 'resolveDecision', 'refreshWarViews', 'scSetG', 'scDeserialize', 'rehydrateState',
   'showAgendaSelModal', 'confirmRouteToken', 'dismissDiscovery', 'cruiserAvailable', 'cruiserAfford',
-  'routeManageDeploy', 'routeManageRecall', '_forgeUpgrade'
+  'routeManageDeploy', 'routeManageRecall', '_forgeUpgrade',
+  /* Bloc @flux — la machine à états. Elle vit dans `moteur.js` (et non côté serveur) parce que le
+     déroulement d'une partie est une RÈGLE : le solo hors ligne la fait tourner aussi. Si l'une de
+     ces fonctions disparaît, le serveur perd le flux SANS S'EN APERCEVOIR — d'où ce contrôle. */
+  'fluxInit', 'fluxAller', 'fluxEtat', 'fluxActiver', 'fluxActiverTous', 'fluxARepondu',
+  'fluxResteARepondre', 'fluxPeutAgir', 'fluxActionPermise', 'fluxDiagnostiquer', 'fluxArguments',
+  'fluxDeclarer', 'fluxTable', 'fluxNumeros', 'fluxTypes',
+  /* Flux des guerres et fin de tour, migrés sur la machine (les anciennes `processAllWars` /
+     `finishTurn` vivaient dans des fermetures et étaient donc INVISIBLES d'ici — impossible de
+     vérifier qu'elles existaient). Maintenant qu'elles sont nommées, on peut l'exiger. */
+  'stGuerres', 'guerreEtape', 'guerreSuivante', 'guerreCourante', 'guerresPreparer',
+  'stFinDeTour', 'stBilanDeTour', 'stDysonPuisGuerres',
+  'fluxOublierVolatiles', 'fluxDetteDecisions', 'stInvestDemander'
 ];
 
-/* Charge UNIQUEMENT le bloc MOTEUR du jeu.
-   ⚠️ Il est repéré par la SENTINELLE `@moteur` placée en tête du bloc dans index.html, et NON plus
-   par « le plus gros bloc <script> » : cette heuristique ne disait jamais où s'arrêtait le moteur,
-   si bien qu'une fonction pouvait vivre hors de lui sans que rien ne le signale. */
+/* Charge le MOTEUR du jeu — c'est-à-dire `moteur.js`, un vrai fichier.
+   ⚠️ HISTORIQUE, à ne pas refaire : les règles étaient collées dans index.html et il fallait les en
+   EXTRAIRE (d'abord « le plus gros bloc <script> », puis une sentinelle `@moteur`). Les deux étaient
+   des devinettes, et elles ont coûté deux bugs majeurs — `uiFillIncome` et `doRaidTarget` vivaient
+   hors du bloc extrait, donc invisibles pour le serveur. Il n'y a plus rien à deviner : on lit le
+   fichier des règles.
+   L'argument reste le chemin de l'INDEX (tous les appelants le passent) ; `moteur.js` est son voisin. */
 function loadLogic(htmlPath) {
-  const html = fs.readFileSync(htmlPath, 'utf8');
-  const blocks = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
-  const marques = blocks.filter(b => b.indexOf('@moteur') !== -1);
-  if (marques.length > 1) throw new Error('index.html : plusieurs blocs <script> portent la sentinelle @moteur — il ne doit y en avoir qu\'UN.');
-  let logic = marques[0];
-  if (!logic) {
-    // Repli explicite (et bruyant) : on prend le plus gros, mais on prévient que la sentinelle manque.
-    console.error('⚠️  index.html : sentinelle « @moteur » ABSENTE — repli sur le plus gros bloc <script>.\n' +
-                  '    Ajouter `/* @moteur */` en tête du bloc de logique pour rendre le découpage explicite.');
-    logic = blocks.slice().sort((a, b) => b.length - a.length)[0];
+  const dossier = path.dirname(htmlPath);
+  const moteurPath = path.join(dossier, 'moteur.js');
+  let logic;
+  try { logic = fs.readFileSync(moteurPath, 'utf8'); }
+  catch (e) {
+    throw new Error('MOTEUR INTROUVABLE : ' + moteurPath + '\n'
+      + 'Les règles du jeu vivent dans `moteur.js`, chargé par index.html via <script src>.\n'
+      + 'Si ce fichier manque, le serveur ne peut pas faire tourner le jeu.');
   }
   const sb = buildSandbox();
   vm.createContext(sb);

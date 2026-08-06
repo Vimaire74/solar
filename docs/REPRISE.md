@@ -15,6 +15,16 @@
 0ter. 📧 **Email / infrastructure** : la fiche « EMAIL — FICHE DE RÉFÉRENCE » dans
    `OVH_SETUP_JOURNAL.md` contient les paramètres SMTP acquis et les pièges. **Ne JAMAIS
    redemander à Marc une décision d'infrastructure déjà prise** : la chercher d'abord ici.
+0septies. 🏗️ **LE FLUX EST UNE MACHINE À ÉTATS (bloc `@flux`, bas de `moteur.js`).** Décision de Marc du 2026-08-06 : modèle BGA exact, pas d'hybride. L'état vit dans `G._flux` → sérialisable. ⚠️ Aucune copie côté serveur (`server/states.js` et `machine.js` ont été SUPPRIMÉS) : une copie diverge. ⚠️ Migration EN COURS — le jeu tourne encore sur les anciens rappels ; condition de fin = `node server/test_serialisation.js` au vert. Test de la machine : `node server/test_flux.js`.
+0quinquies. ⏱️ **RÈGLE D'OR DU SERVEUR (v7.3) : aucun délai ne fait avancer une partie.**
+   Le serveur ne joue JAMAIS à la place de quelqu'un. Une partie dont le joueur attendu est absent
+   attend, sans limite. Le seul délai restant (`ECHEANCE_MS`) n'affiche qu'un bouton chez les autres
+   joueurs, qui peuvent alors VOTER un remplacement par une IA (unanimité des présents).
+   ⚠️ Ne jamais réintroduire un `setTimeout` qui répond, valide ou joue à la place d'un joueur :
+   c'est ce qui cassait la partie de Marc à chaque rafraîchissement de page. Test : `node server/test_refresh.js`.
+0quater. 🎲 **`docs/LOT17_PARTIES_PERSISTANTES.md`** — parties reprenables façon BGA. Contient les
+   DÉCISIONS DÉJÀ PRISES par Marc (option C pour les absents, types de partie, rafraîchissement
+   sans perte) : ne pas les rediscuter. Les points ouverts y sont marqués comme tels.
 1. **CE fichier** (REPRISE.md) — état global + où est quoi.
 2. `docs/MULTIJOUEUR_BUILD.md` — détail de l'architecture en ligne (si on touche au multijoueur).
 3. `docs/DEPLOIEMENT_PLESK.md` — comment c'est déployé (si on touche au serveur).
@@ -26,7 +36,10 @@ Les autres docs (`RESUME_PROJET.md`, `TODO_mobile.md`, `SPEC_IA_strategie.md`, e
 **Solar Conquest** : jeu de stratégie spatiale au tour par tour (colonies, routes, techs, guerre, diplomatie, 10 tours, 2-4 nations = 1+ humains + IA). Un **seul fichier de jeu**.
 
 ## 3) Le fichier de jeu — RÈGLE IMPORTANTE (màj 2026-07-16)
-- **`index.html`** = LE jeu ET la source qu'on ÉDITE directement (~520 Ko, tout en un HTML+CSS+JS inline). Marc l'uploade sur le serveur.
+- 🆕 **`moteur.js`** = **TOUTES LES RÈGLES DU JEU** (~488 Ko), depuis la v7.2. Chargé par `index.html`
+  via `<script src>`, lu directement par `server/game-core.js`, embarqué tel quel dans l'application.
+  **Toute règle se modifie ICI.** Une règle écrite ailleurs serait invisible pour le serveur.
+- **`index.html`** = la PAGE (~123 Ko) : structure, CSS, écran d'accueil et affichage pur. Plus aucune règle.
 - **`tutorial.html`** = copie d'`index.html` où `<script src="online.js">` est remplacé par `<script src="tutorial.js">`. **À RÉGÉNÉRER après CHAQUE modif du jeu** : `cp index.html tutorial.html && sed -i 's#<script src="online.js"></script>#<script src="tutorial.js"></script>#' tutorial.html`.
 - **`solar_conquest_carte.html`** = ANCIENNE source parallèle, désormais **ARCHIVÉE dans `archives/`** (2026-07-16). Ne plus l'éditer. `server/selftest.js` pointe maintenant sur `index.html`.
 - **`regles.html`** = règles du jeu (lien depuis le menu Journal). C'est LA source des règles ; on ne maintient plus le .docx/.pdf.
@@ -79,6 +92,19 @@ Depuis le dossier projet :
 - 🐛 Points mineurs notés : timing popup route (peut-être réglé par la refonte, à confirmer), vérifier que toutes les images de cartes civiques sont uploadées.
 
 ## 11) Préférences de Marc (rappel)
+
+> 📋 **URLs et commandes : TOUJOURS donner la forme COMPLÈTE, prête à copier-coller.**
+> Jamais « ajoute `&to=…` à l'URL » — écrire l'adresse entière :
+> `https://live.solar-game.com/mailtest?key=TA_CLE&to=marc@guerir.ch`
+> Même règle pour les commandes shell et les chemins de fichiers. (Demandé le 2026-08-04.)
+>
+> 🔗 Adresses utiles, complètes :
+> · `https://live.solar-game.com/mailtest?key=TA_CLE` — diagnostic email
+> · `https://live.solar-game.com/mailtest?key=TA_CLE&to=marc@guerir.ch` — + envoi d'essai
+> · `https://live.solar-game.com/stats` — parties archivées et journaux
+> · `https://live.solar-game.com/health` — état du serveur
+> · `https://solar-game.com` — le jeu · `https://solar-game.com/tutorial.html` — le tutoriel
+
 Concision, pas d'obséquiosité, ne jamais mentir, ne pas lancer d'itération coûteuse en tokens sans GO (assoupli pour ce build). Chercher le plus simple/gratuit d'abord. « mémorise » = noter sans implémenter.
 
 ## 13) 🤖 IA — moteur à UTILITÉ (refonte 2026-07-05)

@@ -13,7 +13,7 @@ const { Engine } = require('./game-core.js');
 function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
 
 class GameDriver {
-  /* htmlPath = chemin de solar_conquest_carte.html */
+  /* htmlPath = chemin d'index.html (le moteur, `moteur.js`, est son voisin). */
   constructor(htmlPath){
     this.engine = new Engine(htmlPath);
     this.sb = this.engine.sb;

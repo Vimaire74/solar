@@ -87,11 +87,16 @@ Le plus sûr : le solo ne dépend d'aucun serveur. Deux réserves :
 - **Deux chemins de fin de tour coexistent** : `endTurn` (solo) et `runEndOfRound` (serveur). Je me
   suis fait piéger deux fois en corrigeant l'un et pas l'autre. Deux chemins = deux comportements :
   le jeu appris hors ligne peut différer du jeu en ligne.
-- **Le moteur est défini par une heuristique.** `game-core.js` charge « le plus gros bloc
-  `<script>` » d'`index.html`. Conséquence réelle : `uiFillIncome` vit dans un bloc que le serveur
-  **ne charge jamais** — une partie du code de règles/affichage est invisible côté autorité, sans
-  que rien ne le déclare. C'est ce qui a rendu le correctif du revenu net inopérant pendant une
-  semaine (deux fonctions écrivaient `#top-res`, la seconde écrasait la première).
+- ~~**Le moteur est défini par une heuristique.**~~ ✅ **RÉGLÉ en v7.2 (2026-08-05).** Historique,
+  parce que la leçon vaut plus que le bug : `game-core.js` chargeait « le plus gros bloc `<script>` »
+  d'`index.html`. Conséquence réelle : `uiFillIncome` vivait dans un bloc que le serveur **ne
+  chargeait jamais** — du code de règles invisible côté autorité, sans que rien ne le déclare. C'est
+  ce qui a rendu le correctif du revenu net inopérant pendant une semaine (deux fonctions écrivaient
+  `#top-res`, la seconde écrasait la première).
+  **Aujourd'hui les règles sont dans `moteur.js`**, un vrai fichier que le navigateur charge par
+  `<script src>` et que le serveur lit tel quel. Plus d'heuristique, plus de bloc « oublié ».
+  ⚠️ **La règle qui en découle : toute règle du jeu s'écrit dans `moteur.js`.** Une règle posée dans
+  `index.html` redeviendrait invisible pour le serveur — le même bug, sous un autre nom.
 
 ### Cas 2 — IA forte côté serveur
 **Le cas le plus mal préparé.** L'IA actuelle n'est pas une fonction « état → action » : elle lit et
@@ -159,3 +164,69 @@ Par valeur décroissante rapportée au coût et au risque :
 
 ⚠️ Le point 1 immobilise le jeu quelques jours. **Ne pas le lancer pendant une phase de test avec
 les amis de Marc.** Les points 2 et 3 sont sans danger et peuvent se faire à tout moment.
+
+
+---
+
+## 7. 📦 OÙ DOIVENT VIVRE LES RÈGLES ? (question de Marc, 2026-08-05)
+
+### Ce que fait BGA
+Leur documentation range les fichiers par rôle sans ambiguïté :
+**`Game.php` — main game logic** (les règles, sur le SERVEUR) · **`Game.js` — interface logic**
+(l'affichage, sur le CLIENT). Chez BGA, **les règles ne sont jamais dans le client**. Le client
+n'est qu'un écran : il ne sait pas calculer un revenu ni résoudre un combat.
+
+Deux raisons : on ne peut pas faire confiance à un client (il est modifiable), et le serveur doit
+être la seule autorité.
+
+### ⚠️ Mais BGA n'a PAS de mode hors ligne — nous si
+C'est la différence décisive, et elle interdit de les copier bêtement.
+- **Cas 1 de Marc** : le jeu doit rester **pleinement jouable sans réseau**. Les règles doivent donc
+  pouvoir s'exécuter **sur l'appareil**.
+- **Cas 3** : le serveur doit rester l'autorité. Les règles doivent donc **aussi** s'exécuter côté serveur.
+
+👉 Conclusion : contrairement à BGA, il nous faut **les mêmes règles exécutables des DEUX côtés**.
+C'est exactement ce qu'on a déjà — et c'est le bon choix, pas un accident.
+
+### La vraie question n'est pas « HTML ou pas », c'est l'EMPAQUETAGE
+Deux choses différentes qu'on confond facilement :
+- **où les règles s'EXÉCUTENT** → chez nous : client ET serveur. ✅ correct, à garder.
+- **comment elles sont EMPAQUETÉES** → chez nous : *collées dans index.html*, et le serveur les en
+  extrait en cherchant un bloc `<script>`. ❌ **c'est ça, le vrai problème.**
+
+Mesuré le 2026-08-05 :
+```
+index.html          603 Ko
+  dont bloc moteur  478 Ko  (79 % du fichier, 384 fonctions)
+  dont HTML+CSS+UI  125 Ko
+```
+Les règles représentent **79 %** d'un fichier qui prétend être une page. Conséquences déjà payées :
+- le serveur devait deviner quel bloc était le moteur (corrigé en v6.0 par une sentinelle, mais
+  la sentinelle reste un pansement sur un mauvais découpage) ;
+- deux fonctions de RÈGLE se sont retrouvées hors moteur sans que rien ne le signale
+  (`uiFillIncome` → revenu net inopérant une semaine ; `doRaidTarget` → raids sur une nation au hasard) ;
+- impossible de vérifier la syntaxe du moteur seul, de le tester isolément, ou de lire un diff propre.
+
+### ✅ RECOMMANDATION : extraire le moteur dans `moteur.js`
+Un vrai fichier, chargé par les trois environnements :
+| Environnement | Comment |
+|---|---|
+| Navigateur (solo et en ligne) | `<script src="moteur.js">` dans index.html — mis en cache par le service worker, **fonctionne hors ligne** |
+| Serveur Node | `require('./moteur.js')` — **plus aucune extraction depuis du HTML** |
+| Application mobile | embarqué dans le paquet, comme les autres fichiers |
+
+Ce que ça apporte, concrètement :
+- la question « cette fonction est-elle dans le moteur ? » **ne se pose plus** : elle est dans le
+  fichier ou elle n'y est pas. Les deux bugs les plus coûteux de la semaine deviennent impossibles ;
+- `node --check moteur.js` devient une vraie vérification ; on peut tester les règles sans DOM ;
+- `index.html` retombe à ~125 Ko : une page redevient une page ;
+- rien ne change pour le mode hors ligne — le service worker met déjà en cache plusieurs fichiers
+  (`index.html`, `online.js`, `regles.html`…), un de plus ne change rien.
+
+**Ce qu'on perd** : le « tout dans un seul fichier ». C'était pratique pour envoyer le jeu par mail
+au tout début ; ça n'a plus de valeur depuis qu'il y a un service worker, un serveur et bientôt une
+application. Le coût du déplacement est mécanique (couper/coller + une balise), le risque est faible
+et immédiatement vérifiable par le selftest.
+
+**Moment idéal** : maintenant, pendant le chantier de la machine à états — le jeu est déjà immobilisé,
+autant ne pas le figer deux fois. ⚠️ Ne pas le faire sans le GO de Marc.

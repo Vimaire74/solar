@@ -9,13 +9,17 @@
      interceptées, elles passent directement. Rien n'est mis en cache du serveur de jeu.
    - HORS-LIGNE : le solo reste jouable ; en navigation hors-ligne on sert index.html depuis le cache.
    Le numéro de version ci-dessous purge les anciens caches à chaque mise à jour du SW. */
-const VERSION = 'v2-2026-07-23';
+const VERSION = 'v4-2026-08-07';
 const HTML_CACHE = 'sc-html-' + VERSION;     // documents + scripts (network-first)
 const ASSET_CACHE = 'sc-assets-' + VERSION;  // images, icônes, PDF (cache-first)
 
 // Fichiers du « shell » précachés à l'installation → ouverture instantanée + hors-ligne immédiat.
 const SHELL = [
-  './', './index.html', './online.js', './regles.html',
+  /* ⚠️ `moteur.js` porte TOUTES les règles du jeu (479 Ko). Sans lui dans ce pré-cache, le solo
+     hors ligne ne démarrerait pas : index.html ne serait plus qu'une coquille. Il était auparavant
+     collé dans index.html, donc mis en cache « gratuitement » — l'extraction en fichier séparé rend
+     cette ligne INDISPENSABLE. */
+  './', './index.html', './moteur.js', './online.js', './regles.html',
   './assets/pwa/manifest.webmanifest',
   './assets/pwa/icon-192.png', './assets/pwa/icon-512.png', './assets/pwa/icon-maskable-512.png'
 ];

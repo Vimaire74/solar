@@ -45,10 +45,21 @@ const FIX = process.argv.includes('--fix');
 
 const index = fs.readFileSync(F_INDEX, 'utf8');
 const tuto = fs.readFileSync(F_TUTOJS, 'utf8');
-
+/* Les RÈGLES (et donc les cartes, et la plupart des fonctions appelées par le tutoriel) vivent
+   depuis la v7.2 dans `moteur.js`, plus dans index.html. Chercher au seul endroit historique
+   produirait 28 faux positifs — c'est ce qui est arrivé juste après l'extraction. On regarde
+   donc dans les DEUX : le HTML pour les identifiants d'éléments, le moteur pour le reste. */
 const soucis = [];   // {gravite:'bloquant'|'attention', texte}
 const bloquant = (t) => soucis.push({ gravite: 'bloquant', texte: t });
 const attention = (t) => soucis.push({ gravite: 'attention', texte: t });
+
+/* ⚠️ Déclaré APRÈS `bloquant` : `const` n'est pas remonté, l'appeler plus haut lèverait une
+   ReferenceError au lieu du message d'erreur voulu — piège classique, vu à l'écriture. */
+const F_MOTEUR = path.join(RACINE, 'moteur.js');
+let moteur = '';
+try { moteur = fs.readFileSync(F_MOTEUR, 'utf8'); }
+catch (e) { bloquant('moteur.js INTROUVABLE — les règles du jeu y vivent depuis la v7.2.'); }
+const jeu = index + '\n' + moteur;   // « tout le jeu » : le HTML pour les éléments, le moteur pour les règles
 
 /* ---------------------------------------------------------------- 1. Le scénario
    On lit le tableau STEPS dans la SOURCE (tutorial.js est une IIFE : on ne peut
@@ -94,7 +105,7 @@ for (const e of etapes) {
 
 /* ---------------------------------------------------------------- 3. Cartes citées en démonstration */
 const idsCartes = new Set();
-for (const m of index.matchAll(/\bid:\s*'([a-z][\w]*)'/g)) idsCartes.add(m[1]);
+for (const m of jeu.matchAll(/\bid:\s*'([a-z][\w]*)'/g)) idsCartes.add(m[1]);
 for (const e of etapes) {
   if (!e.demoId) continue;
   if (!idsCartes.has(e.demoId))
@@ -107,10 +118,12 @@ for (const m of tuto.matchAll(/window\.([A-Za-z_]\w*)\s*(?:\(|&&|\|\||\))/g)) fn
 const IGNORE = new Set(['innerHeight', 'innerWidth', 'SC_TUTO', 'scrollTo', 'addEventListener', 'removeEventListener', 'getComputedStyle', 'location', 'setTimeout']);
 for (const fn of fnsAppelees) {
   if (IGNORE.has(fn)) continue;
-  const declaree = new RegExp('function\\s+' + fn + '\\b').test(index) || new RegExp('window\\.' + fn + '\\s*=').test(index)
-                || new RegExp('\\b' + fn + '\\s*=\\s*function').test(index);
+  /* Chercher dans TOUT le jeu (index.html + moteur.js) : depuis la v7.2 les règles ont quitté
+     le HTML, et n'interroger que lui produisait 21 faux positifs sur des fonctions bien vivantes. */
+  const declaree = new RegExp('function\\s+' + fn + '\\b').test(jeu) || new RegExp('window\\.' + fn + '\\s*=').test(jeu)
+                || new RegExp('\\b' + fn + '\\s*=\\s*function').test(jeu);
   if (!declaree)
-    bloquant('le tutoriel appelle window.' + fn + '() — cette fonction n\'existe plus dans index.html.');
+    bloquant('le tutoriel appelle window.' + fn + '() — introuvable dans index.html NI dans moteur.js.');
 }
 
 /* ---------------------------------------------------------------- 5. ORDRE RÉEL des fenêtres

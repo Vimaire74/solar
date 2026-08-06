@@ -9,9 +9,11 @@
     "test": "node selftest.js 1",
     "test-ws": "node test_ws.js"
   },
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
-    "ws": "^8.18.0",
-    "nodemailer": "^6.9.14"
+    "nodemailer": "^6.10.1",
+    "ws": "^8.18.0"
   }
 }

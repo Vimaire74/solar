@@ -5,7 +5,7 @@
    - 1 partie = 1 GameDriver (contexte moteur isolé). Décisions routées vers le bon joueur.
    - Repli IA : si un joueur est déconnecté (ou AFK trop longtemps), l'IA joue à sa place.
    - Snapshots d'état sur disque après chaque avancée (data/games/<code>.json) — reprise après redémarrage : TODO v2.
-   Usage : node server.js   (PORT, GAME_HTML, DATA_DIR, AFK_MS surchargeables par variables d'env)
+   Usage : node server.js   (PORT, GAME_HTML, DATA_DIR, ECHEANCE_MS surchargeables par variables d'env)
 */
 'use strict';
 /* VERSION DU PROTOCOLE parlé avec les clients. `PROTO_MAX` = ce que ce serveur sait faire ;
@@ -13,7 +13,7 @@
    sur mobile, les joueurs mettent des semaines à mettre à jour. À incrémenter dès qu'un message
    change de forme (nouveau champ obligatoire, sens modifié, message retiré). */
 const PROTO_MIN = 1, PROTO_MAX = 1;
-const SERVER_BUILD = '2026-08-04 · v6.6';
+const SERVER_BUILD = '2026-08-07 · v7.4';
 const http = require('http');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -24,7 +24,9 @@ const { GameDriver } = require('./driver.js');
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const HTML = process.env.GAME_HTML || path.join(__dirname, '..', 'index.html');
 const DATA = process.env.DATA_DIR || path.join(__dirname, 'data');
-const AFK_MS = parseInt(process.env.AFK_MS || '120000', 10); // 2 min puis l'IA joue à ta place (0 = jamais)
+// AFK_MS a été SUPPRIMÉ (lot 17). C'était le levier « au bout de N secondes, l'IA joue à ta place ».
+// Plus aucun délai ne fait avancer une partie : voir « ABSENCE D'UN JOUEUR » plus bas. Le seul délai
+// restant, ECHEANCE_MS, n'affiche qu'un bouton chez les autres joueurs.
 fs.mkdirSync(path.join(DATA, 'games'), { recursive: true });
 
 const CIVS = ['terriens', 'martiens', 'jupiteriens', 'ceinturiens'];
@@ -110,6 +112,16 @@ function smtpAvertissements() {
   if (_secureForce) a.push('SMTP_SECURE=' + process.env.SMTP_SECURE + ' est en désaccord avec le port ' + SMTP_PORT
     + ' → IGNORÉ, on applique le réglage imposé par le port (' + (SMTP_SECURE ? 'TLS implicite' : 'STARTTLS')
     + '). Tu peux laisser cette variable telle quelle, elle ne bloque plus rien.');
+  /* Caractères actifs pour le shell : Coolify/Docker les mangent ou les transforment en passant la
+     variable au conteneur. C'est une INCOHÉRENCE à part entière, pas un simple détail d'affichage —
+     elle explique un mot de passe qui marche au webmail et échoue en SMTP. */
+  const _actifs = [...new Set((SMTP_PASS.match(/[`$\\"']/g) || []))];
+  if (_actifs.length) a.push('SMTP_PASS contient des caractères que le shell INTERPRÈTE : ' + _actifs.join(' ')
+    + '. Coolify/Docker les abîment au passage vers le conteneur (l\'antislash échappe, l\'accent grave'
+    + ' substitue).\n    REMÈDE 1 (le plus simple, rien à changer d\'autre) : cocher « Is Literal » sur'
+    + ' cette variable dans Coolify — la valeur est alors passée telle quelle.'
+    + '\n    REMÈDE 2 (le plus robuste) : un mot de passe LONG mais uniquement alphanumérique, qui ne'
+    + ' dépend d\'aucune case à cocher et survit à un changement d\'hébergeur.');
   if (SMTP_PORT !== 465 && SMTP_PORT !== 587) a.push('port ' + SMTP_PORT + ' inhabituel : chez OVH, utilise 465 (SSL) ou 587 (STARTTLS).');
   if (u && isEmail(u) && _adresseDe(MAIL_FROM) !== u.toLowerCase())
     a.push('MAIL_FROM (« ' + _adresseDe(MAIL_FROM) + ' ») diffère de la boîte authentifiée (« ' + u.toLowerCase() + ' ») — OVH refuse de relayer une adresse d\'expéditeur qui n\'est pas la sienne.');
@@ -199,7 +211,57 @@ function checkPass(pass, stored) {
     return a.length === b.length && crypto.timingSafeEqual(a, b);
   } catch (e) { return false; }
 }
-const tokens = new Map(); // token -> username (sessions en mémoire ; re-login après redémarrage serveur)
+/* ============ SESSIONS PERSISTANTES ============
+   ⚠️ Les jetons vivaient en MÉMOIRE : chaque redéploiement déconnectait TOUS les joueurs, y compris
+   en pleine partie. C'est ce qui a bloqué Marc sur mobile le 2026-08-05 — son téléphone tentait une
+   reprise avec un jeton mort et n'arrivait plus à en sortir. Ils sont désormais écrits sur le volume
+   `/data`, avec une péremption glissante : une session inutilisée pendant TOKEN_TTL_J jours expire.
+   Écriture différée (200 ms) pour ne pas toucher le disque à chaque message. */
+const TOKENS_FILE = path.join(DATA, 'tokens.json');
+const TOKEN_TTL_J = 90;
+const TOKEN_TTL_MS = TOKEN_TTL_J * 24 * 3600 * 1000;
+const tokens = new Map(); // token -> {user, vu} (vu = dernier usage, pour la péremption)
+(function chargerTokens() {
+  let brut = {};
+  try { brut = JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8')); } catch (e) { return; }
+  const now = Date.now(); let charges = 0, perimes = 0;
+  for (const [t, v] of Object.entries(brut || {})) {
+    const o = (typeof v === 'string') ? { user: v, vu: now } : v;   // tolère l'ancien format
+    if (!o || !o.user) continue;
+    if (now - (o.vu || 0) > TOKEN_TTL_MS) { perimes++; continue; }
+    tokens.set(t, o); charges++;
+  }
+  console.log('sessions rechargées : ' + charges + (perimes ? ' (' + perimes + ' périmée(s) écartée(s))' : ''));
+})();
+let _tokSaveTimer = null;
+function _ecrireTokens() {
+  clearTimeout(_tokSaveTimer); _tokSaveTimer = null;
+  try {
+    const now = Date.now(), out = {};
+    for (const [t, o] of tokens) { if (now - (o.vu || 0) <= TOKEN_TTL_MS) out[t] = o; else tokens.delete(t); }
+    fs.writeFileSync(TOKENS_FILE, JSON.stringify(out));
+  } catch (e) { console.error('saveTokens:', e.message); }
+}
+/* `immediat` = une session vient d'être CRÉÉE ou SUPPRIMÉE : il ne faut pas la perdre si le serveur
+   s'arrête dans la seconde (un redéploiement, justement). Une écriture différée était perdue à
+   l'arrêt — la session ne survivait donc pas, ce que le test a montré.
+   Sans `immediat` : simple rafraîchissement de la date d'usage, sans conséquence si on le perd. */
+function saveTokens(immediat) {
+  if (immediat) return _ecrireTokens();
+  if (!_tokSaveTimer) _tokSaveTimer = setTimeout(_ecrireTokens, 2000);
+}
+/* Arrêt propre : on vide ce qui attend avant de rendre la main (Docker envoie SIGTERM au redéploiement). */
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.on(sig, () => { try { if (_tokSaveTimer) _ecrireTokens(); } catch (e) {} process.exit(0); });
+}
+/* Retrouve l'utilisateur d'un jeton ET rafraîchit sa date d'usage (péremption glissante). */
+function userDuToken(t) {
+  const o = tokens.get(t);
+  if (!o) return null;
+  if (Date.now() - (o.vu || 0) > TOKEN_TTL_MS) { tokens.delete(t); saveTokens(); return null; }
+  o.vu = Date.now(); saveTokens();
+  return o.user;
+}
 
 /* ============ parties ============ */
 const games = new Map(); // code -> game
@@ -208,7 +270,12 @@ function newCode() { let c; do { c = crypto.randomBytes(2).toString('hex').toUpp
 function gameView(g) { // ce que le lobby a le droit de voir
   return {
     code: g.code, status: g.status, host: g.host,
-    seats: g.seats.map(s => ({ civId: s.civId, ai: s.ai, user: s.user || null, connected: !!(s.ws && s.ws.readyState === 1) }))
+    seats: g.seats.map(s => ({ civId: s.civId, ai: s.ai, user: s.user || null, connected: !!(s.ws && s.ws.readyState === 1),
+                               remplace: !!s.remplaceLe })),
+    // De qui la partie attend un geste, et si un remplacement est proposable. Le client s'en sert pour
+    // afficher « en attente de X » plutôt qu'un plateau silencieux — la cause n°1 des « c'est bloqué ».
+    attendu: g.attendu || null, voteOuvert: g.voteOuvert || null,
+    votePour: (g.vote && g.vote.pour) ? g.vote.pour.slice() : []
   };
 }
 function seatOf(g, wsOrUser) {
@@ -241,15 +308,96 @@ function sendWindowToAll(g, kind, payload, ownerCiv) {
   }
 }
 
+/* ============================================================================
+   PARTIES QUI SURVIVENT AU REDÉMARRAGE — le modèle BGA, enfin possible
+   ----------------------------------------------------------------------------
+   Ce n'était PAS faisable jusqu'au 2026-08-06. On savait écrire l'état d'une
+   partie et le relire à l'identique, mais elle ne REPARTAIT pas : le déroulement
+   vivait dans des fonctions (« et après cette réponse, fais ceci »), et JSON
+   n'écrit pas de fonctions. Une partie restaurée s'arrêtait sur la première
+   question, sa suite envolée.
+   Depuis la migration du flux en machine à états, le déroulement est une DONNÉE
+   rangée dans `G._flux` : numéro d'état, nations actives, curseurs, et le registre
+   des questions en attente avec leurs suites sous forme de NOMS. Sauver `G`, c'est
+   donc sauver la partie ENTIÈRE — règles et déroulement. C'est exactement ce que
+   fait BGA (état + données en base), et c'est vérifié par
+   `node server/test_serialisation.js` et `node server/test_reprise.js` (5/5).
+
+   On écrit UN fichier par partie : l'état du jeu + ce que le serveur seul connaît
+   (qui occupe quel siège, qui est l'hôte). Le reste — de qui on attend un geste —
+   est recalculé au chargement en rejouant `pump()`, jamais mémorisé.
+   ========================================================================== */
+const PARTIES_DIR = path.join(DATA, 'games');
+try { fs.mkdirSync(PARTIES_DIR, { recursive: true }); } catch (e) {}
+function fichierPartie(code) { return path.join(PARTIES_DIR, String(code) + '.json'); }
+
 function snapshot(g) {
-  if (!g.driver) return;
+  if (!g.driver || g.status !== 'playing') return;
   try {
-    fs.writeFileSync(path.join(DATA, 'games', g.code + '.json'), J(g.driver.state()));
+    fs.writeFileSync(fichierPartie(g.code), J({
+      version: 2, code: g.code, host: g.host, status: g.status,
+      cree: g.cree || Date.now(), maj: Date.now(),
+      // Les sièges d'AUJOURD'HUI : un remplacement par IA fait partie de l'état de la partie,
+      // et `_isAI` est de toute façon porté par les nations dans l'état du jeu.
+      sieges: g.seats.map(s => ({ civId: s.civId, ai: !!s.ai, user: s.user || null })),
+      etat: g.driver.state()
+    }));
   } catch (e) { console.error('snapshot', g.code, ':', e.message); }
 }
+function oublierPartie(code) { try { fs.unlinkSync(fichierPartie(code)); } catch (e) {} }
 
-/* Réponse automatique de secours à une décision (même heuristique validée en test :
-   première option proposée). Utilisée seulement si le joueur est déconnecté/AFK. */
+/* Recharge une partie depuis son fichier. Rend la partie, ou lève. */
+function chargerPartie(fiche) {
+  const g = {
+    code: fiche.code, host: fiche.host, cree: fiche.cree, status: 'playing',
+    seats: fiche.sieges.map(s => ({ civId: s.civId, ai: !!s.ai, user: s.user || null, ws: null })),
+    driver: null, timer: null, lastRoute: null
+  };
+  g.driver = new GameDriver(HTML);
+  // On démarre une partie « vide » pour construire le bac à sable, puis on remplace l'état par
+  // celui du fichier. `_restore` reconstruit aussi le roster : sans lui, le pilote garderait les
+  // nations de la partie vide et jouerait à côté de la plaque.
+  g.driver.boot(g.seats.map(s => ({ civId: s.civId, isAI: s.ai })), () => {});
+  g.driver._restore(J(fiche.etat));
+  for (const s of g.seats) { const n = g.driver.nation(s.civId); if (n) n._isAI = !!s.ai; }
+  installerJournalPilote(g);
+  return g;
+}
+
+function rechargerParties() {
+  let fichiers = [];
+  try { fichiers = fs.readdirSync(PARTIES_DIR).filter(f => f.endsWith('.json')); } catch (e) { return; }
+  let ok = 0, perdues = 0;
+  for (const f of fichiers) {
+    let fiche = null;
+    try { fiche = JSON.parse(fs.readFileSync(path.join(PARTIES_DIR, f), 'utf8')); } catch (e) { continue; }
+    // Les fichiers de l'ancien format (l'état nu, sans les sièges) ne sont pas reprenables :
+    // on ne sait pas qui occupait quel siège. On les ignore plutôt que de deviner.
+    if (!fiche || fiche.version !== 2 || !Array.isArray(fiche.sieges) || fiche.status !== 'playing') continue;
+    try {
+      const g = chargerPartie(fiche);
+      games.set(g.code, g);
+      // ⚠️ `route()` est INDISPENSABLE : sans lui la partie est bien là, mais `lastRoute` est vide et
+      // le joueur qui revient reçoit un plateau MUET, sans savoir si c'est à lui de jouer. Le
+      // chargement rend l'ÉTAT ; c'est route() qui rend LA MAIN.
+      route(g, g.driver.pump());
+      ok++;
+      console.log('  · partie ' + g.code + ' reprise — tour ' + g.driver.state().turn
+        + ' — ' + g.seats.filter(s => !s.ai).map(s => s.user || '?').join(', '));
+    } catch (e) {
+      perdues++;
+      console.error('  ✗ partie ' + fiche.code + ' NON reprise : ' + e.message.split('\n')[0]);
+      try { fs.renameSync(fichierPartie(fiche.code), fichierPartie(fiche.code) + '.echec'); } catch (e2) {}
+    }
+  }
+  if (ok || perdues) console.log('Parties reprises : ' + ok + (perdues ? ' — non reprises : ' + perdues + ' (fichiers .echec conservés pour diagnostic)' : ''));
+}
+
+/* Réponse par défaut à une décision : la première option proposée.
+   ⚠️ N'EST PLUS DÉCLENCHÉE PAR UN DÉLAI. Depuis le lot 17, elle ne sert QUE lorsqu'un
+   siège vient d'être converti en IA **par un vote des autres joueurs** : il faut bien
+   solder la décision déjà émise pour l'humain qui vient d'être remplacé. Voir
+   « ABSENCE D'UN JOUEUR » plus bas. */
 function autoAnswer(pending) {
   const pay = (pending && pending.payload) || {};
   for (const k of Object.keys(pay)) {
@@ -274,20 +422,127 @@ function plainText(s) {
     .replace(/<[^>]+>/g, '')
     .trim();
 }
+/* ============================================================================
+   ABSENCE D'UN JOUEUR — ce que le serveur a le DROIT de faire   (lot 17)
+   ----------------------------------------------------------------------------
+   AVANT : au bout de 30 s de déconnexion, le serveur RÉPONDAIT À LA PLACE du
+   joueur (première option de la liste) puis enchaînait tout seul. Deux dégâts
+   réels, constatés par Marc :
+     · **un simple rafraîchissement de page cassait la partie.** Recharger le jeu
+       peut dépasser 30 s (mobile, réseau lent, cache vide — et le moteur pèse
+       maintenant 488 Ko) : le temps de revenir, l'IA avait joué son tour.
+     · une partie abandonnée se terminait toute seule et arrivait « finie » —
+       « c'est déprimant » (Marc, 2026-08-04).
+
+   MAINTENANT : **le serveur ne joue JAMAIS à la place de personne.** Une partie
+   dont le joueur attendu est absent ATTEND — sans limite. L'échéance ne déclenche
+   RIEN : elle OUVRE seulement la possibilité, pour les AUTRES joueurs, de VOTER le
+   remplacement de l'absent par une IA (option C, choisie par Marc le 2026-08-04).
+   Le vote doit être UNANIME parmi les humains présents. Tant qu'il ne l'est pas,
+   ou que personne ne vote, rien ne bouge : c'est le comportement voulu.
+
+   Autrement dit : le temps qui passe n'a plus aucun pouvoir sur une partie.
+   Seuls des JOUEURS peuvent faire avancer une partie — soit en jouant, soit en
+   décidant ensemble de remplacer un absent.
+   ========================================================================== */
 function clearTimer(g) { if (g.timer) { clearTimeout(g.timer); g.timer = null; } }
-const RECONNECT_GRACE_MS = parseInt(process.env.RECONNECT_GRACE_MS || '30000', 10);
-function armTimer(g, civId, fn) {
-  clearTimer(g);
+/* Délai au bout duquel le vote de remplacement devient PROPOSABLE. Il ne « fait » rien :
+   il ne fait qu'afficher un bouton chez les autres. 90 s laisse largement le temps de
+   recharger une page ; ce n'est pas une horloge de partie (celles-ci viennent avec les
+   types de partie temps réel / tour par tour). */
+const ECHEANCE_MS = parseInt(process.env.ECHEANCE_MS || '90000', 10);
+
+/* Le PUITS DE NOTICES d'une partie : à qui va chaque fenêtre non bloquante.
+   ⚠️ ELLES NE SONT PAS DIFFUSÉES À TOUT LE MONDE. Un `broadcast` faisait apparaître « Tu as gagné
+   le combat » chez TOUS les humains : Laurent voyait la fenêtre de victoire de Marc, puis l'inverse
+   (bug du 2026-08-01). Une notice appartient à UNE nation, celle inscrite dans `p.nation`.
+   Exception : le BILAN DE FIN DE TOUR (`eot`) va bien à tous en même temps, chacun recevant LE SIEN
+   (`payload.bodies`) — à cet instant il n'y a plus de joueur actif, c'est un temps commun ; il est
+   distribué par route(), donc on ne le double pas ici. */
+function puitsNotices(g) {
+  return (p) => {
+    try {
+      if (!(p && (p.notice || ['war_result', 'event_result', 'event_announce', 'eot'].includes(p.kind)))) return;
+      if (FENETRES_COLLECTIVES.includes(p.kind)) return;
+      const civ = (p.nation && p.nation.civ) ? p.nation.civ.id : p.nation;
+      const seat = civ ? g.seats.find(s2 => s2.civId === civ && !s2.ai) : null;
+      if (seat) sendTo(seat.ws, { t: 'notice', kind: p.kind, payload: p.payload });
+      else if (!civ) broadcast(g, { t: 'notice', kind: p.kind, payload: p.payload }); // notice sans destinataire = information générale
+    } catch (e) {}
+  };
+}
+/* Branche le pilote sur les clients : journal des actions + puits de notices. */
+function installerJournalPilote(g) {
+  if (!g.driver) return;
+  // Le journal des actions part vers TOUS SAUF l'auteur : la fenêtre rouge montre ce que font les
+  // AUTRES nations, pas ce que le joueur vient lui-même de faire.
+  g.driver.onLog = entries => { for (const s2 of g.seats) { if (g._actingCiv && s2.civId === g._actingCiv) continue; sendTo(s2.ws, { t: 'log', entries }); } };
+  g.driver._onDecision = puitsNotices(g);
+}
+
+function nomSiege(g, civId) {
   const s = g.seats.find(x => x.civId === civId);
-  const connected = !!(s && s.ws && s.ws.readyState === 1);
-  g.timerFn = fn; g.timerCiv = civId; // mémorisé pour ré-armer à la reconnexion
-  if (!connected) { // déconnecté : on laisse 30 s pour se reconnecter avant que l'IA reprenne
-    broadcast(g, { t: 'notice', kind: 'info', payload: { msg: civId + ' est déconnecté — l\'IA jouera pour lui dans ' + Math.round(RECONNECT_GRACE_MS / 1000) + ' s s\'il ne revient pas.' } });
-    g.timer = setTimeout(fn, RECONNECT_GRACE_MS);
-    return;
-  }
-  // CONNECTÉ = on NE joue JAMAIS à sa place (bugs #2/#13 : le jeu choisissait l'agenda / jouait une action
-  // alors que le joueur réfléchissait). Il prend tout son temps. L'auto-jeu ne sert QU'à un joueur déconnecté.
+  return (s && s.user) ? s.user : String(civId || '?');
+}
+function humainsPresentsSauf(g, civId) {
+  return g.seats.filter(s => !s.ai && s.civId !== civId && s.ws && s.ws.readyState === 1);
+}
+/* La partie attend un geste de `civId`. On note QUI on attend et depuis quand, et on arme
+   l'échéance au bout de laquelle les AUTRES pourront proposer un remplacement. */
+function attendre(g, civId) {
+  clearTimer(g);
+  g.attendu = civId;
+  g.attendDepuis = Date.now();
+  g.voteOuvert = null;   // nouvelle attente = toute proposition précédente tombe
+  g.vote = null;
+  g.timer = setTimeout(() => {
+    g.timer = null;
+    if (g.attendu !== civId || g.status !== 'playing') return;
+    g.voteOuvert = civId;
+    broadcast(g, {
+      t: 'absence', civId, votable: true,
+      msg: nomSiege(g, civId) + ' n\'a pas joué depuis un moment. Vous pouvez proposer de le remplacer par une IA — '
+         + 'ou simplement attendre : la partie l\'attendra aussi longtemps qu\'il le faudra.'
+    });
+  }, ECHEANCE_MS);
+}
+/* Un joueur vote le remplacement de l'absent. Unanimité des humains PRÉSENTS requise.
+   Un seul humain présent → son vote suffit (il est l'unanimité). */
+function voterRemplacement(g, votantCiv) {
+  if (g.status !== 'playing' || !g.voteOuvert) return { ok: false, msg: 'aucun remplacement à voter' };
+  const cible = g.voteOuvert;
+  if (votantCiv === cible) return { ok: false, msg: 'tu ne peux pas voter ton propre remplacement' };
+  if (!g.vote || g.vote.cible !== cible) g.vote = { cible, pour: [] };
+  if (!g.vote.pour.includes(votantCiv)) g.vote.pour.push(votantCiv);
+  const requis = humainsPresentsSauf(g, cible).map(s => s.civId);
+  const manquants = requis.filter(c => !g.vote.pour.includes(c));
+  broadcast(g, { t: 'vote', cible, pour: g.vote.pour.slice(), requis, manquants });
+  if (manquants.length) return { ok: true, encore: manquants.length };
+  remplacerParIA(g, cible);
+  return { ok: true, encore: 0 };
+}
+/* Conversion effective d'un siège humain en IA. C'est le SEUL chemin par lequel une nation
+   humaine peut se mettre à jouer seule — et il passe par un vote, jamais par une horloge. */
+function remplacerParIA(g, cible) {
+  const s = g.seats.find(x => x.civId === cible);
+  if (!s || s.ai) return;
+  s.remplaceLe = Date.now(); s.remplaceUser = s.user || null;
+  s.ai = true;
+  try { const n = g.driver && g.driver.nation(cible); if (n) n._isAI = true; } catch (e) {}
+  g.vote = null; g.voteOuvert = null; clearTimer(g);
+  broadcast(g, { t: 'notice', kind: 'info', payload: { msg: '🤖 ' + nomSiege(g, cible) + ' est remplacé par une IA (vote des joueurs présents).' } });
+  broadcast(g, { t: 'game', game: gameView(g) });
+  // La décision déjà émise pour cet humain doit être soldée, sinon la partie reste figée dessus.
+  try {
+    const p = g.driver && g.driver.state()._pending;
+    if (p && String(p.nation && p.nation.civ ? p.nation.civ.id : p.nation) === String(cible)) {
+      route(g, g.driver.answer(p.id, autoAnswer(p)));
+      return;
+    }
+    if (g.lastRoute && g.lastRoute.kind === 'action' && g.lastRoute.civId === cible) {
+      route(g, g.driver.actAuto(cible));
+    }
+  } catch (e) { console.error('remplacerParIA:', e.message); }
 }
 
 /* Le cœur : appliquer le résultat de pump() → router vers les clients. */
@@ -299,6 +554,34 @@ function armTimer(g, civId, fn) {
    multijoueur à des inconnus.
    Principe : on ne « devine » rien. Les nombres sont bornés, et toute valeur censée venir d'une
    LISTE proposée doit s'y trouver ; sinon on la retire plutôt que de l'inventer. */
+/* REMETTRE UN JOUEUR DANS LE BAIN — appelé quand il revient (`join` après un rafraîchissement)
+   et quand il se sent perdu (`resync`). C'est LE point unique qui répond à « où en est la partie,
+   et qu'est-ce que j'ai à faire maintenant ? ».
+   Il existait deux versions divergentes de ce code (une dans `join`, une dans `resync`) et aucune
+   des deux ne savait rendre une action TENUE : après un rafraîchissement au mauvais moment, le
+   joueur retrouvait un plateau muet, sans barre Valider/Annuler, et croyait sa partie cassée. */
+function renvoyerLaMain(g, s, ws) {
+  if (!g || !s || !g.lastRoute || g.status !== 'playing') return;
+  const r = g.lastRoute;
+  if (r.civId === s.civId) {
+    if (r.kind === 'decision') sendTo(ws, { t: 'decision', pending: r.pending });
+    else if (r.kind === 'action') sendTo(ws, { t: 'your_action', civId: s.civId });
+    else if (r.kind === 'confirm') sendTo(ws, { t: 'confirm_pending', civId: s.civId });
+  } else {
+    sendTo(ws, { t: r.kind === 'decision' ? 'waiting' : 'turn', civId: r.civId, kind: r.pending && r.pending.kind });
+  }
+  // Et l'état d'absence en cours, sinon celui qui revient ne verrait pas qu'un vote est ouvert.
+  if (g.voteOuvert && g.voteOuvert !== s.civId) {
+    sendTo(ws, { t: 'absence', civId: g.voteOuvert, votable: true,
+                 msg: nomSiege(g, g.voteOuvert) + ' n\'a pas joué depuis un moment. Vous pouvez proposer de le remplacer par une IA.' });
+    if (g.vote && g.vote.cible === g.voteOuvert) {
+      const requis = humainsPresentsSauf(g, g.voteOuvert).map(x => x.civId);
+      sendTo(ws, { t: 'vote', cible: g.voteOuvert, pour: g.vote.pour.slice(), requis,
+                   manquants: requis.filter(c => !g.vote.pour.includes(c)) });
+    }
+  }
+}
+
 function assainirReponse(g, pending, ans) {
   if (!ans || typeof ans !== 'object' || Array.isArray(ans)) return {};
   const out = {};
@@ -335,6 +618,7 @@ function assainirReponse(g, pending, ans) {
 
 function route(g, r) {
   clearTimer(g);
+  if (r && (r.kind === 'decision' || r.kind === 'action' || r.kind === 'over')) g._idleEssais = 0; // ça repart : on oublie les tentatives
   snapshot(g);
   g.lastRoute = r;
   if (!r) return;
@@ -348,17 +632,18 @@ function route(g, r) {
     if (FENETRES_COLLECTIVES.includes(p.kind)) sendWindowToAll(g, p.kind, p.payload, civ);
     sendToCiv(g, civ, { t: 'decision', pending: g.lastRoute.pending });
     broadcast(g, { t: 'waiting', civId: civ, kind: p.kind });
-    armTimer(g, civ, () => { try { route(g, g.driver.answer(p.id, autoAnswer(p))); } catch (e) { console.error('auto-answer:', e.message); } });
+    attendre(g, civ); // on attend SA réponse — aussi longtemps qu'il le faut (plus d'auto-réponse au bout de 30 s)
     return;
   }
   if (r.kind === 'action') {
     sendToCiv(g, r.civId, { t: 'your_action', civId: r.civId });
     broadcast(g, { t: 'turn', civId: r.civId, turn: g.driver.state().turn });
-    armTimer(g, r.civId, () => { try { route(g, g.driver.actAuto(r.civId)); } catch (e) { console.error('auto-act:', e.message); } });
+    attendre(g, r.civId); // idem : c'est son tour, la partie l'attend
     return;
   }
   if (r.kind === 'over') {
     g.status = 'over';
+    oublierPartie(g.code);   // partie finie : l'archive prend le relais
     let scores = [];
     try {
       const sb = g.driver.sb, G = g.driver.state();
@@ -383,13 +668,57 @@ function route(g, r) {
     return;
   }
   // 'idle' / 'guard' : le moteur n'a rien rendu à distribuer → anti-gel : on retente une fois peu après.
-  console.error('route', g.code, ': état', r.kind, '(anti-gel armé)');
-  if (!g._idleRetry) {
-    g._idleRetry = setTimeout(() => {
-      g._idleRetry = null;
-      try { route(g, g.driver.pump()); } catch (e) { console.error('anti-gel', g.code, ':', e.message); }
-    }, 1200);
+  /* ANTI-GEL BORNÉ. Il réessayait toutes les 1,2 s INDÉFINIMENT : une partie réellement bloquée
+     produisait une ligne de log par seconde, pour toujours, sans que personne apprenne POURQUOI.
+     Maintenant : quelques tentatives, puis on s'arrête et on DIAGNOSTIQUE — c'est exactement ce
+     que Marc demandait (« le rafraîchissement amène le jeu à vérifier les bugs éventuels »).
+     Le diagnostic vient de la machine à états : elle sait dire quel état attend quoi, et de qui. */
+  g._idleEssais = (g._idleEssais || 0) + 1;
+  if (g._idleEssais <= 4) {
+    if (!g._idleRetry) {
+      g._idleRetry = setTimeout(() => {
+        g._idleRetry = null;
+        try { route(g, g.driver.pump()); } catch (e) { console.error('anti-gel', g.code, ':', e.message); }
+      }, 1200);
+    }
+    return;
   }
+  const diag = diagnostiquer(g);
+  console.error('route ' + g.code + ' : BLOQUÉE après ' + g._idleEssais + ' tentatives — ' + diag.resume);
+  broadcast(g, { t: 'notice', kind: 'info', payload: { msg:
+    '⚠️ La partie ne parvient pas à repartir toute seule. ' + diag.resume
+    + ' Rafraîchis la page : le serveur revérifiera. Le problème a été signalé.' } });
+  sendMail(ADMIN_MAIL, 'Solar — partie bloquée : ' + g.code, diag.texte);
+  g._idleEssais = 0;
+}
+
+/* CE QUE LE SERVEUR SAIT DIRE D'UNE PARTIE QUI NE BOUGE PAS.
+   Avant, la réponse était « rien » : le moteur rendait `idle` et on relançait à l'aveugle.
+   La machine à états (bloc @flux de moteur.js) sait, elle, dans quel état on est, qui doit agir,
+   et quelles transitions ont mené là. On lui demande. */
+function diagnostiquer(g) {
+  let d = null;
+  try { d = g.driver && g.driver.sb.fluxDiagnostiquer(); } catch (e) {}
+  const G = (() => { try { return g.driver.state(); } catch (e) { return null; } })();
+  if (!d) return { resume: 'Diagnostic indisponible.', texte: 'Partie ' + g.code + ' : diagnostic indisponible.' };
+  const resume = 'État « ' + d.nom + ' » (' + d.type + '), tour ' + d.tour
+    + (d.actifs.length ? ', en attente de : ' + d.actifs.join(', ') : ', AUCUNE nation active')
+    + (d.soucis.length ? ' — ' + d.soucis[0] : '');
+  const texte = [
+    'Partie ' + g.code + ' bloquée le ' + frDate(Date.now()),
+    'Tour ' + (G ? G.turn : '?') + ' — phase ' + (G ? G.phase : '?'),
+    'État du flux : ' + d.nom + ' (' + d.type + ')',
+    'Nations actives : ' + (d.actifs.join(', ') || 'aucune'),
+    'En attente de réponse : ' + (d.enAttente.join(', ') || 'personne'),
+    'Sièges : ' + g.seats.map(s => s.civId + (s.ai ? ' [IA]' : ' [' + (s.user || 'vide') + ']')).join(' · '),
+    '',
+    'Problèmes détectés :',
+    ...(d.soucis.length ? d.soucis.map(x => '  · ' + x) : ['  (aucun — la machine se croit saine, le blocage est ailleurs)']),
+    '',
+    'Douze dernières transitions :',
+    ...(d.histoire || []).map(h => '  tour ' + h.t + ' : ' + h.deNom + ' --' + h.via + '--> ' + h.versNom)
+  ].join('\n');
+  return { resume, texte };
 }
 /* Reprise sûre après une exception du moteur : on repompe pour re-dispatcher le jeu. */
 function recover(g, tag, e) {
@@ -450,9 +779,15 @@ const server = http.createServer((req, res) => {
     const KEY_M = process.env.ADMIN_KEY || '';
     if (!KEY_M || q.get('key') !== KEY_M) {
       res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end(KEY_M
-        ? 'Accès refusé. Utilise /mailtest?key=TA_CLE (variable ADMIN_KEY du serveur).'
-        : 'Page désactivée : définis la variable ADMIN_KEY sur le serveur, puis appelle /mailtest?key=TA_CLE');
+      /* La VERSION figure même sur le refus : sans elle, on ne sait pas si la page vient du build
+         qu'on croit — ambiguïté qui nous a déjà coûté un aller-retour de déploiement. */
+      res.end((KEY_M
+        ? 'Accès refusé.\n\nLa clé attendue est la valeur de la variable ADMIN_KEY de ce serveur\n'
+          + '(celle qui protège déjà /admin/reset), PAS le mot de passe de la boîte mail.\n'
+          + 'À lire dans Coolify → variables d\'environnement de live.solar-game.com.\n\n'
+          + 'Puis : /mailtest?key=LA_VALEUR_DE_ADMIN_KEY'
+        : 'Page désactivée : définis la variable ADMIN_KEY sur le serveur, puis appelle /mailtest?key=TA_CLE')
+        + '\n\nVersion du serveur : ' + SERVER_BUILD + '\n');
       return;
     }
     const dest = q.get('to');
@@ -461,7 +796,7 @@ const server = http.createServer((req, res) => {
        Le mot de passe n'est JAMAIS acceptable en paramètre d'URL — seuls l'hôte et le port. */
     const hostAlt = q.get('host'), portAlt = parseInt(q.get('port'), 10);
     const out = [];
-    out.push('SOLAR — DIAGNOSTIC EMAIL  (' + frDate(Date.now()) + ')');
+    out.push('SOLAR — DIAGNOSTIC EMAIL  (' + frDate(Date.now()) + ')  —  serveur ' + SERVER_BUILD);
     out.push('');
     out.push('CONFIGURATION EFFECTIVE');
     out.push('  SMTP_HOST   : ' + (SMTP_HOST || '(absent)'));
@@ -688,14 +1023,14 @@ wss.on('connection', (ws) => {
           const u = String(m.user || '').trim().toLowerCase();
           if (!users[u] || !checkPass(m.pass, users[u].pass)) return err('identifiants incorrects');
           const token = crypto.randomBytes(24).toString('hex');
-          tokens.set(token, u);
+          tokens.set(token, { user: u, vu: Date.now() }); saveTokens(true); // création : écriture immédiate
           sess.user = u;
           sendTo(ws, { t: 'logged', user: u, token, tier: users[u].tier || 1 });
           break;
         }
 
         case 'token': { // reconnexion rapide avec un token encore valide
-          const u = tokens.get(m.token);
+          const u = userDuToken(m.token);   // rafraîchit la péremption glissante
           if (!u) return err('token inconnu ou expiré');
           sess.user = u;
           sendTo(ws, { t: 'logged', user: u, token: m.token, tier: users[u].tier || 1 });
@@ -713,7 +1048,8 @@ wss.on('connection', (ws) => {
             seats.push({ civId: s.civId, ai: !!s.ai, user: null, ws: null });
           }
           if (seats.length < 2 || seats.length > 4) return err('2 à 4 sièges requis');
-          const g = { code: newCode(), host: sess.user, seats, status: 'lobby', driver: null, timer: null, lastRoute: null };
+          const g = { code: newCode(), host: sess.user, seats, status: 'lobby', driver: null, timer: null, lastRoute: null,
+                      cree: Date.now() };
           games.set(g.code, g);
           sess.game = g.code;
           sendTo(ws, { t: 'game', game: gameView(g) });
@@ -737,11 +1073,10 @@ wss.on('connection', (ws) => {
           sess.game = g.code;
           broadcast(g, { t: 'game', game: gameView(g) });
           // si la partie tourne, remettre le joueur dans le bain
-          if (g.status === 'playing' && g.lastRoute) {
-            if (g.lastRoute.kind === 'decision' && g.lastRoute.civId === s.civId) sendTo(ws, { t: 'decision', pending: g.lastRoute.pending });
-            if (g.lastRoute.kind === 'action' && g.lastRoute.civId === s.civId) sendTo(ws, { t: 'your_action', civId: s.civId });
-            // il est revenu : annuler le compte à rebours « déconnecté » et repartir sur le délai anti-AFK normal
-            if (g.timerCiv === s.civId && g.timerFn) armTimer(g, s.civId, g.timerFn);
+          if (g.status === 'playing') {
+            // il est revenu : toute proposition de remplacement le concernant tombe, l'échéance repart à zéro
+            if (g.attendu === s.civId) attendre(g, s.civId);
+            renvoyerLaMain(g, s, ws);
           }
           break;
         }
@@ -754,32 +1089,12 @@ wss.on('connection', (ws) => {
           const empty = g.seats.filter(s => !s.ai && !s.user);
           if (empty.length) return err('sièges humains vides: ' + empty.map(s => s.civId).join(','));
           g.driver = new GameDriver(HTML);
-          // Le journal des actions part vers TOUS SAUF l'auteur de l'action : la fenêtre rouge doit
-          // montrer ce que font les AUTRES nations, pas ce que le joueur vient lui-même de faire.
-          g.driver.onLog = entries => { for (const s2 of g.seats) { if (g._actingCiv && s2.civId === g._actingCiv) continue; sendTo(s2.ws, { t: 'log', entries }); } };
           g.status = 'playing';
           broadcast(g, { t: 'started', game: gameView(g) });
-          // Décisions humaines : récupérées via pump(). Notices (résultats de combat/événement/fin de tour) :
-          // le pump les acquitte automatiquement, on les envoie ici pour que les joueurs les voient.
-          //
-          // ⚠️ ELLES NE SONT PLUS DIFFUSÉES À TOUT LE MONDE. Un `broadcast` faisait apparaître « Tu as
-          // gagné le combat » chez TOUS les humains : Laurent voyait la fenêtre de victoire de Marc,
-          // puis l'inverse (bug signalé le 2026-08-01). Une notice appartient à UNE nation : celle
-          // inscrite dans `p.nation`. On l'envoie donc au siège correspondant, et à lui seul.
-          // Exception : le BILAN DE FIN DE TOUR (`eot`) va bien à tout le monde en même temps, chacun
-          // recevant SON propre bilan (voir `payload.bodies`), parce qu'à cet instant il n'y a plus de
-          // joueur actif — c'est un temps commun.
-          g.driver.boot(g.seats.map(s => ({ civId: s.civId, isAI: s.ai })), (p) => {
-            try {
-              if (!(p && (p.notice || ['war_result', 'event_result', 'event_announce', 'eot'].includes(p.kind)))) return;
-              // Les fenêtres collectives sont distribuées par route() (une seule fois, à tous) : ne pas les doubler ici.
-              if (FENETRES_COLLECTIVES.includes(p.kind)) return;
-              const civ = (p.nation && p.nation.civ) ? p.nation.civ.id : p.nation;
-              const seat = civ ? g.seats.find(s2 => s2.civId === civ && !s2.ai) : null;
-              if (seat) sendTo(seat.ws, { t: 'notice', kind: p.kind, payload: p.payload });
-              else if (!civ) broadcast(g, { t: 'notice', kind: p.kind, payload: p.payload }); // notice sans destinataire = information générale
-            } catch (e) {}
-          });
+          // Décisions humaines : récupérées via pump(). Notices : acquittées par le pump, distribuées
+          // par le puits ci-dessous (voir `puitsNotices` pour le pourquoi du destinataire unique).
+          g.driver.boot(g.seats.map(s => ({ civId: s.civId, isAI: s.ai })), puitsNotices(g));
+          installerJournalPilote(g);
           route(g, g.driver.pump());
           break;
         }
@@ -819,9 +1134,10 @@ wss.on('connection', (ws) => {
               snapshot(g);
               g.lastRoute = { kind: 'confirm', civId: s.civId };
               sendTo(ws, { t: 'confirm_pending', civId: s.civId });   // le client redemandera l'état (reqState)
-              // Sécurité : pas de réponse / déconnexion → auto-Valider (le jeu n'attend pas indéfiniment).
-              clearTimer(g);
-              g.timer = setTimeout(() => { try { route(g, g.driver.commit(s.civId)); } catch (e) {} }, AFK_MS > 0 ? AFK_MS : 120000);
+              // AVANT : auto-Valider au bout de 2 min. Une action était donc VALIDÉE À SA PLACE pendant
+              // qu'il rechargeait sa page. Maintenant l'action reste TENUE : il la retrouvera telle quelle
+              // en revenant (voir `resync`), et si vraiment il ne revient pas, les autres pourront voter.
+              attendre(g, s.civId);
             } else {
               route(g, rr);
             }
@@ -860,14 +1176,22 @@ wss.on('connection', (ws) => {
           break;
         }
 
+        case 'vote_ia': { // {t:'vote_ia'} — proposer/soutenir le remplacement de l'absent par une IA
+          if (!requireAuth() || !requireGame()) break;
+          const g = games.get(sess.game);
+          const s = seatOf(g, ws) || seatOf(g, sess.user);
+          if (!g || !s) return err('pas dans cette partie');
+          const r = voterRemplacement(g, s.civId);
+          if (!r.ok) return err(r.msg);
+          break;
+        }
+
         case 'resync': { // le client se sent perdu → on lui renvoie où en est la partie
           if (!requireGame()) break;
           const g = games.get(sess.game);
           const s = seatOf(g, ws) || seatOf(g, sess.user);
           if (!g.driver || !s) return err('pas dans cette partie');
-          if (g.lastRoute && g.lastRoute.kind === 'decision' && g.lastRoute.civId === s.civId) sendTo(ws, { t: 'decision', pending: g.lastRoute.pending });
-          else if (g.lastRoute && g.lastRoute.kind === 'action' && g.lastRoute.civId === s.civId) sendTo(ws, { t: 'your_action', civId: s.civId });
-          else if (g.status === 'playing' && g.lastRoute) sendTo(ws, { t: g.lastRoute.kind === 'decision' ? 'waiting' : 'turn', civId: g.lastRoute.civId });
+          renvoyerLaMain(g, s, ws);
           break;
         }
 
@@ -899,7 +1223,7 @@ wss.on('connection', (ws) => {
             // l'hôte quitte, ou partie en cours → on TERMINE la partie pour tout le monde.
             clearTimer(g);
             broadcast(g, { t: 'game_ended', by: sess.user });
-            try { fs.unlinkSync(path.join(DATA, 'games', g.code + '.json')); } catch (e) {}
+            oublierPartie(g.code);
             games.delete(g.code);
           } else {
             // un invité quitte le lobby → on libère juste son siège.
@@ -946,19 +1270,17 @@ wss.on('connection', (ws) => {
       const s = g.seats.find(x => x.ws === ws);
       if (s) s.ws = null;
       broadcast(g, { t: 'game', game: gameView(g) });
-      // si c'était à lui de jouer, le timer de repli IA est déjà armé (armTimer re-évalue à la déconnexion suivante)
-      if (g.status === 'playing' && g.lastRoute && g.lastRoute.civId === (s && s.civId)) {
-        if (g.lastRoute.kind === 'decision') {
-          const p = g.driver.state()._pending;
-          if (p) armTimer(g, s.civId, () => { try { route(g, g.driver.answer(p.id, autoAnswer(p))); } catch (e) {} });
-        } else if (g.lastRoute.kind === 'action') {
-          armTimer(g, s.civId, () => { try { route(g, g.driver.actAuto(s.civId)); } catch (e) {} });
-        }
-      }
+      // Une déconnexion ne déclenche RIEN. Surtout pas un tour joué à sa place : c'est le plus souvent
+      // un simple rafraîchissement de page. On signale seulement l'absence aux autres.
+      if (s) broadcast(g, { t: 'absence', civId: s.civId, votable: false,
+                            msg: nomSiege(g, s.civId) + ' s\'est déconnecté.' });
     }
   });
 });
 
 server.listen(PORT, () => {
   console.log('Solar Conquest server — port ' + PORT + ' — moteur: ' + HTML + ' — data: ' + DATA);
+  // Les parties en cours sont rechargées depuis leur fichier (état + déroulement). Voir le bandeau
+  // « PARTIES QUI SURVIVENT AU REDÉMARRAGE » plus haut.
+  try { rechargerParties(); } catch (e) { console.error('rechargerParties:', e.message); }
 });

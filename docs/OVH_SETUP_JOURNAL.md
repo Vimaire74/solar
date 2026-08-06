@@ -911,6 +911,53 @@ voit donc jamais le problème, ce qui rend le bug très trompeur. `SMTP_USER`, `
 le faire (modifier un mot de passe en silence serait pire que le bug).
 *Vérifié : mot de passe avec retour à la ligne collé, puis avec espaces autour → détecté et retiré.*
 
+### 🎯 CAUSE TROUVÉE (2026-08-04) : caractères actifs dans le mot de passe
+`/mailtest` v6.6 a livré la réponse :
+```
+SMTP_PASS : (défini, 21 caractères — dont 3 caractère(s) fragile(s) : \ ` )
+```
+Le mot de passe de la boîte contient des **antislashs** et des **accents graves**. Ce sont exactement
+les caractères que le shell interprète : `\` échappe le suivant, `` ` `` déclenche une substitution de
+commande. Coolify/Docker les abîment en transmettant la variable au conteneur. **Le webmail reçoit ce
+qui est TAPÉ, le serveur SMTP reçoit ce qui a SURVÉCU au passage** — d'où un mot de passe qui marche
+d'un côté et pas de l'autre, symptôme parfaitement trompeur qui nous a coûté plusieurs heures.
+
+**✅ RÉSOLU le 2026-08-04** — chaîne complète vérifiée :
+```
+13h17  ✅ connexion et authentification acceptées.
+13h21  ✅ message d'essai envoyé à marc@guerir.ch
+       (id <…@solar-game.com> — OVH a donc accepté de RELAYER, pas seulement d'authentifier)
+```
+Les deux étapes sont distinctes : l'authentification (535 si elle échoue) et le relais (550/553).
+Les deux passent.
+
+**DEUX remèdes, à connaître tous les deux :**
+
+1. **Cocher « Is Literal » sur la variable dans Coolify.** C'est fait POUR ça : la valeur est passée
+   telle quelle, sans interprétation. ⚠️ **Marc l'avait déjà utilisé pour `soireematch.com`** — cette
+   connaissance n'était écrite nulle part, il a fallu qu'il s'en souvienne. *C'est le remède le moins
+   intrusif : rien d'autre à changer.*
+2. **Un mot de passe long mais uniquement alphanumérique** (retenu ici). Plus robuste : ne dépend
+   d'aucune case à cocher, survit à une migration d'hébergeur ou à une variable recréée à la main.
+
+**REMÈDE APPLIQUÉ** : changer le mot de passe de la boîte pour un mot de passe **long mais uniquement
+alphanumérique** (24 caractères, lettres + chiffres). La longueur compense l'absence de symboles, et
+la classe entière de problème disparaît — plutôt que de chercher quel échappement Coolify attend.
+`Zimbra Mail` → `Compte email` → les trois points → `Modifier le mot de passe`, puis reporter dans
+`SMTP_PASS` et redéployer.
+
+**Détecté automatiquement depuis la v6.8** : la présence de `` ` `` `$` `\` `"` `'` dans `SMTP_PASS` est
+signalée comme une INCOHÉRENCE à part entière, avec le remède. Plus besoin de le rechercher.
+
+### 📌 RÈGLE GÉNÉRALE À RETENIR
+**Tout secret passé par une variable d'environnement doit être alphanumérique**, OU porter la case
+**« Is Literal »** de Coolify. Ça vaut pour `SMTP_PASS`, `ADMIN_KEY`, et tout ce qu'on ajoutera.
+Le coût est nul, le piège est invisible et il nous a coûté plusieurs heures.
+
+⚠️ **Et la vraie leçon** : Marc connaissait déjà « Is Literal » pour l'avoir utilisé sur un autre
+service. Je ne l'ai pas retrouvé parce que **je ne l'avais jamais écrit**. Tout réglage d'hébergement
+découvert ensemble se consigne ICI, immédiatement — sinon je fais refaire le chemin à Marc.
+
 ### LE TEST DÉCISIF, sans code et sans déploiement
 Se connecter à **`https://webmail.mail.ovh.net/`** avec `contact@solar-game.com` et le mot de passe.
 C'est exactement le même couple identifiant/mot de passe que le SMTP.
@@ -925,6 +972,118 @@ C'est exactement le même couple identifiant/mot de passe que le SMTP.
 c'est la raison pour laquelle un futur envoi en masse passerait par un service externe.
 
 
+## ✅ v7.0 — connexion mobile : état bloqué, touche « Aller », bouton œil (2026-08-05)
+
+Marc bloqué sur mobile : « je clique sur Se connecter et il ne se passe rien ». Compte présent dans
+`/stats`, connexion OK sur ordinateur, **et OK sur Firefox Android en navigation privée** — c'est cet
+indice qui désigne la cause : la navigation privée part d'un `localStorage` VIDE.
+
+### 🔴 Un état mémorisé dont le client ne se relevait pas
+Le serveur garde les jetons de session **en mémoire** (`const tokens = new Map()`) : chaque
+redéploiement les efface. Au chargement, le client trouvait `sc_ws_token`, tentait la reprise, se
+faisait refuser — et basculait alors sur le **second écran de connexion** (`screenAuth` d'online.js)
+par-dessus celui du jeu. Marc cliquait donc sur un bouton qui n'était pas celui attendu. En prime,
+`sc_ws_game` restait en place et faisait ensuite tenter la reprise d'une partie disparue.
+- **Corrigé** : sur jeton refusé, on purge **tout** l'état (`sc_ws_token` ET `sc_ws_game`, `STATE.game`,
+  `STATE.started`) et **on n'ouvre plus le second écran si celui du jeu est déjà affiché** — on écrit
+  simplement « Session expirée » dans son champ d'erreur. Le client se remet d'aplomb seul.
+- Contournement utilisé en attendant : effacer les données de site sur le mobile (a fonctionné).
+- ⚠️ **Défaut de conception restant** : les jetons en mémoire déconnectent TOUS les joueurs à chaque
+  mise en ligne, y compris en pleine partie. À traiter (les persister sur le volume).
+
+### Touche « Aller » du clavier mobile
+Les champs ne sont dans **aucun `<form>`** : il n'y a donc aucune validation implicite, et la flèche
+du clavier ne faisait rien. Traitement explicite de la touche Entrée sur les DEUX écrans
+(`lvKey` dans index.html, écouteurs dans `screenAuth`) : depuis l'email on passe au mot de passe,
+depuis le mot de passe on valide et le clavier se referme. `enterkeyhint="next"/"go"` fait afficher
+la bonne étiquette sur le clavier.
+
+### Bouton œil « à des endroits bizarres »
+Je l'injectais depuis `online.js` avec `margin-left:-38px` — un placement bricolé. Or
+`#lv-auth input` fait `width:100%` : le bouton passait donc **à la ligne suivante**, décalé vers la
+gauche. Il est désormais **dans le HTML**, à l'intérieur d'un conteneur `position:relative`, ancré en
+absolu dans le champ, avec une zone de touche de 40 px. Corollaire : il existe aussi en solo et dans
+le tutoriel, ce qui n'était pas le cas.
+
+### 📌 Demande de Marc (2026-08-05) — NE PAS DÉCIDER SEUL
+**Désactiver la fin de partie automatique.** J'avais ajouté ce filet pour qu'une partie bloquée
+puisse continuer ; Marc : *« c'est une mauvaise solution, il faut trouver autre chose »*. À traiter
+**ensemble**, en lui demandant avant d'écrire la moindre ligne.
+
+
+## ✅ v7.1 — sessions persistantes : un redéploiement ne déconnecte plus personne (2026-08-05)
+
+Les jetons vivaient dans `const tokens = new Map()` — **en mémoire**. Chaque mise en ligne déconnectait
+tous les joueurs, y compris en pleine partie ; c'est ce qui a bloqué Marc sur mobile.
+- **Corrigé** : jetons écrits dans `/data/tokens.json` (le volume), péremption **glissante** de 90 jours
+  rafraîchie à chaque usage, tolérance à l'ancien format.
+- ⚠️ **Piège rencontré, à retenir** : ma première version écrivait en **différé (200 ms)** — l'écriture
+  était donc **perdue à l'arrêt du serveur**, et la session ne survivait pas. C'est le test qui l'a
+  montré, pas une relecture. Corrigé : écriture **immédiate** à la création d'une session, différée
+  seulement pour le rafraîchissement de date (sans conséquence si perdu), plus un **vidage sur
+  SIGTERM/SIGINT** (Docker envoie SIGTERM au redéploiement).
+- **Vérifié de bout en bout** : session ouverte → `tokens.json` écrit → serveur redémarré →
+  `sessions rechargées : 1` → même jeton **accepté**.
+
+📌 La suite (parties reprenables façon BGA) est spécifiée dans **`docs/LOT17_PARTIES_PERSISTANTES.md`**.
+
+
+## 🏗️ EN COURS — machine à états (lot 17, voie B) — GO « d'un bloc » de Marc (2026-08-05)
+
+⚠️ **NE RIEN DÉPLOYER** tant que ce chantier n'est pas terminé et vérifié. Détails et décisions :
+`docs/LOT17_PARTIES_PERSISTANTES.md`.
+
+Deux fichiers neufs, aucun changement dans le jeu pour l'instant :
+- **`server/states.js`** — 32 états déclarés en DONNÉES (type, actions permises, transitions nommées).
+  Couvre les **24 questions** réellement posées en partie. Le fichier **refuse de se charger** si une
+  transition pointe dans le vide ou si un état est inatteignable ; il a d'ailleurs trouvé un vrai
+  trou dès le premier chargement (état `DYSON` orphelin).
+- **`server/machine.js`** — moteur de transitions. **L'état de flux d'une partie tient en 266 octets**
+  et la partie **repart** après restauration. Avant : impossible, la moitié de l'état vivant dans des
+  fermetures JavaScript (démontré par `server/test_serialisation.js`).
+
+Prochaine étape, la plus lourde : migrer le flux d'`index.html` (chaînes de rappels → transitions).
+
+
+## ✅ v7.2 — LES RÈGLES QUITTENT LE HTML : `moteur.js` (2026-08-05, GO de Marc)
+
+Question de Marc : *« est-ce que les règles d'une partie sur BGA sont dans le fichier html ? »*
+Réponse vérifiée dans leur documentation : **non** — `Game.php` porte les règles (serveur),
+`Game.js` seulement l'interface. Mais **BGA n'a pas de mode hors ligne**, alors que le cas 1 de Marc
+l'exige : chez nous les règles doivent tourner **sur l'appareil ET sur le serveur**. La bonne question
+n'était donc pas « HTML ou pas » mais **l'empaquetage**. Analyse complète : `ARCHITECTURE_AVENIR.md` §7.
+
+### Ce qui a été fait
+```
+AVANT : index.html 603 Ko — dont 479 Ko de RÈGLES (79 %), extraites par le serveur
+        en cherchant un bloc <script>  →  deux bugs majeurs déjà payés
+APRÈS : index.html 123 Ko (une page redevient une page)
+        moteur.js  488 Ko — TOUTES les règles, un vrai fichier
+```
+- `index.html` charge `<script src="moteur.js">` **avant** les blocs d'interface et `online.js`.
+- `server/game-core.js` **lit `moteur.js` directement**. Plus aucune extraction depuis du HTML,
+  plus de sentinelle, plus de devinette. Si le fichier manque : erreur claire et immédiate.
+- `sw.js` **pré-cache `moteur.js`** (version purgée en `v3-2026-08-05`). ⚠️ Sans cette ligne, le solo
+  hors ligne ne démarrerait plus : `index.html` ne serait qu'une coquille. C'était « gratuit » tant
+  que les règles étaient collées dedans — l'extraction rend ce pré-cache INDISPENSABLE.
+- **`node --check moteur.js` fonctionne enfin** : la syntaxe des règles était invérifiable quand
+  elles étaient noyées dans du HTML.
+
+### Doublon supprimé au passage
+`uiIncome()` — **55 lignes d'un SECOND calcul de revenu**, brut et faux, hors moteur. Inutilisée
+depuis la v6.0 mais toujours là, en repli. C'est exactement le genre de doublon qui a coûté une
+semaine sur le revenu net. Le repli est retiré : `_netIncome` vient du moteur, toujours chargé avant.
+
+### Effet de bord attrapé
+`tutorial-sync.js` a aussitôt signalé **28 puis 21 désynchronisations** : il cherchait les cartes et
+les fonctions dans `index.html`, où elles ne sont plus. Recalé sur `index.html` + `moteur.js`.
+*C'est l'outil qui a fait son travail — et il aurait signalé la même chose à un humain distrait.*
+
+### Vérifications
+selftest 0 crash · partie à 4 humains sans problème · sérialisation « aucun écart » et la partie
+repart · tutorial-sync **0 désynchronisation** (reste le point jaune connu sur `route-token-modal`).
+
+
 ## 📝 MÉMO (noté, NON implémenté — à faire quand Marc donne le GO)
 *Section purgée le 2026-08-03 : les entrées précédentes (libellé « route passive », Sphère de Dyson multi-nations, avancée des pirates sur la carte, événements invisibles) étaient **déjà corrigées** et n'avaient jamais été retirées d'ici — elles nous ont fait perdre du temps à tous les deux. Ne laisser ici QUE ce qui est réellement en attente.*
 
@@ -935,7 +1094,7 @@ c'est la raison pour laquelle un futur envoi en masse passerait par un service e
   `.gen-row` (index.html). À faire : découper en trois vues navigables plutôt qu'une liste continue.
   ⚠️ Vérifier l'impact sur le TUTORIEL (étapes « Les 3 onglets », « Actions civiles », « Actions
   militaires » pointent sur `#tech-tabs`) → relancer `node server/tutorial-sync.js` après coup.
-- **SMTP `535 Authentication failed`** : les emails sont archivés (`data/outbox.log`, visibles dans `/stats`) mais rien ne part. Vérifier les identifiants OVH dans Coolify (`SMTP_USER` = adresse complète).
+- ~~SMTP `535`~~ → **RÉSOLU le 2026-08-04** (v6.6/v6.9). Cause : caractères actifs (`\` et `` ` ``) dans le mot de passe, mangés par Coolify. Voir la fiche « EMAIL — FICHE DE RÉFÉRENCE » plus haut. Envoi de bout en bout vérifié.
 - **IA de guerre** : elle engage tout ce qu'elle peut payer au lieu d'estimer le juste nécessaire.
 - **Bilan « Actions ce tour »** : un assaut résolu via la fenêtre de combat n'est pas inscrit dans `turnActions` — il n'apparaît donc pas dans la liste des actions du bilan (les lignes de journal, elles, sont correctes).
 - **Toast vert de résultat d'action** : supprimé avec les fenêtres bleues. Si un retour visuel du butin (commerce avec les pirates) est souhaité, il faut le redemander — ce n'est plus une correction mais un ajout.
@@ -948,3 +1107,31 @@ c'est la raison pour laquelle un futur envoi en masse passerait par un service e
 3. **Test multijoueur à 2 navigateurs** sur le vrai serveur.
 4. Plus tard : filtrage des secrets dans `state`, reprise après redémarrage, BDD, Capacitor/stores.
 5. TitanCorp : reste sur Netlify tant que pas de domaine dédié ; migrable sur ce serveur plus tard.
+
+## ✅ v7.3 — LE SERVEUR N'A PLUS LE DROIT DE JOUER À TA PLACE, ET LES PARTIES SURVIVENT (2026-08-06)
+
+Deux changements, tous deux au serveur, aucun dans les règles du jeu.
+
+### 1. Aucun délai ne fait plus avancer une partie
+`armTimer` répondait à la place d'un joueur déconnecté au bout de **30 s**, et `AFK_MS` validait
+son action en attente au bout de **2 min**. Recharger la page pouvait dépasser 30 s : le geste le
+plus anodin cassait la partie. Les deux leviers sont **supprimés**.
+Il reste `ECHEANCE_MS` (90 s) — et il **n'agit pas** : il affiche un bouton chez les autres joueurs,
+qui peuvent alors **voter** le remplacement de l'absent par une IA (unanimité des présents).
+Une partie sans son joueur attend, sans limite. Test : `node server/test_refresh.js`.
+
+### 2. Les parties survivent au redémarrage du serveur
+Elles ne vivaient qu'en mémoire : chaque redéploiement Coolify les effaçait. Elles sont maintenant
+**rejouées** depuis un journal (graine du hasard + entrées ordonnées, dans `data/rejeu/`).
+Cela repose sur le déterminisme du moteur, **mesuré** et non supposé : deux parties complètes avec
+la même graine donnent le même état au caractère près (`node server/test_determinisme.js`).
+Test bout-en-bout : `node server/test_redemarrage.js` tue le serveur au SIGKILL et vérifie que le
+joueur retrouve sa partie, au même tour, jouable.
+
+⚠️ **Nouveau dossier à conserver sur le VPS : `DATA_DIR/rejeu/`.** Il contient les parties en cours.
+Le perdre = perdre les parties (les archives de fin de partie, elles, sont ailleurs).
+
+### Détail qui n'en est pas un
+`test_ws.js` — le test bout-en-bout — ne testait plus rien depuis le passage aux comptes par email :
+il s'inscrivait avec des pseudos, l'inscription était refusée, et il restait muet jusqu'à son
+timeout. Réparé. *Un test qui ne peut plus échouer bruyamment ne protège plus de rien.*

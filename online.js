@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-04 · v6.6';
+const SOLAR_BUILD_JS = '2026-08-07 · v7.4';
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :
@@ -122,11 +122,21 @@ function handle(m){
       status('Partie lancée — synchronisation…');
       reqState(true);
       break;
+    case 'absence':
+      // Un joueur est absent. RIEN ne se passera tout seul : on informe, et on n'offre le vote
+      // que lorsque le serveur déclare l'échéance dépassée (m.votable).
+      absenceBanner(m);
+      break;
+    case 'vote':
+      absenceVoteEtat(m);
+      break;
     case 'decision':
+      hideAbsence();   // la partie repart : plus personne n'est en attente de l'absent
       onDecision(m.pending);
       break;
     case 'your_action':
       STATE._confirmPending=false; hideConfirmBar();
+      hideAbsence();
       onMyActionTurn();
       break;
     case 'confirm_pending':
@@ -184,10 +194,26 @@ function handle(m){
         if (!STATE.started) screenLobby();
       }
       else if (/token/.test(m.msg||'')){
-        // token invalide (ex. serveur redémarré) : redemander le mot de passe, pseudo prérempli — PAS de blocage silencieux
-        STATE.token=null; try{localStorage.removeItem('sc_ws_token');}catch(e){}
-        status('Session expirée — reconnecte-toi.');
-        screenAuth('login');
+        /* JETON PÉRIMÉ (le serveur garde les jetons en MÉMOIRE : chaque redéploiement les efface).
+           ⚠️ Il faut purger TOUT l'état mémorisé, pas seulement le jeton : un `sc_ws_game` resté en
+           place fait ensuite tenter la reprise d'une partie qui n'existe plus, et le client s'enlise.
+           Marc s'est retrouvé bloqué sur mobile — bouton sans effet — et n'a pu s'en sortir qu'en
+           effaçant les données du site. Le client doit se remettre d'aplomb TOUT SEUL. */
+        STATE.token=null; STATE.game=null; STATE.started=false;
+        try{ localStorage.removeItem('sc_ws_token'); localStorage.removeItem('sc_ws_game'); }catch(e){}
+        /* Et surtout : ne PAS ouvrir le second écran de connexion si celui du jeu est déjà à
+           l'écran — deux écrans superposés, c'est exactement ce qui donne « je clique, rien ne se
+           passe ». On se contente alors d'un message sur l'écran d'accueil. */
+        const accueil=document.getElementById('civ-sel');
+        const accueilVisible = accueil && !accueil.classList.contains('hidden') && accueil.offsetParent!==null;
+        if(accueilVisible){
+          const err=document.getElementById('lv-err');
+          if(err) err.textContent='Session expirée — saisis ton email et ton mot de passe.';
+          hideStatus();
+        } else {
+          status('Session expirée — reconnecte-toi.');
+          screenAuth('login');
+        }
       }
       else if (_errCb){ _errCb(m.msg); }
       else status('⚠️ '+m.msg);
@@ -1043,6 +1069,39 @@ function hideStatus(){ const b=document.getElementById('sc-status'); if(b) b.sty
 // (via les interceptions, message « pas ton tour »). showWaitBlock ne fait plus qu'afficher un statut discret.
 function showWaitBlock(){ /* volontairement non bloquant — voir intercepts */ }
 function hideWaitBlock(){ const b=document.getElementById('sc-waitblock'); if(b) b.style.display='none'; }
+
+/* ─────────────── BANDEAU D'ABSENCE + VOTE DE REMPLACEMENT (lot 17) ───────────────
+   Le serveur ne joue plus jamais à la place de personne : une partie dont le joueur
+   attendu est absent ATTEND, indéfiniment. Sans ce bandeau, les autres n'auraient
+   aucun moyen de savoir pourquoi rien ne bouge — ils croiraient la partie plantée.
+   Le bouton ne fait qu'ENREGISTRER UN VOTE : le remplacement par une IA ne se produit
+   que si TOUS les humains présents le demandent. Ne rien faire est un choix valable,
+   et c'est celui par défaut : la partie attend le joueur aussi longtemps qu'il faut. */
+function absenceBanner(m){
+  hideAbsence();
+  if(!m || !m.civId || m.civId===STATE.myCiv) return;
+  const b=el('<div id="sc-absence" style="position:fixed;left:50%;transform:translateX(-50%);bottom:64px;z-index:8200;'
+    +'max-width:min(94vw,560px);background:rgba(24,30,44,.97);border:1px solid #45557a;border-radius:12px;'
+    +'padding:10px 14px;color:#dbe6ff;font:600 .82em system-ui;box-shadow:0 8px 28px rgba(0,0,0,.5);text-align:center">'
+    +'<div id="sc-absence-msg" style="margin-bottom:'+(m.votable?'8px':'0')+'"></div>'
+    +(m.votable
+      ? '<button id="sc-absence-vote" style="background:linear-gradient(135deg,#a2542f,#7a3c20);color:#fff;border:0;'
+        +'border-radius:9px;padding:7px 13px;font:700 .95em system-ui;cursor:pointer">🤖 Proposer de le remplacer par une IA</button>'
+        +'<div id="sc-absence-vote-etat" style="margin-top:6px;color:#9fb4d8;font-weight:500"></div>'
+      : '')
+    +'</div>');
+  b.querySelector('#sc-absence-msg').textContent = m.msg || '';
+  document.body.appendChild(b);
+  const bt=document.getElementById('sc-absence-vote');
+  if(bt) bt.onclick=()=>{ bt.disabled=true; bt.textContent='✓ Ton vote est enregistré'; bt.style.opacity=.65; send({t:'vote_ia'}); };
+}
+function hideAbsence(){ const b=document.getElementById('sc-absence'); if(b) b.remove(); }
+function absenceVoteEtat(m){
+  const d=document.getElementById('sc-absence-vote-etat'); if(!d) return;
+  const n=(m.manquants||[]).length;
+  d.textContent = n ? ('En attente de '+n+' autre'+(n>1?'s':'')+' joueur'+(n>1?'s':'')+' pour que le remplacement ait lieu.')
+                    : 'Vote complet — remplacement en cours…';
+}
 let _notYourTurnTs=0;
 function notYourTurnToast(){
   // Fenêtre flottante SUPPRIMÉE (demande de Marc) : on utilise la ligne d'aide NATIVE du jeu (setHint),
@@ -1067,9 +1126,9 @@ function screenAuth(mode){
   let savedUser=''; try{ savedUser=localStorage.getItem('sc_ws_user')||''; }catch(e){}
   overlay(`
     <h2>${isReg?'Créer un compte':'Connexion'} — Solar</h2>
-    <input id="sc-u" type="email" inputmode="email" placeholder="Ton adresse email" autocomplete="email" value="${savedUser}">
+    <input id="sc-u" type="email" inputmode="email" placeholder="Ton adresse email" autocomplete="email" enterkeyhint="next" value="${savedUser}">
     <div style="position:relative">
-      <input id="sc-p" type="password" placeholder="Mot de passe (min. 6)" autocomplete="${isReg?'new-password':'current-password'}" style="padding-right:44px">
+      <input id="sc-p" type="password" placeholder="Mot de passe (min. 6)" autocomplete="${isReg?'new-password':'current-password'}" enterkeyhint="go" style="padding-right:44px">
       <button type="button" id="sc-eye" title="Afficher / masquer le mot de passe" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#8fb0e0;font-size:1.1em;cursor:pointer;padding:4px 8px">👁</button>
     </div>
     <div class="muted" style="font-size:.78em;margin:2px 0 6px">Ton email sert d'identifiant et reçoit les scores de fin de partie.</div>
@@ -1085,6 +1144,14 @@ function screenAuth(mode){
     <div class="muted" style="font-size:.72em;opacity:.7;margin-top:9px;text-align:center">${_buildLabel()}</div>
   `);
   _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
+  /* Touche « Aller » du clavier : ces champs ne sont pas dans un <form>, il n'y a donc aucune
+     validation implicite. Sans ça, la flèche du clavier mobile ne fait rien (signalé par Marc). */
+  {const _u=document.getElementById('sc-u'), _p=document.getElementById('sc-p');
+   const _onKey=(ev)=>{ if(!ev||ev.key!=='Enter')return; ev.preventDefault();
+     if(ev.target===_u && _p && !_p.value){ _p.focus(); return; }
+     try{ ev.target.blur(); }catch(e){}
+     const go=document.getElementById('sc-go'); if(go)go.click(); };
+   if(_u)_u.addEventListener('keydown',_onKey); if(_p)_p.addEventListener('keydown',_onKey);}
   // Œil : afficher / masquer le mot de passe
   {const eye=document.getElementById('sc-eye'), pw=document.getElementById('sc-p');
    if(eye&&pw)eye.onclick=()=>{ const show=pw.type==='password'; pw.type=show?'text':'password'; eye.textContent=show?'🙈':'👁'; pw.focus(); };}
@@ -1416,17 +1483,10 @@ function hijackBuiltinAuth(){
     const uEl = document.getElementById('lv-user');
     // L'identifiant est une ADRESSE EMAIL (elle reçoit les scores de fin de partie).
     if (uEl){ uEl.placeholder='Ton adresse email'; try{ uEl.type='email'; uEl.setAttribute('inputmode','email'); uEl.setAttribute('autocomplete','email'); }catch(e){} }
-    // Bouton œil : afficher / masquer le mot de passe (même confort que la fenêtre en ligne).
-    try{
-      const pEl=document.getElementById('lv-pass');
-      if(pEl && !document.getElementById('lv-eye')){
-        const b=document.createElement('button');
-        b.id='lv-eye'; b.type='button'; b.textContent='👁'; b.title='Afficher / masquer le mot de passe';
-        b.style.cssText='margin-left:-38px;background:transparent;border:0;color:#8fb0e0;font-size:1.1em;cursor:pointer;padding:4px 8px;vertical-align:middle';
-        b.onclick=function(){ const sh=pEl.type==='password'; pEl.type=sh?'text':'password'; b.textContent=sh?'🙈':'👁'; pEl.focus(); };
-        if(pEl.parentNode) pEl.parentNode.insertBefore(b, pEl.nextSibling);
-      }
-    }catch(e){}
+    /* Le bouton œil n'est PLUS créé ici : il fait partie du HTML de l'écran d'accueil (index.html),
+       positionné par le CSS dans un conteneur relatif. L'injecter au forceps le faisait passer à la
+       ligne et se décaler (les champs font width:100%) — il apparaissait « à des endroits bizarres »
+       sur mobile. Corollaire : il existe désormais aussi en solo et dans le tutoriel. */
     window.lvSubmit = function(){
       const u=(document.getElementById('lv-user')||{}).value||'', p=(document.getElementById('lv-pass')||{}).value||'';
       if (err) err.textContent='';

@@ -87,7 +87,7 @@ function client(name, role, civ){
   ws.on('message',raw=>{
     const m=JSON.parse(raw.toString());
     if(m.t==='registered') send({t:'login',user:name,pass:'test-123456'});
-    else if(m.t==='error'){ if(/déjà pris/.test(m.msg)) send({t:'login',user:name,pass:'test-123456'}); else errors.push(name+': '+m.msg); }
+    else if(m.t==='error'){ if(/déjà pris|déjà inscrite/.test(m.msg)) send({t:'login',user:name,pass:'test-123456'}); else errors.push(name+': '+m.msg); }
     else if(m.t==='logged'){
       if(role==='host') send({t:'create',civId:civ,seats:[{civId:'martiens',ai:false},{civId:'jupiteriens',ai:true},{civId:'ceinturiens',ai:true}]});
       else { const w=setInterval(()=>{ if(code){clearInterval(w); send({t:'join',code,civId:civ});} },50); }
@@ -110,7 +110,7 @@ function client(name, role, civ){
   });
   ws.on('open',()=>send({t:'register',user:name,pass:'test-123456'}));
 }
-client('act_hote','host','terriens'); client('act_inv','guest','martiens');
+client('act_hote@test.ch','host','terriens'); client('act_inv@test.ch','guest','martiens');
 setTimeout(()=>{ console.log('❌ TIMEOUT — over:'+over, done, notices, errors.slice(0,3)); process.exit(1); }, 90000);
 const iv=setInterval(()=>{ if(over>=2 && finalState){ clearInterval(iv);
   const h = me(finalState,'terriens'), g = me(finalState,'martiens');
