@@ -1278,6 +1278,31 @@ wss.on('connection', (ws) => {
   });
 });
 
+/* ============================================================================
+   CONTRÔLE AU DÉMARRAGE — le moteur se charge-t-il ?
+   ----------------------------------------------------------------------------
+   Le 2026-08-07, le serveur a démarré normalement, accepté une connexion, affiché
+   le lobby… puis explosé au moment de créer la partie : « MOTEUR INTROUVABLE :
+   /app/moteur.js ». L'image Docker ne copiait qu'`index.html` — son Dockerfile
+   datait d'avant l'extraction des règles dans `moteur.js` (v7.2).
+   Un serveur qui accueille des joueurs alors qu'il est incapable de faire tourner
+   une partie est pire qu'un serveur éteint : le joueur perd son temps et croit que
+   c'est le jeu qui est cassé. On vérifie donc AVANT d'écouter, et on refuse de
+   démarrer avec un message qui dit quoi faire.
+   Coût : ~1 s au démarrage, une fois. C'est le prix d'un échec franc.
+   ========================================================================== */
+try {
+  const _t0 = Date.now();
+  new GameDriver(HTML);
+  console.log('Moteur vérifié au démarrage (' + (Date.now() - _t0) + ' ms) — ' + HTML);
+} catch (e) {
+  console.error('\n❌ DÉMARRAGE REFUSÉ — le moteur du jeu ne se charge pas :\n');
+  console.error(e.message);
+  console.error('\nLe serveur ne peut faire tourner AUCUNE partie dans cet état. Il vaut mieux ne pas');
+  console.error('démarrer que d\'accueillir des joueurs et les planter à la création de leur partie.');
+  process.exit(1);
+}
+
 server.listen(PORT, () => {
   console.log('Solar Conquest server — port ' + PORT + ' — moteur: ' + HTML + ' — data: ' + DATA);
   // Les parties en cours sont rechargées depuis leur fichier (état + déroulement). Voir le bandeau

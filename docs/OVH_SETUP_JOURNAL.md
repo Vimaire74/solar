@@ -1135,3 +1135,38 @@ Le perdre = perdre les parties (les archives de fin de partie, elles, sont aille
 `test_ws.js` — le test bout-en-bout — ne testait plus rien depuis le passage aux comptes par email :
 il s'inscrivait avec des pseudos, l'inscription était refusée, et il restait muet jusqu'à son
 timeout. Réparé. *Un test qui ne peut plus échouer bruyamment ne protège plus de rien.*
+
+## 🔴 2026-08-07 — « MOTEUR INTROUVABLE : /app/moteur.js » au premier déploiement de la v7.4
+
+### Ce que Marc a vu
+Le serveur démarre, la connexion marche, le lobby s'affiche… et à l'écran de **choix des nations**,
+au moment de créer la partie : `MOTEUR INTROUVABLE : /app/moteur.js`.
+
+### La cause
+`server/Dockerfile` ne copiait qu'`index.html` dans l'image. Il datait d'**avant la v7.2**, quand
+les règles étaient encore collées dans le HTML. Depuis, elles vivent dans `moteur.js` — que le
+serveur lit comme source de vérité. Le fichier manquait simplement dans le conteneur.
+
+Corrigé : `COPY index.html moteur.js ./`
+
+### Ce qui était PIRE que le fichier manquant
+Le serveur **acceptait des joueurs** alors qu'il était incapable de faire tourner une seule partie.
+Marc s'est connecté, a créé une partie, choisi ses nations — et n'a appris le problème qu'à la fin.
+Un serveur dans cet état est plus nuisible qu'un serveur éteint : le joueur perd son temps et croit
+que c'est le JEU qui est cassé.
+
+Deux garde-fous ajoutés, volontairement redondants :
+1. **`server.js` charge le moteur AVANT d'écouter.** S'il échoue : message explicite et `exit 1`.
+   Coût : ~10 ms. Marche partout, pas seulement dans Docker.
+2. **Le `CMD` du Dockerfile vérifie la présence de `/app/moteur.js`** avant de lancer Node, et dit
+   quoi corriger (la ligne `COPY` et le `Base Directory = /` de Coolify).
+
+*Leçon : un fichier de déploiement est du code. Celui-ci n'avait pas été relu depuis un changement
+d'architecture majeur, et aucun test ne le couvrait — les bancs d'essai tournent sur le dossier de
+travail, où `moteur.js` est évidemment là.*
+
+### ⚠️ Rappel Coolify pour l'app `live.solar-game.com`
+- Build Pack : **Dockerfile** · Dockerfile Location : **/server/Dockerfile** · Base Directory : **/**
+  (le contexte de build DOIT être la racine du dépôt, sinon `moteur.js` est hors de portée du COPY)
+- Volume **/data** : contient les comptes, les jetons **et depuis la v7.4 les PARTIES EN COURS**
+  (`/data/games/`). **Ne jamais le vider à un redéploiement.**
