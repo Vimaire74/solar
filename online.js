@@ -306,6 +306,7 @@ function onDecision(pending){
   reqState();
   const finish=(ans)=>{
     STATE._realDecide=null;
+    bandeauATonTour(false);   // idem : répondre, c'est avoir joué
     send({t:'answer', id:pending.id, ans:ans});
     STATE._answering = false;
     showWaitBlock();
@@ -761,6 +762,7 @@ function sendAction(action){
   if(STATE._confirmPending) return;   // une action est en attente de Valider/Annuler → bloquer
   STATE._myTurn=false;
   closeDecision(); turnBar(false);
+  bandeauATonTour(false);   // ← tu viens de jouer : le badge s'éteint sans attendre un message du serveur
   window._scOnPass=null;
   send({t:'act', action});
   showWaitBlock(); status('Coup envoyé…');
@@ -1144,26 +1146,29 @@ function hideBilanAttente(){ const b=document.getElementById('sc-bilan-attente')
    d'attente — autant dire pas du tout sur mobile, où l'on ne savait pas si la partie attendait
    quelqu'un d'autre. Il s'efface dès que le tour passe : un bandeau qui reste ne veut plus rien
    dire au bout de deux minutes. */
-/* ⚠️ UNE PASTILLE, PAS UN BANDEAU PLEIN ÉCRAN.
-   Première version : une bande verte sur toute la largeur, ancrée à `top:0`. Elle passait
-   PAR-DESSUS la barre du haut et masquait les ressources et le score — l'information la plus
-   consultée du jeu — pour annoncer une chose qu'on sait déjà en voyant ses boutons s'activer
-   (capture de Marc, 2026-08-07 : « ça occulte tout l'écran et cache le menu du haut »).
-   Elle occupe maintenant exactement la place du message « c'est au tour de X » : petite, centrée,
-   sous la barre du haut. Même géométrie que `#sc-status`, en vert — et les deux ne peuvent pas
-   s'afficher en même temps, puisqu'ils disent des choses contradictoires. */
+/* ⚠️ UN PETIT BADGE, PAS UN BANDEAU — ET IL DOIT S'ÉTEINDRE.
+   Trois versions, trois défauts, tous signalés par Marc :
+     1. bande verte pleine largeur ancrée à `top:0` → elle recouvrait la barre du haut
+        (ressources, score, capacité), l'information la plus consultée du jeu ;
+     2. pastille centrée sous la barre → elle passait par-dessus le contenu du menu ;
+     3. et surtout : elle RESTAIT ALLUMÉE pendant que les autres nations jouaient.
+   Ce troisième point n'était pas un défaut d'affichage. Elle était éteinte à la réception d'une
+   décision, d'un `turn` ou d'un `waiting` — mais quand ce sont les IA qui enchaînent, le serveur
+   n'envoie AUCUN de ces messages : rien ne venait donc l'éteindre après ton propre coup. On
+   l'éteint désormais là où l'information est certaine : au moment où TU joues (`sendAction`).
+   Place définitive : calée à DROITE, sous la barre du haut, courte (« À TOI »), et assez étroite
+   pour ne rien recouvrir. */
 function bandeauATonTour(afficher){
   const id='sc-a-toi';
   let b=document.getElementById(id);
   if(!afficher){ if(b)b.remove(); return; }
   if(b) return;
-  hideStatus();   // « au tour de X » et « à toi de jouer » ne coexistent pas
-  b=el('<div id="'+id+'" style="position:fixed;top:calc(var(--topband,56px) + 8px);left:50%;'
-    +'transform:translateX(-50%);z-index:8500;max-width:min(86vw,320px);'
-    +'background:linear-gradient(135deg,#1f7a3a,#146030);color:#eafff0;'
-    +'border:1px solid #35a35c;border-radius:10px;'
-    +'font:800 .78em/1 system-ui;letter-spacing:.12em;text-align:center;white-space:nowrap;'
-    +'padding:7px 16px;box-shadow:0 4px 14px rgba(0,0,0,.45)">A TOI DE JOUER</div>');
+  hideStatus();   // « au tour de X » et « à toi » ne peuvent pas être vrais en même temps
+  b=el('<div id="'+id+'" style="position:fixed;top:calc(var(--topband,56px) + 6px);right:10px;'
+    +'z-index:8500;background:linear-gradient(135deg,#1f7a3a,#146030);color:#eafff0;'
+    +'border:1px solid #35a35c;border-radius:8px;pointer-events:none;'
+    +'font:800 .68em/1 system-ui;letter-spacing:.1em;text-align:center;white-space:nowrap;'
+    +'padding:5px 10px;box-shadow:0 3px 10px rgba(0,0,0,.4)">À TOI</div>');
   document.body.appendChild(b);
 }
 function absenceVoteEtat(m){

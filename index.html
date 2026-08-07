@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-07 · v8.5';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-07 · v8.7';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -547,18 +547,24 @@ body{max-width:var(--appw,480px);margin:0 auto;height:100dvh;height:100vh;positi
    toucher au reste de la mise en page. `calc(50% - 50vw)` est la marge négative qui
    ramène le bord gauche du bloc au bord gauche de l'écran, quelle que soit la
    largeur de la colonne — donc valable sur téléphone, tablette et ordinateur. */
-@media (min-width:520px){
-  #mp-map.active #map-wrap{
-    width:100vw;
-    margin-left:calc(50% - 50vw);
-    margin-right:calc(50% - 50vw);
-  }
-}
-/* Carte plus petite que son cadre (après un dézoom) : elle se CENTRE au lieu de rester
-   collée en haut à gauche. `grid` supporte le débordement mieux que `flex`, qui coupe
-   la partie dépassant à gauche et la rend inatteignable au défilement. */
-#map-wrap.mapzoom{display:grid;}
-#map-wrap.mapzoom #solar-svg{place-self:center;}
+/* ⚠️ POURQUOI MA PREMIÈRE TENTATIVE N'A RIEN CHANGÉ.
+   J'avais élargi le cadre de la carte à `100vw` avec des marges négatives. Techniquement correct,
+   mais `body` porte `overflow:hidden` : tout ce qui dépasse de la colonne de 480 px est COUPÉ. La
+   carte était bien large de 100vw — on n'en voyait que les 480 px du milieu. Corriger le symptôme
+   sans vérifier ce qui le contient, c'est ce qui m'a fait perdre un aller-retour.
+   On élargit donc la COLONNE elle-même, et seulement quand l'onglet Carte est affiché : le reste du
+   temps le jeu garde sa mise en page téléphone, où elle est juste. */
+body.vue-carte{max-width:100vw;}
+body.vue-carte #top-bar,body.vue-carte #bottom-bar{border-radius:0;}
+#mp-map.active{position:relative;}   /* repère pour les boutons de zoom */
+/* ⚠️ NE PAS METTRE `#map-wrap` EN `grid` (ni en `flex`).
+   J'avais essayé, pour centrer la carte après un dézoom. Mais la carte se dimensionne avec
+   `height:100%` du cadre : dans une grille, la hauteur de la piste dépend du contenu, et le
+   contenu dépend de la hauteur de la piste. Le calcul tourne en rond et la carte devenait
+   DÉMESURÉMENT HAUTE (signalé par Marc). On reste donc en flux normal, et on centre à la marge —
+   `margin:0 auto` ne s'applique que quand la carte est plus étroite que son cadre, ce qui est
+   exactement le cas après un dézoom. */
+#map-wrap.mapzoom #solar-svg{margin:0 auto;}
 /* ---------- Onglet Carte ---------- */
 #mp-map{display:none;}
 #mp-map.active{display:flex;flex-direction:column;}
@@ -575,7 +581,7 @@ body{max-width:var(--appw,480px);margin:0 auto;height:100dvh;height:100vh;positi
 /* Barre de zoom horizontale, discrète, sous la carte (~5 % ; la carte garde ~95 %) */
 /* Zoom carte : FLOTTANT au-dessus de la carte (avant : en flux sous la carte → invisible sur mobile,
    impossible de dézoomer pour atteindre les nœuds du bas comme Triton). */
-.map-zoom{position:absolute;right:8px;top:8px;z-index:7;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:8px;padding:5px 8px;background:rgba(8,10,28,.86);border:1px solid #2a3a6a;border-radius:10px;backdrop-filter:blur(4px);box-shadow:0 4px 14px rgba(0,0,0,.5);}
+.map-zoom{position:absolute;right:10px;top:10px;z-index:20;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:8px;padding:5px 8px;background:rgba(8,10,28,.86);border:1px solid #2a3a6a;border-radius:10px;backdrop-filter:blur(4px);box-shadow:0 4px 14px rgba(0,0,0,.5);}
 .map-zoom .mz-lbl{font-size:.72em;color:#7a88aa;min-width:32px;text-align:center;font-weight:700;}
 .map-zoom button{width:26px;height:26px;border-radius:6px;background:rgba(10,12,34,.9);border:1px solid #2a3a6a;color:#9cc2ff;font-size:.95em;line-height:1;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .map-zoom button:active{background:#1a2a5a;}
@@ -1000,10 +1006,13 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
         <div class="npop-info" id="npop-info"></div>
         <div class="npop-acts" id="npop-acts"></div>
       </div>
-      <!-- Les boutons de zoom vivent DANS la carte (en haut à droite) : posés en dehors, ils
-           flottaient au-dessus de la barre du bas et disparaissaient dès que la carte s'élargissait. -->
-      <div class="map-zoom"><button onclick="uiZoom(-1)" title="Dézoomer">−</button><span id="mz-lbl" class="mz-lbl">1×</span><button onclick="uiZoom(1)" title="Zoomer">＋</button></div>
     </div>
+    <!-- ⚠️ LES BOUTONS DE ZOOM NE DOIVENT PAS ÊTRE DANS `#map-wrap`.
+         Je les y avais mis pour les poser « sur la carte ». Mais `#map-wrap` est le cadre qui
+         DÉFILE : un élément en `position:absolute` à l'intérieur défile avec le contenu, donc les
+         boutons partaient hors de vue dès qu'on faisait glisser la carte. Ils sont maintenant
+         ancrés au PANNEAU (qui, lui, ne défile pas) : toujours visibles, en haut à droite. -->
+    <div class="map-zoom"><button onclick="uiZoom(-1)" title="Dézoomer">−</button><span id="mz-lbl" class="mz-lbl">1×</span><button onclick="uiZoom(1)" title="Zoomer">＋</button></div>
   </div>
   </div>
   <div class="m-panel" id="mp-tech">
@@ -1376,6 +1385,10 @@ function uiTab(name){
   try{
     document.querySelectorAll('.mtab').forEach(b=>b.classList.toggle('active',b.getAttribute('data-tab')===name));
     document.querySelectorAll('.m-panel').forEach(p=>p.classList.toggle('active',p.id==='mp-'+name));
+    // La CARTE mérite tout l'écran ; les menus et les cartes tech restent dans la colonne étroite,
+    // où leur mise en page a été pensée. C'est le seul moyen d'élargir sans tout déformer.
+    document.body.classList.toggle('vue-carte', name==='map');
+    try{ uiSyncBands(); }catch(e){}
     if(G&&G.player){
       if(name==='tech')renderTechTree();
       else if(name==='map')renderMap();

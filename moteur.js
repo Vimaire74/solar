@@ -5804,6 +5804,10 @@ function scrollToNode(nodeId){
   try{ wrap.scrollTo({left,top,behavior:'smooth'}); }catch(e){ wrap.scrollLeft=left; wrap.scrollTop=top; }
 }
 function renderMap(){
+  /* La colonne du jeu s'élargit quand l'onglet Carte est affiché (voir `body.vue-carte` dans
+     index.html). On le vérifie ICI et pas seulement au clic d'onglet : au tout premier affichage,
+     la partie démarre sur la carte sans passer par `uiTab`, et la carte serait restée à l'étroit. */
+  try{ document.body.classList.toggle('vue-carte', !!document.querySelector('#mp-map.active')); }catch(e){}
   const svg=document.getElementById('solar-svg'); const wrap=document.getElementById('map-wrap');
   const bg=document.getElementById('map-bg-img'); const ng=document.getElementById('nodes-g');
   const view=G.mapView||'global';
