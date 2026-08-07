@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-07 · v8.8';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-07 · v9.0';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -45,8 +45,18 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
 .diff-btn.active{border-color:#ffd700;color:#ffd700;background:#1a1a08}
 .diff-btn:hover:not(.active){border-color:#4a9eff;color:#aabbff}
 .btn-go:disabled{opacity:.35;cursor:not-allowed}
-#a-toi-badge{display:none;margin-left:auto;flex:0 0 auto;background:linear-gradient(135deg,#1f7a3a,#146030);color:#eafff0;border:1px solid #35a35c;border-radius:7px;padding:3px 9px;font:800 .62em/1 system-ui;letter-spacing:.09em;white-space:nowrap;align-self:center;}
-#a-toi-badge.on{display:inline-block;}
+/* ⚠️ LE BADGE NE DOIT NI RECOUVRIR NI POUSSER.
+   Dans le flux, il a fait GRANDIR la barre du haut (Marc : « tu as agrandi le menu du haut pour
+   placer ton bouton »). Il est donc sorti du flux — `position:absolute` dans `#top-bar`, calé en bas
+   à droite, sous le bouton Capacité : la hauteur de la barre redevient exactement ce qu'elle était.
+   Et pour qu'il ne recouvre rien, la deuxième ligne se réserve la place à droite (`padding-right`)
+   uniquement quand le badge est allumé. Ni superposition, ni décalage. */
+#a-toi-badge{display:none;position:absolute;right:9px;bottom:5px;z-index:2;
+  background:linear-gradient(135deg,#1f7a3a,#146030);color:#eafff0;border:1px solid #35a35c;
+  border-radius:6px;padding:2px 7px;font:800 .55em/1.1 system-ui;letter-spacing:.08em;
+  white-space:nowrap;pointer-events:none;}
+#a-toi-badge.on{display:block;}
+#top-bar.a-toi .mtb-line2{padding-right:54px;}   /* classe posée par le client, plutôt que `:has()` : même effet, aucune dépendance à la version du navigateur */
 #top-bar{display:flex;align-items:center;gap:10px;padding:6px 14px;background:#0a0a22;border-bottom:1px solid #1a1a3a;flex-shrink:0;min-height:38px}
 .gtitle{font-weight:700;font-size:.95em;color:#4a9eff;letter-spacing:2px}
 #turn-disp{color:#ffd700;font-weight:700;font-size:.85em;min-width:70px}
@@ -578,13 +588,24 @@ body.vue-carte #top-bar,body.vue-carte #bottom-bar{border-radius:0;}
        multipliait la HAUTEUR par 1,5 ; d'où la carte devenue démesurément haute ;
      · vue système  : `height:100%` + `aspect-ratio:2020/490` → la largeur valait quatre fois la
        hauteur, impossible de voir le système entier.
-   Aucune des deux ne tenait dans le cadre. Or le `<svg>` porte déjà
+   ⚠️ ET MA PREMIÈRE CORRECTION N'A MARCHÉ QUE SUR UNE DES DEUX VUES.
+   J'ai donné `height:100%` au dessin — mais une hauteur en POURCENTAGE n'a de sens que si le cadre
+   a une hauteur définie. Selon le chemin de mise en page, le navigateur la traite alors comme
+   `auto` : la hauteur repart de la largeur via le ratio du `viewBox`, et la carte globale (portrait
+   400×600) redevenait une fois et demie plus haute que large. D'où « elle reste trop grande », et
+   un dézoom sans effet puisqu'il n'agissait plus sur rien.
+   Le dessin est donc maintenant en `position:absolute` dans le cadre : ses dimensions se calculent
+   sur le bloc conteneur, sans passer par la résolution des pourcentages. Il n'y a plus de cas où
+   ça peut retomber en `auto`.
+
+   Or le `<svg>` porte déjà
    `preserveAspectRatio="xMidYMid meet"` : si on lui donne les DEUX dimensions, il met le dessin à
    l'échelle pour qu'il tienne entièrement, centré, sans rien déformer. C'est le navigateur qui fait
    le travail, et il le fait bien. À 1× tout est visible ; au-delà, le cadre défile.
    Rien d'autre ne dépend de la taille de la carte : les nœuds sont placés en coordonnées du
    `viewBox`, pas en pixels. Agrandir ne casse donc rien — c'était le sens de ta question. */
-#solar-svg{display:block;width:calc(100% * var(--mz,1));height:calc(100% * var(--mz,1));min-height:0;margin:0 auto;transition:none;}
+#solar-svg{position:absolute;top:0;left:0;display:block;
+  width:calc(100% * var(--mz,1));height:calc(100% * var(--mz,1));min-height:0;transition:none;}
 /* 2e carte (système entier index, scrollable) : SVG large 980x320 */
 /* (l'ancienne règle `.mapzoom` qui forçait `aspect-ratio` + `width:auto` est supprimée :
    c'est elle qui empêchait la carte de tenir dans son cadre.) */

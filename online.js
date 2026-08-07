@@ -153,19 +153,24 @@ function handle(m){
       showConfirmBar();
       break;
     case 'turn':
-      if (m.civId !== STATE.myCiv){ STATE._myTurn=false; bandeauATonTour(false); turnBar(false); status('Tour '+(m.turn||'')+' — au tour de '+civLabel(m.civId)+'…'); showWaitBlock(); }
+      if (m.civId !== STATE.myCiv){ STATE._myTurn=false; badgeTour(m.civId); turnBar(false); showWaitBlock(); }
       reqState();
       break;
     case 'waiting':
-      bandeauATonTour(false);   // on attend quelqu'un d'autre : ce n'est plus à toi
       if (m.civId !== STATE.myCiv){
         STATE._myTurn=false; turnBar(false);
-        /* Plusieurs joueurs peuvent choisir EN MÊME TEMPS (agenda, investissement) : on les nomme
-           tous, sinon on annonçait « Choix de X… » alors qu'on attendait aussi Y — et le joueur
-           croyait la partie bloquée sur une seule personne. */
-        const qui=(Array.isArray(m.civIds)&&m.civIds.length?m.civIds:[m.civId]).filter(c=>c!==STATE.myCiv).map(civLabel);
-        status(qui.length>1 ? ('Choix de '+qui.slice(0,-1).join(', ')+' et '+qui[qui.length-1]+'…')
-                            : ('Choix de '+(qui[0]||civLabel(m.civId))+'…'));
+        // Plusieurs joueurs peuvent être interrogés en même temps : on nomme celui qu'on attend
+        // (le premier qui n'est pas toi), plutôt que de laisser le badge vert allumé.
+        /* Plusieurs joueurs peuvent choisir EN MÊME TEMPS (agenda, investissement). Le badge nomme
+           le premier ; la pastille de statut, elle, les nomme TOUS — sinon on annonçait « Choix de
+           X… » alors qu'on attendait aussi Y, et le joueur croyait la partie bloquée sur une seule
+           personne. Les deux ne se contredisent pas : l'un est un état, l'autre un détail. */
+        const attendus=(Array.isArray(m.civIds)&&m.civIds.length?m.civIds:[m.civId]).filter(c=>c!==STATE.myCiv);
+        badgeTour(attendus[0]||m.civId);
+        if(attendus.length>1){
+          const qui=attendus.map(civLabel);
+          status('Choix de '+qui.slice(0,-1).join(', ')+' et '+qui[qui.length-1]+'…');
+        }
         showWaitBlock();
       }
       reqState();
@@ -1082,8 +1087,7 @@ function overlay(inner){
   return ov;
 }
 function hideOverlay(){ const ov=document.getElementById('sc-ov'); if(ov) ov.style.display='none'; }
-function status(txt){ if(document.getElementById('sc-a-toi')) return;   // c'est TON tour : pas de « au tour de X » par-dessus
-  let b=document.getElementById('sc-status'); if(!b){ injectStyles(); b=el('<div id="sc-status"></div>'); document.body.appendChild(b);} b.textContent=txt; b.style.display='block'; }
+function status(txt){ let b=document.getElementById('sc-status'); if(!b){ injectStyles(); b=el('<div id="sc-status"></div>'); document.body.appendChild(b);} b.textContent=txt; b.style.display='block'; }
 function hideStatus(){ const b=document.getElementById('sc-status'); if(b) b.style.display='none'; }
 // #6 : plus de voile plein écran qui bloque TOUT. On laisse le joueur regarder librement (carte, journal,
 // empire, diplo, détail des techs, survol des ressources). Seules les ACTIONS CONCRÈTES sont bloquées
@@ -1148,23 +1152,39 @@ function hideBilanAttente(){ const b=document.getElementById('sc-bilan-attente')
    dire au bout de deux minutes. */
 /* ⚠️ LE BADGE EST DANS LA BARRE DU HAUT, PAS FLOTTANT AU-DESSUS DU JEU.
    Trois tentatives, trois fois le même tort : j'ai posé un élément flottant, et un élément flottant
-   se superpose forcément à quelque chose. Bande pleine largeur → elle couvrait les ressources et le
-   score ; pastille centrée → elle couvrait le menu ; pastille à droite → elle flottait dans la zone
-   de jeu. Marc demandait depuis le début qu'il soit DANS la barre du haut. Il y est : c'est
-   `#a-toi-badge`, deuxième ligne, calé à droite sous le bouton Capacité. Il pousse le contenu au
-   lieu de le recouvrir, donc il ne peut plus rien cacher.
+   se superpose forcément à quelque chose. Il est maintenant DANS `#top-bar`, hors du flux (donc la
+   barre ne change pas de hauteur), calé en bas à droite sous le bouton Capacité.
 
-   ET IL DOIT S'ÉTEINDRE. Il restait allumé pendant que les autres nations jouaient : il n'était
-   éteint qu'à la réception d'une décision, d'un `turn` ou d'un `waiting`, or quand les IA
-   enchaînent le serveur n'envoie AUCUN de ces messages. On l'éteint donc au moment où TU joues —
-   le seul instant où l'information est certaine. */
-function bandeauATonTour(afficher){
-  const vieux=document.getElementById('sc-a-toi'); if(vieux)vieux.remove();   // résidu d'une version précédente
-  const b=document.getElementById('a-toi-badge');
-  if(!b) return;
-  b.classList.toggle('on', !!afficher);
-  if(afficher) hideStatus();   // « au tour de X » et « à toi » ne peuvent pas être vrais ensemble
+   IL DIT AUSSI QUI JOUE QUAND CE N'EST PAS TOI (demande de Marc) : vert « À TOI », rouge
+   « LE CEINTURIEN JOUE », ou « IA JOUE » si le siège est tenu par l'ordinateur. Avant, cette
+   information vivait dans une pastille flottante séparée (`#sc-status`) qui disait « Choix de… » —
+   deux endroits pour une seule question, « est-ce mon tour ? ». Il n'y en a plus qu'un. */
+const _SINGULIER={terriens:'LE TERRIEN',martiens:'LE MARTIEN',jupiteriens:'LE JUPITÉRIEN',ceinturiens:'LE CEINTURIEN'};
+function _estIA(civId){
+  try{ const s=(STATE.game&&STATE.game.seats||[]).find(x=>x.civId===civId); return !!(s&&s.ai); }catch(e){ return false; }
 }
+/* qui : 'moi' | un civId | null (rien à afficher) */
+function badgeTour(qui){
+  const b=document.getElementById('a-toi-badge');
+  const tb=document.getElementById('top-bar');
+  const vieux=document.getElementById('sc-a-toi'); if(vieux)vieux.remove();   // résidu d'une version précédente
+  if(!b) return;
+  if(!qui){ b.classList.remove('on'); if(tb)tb.classList.remove('a-toi'); return; }
+  if(qui==='moi'){
+    b.textContent='À TOI';
+    b.style.background='linear-gradient(135deg,#1f7a3a,#146030)';
+    b.style.borderColor='#35a35c';
+  }else{
+    b.textContent=(_estIA(qui) ? 'IA JOUE' : ((_SINGULIER[qui]||String(qui).toUpperCase())+' JOUE'));
+    b.style.background='linear-gradient(135deg,#8f2b2b,#6b1d1d)';
+    b.style.borderColor='#c05555';
+  }
+  b.classList.add('on');
+  if(tb) tb.classList.add('a-toi');
+  if(qui==='moi') hideStatus();   // c'est ton tour : aucun « on attend X » ne doit rester affiché
+}
+// Ancien nom, conservé : il est appelé à une dizaine d'endroits.
+function bandeauATonTour(afficher){ badgeTour(afficher?'moi':null); }
 function absenceVoteEtat(m){
   const d=document.getElementById('sc-absence-vote-etat'); if(!d) return;
   const n=(m.manquants||[]).length;
