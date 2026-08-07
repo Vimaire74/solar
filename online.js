@@ -1146,30 +1146,24 @@ function hideBilanAttente(){ const b=document.getElementById('sc-bilan-attente')
    d'attente — autant dire pas du tout sur mobile, où l'on ne savait pas si la partie attendait
    quelqu'un d'autre. Il s'efface dès que le tour passe : un bandeau qui reste ne veut plus rien
    dire au bout de deux minutes. */
-/* ⚠️ UN PETIT BADGE, PAS UN BANDEAU — ET IL DOIT S'ÉTEINDRE.
-   Trois versions, trois défauts, tous signalés par Marc :
-     1. bande verte pleine largeur ancrée à `top:0` → elle recouvrait la barre du haut
-        (ressources, score, capacité), l'information la plus consultée du jeu ;
-     2. pastille centrée sous la barre → elle passait par-dessus le contenu du menu ;
-     3. et surtout : elle RESTAIT ALLUMÉE pendant que les autres nations jouaient.
-   Ce troisième point n'était pas un défaut d'affichage. Elle était éteinte à la réception d'une
-   décision, d'un `turn` ou d'un `waiting` — mais quand ce sont les IA qui enchaînent, le serveur
-   n'envoie AUCUN de ces messages : rien ne venait donc l'éteindre après ton propre coup. On
-   l'éteint désormais là où l'information est certaine : au moment où TU joues (`sendAction`).
-   Place définitive : calée à DROITE, sous la barre du haut, courte (« À TOI »), et assez étroite
-   pour ne rien recouvrir. */
+/* ⚠️ LE BADGE EST DANS LA BARRE DU HAUT, PAS FLOTTANT AU-DESSUS DU JEU.
+   Trois tentatives, trois fois le même tort : j'ai posé un élément flottant, et un élément flottant
+   se superpose forcément à quelque chose. Bande pleine largeur → elle couvrait les ressources et le
+   score ; pastille centrée → elle couvrait le menu ; pastille à droite → elle flottait dans la zone
+   de jeu. Marc demandait depuis le début qu'il soit DANS la barre du haut. Il y est : c'est
+   `#a-toi-badge`, deuxième ligne, calé à droite sous le bouton Capacité. Il pousse le contenu au
+   lieu de le recouvrir, donc il ne peut plus rien cacher.
+
+   ET IL DOIT S'ÉTEINDRE. Il restait allumé pendant que les autres nations jouaient : il n'était
+   éteint qu'à la réception d'une décision, d'un `turn` ou d'un `waiting`, or quand les IA
+   enchaînent le serveur n'envoie AUCUN de ces messages. On l'éteint donc au moment où TU joues —
+   le seul instant où l'information est certaine. */
 function bandeauATonTour(afficher){
-  const id='sc-a-toi';
-  let b=document.getElementById(id);
-  if(!afficher){ if(b)b.remove(); return; }
-  if(b) return;
-  hideStatus();   // « au tour de X » et « à toi » ne peuvent pas être vrais en même temps
-  b=el('<div id="'+id+'" style="position:fixed;top:calc(var(--topband,56px) + 6px);right:10px;'
-    +'z-index:8500;background:linear-gradient(135deg,#1f7a3a,#146030);color:#eafff0;'
-    +'border:1px solid #35a35c;border-radius:8px;pointer-events:none;'
-    +'font:800 .68em/1 system-ui;letter-spacing:.1em;text-align:center;white-space:nowrap;'
-    +'padding:5px 10px;box-shadow:0 3px 10px rgba(0,0,0,.4)">À TOI</div>');
-  document.body.appendChild(b);
+  const vieux=document.getElementById('sc-a-toi'); if(vieux)vieux.remove();   // résidu d'une version précédente
+  const b=document.getElementById('a-toi-badge');
+  if(!b) return;
+  b.classList.toggle('on', !!afficher);
+  if(afficher) hideStatus();   // « au tour de X » et « à toi » ne peuvent pas être vrais ensemble
 }
 function absenceVoteEtat(m){
   const d=document.getElementById('sc-absence-vote-etat'); if(!d) return;

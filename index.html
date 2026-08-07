@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-07 · v8.7';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-07 · v8.8';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -45,6 +45,8 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
 .diff-btn.active{border-color:#ffd700;color:#ffd700;background:#1a1a08}
 .diff-btn:hover:not(.active){border-color:#4a9eff;color:#aabbff}
 .btn-go:disabled{opacity:.35;cursor:not-allowed}
+#a-toi-badge{display:none;margin-left:auto;flex:0 0 auto;background:linear-gradient(135deg,#1f7a3a,#146030);color:#eafff0;border:1px solid #35a35c;border-radius:7px;padding:3px 9px;font:800 .62em/1 system-ui;letter-spacing:.09em;white-space:nowrap;align-self:center;}
+#a-toi-badge.on{display:inline-block;}
 #top-bar{display:flex;align-items:center;gap:10px;padding:6px 14px;background:#0a0a22;border-bottom:1px solid #1a1a3a;flex-shrink:0;min-height:38px}
 .gtitle{font-weight:700;font-size:.95em;color:#4a9eff;letter-spacing:2px}
 #turn-disp{color:#ffd700;font-weight:700;font-size:.85em;min-width:70px}
@@ -564,15 +566,28 @@ body.vue-carte #top-bar,body.vue-carte #bottom-bar{border-radius:0;}
    DÉMESURÉMENT HAUTE (signalé par Marc). On reste donc en flux normal, et on centre à la marge —
    `margin:0 auto` ne s'applique que quand la carte est plus étroite que son cadre, ce qui est
    exactement le cas après un dézoom. */
-#map-wrap.mapzoom #solar-svg{margin:0 auto;}
+
 /* ---------- Onglet Carte ---------- */
 #mp-map{display:none;}
 #mp-map.active{display:flex;flex-direction:column;}
 #center{display:contents;}
 #map-wrap{flex:1;min-height:0;overflow:auto;position:relative;background:#070718;}
-#solar-svg{display:block;width:100%;height:auto;aspect-ratio:400/600;min-height:0;margin:0 auto;transition:none;}
+/* ⚠️ LA CONTRAINTE ÉTAIT ICI, ET NULLE PART AILLEURS.
+   Le dessin était dimensionné sur UN SEUL axe, l'autre étant déduit par `aspect-ratio` :
+     · vue globale  : `width:100%` + `aspect-ratio:400/600` (portrait) → élargir la colonne
+       multipliait la HAUTEUR par 1,5 ; d'où la carte devenue démesurément haute ;
+     · vue système  : `height:100%` + `aspect-ratio:2020/490` → la largeur valait quatre fois la
+       hauteur, impossible de voir le système entier.
+   Aucune des deux ne tenait dans le cadre. Or le `<svg>` porte déjà
+   `preserveAspectRatio="xMidYMid meet"` : si on lui donne les DEUX dimensions, il met le dessin à
+   l'échelle pour qu'il tienne entièrement, centré, sans rien déformer. C'est le navigateur qui fait
+   le travail, et il le fait bien. À 1× tout est visible ; au-delà, le cadre défile.
+   Rien d'autre ne dépend de la taille de la carte : les nœuds sont placés en coordonnées du
+   `viewBox`, pas en pixels. Agrandir ne casse donc rien — c'était le sens de ta question. */
+#solar-svg{display:block;width:calc(100% * var(--mz,1));height:calc(100% * var(--mz,1));min-height:0;margin:0 auto;transition:none;}
 /* 2e carte (système entier index, scrollable) : SVG large 980x320 */
-#map-wrap.mapzoom #solar-svg{aspect-ratio:2020/490;height:calc(100% * var(--mz,1));width:auto;margin:0;}
+/* (l'ancienne règle `.mapzoom` qui forçait `aspect-ratio` + `width:auto` est supprimée :
+   c'est elle qui empêchait la carte de tenir dans son cadre.) */
 #map-back{display:none;position:absolute;top:8px;left:8px;z-index:6;padding:6px 13px;border-radius:16px;background:#13203f;border:1px solid #33509a;color:#bcd0ff;font-weight:700;font-size:.82em;cursor:pointer;}
 #map-wrap.mapzoom #map-back{display:block;}
 #map-wrap.mapzoom .panel-nav{display:none!important;}
@@ -944,6 +959,9 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
   <div class="mtb-line2">
     <div class="top-res" id="top-res"></div>
     <div id="top-income"></div>
+    <!-- « À TOI » : DANS la barre du haut, à droite, sous le bouton Capacité (demande de Marc).
+         Posé ici et pas en flottant : un élément flottant se superpose forcément à quelque chose. -->
+    <span id="a-toi-badge">À TOI</span>
   </div>
 </div>
 <div id="game-wrap" style="display:none">
@@ -1419,8 +1437,9 @@ function uiZoom(d){
      de voir le système entier, et le bouton « − » ne faisait plus rien une fois à 1×.
      On descend maintenant jusqu'à 0,3× — de quoi embrasser tout le système d'un coup —
      avec un pas plus fin en bas de l'échelle, où chaque cran compte davantage. */
-  var pas=(uiMZ<=1?0.1:0.5);
-  uiMZ=Math.max(0.3,Math.min(4,Math.round((uiMZ+d*pas)*10)/10));
+  /* Depuis que la carte TIENT dans son cadre à 1×, « dézoomer » n'a plus de sens en dessous :
+     à 1× le système entier est déjà visible. L'échelle repart donc de 1 à 4. */
+  uiMZ=Math.max(1,Math.min(4,Math.round((uiMZ+d*0.5)*10)/10));
   uiApplyMZ();
 }
 
