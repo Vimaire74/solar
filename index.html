@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-07 · v8.4';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-07 · v8.5';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -492,7 +492,7 @@ body.modal-lock #btn-ability,body.modal-lock #btn-undo,body.modal-lock #btn-col,
 /* ======================  SURCHARGE MOBILE / SMALL SCREEN  ============= */
 /* ===================================================================== */
 html{background:#020208;height:100%;}
-body{max-width:480px;margin:0 auto;height:100dvh;height:100vh;position:relative;overflow:hidden;font-size:14px;box-shadow:0 0 50px #000;display:flex;flex-direction:column;padding:10px 0 calc(10px + env(safe-area-inset-bottom,0));}
+body{max-width:var(--appw,480px);margin:0 auto;height:100dvh;height:100vh;position:relative;overflow:hidden;font-size:14px;box-shadow:0 0 50px #000;display:flex;flex-direction:column;padding:10px 0 calc(10px + env(safe-area-inset-bottom,0));}
 #top-bar{border-radius:12px 12px 0 0;}
 #bottom-bar{border-radius:0 0 12px 12px;overflow:hidden;}
 /* revenu inline dans la barre de ressources */
@@ -537,6 +537,28 @@ body{max-width:480px;margin:0 auto;height:100dvh;height:100vh;position:relative;
 .m-panel{position:absolute;inset:0;overflow-y:auto;display:none;padding-bottom:96px;-webkit-overflow-scrolling:touch;}
 .m-panel.active{display:block;}
 
+/* ═══ LA CARTE PREND TOUTE LA PLACE DISPONIBLE ═══════════════════════════════
+   Le jeu est dessiné dans une colonne de 480 px centrée — la forme d'un téléphone.
+   C'est juste pour les menus et les cartes tech, mais sur un ordinateur la CARTE se
+   retrouvait coincée dans cette colonne, avec du noir de chaque côté et un ruban
+   minuscule au milieu (capture de Marc, 2026-08-07) : on jouait sur un timbre-poste
+   au milieu d'un écran vide.
+   La carte sort donc de la colonne et occupe toute la largeur de la fenêtre, sans
+   toucher au reste de la mise en page. `calc(50% - 50vw)` est la marge négative qui
+   ramène le bord gauche du bloc au bord gauche de l'écran, quelle que soit la
+   largeur de la colonne — donc valable sur téléphone, tablette et ordinateur. */
+@media (min-width:520px){
+  #mp-map.active #map-wrap{
+    width:100vw;
+    margin-left:calc(50% - 50vw);
+    margin-right:calc(50% - 50vw);
+  }
+}
+/* Carte plus petite que son cadre (après un dézoom) : elle se CENTRE au lieu de rester
+   collée en haut à gauche. `grid` supporte le débordement mieux que `flex`, qui coupe
+   la partie dépassant à gauche et la rend inatteignable au défilement. */
+#map-wrap.mapzoom{display:grid;}
+#map-wrap.mapzoom #solar-svg{place-self:center;}
 /* ---------- Onglet Carte ---------- */
 #mp-map{display:none;}
 #mp-map.active{display:flex;flex-direction:column;}
@@ -553,7 +575,7 @@ body{max-width:480px;margin:0 auto;height:100dvh;height:100vh;position:relative;
 /* Barre de zoom horizontale, discrète, sous la carte (~5 % ; la carte garde ~95 %) */
 /* Zoom carte : FLOTTANT au-dessus de la carte (avant : en flux sous la carte → invisible sur mobile,
    impossible de dézoomer pour atteindre les nœuds du bas comme Triton). */
-.map-zoom{position:fixed;right:10px;bottom:calc(var(--botband,84px) + 10px);z-index:200;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:8px;padding:5px 8px;background:rgba(8,10,28,.86);border:1px solid #2a3a6a;border-radius:10px;backdrop-filter:blur(4px);box-shadow:0 4px 14px rgba(0,0,0,.5);}
+.map-zoom{position:absolute;right:8px;top:8px;z-index:7;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:8px;padding:5px 8px;background:rgba(8,10,28,.86);border:1px solid #2a3a6a;border-radius:10px;backdrop-filter:blur(4px);box-shadow:0 4px 14px rgba(0,0,0,.5);}
 .map-zoom .mz-lbl{font-size:.72em;color:#7a88aa;min-width:32px;text-align:center;font-weight:700;}
 .map-zoom button{width:26px;height:26px;border-radius:6px;background:rgba(10,12,34,.9);border:1px solid #2a3a6a;color:#9cc2ff;font-size:.95em;line-height:1;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .map-zoom button:active{background:#1a2a5a;}
@@ -978,8 +1000,10 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
         <div class="npop-info" id="npop-info"></div>
         <div class="npop-acts" id="npop-acts"></div>
       </div>
+      <!-- Les boutons de zoom vivent DANS la carte (en haut à droite) : posés en dehors, ils
+           flottaient au-dessus de la barre du bas et disparaissaient dès que la carte s'élargissait. -->
+      <div class="map-zoom"><button onclick="uiZoom(-1)" title="Dézoomer">−</button><span id="mz-lbl" class="mz-lbl">1×</span><button onclick="uiZoom(1)" title="Zoomer">＋</button></div>
     </div>
-    <div class="map-zoom"><button onclick="uiZoom(-1)" title="Zoom −">−</button><span id="mz-lbl" class="mz-lbl">2×</span><button onclick="uiZoom(1)" title="Zoom +">＋</button></div>
   </div>
   </div>
   <div class="m-panel" id="mp-tech">
@@ -1377,7 +1401,13 @@ function uiApplyMZ(){
   if(l2)l2.textContent=uiMZ.toFixed(1).replace(/\.0$/,'')+'×';
 }
 function uiZoom(d){
-  uiMZ=Math.max(1,Math.min(4,Math.round((uiMZ+d*0.5)*10)/10));
+  /* ⚠️ LE DÉZOOM S'ARRÊTAIT À 1×, ET 1× VEUT DIRE « la carte remplit la HAUTEUR ».
+     Sur un écran large, la carte fait alors quatre fois la largeur du cadre : impossible
+     de voir le système entier, et le bouton « − » ne faisait plus rien une fois à 1×.
+     On descend maintenant jusqu'à 0,3× — de quoi embrasser tout le système d'un coup —
+     avec un pas plus fin en bas de l'échelle, où chaque cran compte davantage. */
+  var pas=(uiMZ<=1?0.1:0.5);
+  uiMZ=Math.max(0.3,Math.min(4,Math.round((uiMZ+d*pas)*10)/10));
   uiApplyMZ();
 }
 

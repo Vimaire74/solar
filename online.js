@@ -1080,7 +1080,8 @@ function overlay(inner){
   return ov;
 }
 function hideOverlay(){ const ov=document.getElementById('sc-ov'); if(ov) ov.style.display='none'; }
-function status(txt){ let b=document.getElementById('sc-status'); if(!b){ injectStyles(); b=el('<div id="sc-status"></div>'); document.body.appendChild(b);} b.textContent=txt; b.style.display='block'; }
+function status(txt){ if(document.getElementById('sc-a-toi')) return;   // c'est TON tour : pas de « au tour de X » par-dessus
+  let b=document.getElementById('sc-status'); if(!b){ injectStyles(); b=el('<div id="sc-status"></div>'); document.body.appendChild(b);} b.textContent=txt; b.style.display='block'; }
 function hideStatus(){ const b=document.getElementById('sc-status'); if(b) b.style.display='none'; }
 // #6 : plus de voile plein écran qui bloque TOUT. On laisse le joueur regarder librement (carte, journal,
 // empire, diplo, détail des techs, survol des ressources). Seules les ACTIONS CONCRÈTES sont bloquées
@@ -1143,15 +1144,26 @@ function hideBilanAttente(){ const b=document.getElementById('sc-bilan-attente')
    d'attente — autant dire pas du tout sur mobile, où l'on ne savait pas si la partie attendait
    quelqu'un d'autre. Il s'efface dès que le tour passe : un bandeau qui reste ne veut plus rien
    dire au bout de deux minutes. */
+/* ⚠️ UNE PASTILLE, PAS UN BANDEAU PLEIN ÉCRAN.
+   Première version : une bande verte sur toute la largeur, ancrée à `top:0`. Elle passait
+   PAR-DESSUS la barre du haut et masquait les ressources et le score — l'information la plus
+   consultée du jeu — pour annoncer une chose qu'on sait déjà en voyant ses boutons s'activer
+   (capture de Marc, 2026-08-07 : « ça occulte tout l'écran et cache le menu du haut »).
+   Elle occupe maintenant exactement la place du message « c'est au tour de X » : petite, centrée,
+   sous la barre du haut. Même géométrie que `#sc-status`, en vert — et les deux ne peuvent pas
+   s'afficher en même temps, puisqu'ils disent des choses contradictoires. */
 function bandeauATonTour(afficher){
   const id='sc-a-toi';
   let b=document.getElementById(id);
   if(!afficher){ if(b)b.remove(); return; }
   if(b) return;
-  b=el('<div id="'+id+'" style="position:fixed;top:0;left:0;right:0;z-index:8400;'
+  hideStatus();   // « au tour de X » et « à toi de jouer » ne coexistent pas
+  b=el('<div id="'+id+'" style="position:fixed;top:calc(var(--topband,56px) + 8px);left:50%;'
+    +'transform:translateX(-50%);z-index:8500;max-width:min(86vw,320px);'
     +'background:linear-gradient(135deg,#1f7a3a,#146030);color:#eafff0;'
-    +'font:800 .92em/1 system-ui;letter-spacing:.14em;text-align:center;'
-    +'padding:7px 10px;box-shadow:0 3px 14px rgba(0,0,0,.45)">A TOI DE JOUER</div>');
+    +'border:1px solid #35a35c;border-radius:10px;'
+    +'font:800 .78em/1 system-ui;letter-spacing:.12em;text-align:center;white-space:nowrap;'
+    +'padding:7px 16px;box-shadow:0 4px 14px rgba(0,0,0,.45)">A TOI DE JOUER</div>');
   document.body.appendChild(b);
 }
 function absenceVoteEtat(m){
