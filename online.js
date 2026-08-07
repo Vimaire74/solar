@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-07 · v7.5';
+const SOLAR_BUILD_JS = '2026-08-07 · v8.1';
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :
@@ -122,6 +122,11 @@ function handle(m){
       status('Partie lancée — synchronisation…');
       reqState(true);
       break;
+    case 'bilan_attente':
+      // Bilan de fin de tour : chacun clique OK. On dit qui manque, sinon celui qui a déjà cliqué
+      // attend devant un écran muet sans savoir pourquoi le tour ne repart pas.
+      bilanAttente(m.restants || []);
+      break;
     case 'absence':
       // Un joueur est absent. RIEN ne se passera tout seul : on informe, et on n'offre le vote
       // que lorsque le serveur déclare l'échéance dépassée (m.votable).
@@ -131,12 +136,14 @@ function handle(m){
       absenceVoteEtat(m);
       break;
     case 'decision':
+      bandeauATonTour(false);   // une question remplace le tour d'action
       hideAbsence();   // la partie repart : plus personne n'est en attente de l'absent
+      if(m.pending&&m.pending.kind!=='eot')hideBilanAttente();
       onDecision(m.pending);
       break;
     case 'your_action':
       STATE._confirmPending=false; hideConfirmBar();
-      hideAbsence();
+      hideAbsence(); hideBilanAttente();
       onMyActionTurn();
       break;
     case 'confirm_pending':
@@ -146,11 +153,21 @@ function handle(m){
       showConfirmBar();
       break;
     case 'turn':
-      if (m.civId !== STATE.myCiv){ STATE._myTurn=false; turnBar(false); status('Tour '+(m.turn||'')+' — au tour de '+civLabel(m.civId)+'…'); showWaitBlock(); }
+      if (m.civId !== STATE.myCiv){ STATE._myTurn=false; bandeauATonTour(false); turnBar(false); status('Tour '+(m.turn||'')+' — au tour de '+civLabel(m.civId)+'…'); showWaitBlock(); }
       reqState();
       break;
     case 'waiting':
-      if (m.civId !== STATE.myCiv){ STATE._myTurn=false; turnBar(false); status('Choix de '+civLabel(m.civId)+'…'); showWaitBlock(); }
+      bandeauATonTour(false);   // on attend quelqu'un d'autre : ce n'est plus à toi
+      if (m.civId !== STATE.myCiv){
+        STATE._myTurn=false; turnBar(false);
+        /* Plusieurs joueurs peuvent choisir EN MÊME TEMPS (agenda, investissement) : on les nomme
+           tous, sinon on annonçait « Choix de X… » alors qu'on attendait aussi Y — et le joueur
+           croyait la partie bloquée sur une seule personne. */
+        const qui=(Array.isArray(m.civIds)&&m.civIds.length?m.civIds:[m.civId]).filter(c=>c!==STATE.myCiv).map(civLabel);
+        status(qui.length>1 ? ('Choix de '+qui.slice(0,-1).join(', ')+' et '+qui[qui.length-1]+'…')
+                            : ('Choix de '+(qui[0]||civLabel(m.civId))+'…'));
+        showWaitBlock();
+      }
       reqState();
       break;
     case 'log': // actions des autres joueurs → pop-up rouge (comme les tours d'IA en solo)
@@ -971,6 +988,7 @@ function turnBar(show){
 function onMyActionTurn(){
   STATE._myTurn = true;
   hideWaitBlock(); closeDecision(); hideStatus();
+  bandeauATonTour(true);   // « A TOI DE JOUER », en haut, en majuscules (demande de Marc)
   reqState(true);                                   // état frais → plateau à jour
   window._scOnPass = ()=> sendAction({type:'pass'}); // le bouton « Fin de Tour » du jeu = passer
   turnBar(true);
@@ -1096,6 +1114,46 @@ function absenceBanner(m){
   if(bt) bt.onclick=()=>{ bt.disabled=true; bt.textContent='✓ Ton vote est enregistré'; bt.style.opacity=.65; send({t:'vote_ia'}); };
 }
 function hideAbsence(){ const b=document.getElementById('sc-absence'); if(b) b.remove(); }
+
+/* ─── BILAN DE FIN DE TOUR : QUI N'A PAS ENCORE CLIQUÉ ───
+   Le bilan est désormais MULTI-ACTIF : le tour ne repart qu'au dernier clic (demande de Marc).
+   Sans ce bandeau, celui qui a déjà cliqué reste devant un écran figé sans comprendre : il croit
+   la partie plantée. On nomme donc les joueurs attendus, et on efface dès que tout le monde a lu. */
+function bilanAttente(restants){
+  const moi=STATE.myCiv;
+  const autres=(restants||[]).filter(c=>c!==moi);
+  const b=document.getElementById('sc-bilan-attente');
+  if(!restants||!restants.length||( restants.length===1 && restants[0]===moi )){ if(b)b.remove(); return; }
+  const txt = autres.length
+    ? '⏳ Bilan : on attend encore '+autres.map(civLabel).join(', ')+'.'
+    : '⏳ Bilan : les autres joueurs ont terminé.';
+  if(b){ const d=b.querySelector('span'); if(d)d.textContent=txt; return; }
+  const el2=el('<div id="sc-bilan-attente" style="position:fixed;left:50%;transform:translateX(-50%);bottom:64px;z-index:8300;'
+    +'max-width:min(94vw,560px);background:rgba(24,30,44,.97);border:1px solid #45557a;border-radius:12px;'
+    +'padding:8px 14px;color:#dbe6ff;font:600 .82em system-ui;box-shadow:0 8px 28px rgba(0,0,0,.5);text-align:center">'
+    +'<span></span></div>');
+  el2.querySelector('span').textContent=txt;
+  document.body.appendChild(el2);
+}
+function hideBilanAttente(){ const b=document.getElementById('sc-bilan-attente'); if(b) b.remove(); }
+
+/* ─── « A TOI DE JOUER » ───
+   Demande de Marc (2026-08-07) : un bandeau EN HAUT, EN MAJUSCULES, quand c'est son tour.
+   Jusqu'ici l'information n'existait que par la barre de tour et par l'ABSENCE de message
+   d'attente — autant dire pas du tout sur mobile, où l'on ne savait pas si la partie attendait
+   quelqu'un d'autre. Il s'efface dès que le tour passe : un bandeau qui reste ne veut plus rien
+   dire au bout de deux minutes. */
+function bandeauATonTour(afficher){
+  const id='sc-a-toi';
+  let b=document.getElementById(id);
+  if(!afficher){ if(b)b.remove(); return; }
+  if(b) return;
+  b=el('<div id="'+id+'" style="position:fixed;top:0;left:0;right:0;z-index:8400;'
+    +'background:linear-gradient(135deg,#1f7a3a,#146030);color:#eafff0;'
+    +'font:800 .92em/1 system-ui;letter-spacing:.14em;text-align:center;'
+    +'padding:7px 10px;box-shadow:0 3px 14px rgba(0,0,0,.45)">A TOI DE JOUER</div>');
+  document.body.appendChild(b);
+}
 function absenceVoteEtat(m){
   const d=document.getElementById('sc-absence-vote-etat'); if(!d) return;
   const n=(m.manquants||[]).length;
@@ -1264,7 +1322,7 @@ function askLocalDecision(pending){
   return new Promise(resolve=>{
     const o=pending.payload||{}; const k=pending.kind;
     const done=(ans)=>{ closeDecision(); resolve(ans); };
-    const TITLES={raid_target:'💰 Quelle nation piller ?',accord_request:'🤝 Proposition d\'accord commercial',agenda:'Choisis ton agenda secret',strategy:'Carte Stratégie',strategy_calm:'Calmer une tension',invest1:'Investissement (Niv.1)',invest2:'Investissement (Niv.2)',espionage:'Espionnage : branche à copier',extrasolar:'Exploration extra-solaire',empath_copy:'Télépathie : carte à copier',ai_dyson:'Sphère de Dyson adverse',dyson_build:'Ta Sphère de Dyson',peace_offer:'Offre de paix',war_combat:'Combat',accord_confirm:'Accord commercial',defense:'Défense !'};
+    const TITLES={raid_target:'💰 Quelle nation piller ?',accord_request:'🤝 Proposition d\'accord commercial',agenda:'Choisis ton agenda secret',strategy:'Carte Stratégie',strategy_calm:'Calmer une tension',invest1:'Investissement (Niv.1)',invest2:'Investissement (Niv.2)',espionage:'Espionnage : branche à copier',extrasolar:'Exploration extra-solaire',empath_copy:'Télépathie : carte à copier',ai_dyson:'Sphère de Dyson adverse',dyson_build:'Ta Sphère de Dyson',peace_offer:'Offre de paix',war_combat:'Combat',accord_confirm:'Accord commercial',defense:'Défense !',peace_answer:'🕊️ Proposition de paix'};
     let body='<h2>'+(TITLES[k]||k)+'</h2>';
     if(k==='defense'){
       // CHOIX TACTIQUE DE DÉFENSE : combien de jetons engager (0 = ne pas défendre) + Supercroiseur éventuel.
@@ -1380,6 +1438,12 @@ function askLocalDecision(pending){
       document.getElementById('sc-diplo-none').onclick=()=>done({selected:[]});
       return;
     }
+    /* ⚠️ AFFICHER CE QU'ON PROPOSE, PAS SEULEMENT LES BOUTONS.
+       Le rendu générique n'a jamais montré `payload.texte` : sur une proposition d'accord
+       commercial, le destinataire voyait « 🤝 Proposition d'accord commercial » et deux boutons
+       Accepter / Refuser — sans savoir QUI proposait ni ce qu'il offrait. Même chose maintenant
+       pour la paix, où l'offre en ressources est le cœur de la décision. */
+    if(o.texte){ body += '<div style="margin:2px 0 10px;text-align:left">'+o.texte+'</div>'; }
     // Génériques à options (agenda, strategy, invest1/2, espionage, extrasolar, empath_copy…)
     const opts=o.options||[];
     if(!opts.length){ decisionPanel(body+'<button class="opt" id="sc-ok">Continuer</button>'); document.getElementById('sc-ok').onclick=()=>done({}); return; }
