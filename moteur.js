@@ -5818,10 +5818,13 @@ function renderMap(){
     for(const gid of ['stars','connections','routes-ai','routes-p','pirates-g']){const g=document.getElementById(gid);if(g)g.innerHTML='';}
     if(bg)bg.style.display='';
     if(ng)ng.innerHTML=mapGlobalSVG();
+    // On remesure APRÈS le rendu : la vue vient peut-être de changer de largeur.
+    try{ if(typeof uiApplyMZ==='function') setTimeout(uiApplyMZ,0); }catch(e){}
     return;
   }
   // 2e carte : système entier scrollable (dessin index.html), centré sur la planète cliquée
   if(wrap)wrap.classList.add('mapzoom');
+  try{ if(typeof uiApplyMZ==='function') setTimeout(uiApplyMZ,0); }catch(e){}
   if(bg)bg.style.display='none';
   drawConnections();
   renderSystemMap();

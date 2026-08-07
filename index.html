@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-07 · v9.0';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-07 · v9.1';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -604,8 +604,16 @@ body.vue-carte #top-bar,body.vue-carte #bottom-bar{border-radius:0;}
    le travail, et il le fait bien. À 1× tout est visible ; au-delà, le cadre défile.
    Rien d'autre ne dépend de la taille de la carte : les nœuds sont placés en coordonnées du
    `viewBox`, pas en pixels. Agrandir ne casse donc rien — c'était le sens de ta question. */
-#solar-svg{position:absolute;top:0;left:0;display:block;
-  width:calc(100% * var(--mz,1));height:calc(100% * var(--mz,1));min-height:0;transition:none;}
+/* ⚠️ LA TAILLE DE LA CARTE EST CALCULÉE EN JAVASCRIPT (`uiApplyMZ`), PAS ICI.
+   Trois tentatives en CSS, trois échecs, dont un qui a rendu la carte inaccessible :
+     · `height:100%` → retombe en `auto` si le cadre n'a pas de hauteur définie ;
+     · `aspect-ratio` sur un seul axe → l'autre axe explose quand on élargit ;
+     · `position:absolute` → le cadre n'a plus de contenu en flux, et selon la chaîne de
+       conteneurs il peut se réduire à rien.
+   Je ne vois pas le rendu : continuer à raisonner sur des règles que je ne peux pas observer, c'est
+   ce qui a fait perdre trois allers-retours. On MESURE donc le cadre et on pose les pixels. Une
+   mesure ne peut pas « retomber en auto » ni dépendre de la chaîne de conteneurs. */
+#solar-svg{display:block;margin:0 auto;transition:none;}
 /* 2e carte (système entier index, scrollable) : SVG large 980x320 */
 /* (l'ancienne règle `.mapzoom` qui forçait `aspect-ratio` + `width:auto` est supprimée :
    c'est elle qui empêchait la carte de tenir dans son cadre.) */
@@ -1428,6 +1436,8 @@ function uiTab(name){
     // où leur mise en page a été pensée. C'est le seul moyen d'élargir sans tout déformer.
     document.body.classList.toggle('vue-carte', name==='map');
     try{ uiSyncBands(); }catch(e){}
+    // La largeur du cadre vient de changer (colonne élargie ou non) : on remesure.
+    if(name==='map') setTimeout(function(){ try{ uiApplyMZ(); }catch(e){} }, 0);
     if(G&&G.player){
       if(name==='tech')renderTechTree();
       else if(name==='map')renderMap();
@@ -1447,6 +1457,16 @@ var uiMZ=1;
 function uiApplyMZ(){
   var wrap=document.getElementById('map-wrap');
   if(wrap)wrap.style.setProperty('--mz',uiMZ);
+  /* ON MESURE, ON POSE. `clientWidth/clientHeight` sont la taille INTÉRIEURE réelle du cadre, une
+     fois la mise en page faite : aucune ambiguïté possible. Le `<svg>` porte
+     `preserveAspectRatio="xMidYMid meet"`, donc à 1× le dessin tient ENTIER dans ces dimensions,
+     centré, sans déformation — quelle que soit la vue (globale en portrait, tactique en paysage).
+     Au-delà de 1×, la boîte dépasse le cadre et celui-ci défile. */
+  var svg=document.getElementById('solar-svg');
+  if(wrap&&svg){
+    var w=wrap.clientWidth||0, h=wrap.clientHeight||0;
+    if(w>0&&h>0){ svg.style.width=Math.round(w*uiMZ)+'px'; svg.style.height=Math.round(h*uiMZ)+'px'; }
+  }
   var lbl=document.getElementById('panel-label');
   if(lbl)lbl.textContent='Zoom '+uiMZ.toFixed(1).replace(/\.0$/,'')+'×';
   var l2=document.getElementById('mz-lbl');
@@ -1511,6 +1531,7 @@ if(window.visualViewport){
   window.visualViewport.addEventListener('scroll',syncFixedBars);
 }
 setAppHeight();
+try{ window.addEventListener('resize',function(){ try{ uiApplyMZ(); }catch(e){} }); }catch(e){}
 /* La carte affiche TOUJOURS le système entier (viewBox complet) + les "+" de route par-dessus tout */
 /* Vue carte : affiche toujours le système entier (viewBox complet) + zoom,
    puis dessine les "+" de création de route PAR-DESSUS tout (dans nodes-g). */
