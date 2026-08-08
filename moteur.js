@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-07 · v9.8';
+const SOLAR_BUILD_MOTEUR = '2026-08-08 · v9.15';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -83,7 +83,7 @@ const CIVS={
   jupiteriens:{id:'jupiteriens',name:'Jupitériens',emoji:'🟠',color:'#FF9800',
     start:{energy:5,materials:2,science:3,morale:3},startForce:4,home:'io',
     techBonus:'mines_energie',
-    passive:'Colonies joviennes (Io, Europe, Ganymède, Callisto) +1<i class=ri-energy></i>/tour. Base : Io.',
+    passive:'+1<i class=ri-energy></i>/tour dès le premier tour (réacteurs joviens). Base : Io.',
     active:{name:'Forge Orbitale',desc:'Améliore une colonie joviène (Io/Europe/Ganymède/Callisto) 1→2 (0 AC, −1<i class=ri-materials></i> −1<i class=ri-energy></i>)',ac:0,cost:{materials:1,energy:1}}},
   ceinturiens:{id:'ceinturiens',name:'Ceinturiens',emoji:'☠️',color:'#AB47BC',
     start:{energy:6,materials:4,science:1,morale:2},startForce:3,home:'eris',
@@ -106,11 +106,20 @@ const NODES={
   deimos:{id:'deimos',name:'Déimos',emoji:'🟤',color:'#795548',type:'moon',baseVP:1,maxLv:3,r:12,upgradeCost:'remote',strategic:null,res:{materials:1},x:452,y:322,conn:['phobos','lune'],desc:'Petite lune aride de Mars. Conditions difficiles.'},
   ceres:{id:'ceres',name:'Cérès',emoji:'⬜',color:'#CFD8DC',type:'dwarf_planet',baseVP:3,maxLv:3,r:21,upgradeCost:'standard',strategic:'full',res:{energy:1,materials:3},x:625,y:548,conn:['lune','phobos','vesta','io','ganymede'],desc:'Hub de la ceinture d\'astéroïdes. Carrefour stratégique des routes.'},
   vesta:{id:'vesta',name:'Vesta',emoji:'🪨',color:'#78909C',type:'asteroid',baseVP:2,maxLv:3,r:17,upgradeCost:'remote',strategic:null,res:{materials:2},x:715,y:212,conn:['ceres','ganymede'],desc:'Grand astéroïde métallique. Éloigné des routes principales.'},
-  io:{id:'io',name:'Io',emoji:'🟡',color:'#FFD54F',type:'moon',baseVP:3,maxLv:3,r:15,upgradeCost:'standard',strategic:'half',res:{energy:3,materials:1},x:862,y:328,conn:['ceres','europe','ganymede','jorbital1'],desc:'Lune volcanique. Énergie géothermique intense.'},
-  europe:{id:'europe',name:'Europe',emoji:'🔵',color:'#42a5f5',type:'moon',baseVP:4,maxLv:3,r:15,upgradeCost:'remote',strategic:null,res:{energy:1,materials:1},x:1060,y:352,conn:['io','callisto','jorbital1','titan'],desc:'Océan sous-glaciaire. Paysage saisissant sous Jupiter. Radiation intense.'},
-  ganymede:{id:'ganymede',name:'Ganymède',emoji:'🟤',color:'#A1887F',type:'moon',baseVP:4,maxLv:3,r:18,upgradeCost:'standard',strategic:'full',res:{energy:1,materials:2},x:922,y:432,conn:['io','vesta','callisto','titan','jorbital1','ceres'],desc:'Plus grande lune du système. Hub jovien majeur, carrefour de routes.'},
+  io:{id:'io',name:'Io',emoji:'🟡',color:'#FFD54F',type:'moon',baseVP:3,maxLv:3,r:15,upgradeCost:'standard',strategic:'half',res:{energy:3,materials:1},x:862,y:328,conn:['ceres','europe','ganymede'],desc:'Lune volcanique. Énergie géothermique intense.'},
+  europe:{id:'europe',name:'Europe',emoji:'🔵',color:'#42a5f5',type:'moon',baseVP:4,maxLv:3,r:15,upgradeCost:'remote',strategic:null,res:{energy:1,materials:1},x:1060,y:352,conn:['io','callisto','titan'],desc:'Océan sous-glaciaire. Paysage saisissant sous Jupiter. Radiation intense.'},
+  ganymede:{id:'ganymede',name:'Ganymède',emoji:'🟤',color:'#A1887F',type:'moon',baseVP:4,maxLv:3,r:18,upgradeCost:'standard',strategic:'full',res:{energy:1,materials:2},x:922,y:432,conn:['io','vesta','callisto','titan','ceres'],desc:'Plus grande lune du système. Hub jovien majeur, carrefour de routes.'},
   callisto:{id:'callisto',name:'Callisto',emoji:'🔘',color:'#607D8B',type:'moon',baseVP:3,maxLv:3,r:16,upgradeCost:'standard',strategic:'half',res:{energy:1,materials:2},x:1052,y:425,conn:['europe','ganymede','titan'],desc:'Hors de la radiation jovienne. Meilleur habitat humain du système jovien.'},
-  jorbital1:{id:'jorbital1',name:'Station Jupiter',emoji:'🟠',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:16,upgradeCost:'standard',strategic:null,noColonize:true,res:{energy:2,science:1},x:960,y:415,conn:['io','europe','ganymede'],desc:'Anneau orbital de la base jupitérienne (Io) — non colonisable.'},
+  /* ⚠️ « STATION JUPITER » N'EST PLUS QU'UN DESSIN (2026-08-07, décision de Marc).
+     Elle n'est pas SUPPRIMÉE de la table des nœuds, et c'est délibéré : c'est elle qui DESSINE la
+     planète Jupiter sur la carte tactique (`mapImg` la traduit en image `jupiter`, `MAP_RAD` lui
+     donne son rayon de 42). L'effacer ferait disparaître Jupiter de la carte, ce qui n'est pas ce
+     qui était demandé — la base jupitérienne est désormais Io, mais Jupiter doit rester visible.
+     Elle devient donc `decorative` comme les anneaux : aucune ressource, aucun revenu, aucune route
+     possible à travers elle, exclue de tous les calculs. Un décor, rien de plus.
+     À noter : elle portait déjà `noColonize`, donc personne ne pouvait la posséder — l'exception
+     d'entretien jovienne qu'on vient de retirer ne s'appliquait en réalité à RIEN. */
+  jorbital1:{id:'jorbital1',name:'Jupiter',emoji:'🟠',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:16,upgradeCost:'standard',strategic:null,noColonize:true,decorative:true,res:{},x:960,y:415,conn:[],desc:'Géante gazeuse — non colonisable. La base jupitérienne est Io.'},
   jorbital2:{id:'jorbital2',name:'Anneau J-2',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,upgradeCost:'standard',strategic:null,res:{},decorative:true,x:421,y:159,conn:['jorbital1','jorbital3'],desc:'Territoire jovien — non colonisable.'},
   jorbital3:{id:'jorbital3',name:'Anneau J-3',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,upgradeCost:'standard',strategic:null,res:{},decorative:true,x:429,y:194,conn:['jorbital2','jorbital4'],desc:'Territoire jovien — non colonisable.'},
   jorbital4:{id:'jorbital4',name:'Anneau J-4',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,upgradeCost:'standard',strategic:null,res:{},decorative:true,x:406,y:223,conn:['jorbital3','jorbital5'],desc:'Territoire jovien — non colonisable.'},
@@ -129,13 +138,13 @@ const CARD_ART=new Set(['bio1','prop1','drones1','quant1','bio2','nav2','hyper3'
 const CARDS_POOL=[
   // ── EXPANSION ────────────────────────────────────────────────────────────────
   {id:'bio1',branch:'expansion',tier:1,type:'colonization',name:'Biosphère Autonome',emoji:'🏗️',
-   effect:'Colonisation −1<i class=ri-energy></i>',spec:'col_e_disc',
+   effect:'Entretien des colonies : −1<i class=ri-energy></i>/tour',spec:'upkeep_e_disc',
    cost:{materials:2,science:1},vp:1},
   {id:'bio2',branch:'expansion',tier:2,type:'colonization',name:'Biosphère Avancée',emoji:'🌱',
-   effect:'Colonies +1<i class=ri-materials></i>/tour. Colonies Nv.2-3 : sans entretien <i class=ri-energy></i>. Supprime malus moral colonies difficiles.',spec:'bio2_bonus',
+   effect:'Tes colonies ne coûtent PLUS AUCUN entretien (ni <i class=ri-energy></i> ni <i class=ri-materials></i>). Supprime le malus moral des colonies difficiles.',spec:'bio2_bonus',
    cost:{science:4,energy:2,materials:2},vp:3},
   {id:'terra3',branch:'expansion',tier:3,type:'colonization',name:'Terraformation',emoji:'🌍',
-   effect:'+1<i class=ri-materials></i> +1<i class=ri-morale></i>/tour par colonie. Colonies Nv.2-3 : sans aucun entretien.',spec:'terra3',
+   effect:'+1<i class=ri-materials></i> +1<i class=ri-morale></i>/tour par colonie de niveau 2 ou 3.',spec:'terra3',
    cost:{science:6,materials:4,energy:4},vp:5},
   // ── NAVIGATION & MOTEURS ─────────────────────────────────────────────────────
   {id:'prop1',branch:'navigation',tier:1,type:'technology',name:'Propulsion Ionique',emoji:'⚗️',
@@ -1969,26 +1978,51 @@ function stStrategieChoisie(ans, civId){
   const nat=(typeof allPlayers==='function'?allPlayers():[G.player].concat(G.ais||[])).find(p=>p&&p.civ&&p.civ.id===cid)||ordre[0];
   _resolveStratChoice(nat, ans&&ans.cardId);
 }
+/* ─── LA PHRASE DU DRAFT ───────────────────────────────────────────────────────
+   ⚠️ LE DÉFAUT ÉTAIT ICI, ET C'ÉTAIT UN DÉFAUT DE TEXTE, PAS DE RÈGLE.
+   La fenêtre recevait `rank: order.length` — c'est-à-dire le nombre de nations qui n'ont PAS encore
+   choisi, et non la position du joueur. Les deux se ressemblent assez pour passer inaperçus, et se
+   contredisent complètement : à deux nations, le joueur qui choisit en DERNIER voyait « 1er/2 », et
+   celui qui choisissait en PREMIER voyait « 2e/2 ». Le compte des cartes, lui, était juste depuis le
+   début — c'est le texte qui mentait, et qui m'a fait chercher un bug dans la pioche.
+   La position vraie est : total − restants + 1.
+   On formule aussi la phrase en clair (demande de Marc) : le rang de FORCE est l'inverse du rang de
+   choix, puisque le plus faible choisit en premier. Une seule fonction la produit, pour que les
+   modes solo et en ligne ne puissent pas dire deux choses différentes. */
+function _draftOrdinal(n){ return n===1?'premier':(n===2?'deuxième':(n===3?'troisième':(n===4?'quatrième':n+'ème'))); }
+function draftPhrase(pos,total){
+  // Rang inconnu : on le DIT, au lieu d'inventer une position (c'est le `||1` de l'ancienne version
+  // qui affichait « 1er » quand l'information manquait — la valeur la plus trompeuse possible).
+  if(!pos||!total) return 'Ordre de choix indéterminé — à signaler.';
+  const force=total-pos+1;                       // 1 = le plus fort
+  const quand='tu choisis en '+_draftOrdinal(pos);
+  if(pos===1)     return 'Tu es le joueur le plus FAIBLE : '+quand+'.';
+  if(force===1)   return 'Tu es le joueur le plus FORT : '+quand+' (dernier).';
+  return 'Tu es le '+_draftOrdinal(force)+' joueur le plus fort : '+quand+'.';
+}
 function _runDraftStep(){
   const order=G._stratOrder,pool=G._stratPool;if(!order){_startTurnBegin();return;}
   while(order.length){
     const nat=order[0];
+    const _total=G._stratTotal||order.length;
+    const _pos=_total-order.length+1;            // position RÉELLE de celui qui choisit maintenant
+    const _phrase=draftPhrase(_pos,_total);
     if(_isRemote(nat)){ // EN LIGNE : humain DISTANT (pivot) → relayer son choix de Stratégie
       /* SUITE NOMMÉE. La carte Stratégie est la question la PLUS FRÉQUENTE du jeu (une par joueur
          et par tour) : tant que sa suite était une fermeture, une partie enregistrée pendant le
          draft — c'est-à-dire une partie sur deux — ne redémarrait pas. La nation qui répond est
          rendue par le courtier (second argument), il n'y a donc rien à capturer. */
       _emitRemote('strategy', nat,
-        {rank:order.length, total:G._stratTotal, options:pool.map(c=>({id:c.id,name:c.name,emoji:c.emoji,desc:c.desc,calmTension:c.calmTension||0}))},
+        {rank:_pos, total:_total, phrase:_phrase, options:pool.map(c=>({id:c.id,name:c.name,emoji:c.emoji,desc:c.desc,calmTension:c.calmTension||0}))},
         'stStrategieChoisie', null);
       return;
     }
     if(nat._isAI===false){ // une nation HUMAINE doit choisir
       if(_decisionActive()){ // mode serveur : router vers ce joueur
         _emitDecision('strategy', nat,
-          {rank:order.length, total:G._stratTotal, options:pool.map(c=>({id:c.id,name:c.name,emoji:c.emoji,desc:c.desc,calmTension:c.calmTension||0}))},
+          {rank:_pos, total:_total, phrase:_phrase, options:pool.map(c=>({id:c.id,name:c.name,emoji:c.emoji,desc:c.desc,calmTension:c.calmTension||0}))},
           'stStrategieChoisie', null);
-      } else { showStrategyModal(); } // solo : l'unique humain est G.player
+      } else { G._stratPlayerRank=_pos; G._stratTotal=_total; showStrategyModal(); } // solo : l'unique humain est G.player
       return;
     }
     order.shift();
@@ -2065,8 +2099,7 @@ function showStrategyModal(){
   let rank=G._stratPlayerRank;
   if(!rank&&Array.isArray(G._stratOrder)){ const i=G._stratOrder.indexOf(G.player); if(i>=0) rank=i+1; }
   const total=G._stratTotal||_tous.length;
-  const rangTxt=rank?(rank+(rank===1?'er':'e')+'/'+total):('position inconnue sur '+total);
-  document.getElementById('strat-sub').innerHTML='Draft : à toi en '+rangTxt+' — '+pool.length+' carte(s) proposée(s).'+_tensionMiniHtml();
+  document.getElementById('strat-sub').innerHTML=draftPhrase(rank,total)+' — '+pool.length+' carte(s) proposée(s).'+_tensionMiniHtml();
   document.getElementById('strategy-modal').classList.remove('hidden');
   if(typeof _syncEndBtn==='function')_syncEndBtn();
 }
@@ -3190,19 +3223,25 @@ function doMaintenance(){
        (inchangé : 0, 1, 2) qui porte désormais seul la progression.
        ⚠️ Le commentaire précédent annonçait « Nv1 = 0⚡ » : il était FAUX depuis longtemps, le code
        facturait bien 1⚡ au niveau 1. Ne pas se fier au commentaire sans lire la ligne. */
-    // Jupitériens : stations orbitales joviennes (jorbital*) = sans entretien (traitées comme base)
-    const extraCols=p.colonies.filter(c=>{
-      if(c.nodeId===p.civ.home)return false;
-      if(p.civ.id==='jupiteriens'&&c.nodeId.startsWith('jorbital'))return false;
-      return true;
-    });
+    /* ⚠️ EXCEPTION SUPPRIMÉE LE 2026-08-07 (décision de Marc).
+       Les Jupitériens ne payaient pas l'entretien de leurs stations orbitales (`jorbital*`). Cette
+       règle datait de l'époque où ces stations avaient un intérêt ; depuis qu'elles ont été vidées
+       de leur contenu, six des sept ne rapportent RIEN et la septième (Station Jupiter, 2⚡/1🔬)
+       devenait une source gratuite d'énergie — un avantage que rien ne documentait, dans le texte
+       d'aucun pouvoir. Une seule règle d'entretien pour tout le monde : seule la CAPITALE est
+       exemptée, pour toutes les nations. */
+    const extraCols=p.colonies.filter(c=>c.nodeId!==p.civ.home);
     let totalEnergy=0,totalMat=0;
     const freeUpk=(p.investBonus2&&(p.investBonus2.freeUpkeep||0)>0);
     const _terra=hasSpec(p,'terra3'),_bio=hasSpec(p,'bio2_bonus');
+    /* BIOSPHÈRE AVANCÉE : plus aucun entretien, à AUCUN niveau (décision de Marc, 2026-08-08).
+       Avant, l'exemption était partagée entre Biosphère Avancée (énergie, Nv2-3) et Terraformation
+       (tout, Nv2-3) : deux technologies qui se marchaient dessus. Désormais l'exemption appartient
+       à Biosphère Avancée SEULE, et Terraformation ne s'occupe plus que des revenus. */
     for(const col of extraCols){
+      if(_bio) continue;                              // Biosphère Avancée : aucune colonie n'est facturée
       const lvl=col.level;
-      if(lvl>=2&&_terra)continue;                     // Terraformation : colonies Nv.2-3 sans AUCUN entretien
-      if(!(lvl>=2&&(_bio||_terra)))totalEnergy+=1;    // 1⚡ par colonie, quel que soit le niveau. Biosphère Avancée : colonies Nv.2-3 sans entretien énergie
+      totalEnergy+=1;                                 // 1⚡ par colonie, quel que soit le niveau
       totalMat+=lvl>=3?2:(lvl>=2?1:0);
     }
     if(freeUpk){totalEnergy=0;totalMat=0;p.investBonus2.freeUpkeep--;}
@@ -3281,8 +3320,7 @@ function revenueBreakdownHTML(p){
     const _mult=c.level>=3?2:(c.level>=2?1.5:1);
     const o={};for(const r in n.res){const _v=Math.floor(n.res[r]*_mult);o[r]=(o[r]||0)+_v;g[r]=(g[r]||0)+_v;}
     if(c.level>=3){o.morale=(o.morale||0)+2;g.morale+=2;}else if(c.level>=2){o.morale=(o.morale||0)+1;g.morale+=1;}
-    if(hasSpec(p,'bio2_bonus')){o.materials=(o.materials||0)+1;g.materials+=1;}
-    if(hasSpec(p,'terra3')){o.materials=(o.materials||0)+1;o.morale=(o.morale||0)+1;g.materials+=1;g.morale+=1;}
+    if(hasSpec(p,'terra3')&&(c.level||1)>=2){o.materials=(o.materials||0)+1;o.morale=(o.morale||0)+1;g.materials+=1;g.morale+=1;}   // Terraformation : colonies de niveau 2 ou 3 seulement
     let lv=0;if(c.level>=3)lv=2;else if(c.level>=2)lv=1;if(lv){o.science=(o.science||0)+lv;g.science+=lv;}
     inc.push('🏙️ '+(n.name||c.nodeId)+' (Nv.'+(c.level||1)+') : '+fmt(o));
   }
@@ -3308,9 +3346,22 @@ function revenueBreakdownHTML(p){
     if(p.investBonus2.moraleX2&&g.morale){g.morale=Math.floor(g.morale*2);inc.push('🕊️ Confort Population : <i class=ri-morale></i> ×2');}
   }
   // ── ENTRETIEN & MALUS PERMANENTS ──
-  const extraCols=p.colonies.filter(c=>c.nodeId!==p.civ.home&&!(p.civ.id==='jupiteriens'&&String(c.nodeId).startsWith('jorbital')));
-  let upE=0,upM=0;const _terraU=hasSpec(p,'terra3'),_bioU=hasSpec(p,'bio2_bonus');for(const c of extraCols){const lvl=c.level||1;if(lvl>=2&&_terraU)continue;/*Terraformation : Nv2-3 aucun entretien*/if(!(lvl>=2&&(_bioU||_terraU)))upE+=lvl;/*Biosphère : Nv2-3 sans entretien énergie*/upM+=lvl>=3?2:lvl>=2?1:0;}
-  upE=Math.max(0,upE-((p.stratBonus&&p.stratBonus.upkeepDiscount)||0));
+  const extraCols=p.colonies.filter(c=>c.nodeId!==p.civ.home);   // exception « stations orbitales joviennes » supprimée (voir doMaintenance)
+  /* ⚠️ TROISIÈME COPIE DU MÊME BARÈME, ET ELLE AVAIT DIVERGÉ.
+     Elle facturait `upE += lvl` — 2⚡ pour une colonie de niveau 2, 3⚡ au niveau 3 — alors que le
+     calcul RÉEL (`doMaintenance`) et le revenu net (`_netIncome`) facturent 1⚡ quel que soit le
+     niveau, depuis que Marc a fixé cette règle (« on fait 1 énergie toujours »). Le bilan de fin de
+     tour annonçait donc un entretien PLUS ÉLEVÉ que celui réellement prélevé, et l'écart grandissait
+     à mesure qu'on montait ses colonies. C'est très probablement une partie de ce que Marc décrivait
+     en disant que le bilan ne donnait pas le bon résultat.
+     Trois implémentations d'un même barème, c'est deux de trop — mais les fusionner touche à
+     l'affichage, au net et au prélèvement en même temps. En attendant, elles sont au moins
+     identiques, et chacune renvoie aux deux autres. */
+  let upE=0,upM=0;const _terraU=hasSpec(p,'terra3'),_bioU=hasSpec(p,'bio2_bonus');for(const c of extraCols){if(_bioU)continue;/*Biosphère Avancée : aucun entretien*/const lvl=c.level||1;upE+=1;upM+=lvl>=3?2:lvl>=2?1:0;}
+  /* Biosphère Autonome : −1⚡ sur le TOTAL d'entretien (pas par colonie), comme la carte
+     Consolidation. Elle remplace l'ancienne remise de −1⚡ à la colonisation, qui ne servait qu'une
+     fois par colonie et devenait sans objet dès qu'on cessait de s'étendre. */
+  upE=Math.max(0,upE-((p.stratBonus&&p.stratBonus.upkeepDiscount)||0)-(hasSpec(p,'upkeep_e_disc')?1:0));
   if(p.investBonus2&&(p.investBonus2.freeUpkeep||0)>0)mal.push('🏙️ Entretien colonies : gratuit ('+p.investBonus2.freeUpkeep+' tour(s) restants)');
   else if(upE||upM)mal.push('🏙️ Entretien colonies : '+[upE?'−'+upE+'<i class=ri-energy></i>':'',upM?'−'+upM+'<i class=ri-materials></i>':''].filter(Boolean).join(' '));
   const nr=p.routes.length;
@@ -3349,12 +3400,15 @@ function _netIncome(p){
     const mult=c.level>=3?2:(c.level>=2?1.5:1);
     for(const r in n.res) g[r]=(g[r]||0)+Math.floor(n.res[r]*mult);
     if(c.level>=3){g.morale+=2;g.science+=2;} else if(c.level>=2){g.morale+=1;g.science+=1;}
-    if(_bio) g.materials+=1;
-    if(_terra){g.materials+=1;g.morale+=1;}
-    if(p.civ.id==='jupiteriens'&&['io','europe','ganymede','callisto'].includes(c.nodeId)) g.energy+=1;
+    /* ⚠️ QUATRIÈME COPIE DES REVENUS PAR COLONIE — je l'avais manquée en corrigeant les trois autres,
+       et le contrôle chiffré l'a immédiatement montrée : Biosphère Avancée donnait encore +1🪨 par
+       colonie, et Terraformation payait même les colonies de niveau 1. Chercher par le NOM de la
+       technologie plutôt que par la ligne exacte aurait évité l'oubli. */
+    if(_terra&&(c.level||1)>=2){g.materials+=1;g.morale+=1;}   // Terraformation : niveau 2 ou 3 seulement
   }
   if(G.commercialAccords&&G.commercialAccords.length){g.materials+=G.commercialAccords.length;g.morale+=G.commercialAccords.length;}
   if(p.civ.id==='ceinturiens') g.energy+=1;
+  if(p.civ.id==='jupiteriens') g.energy+=1;   // réacteurs joviens : +1⚡/tour, indépendant des colonies
   if(p.rpt) for(const r in p.rpt) g[r]=(g[r]||0)+(p.rpt[r]||0);
   if(p.investBonus&&(p.investBonus.turnsLeft===undefined||p.investBonus.turnsLeft>0)){
     if(p.investBonus.matX2&&g.materials>0) g.materials=Math.floor(g.materials*2);
@@ -3368,12 +3422,15 @@ function _netIncome(p){
   if(m===0){ g.energy=0;g.materials=0;g.science=0;g.morale=0; }
   else if(m===1){ for(const r of ['energy','materials','science','morale']) g[r]=Math.floor((g[r]||0)/2); }
   // ENTRETIEN (déduit après) — colonies hors base
-  const extraCols=p.colonies.filter(c=>c.nodeId!==p.civ.home&&!(p.civ.id==='jupiteriens'&&String(c.nodeId).startsWith('jorbital')));
+  const extraCols=p.colonies.filter(c=>c.nodeId!==p.civ.home);   // exception « stations orbitales joviennes » supprimée (voir doMaintenance)
   /* ⚠️ MÊME BARÈME QUE `doMaintenance` — c'est une SECONDE implémentation du même calcul, et elle a
      déjà divergé par le passé (bug du revenu net, une semaine perdue). Toute modification du barème
      doit toucher LES DEUX. 1⚡ par colonie quel que soit le niveau, matériaux 0/1/2. */
-  let upE=0,upM=0; for(const c of extraCols){const lvl=c.level||1; if(lvl>=2&&_terra)continue; if(!(lvl>=2&&(_bio||_terra)))upE+=1; upM+=lvl>=3?2:lvl>=2?1:0;}
-  upE=Math.max(0,upE-((p.stratBonus&&p.stratBonus.upkeepDiscount)||0));
+  let upE=0,upM=0; for(const c of extraCols){if(_bio)continue;/*Biosphère Avancée : aucun entretien*/const lvl=c.level||1; upE+=1; upM+=lvl>=3?2:lvl>=2?1:0;}
+  /* Biosphère Autonome : −1⚡ sur le TOTAL d'entretien (pas par colonie), comme la carte
+     Consolidation. Elle remplace l'ancienne remise de −1⚡ à la colonisation, qui ne servait qu'une
+     fois par colonie et devenait sans objet dès qu'on cessait de s'étendre. */
+  upE=Math.max(0,upE-((p.stratBonus&&p.stratBonus.upkeepDiscount)||0)-(hasSpec(p,'upkeep_e_disc')?1:0));
   if(p.investBonus2&&(p.investBonus2.freeUpkeep||0)>0){upE=0;upM=0;}
   g.energy-=upE; g.materials-=upM;
   const nr=p.routes.length; if(!hasSpec(p,'route_force_free')) g.energy-=nr; g.materials+=nr; // route : −1⚡ +1🪨
@@ -3426,14 +3483,11 @@ function doRevenues(){
       // v18 : bonus moral RÉCURRENT par niveau — Nv2 +1<i class=ri-morale></i>/tour, Nv3 +2<i class=ri-morale></i>/tour
       if(col.level>=3)gains.morale=(gains.morale||0)+2;
       else if(col.level>=2)gains.morale=(gains.morale||0)+1;
-      // Biosphère Avancée : +1<i class=ri-materials></i>/tour par colonie connectée
-      if(hasSpec(p,'bio2_bonus'))gains.materials=(gains.materials||0)+1;
-      // Terraformation : +1<i class=ri-materials></i> +1<i class=ri-morale></i>/tour par colonie connectée
-      if(hasSpec(p,'terra3')){gains.materials=(gains.materials||0)+1;gains.morale=(gains.morale||0)+1;}
+      // Terraformation : +1🪨 +1❤️/tour par colonie de NIVEAU 2 OU 3 (plus au niveau 1)
+      if(hasSpec(p,'terra3')&&(col.level||1)>=2){gains.materials=(gains.materials||0)+1;gains.morale=(gains.morale||0)+1;}
       // Hub technologique : savoir par niveau (conservé pour ne pas assécher la science)
       if(col.level>=3)gains.science=(gains.science||0)+2;
       else if(col.level>=2)gains.science=(gains.science||0)+1;
-      if(p.civ.id==='jupiteriens'&&['io','europe','ganymede','callisto'].includes(col.nodeId))gains.energy=(gains.energy||0)+1;
       // (Retiré : plus de jeton Force par nœud stratégique/tour. Désormais +1 jeton UNE FOIS à l'acquisition d'une colonie.)
     }
     // Accord commercial actif : +1<i class=ri-materials></i> +1<i class=ri-morale></i> par accord (les deux nations)
@@ -3443,6 +3497,11 @@ function doRevenues(){
       if(p===G.player)addLog('🤝 Accord commercial : +'+G.commercialAccords.length+'<i class=ri-materials></i> +'+G.commercialAccords.length+'<i class=ri-morale></i>','dim');
     }
     if(p.civ.id==='ceinturiens')gains.energy=(gains.energy||0)+1; // réserves de la ceinture
+    /* JUPITÉRIENS (règle de Marc, 2026-08-07) : +1⚡/tour dès le premier tour, quel que soit le
+       nombre de colonies. Remplace l'ancien « +1⚡ par colonie jovienne », qui récompensait
+       l'expansion deux fois — une fois par les ressources du nœud, une fois par le pouvoir — et
+       rendait la nation d'autant plus forte qu'elle était déjà en avance. */
+    if(p.civ.id==='jupiteriens')gains.energy=(gains.energy||0)+1;  // réacteurs joviens
     for(const[r,a]of Object.entries(p.rpt))gains[r]=(gains[r]||0)+a;
     // Bonus investissement Niv.1 (actif si turnsLeft > 0 ou non défini)
     if(p.investBonus&&(p.investBonus.turnsLeft===undefined||p.investBonus.turnsLeft>0)){
@@ -3728,7 +3787,6 @@ function colonizeCost(p){
   let ac=1,mat=2,en=1;
   if(p.civ.id==='martiens'){mat=Math.max(0,mat-1);en=Math.max(0,en-1);}
   if(hasSpec(p,'col_mat_disc'))mat=Math.max(0,mat-1);
-  if(hasSpec(p,'col_e_disc'))en=Math.max(0,en-1);
   let _useStrat=false;
   if(p.stratBonus&&p.stratBonus.spec==='strat_col_ac'&&!p._stratColUsed){ac=Math.max(0,ac-1);_useStrat=true;}
   if(p.stratBonus&&p.stratBonus.spec==='strat_col_free'&&!p._stratColUsed){mat=0;en=0;_useStrat=true;}
@@ -5795,12 +5853,12 @@ const MAP_RAD={jorbital1:42,saturne:54,uranus:30,neptune:30,venus:26,terre:26,ma
 function mrad(id){return MAP_RAD[id]||14;}
 const MAP_HOMECOL={'Terriens':'#4CAF50','Jupitériens':'#FF9800','Ceinturiens':'#AB47BC','Martiens':'#ef5350'};
 const MAP_DECOR={mercure:'Mercure',venus:'Vénus',terre:'Terre',mars:'Mars',saturne:'Saturne',uranus:'Uranus',neptune:'Neptune'};
-const MAP_CAPITAL={terre:'Terriens',mars:'Martiens',jorbital1:'Jupitériens',eris:'Ceinturiens'};
+const MAP_CAPITAL={terre:'Terriens',mars:'Martiens',io:'Jupitériens',eris:'Ceinturiens'};   // la base jovienne est Io, plus la station
 // planète décor-capitale → nœud jouable (QG) qu'elle représente, pour la rendre cliquable
 const MAP_CAPITAL_NODE={terre:'lune',mars:'phobos'};
 // durées de trajet (par arête, ids triés) — voie commerciale ∝ temps
 const MAP_ROUTE_TIME={'lune|phobos':'~7 mois','ceres|lune':'~1 an','ceres|phobos':'~8 mois',
- 'europe|io':'~5 j','ganymede|io':'~8 j','callisto|europe':'~6 j','europe|jorbital1':'~5 j','callisto|ganymede':'~7 j','ganymede|jorbital1':'~8 j','ganymede|vesta':'≈ mois',
+ 'europe|io':'~5 j','ganymede|io':'~8 j','callisto|europe':'~6 j','callisto|ganymede':'~7 j','ganymede|vesta':'≈ mois',
  'encelade|titan':'~5 j','pluto|triton':'~ans','eris|pluto':'~ans',
  'ceres|io':'~1 an','ceres|vesta':'~1 an','ganymede|titan':'~2 ans','callisto|titan':'~2 ans','titan|triton':'~3 ans'};
 function routeTime(a,b){return MAP_ROUTE_TIME[[a,b].sort().join('|')]||'';}
@@ -5849,7 +5907,7 @@ const MAP_HOTSPOTS=[
  {x:134,y:232,r:18,label:'Vénus',lp:'below',sector:'interne',node:'lune'},
  {x:186,y:306,r:20,label:'Terre',lp:'right',sector:'interne',node:'lune'},
  {x:253,y:305,r:19,label:'Mars',lp:'right',sector:'interne',node:'phobos'},
- {x:305,y:231,r:26,label:'Jupiter',lp:'below',sector:'jupiter',node:'jorbital1'},
+ {x:305,y:231,r:26,label:'Jupiter',lp:'below',sector:'jupiter',node:'io'},   // ouvre la vue jovienne sur Io, la vraie base
  {x:128,y:354,r:26,label:'Saturne',lp:'below',sector:'saturne',node:'titan'},
  {x:138,y:127,r:20,label:'Uranus',lp:'right',sector:'externe',node:'triton'},
  {x:288,y:408,r:20,label:'Neptune',lp:'right',sector:'externe',node:'triton'},

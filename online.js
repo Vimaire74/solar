@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-07 · v9.8';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
+const SOLAR_BUILD_JS = '2026-08-08 · v9.15';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :
@@ -1484,7 +1484,10 @@ function askLocalDecision(pending){
       const optName=(id)=>{ const op=opts.find(x=>x.id===id); return op?((op.emoji||'')+' '+op.name):id; };
       body += '<div class="muted" style="margin:2px 0 8px">Choix adverses : '+o.ai.map(a=>a.civ+' → '+optName(a.pick)).join(' · ')+'</div>';
     }
-    if(k==='strategy' && o.rank){ body += '<div class="muted" style="margin-bottom:6px">Ton rang d\'initiative : '+o.rank+'/'+(o.total||'?')+'</div>'; }
+    /* La phrase vient du MOTEUR (`payload.phrase`) : solo et en ligne ne peuvent donc pas dire deux
+       choses différentes. Et « rang d'initiative » était faux de toute façon — l'ordre du draft va du
+       plus faible au plus fort, il n'a rien à voir avec l'initiative du tour. */
+    if(k==='strategy' && (o.phrase||o.rank)){ body += '<div class="muted" style="margin-bottom:6px">'+(o.phrase||('Tu choisis en '+o.rank+'/'+(o.total||'?')))+'</div>'; }
     // Chaque option : nom + (bénéfice/contrepartie pour invest, effet tension pour stratégie, desc sinon)
     body += opts.map((op,i)=>{
       let sub='';
