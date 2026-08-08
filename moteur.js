@@ -5733,6 +5733,7 @@ function renderSystemMap(){
     ng.innerHTML+=`<g style="cursor:pointer" onclick="handleNodeClick('${id}')">${glow}${body}${rings}<circle cx="${node.x}" cy="${node.y}" r="${Math.max(br,12)}" fill="transparent"/><text x="${node.x}" y="${node.y+br+11}" text-anchor="middle" font-size="10" font-weight="600" paint-order="stroke" stroke="#04060f" stroke-width="2.6" fill="${isOrbital?'#FFD08a':'#e6eeff'}">${node.name}</text>${node.baseVP>0?`<text x="${node.x}" y="${node.y+br+19}" text-anchor="middle" font-size="7" fill="#6070a0">${node.baseVP}VP</text>`:''}</g>`;
   }
   if(typeof uiMapMarkers==='function')uiMapMarkers();
+  try{ if(typeof uiMapFit==='function') setTimeout(uiMapFit,0); }catch(e){}
 }
 /* ============ NOUVELLE CARTE : vue globale (image) + vues secteur ============ */
 const MAP_RAD={jorbital1:42,saturne:54,uranus:30,neptune:30,venus:26,terre:26,mars:19,mercure:16,
@@ -5804,9 +5805,8 @@ function scrollToNode(nodeId){
   try{ wrap.scrollTo({left,top,behavior:'smooth'}); }catch(e){ wrap.scrollLeft=left; wrap.scrollTop=top; }
 }
 function renderMap(){
-  /* La colonne du jeu s'élargit quand l'onglet Carte est affiché (voir `body.vue-carte` dans
-     index.html). On le vérifie ICI et pas seulement au clic d'onglet : au tout premier affichage,
-     la partie démarre sur la carte sans passer par `uiTab`, et la carte serait restée à l'étroit. */
+  // La colonne s'élargit sur l'onglet Carte : on le vérifie ici aussi, car la partie démarre sur la
+  // carte sans passer par `uiTab` (sinon elle resterait à l'étroit au tout premier affichage).
   try{ document.body.classList.toggle('vue-carte', !!document.querySelector('#mp-map.active')); }catch(e){}
   const svg=document.getElementById('solar-svg'); const wrap=document.getElementById('map-wrap');
   const bg=document.getElementById('map-bg-img'); const ng=document.getElementById('nodes-g');
@@ -5818,9 +5818,9 @@ function renderMap(){
     for(const gid of ['stars','connections','routes-ai','routes-p','pirates-g']){const g=document.getElementById(gid);if(g)g.innerHTML='';}
     if(bg)bg.style.display='';
     if(ng)ng.innerHTML=mapGlobalSVG();
+    try{ if(typeof uiMapFit==='function') setTimeout(uiMapFit,0); }catch(e){}   // vue globale : ajuster aussi
     // On remesure APRÈS le rendu : la vue vient peut-être de changer de largeur.
-    try{ if(typeof uiApplyMZ==='function') setTimeout(uiApplyMZ,0); }catch(e){}
-    return;
+      return;
   }
   // 2e carte : système entier scrollable (dessin index.html), centré sur la planète cliquée
   if(wrap)wrap.classList.add('mapzoom');

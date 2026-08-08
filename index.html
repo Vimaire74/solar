@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-07 · v9.1';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-07 · v9.4';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -559,16 +559,12 @@ body{max-width:var(--appw,480px);margin:0 auto;height:100dvh;height:100vh;positi
    toucher au reste de la mise en page. `calc(50% - 50vw)` est la marge négative qui
    ramène le bord gauche du bloc au bord gauche de l'écran, quelle que soit la
    largeur de la colonne — donc valable sur téléphone, tablette et ordinateur. */
-/* ⚠️ POURQUOI MA PREMIÈRE TENTATIVE N'A RIEN CHANGÉ.
-   J'avais élargi le cadre de la carte à `100vw` avec des marges négatives. Techniquement correct,
-   mais `body` porte `overflow:hidden` : tout ce qui dépasse de la colonne de 480 px est COUPÉ. La
-   carte était bien large de 100vw — on n'en voyait que les 480 px du milieu. Corriger le symptôme
-   sans vérifier ce qui le contient, c'est ce qui m'a fait perdre un aller-retour.
-   On élargit donc la COLONNE elle-même, et seulement quand l'onglet Carte est affiché : le reste du
-   temps le jeu garde sa mise en page téléphone, où elle est juste. */
-body.vue-carte{max-width:100vw;}
+/* La carte prend toute la largeur de la fenêtre ; les menus et les cartes tech gardent la colonne
+   étroite, où leur mise en page a été pensée. Élargir le CADRE seul ne servait à rien : `body` porte
+   `overflow:hidden` et coupait tout ce qui dépassait de la colonne. */
+body.vue-carte{--appw:100vw;}
 body.vue-carte #top-bar,body.vue-carte #bottom-bar{border-radius:0;}
-#mp-map.active{position:relative;}   /* repère pour les boutons de zoom */
+#mp-map.active{position:relative;}   /* repère pour les boutons de zoom, ancrés au panneau */
 /* ⚠️ NE PAS METTRE `#map-wrap` EN `grid` (ni en `flex`).
    J'avais essayé, pour centrer la carte après un dézoom. Mais la carte se dimensionne avec
    `height:100%` du cadre : dans une grille, la hauteur de la piste dépend du contenu, et le
@@ -604,19 +600,39 @@ body.vue-carte #top-bar,body.vue-carte #bottom-bar{border-radius:0;}
    le travail, et il le fait bien. À 1× tout est visible ; au-delà, le cadre défile.
    Rien d'autre ne dépend de la taille de la carte : les nœuds sont placés en coordonnées du
    `viewBox`, pas en pixels. Agrandir ne casse donc rien — c'était le sens de ta question. */
-/* ⚠️ LA TAILLE DE LA CARTE EST CALCULÉE EN JAVASCRIPT (`uiApplyMZ`), PAS ICI.
-   Trois tentatives en CSS, trois échecs, dont un qui a rendu la carte inaccessible :
-     · `height:100%` → retombe en `auto` si le cadre n'a pas de hauteur définie ;
-     · `aspect-ratio` sur un seul axe → l'autre axe explose quand on élargit ;
-     · `position:absolute` → le cadre n'a plus de contenu en flux, et selon la chaîne de
-       conteneurs il peut se réduire à rien.
-   Je ne vois pas le rendu : continuer à raisonner sur des règles que je ne peux pas observer, c'est
-   ce qui a fait perdre trois allers-retours. On MESURE donc le cadre et on pose les pixels. Une
-   mesure ne peut pas « retomber en auto » ni dépendre de la chaîne de conteneurs. */
-#solar-svg{display:block;margin:0 auto;transition:none;}
+/* ⚠️ RETOUR À LA RÈGLE D'ORIGINE — 2026-08-07.
+   J'ai tenté quatre variantes pour que la carte occupe tout l'écran : `aspect-ratio` sur les deux
+   axes, hauteur en pourcentage, `position:absolute`, puis un calcul en pixels en JavaScript. Aucune
+   n'a marché, et les deux dernières ont cassé l'affichage — carte globale zoomée à l'extrême, carte
+   tactique entièrement noire (captures de Marc). Je ne vois pas le rendu : je corrigeais à l'aveugle
+   une chose que je ne pouvais pas observer, et chaque essai coûtait un aller-retour.
+   On remet donc EXACTEMENT ce qui fonctionnait. L'élargissement de la carte reste à faire, mais il
+   demande de pouvoir vérifier le résultat, pas de deviner. */
+/* ═══ MESURE RÉELLE (console de Marc, v9.1, vue tactique) ═══════════════════
+     cadre 1211 × 1816 px · viewBox « 0 175 2020 490 » (ratio 4,1:1)
+   Le CADRE faisait 1816 px de haut alors que la fenêtre en fait ~900 : il n'a jamais été borné par
+   l'écran. Le dessin, mis à l'échelle pour tenir (0,6×), mesurait 1211 × 294 px et se retrouvait
+   CENTRÉ VERTICALEMENT dans ces 1816 px — donc dessiné vers y≈760, largement sous le bas de la
+   fenêtre. D'où l'écran noir : la carte était là, en dessous.
+   C'est aussi pourquoi `height:100%` était capricieux : la hauteur du parent dépendait de son
+   contenu, donc d'elle-même. On la FIXE maintenant à la place réellement visible, entre les deux
+   barres, dont les hauteurs sont déjà mesurées par `uiSyncBands()`. */
+/* ⚠️ LA HAUTEUR DISPONIBLE EST MESURÉE, PAS CALCULÉE.
+   Ma formule `100dvh − barre du haut − barre du bas` OUBLIAIT deux choses : le `padding` de 10 px
+   du corps de page, et `env(safe-area-inset-bottom)` — la zone réservée à la barre d'accueil des
+   iPhone, jusqu'à 34 px. Le cadre aurait donc débordé d'une cinquantaine de pixels sur mobile, et
+   le bas de la carte se serait fait couper : exactement le défaut d'affichage à ne pas introduire.
+   Plutôt que d'allonger la formule — il y aurait toujours un terme oublié —, `uiMapFit()` MESURE
+   l'espace réellement libre entre le haut du cadre et le sommet de la barre du bas. Une mesure
+   n'oublie rien, sur aucun appareil.
+   Le `max-height` ci-dessous n'est qu'un garde-fou pour le tout premier rendu, avant la mesure. */
+#mp-map.active #map-wrap{max-height:calc(100dvh - var(--topband,56px) - var(--botband,84px) - 20px - env(safe-area-inset-bottom,0px));}
+/* Les deux dimensions sont données au dessin ; `preserveAspectRatio="xMidYMid meet"` (déjà sur la
+   balise <svg>) le met à l'échelle pour qu'il tienne ENTIER, centré, sans déformation. À 1× tout
+   est visible ; au-delà, la boîte dépasse et le cadre défile. */
+#solar-svg{display:block;width:100%;height:100%;min-height:0;margin:0 auto;transition:none;}   /* repli : la taille exacte est posée par uiMapFit() */
 /* 2e carte (système entier index, scrollable) : SVG large 980x320 */
-/* (l'ancienne règle `.mapzoom` qui forçait `aspect-ratio` + `width:auto` est supprimée :
-   c'est elle qui empêchait la carte de tenir dans son cadre.) */
+/* (plus de règle spéciale `.mapzoom` : les deux vues suivent la même, ci-dessus.) */
 #map-back{display:none;position:absolute;top:8px;left:8px;z-index:6;padding:6px 13px;border-radius:16px;background:#13203f;border:1px solid #33509a;color:#bcd0ff;font-weight:700;font-size:.82em;cursor:pointer;}
 #map-wrap.mapzoom #map-back{display:block;}
 #map-wrap.mapzoom .panel-nav{display:none!important;}
@@ -1436,8 +1452,7 @@ function uiTab(name){
     // où leur mise en page a été pensée. C'est le seul moyen d'élargir sans tout déformer.
     document.body.classList.toggle('vue-carte', name==='map');
     try{ uiSyncBands(); }catch(e){}
-    // La largeur du cadre vient de changer (colonne élargie ou non) : on remesure.
-    if(name==='map') setTimeout(function(){ try{ uiApplyMZ(); }catch(e){} }, 0);
+    if(name==='map') setTimeout(function(){ try{ uiMapFit(); }catch(e){} },0);
     if(G&&G.player){
       if(name==='tech')renderTechTree();
       else if(name==='map')renderMap();
@@ -1454,35 +1469,38 @@ getTechAreaMode=function(){return 'full';};
 
 /* --- Zoom carte : 1× = carte remplit la HAUTEUR dispo (scroll horizontal), jusqu'à 4× --- */
 var uiMZ=1;
+/* Borne le cadre de la carte à l'espace VRAIMENT libre, puis met le dessin à cette taille.
+   Deux mesures, aucune formule : `getBoundingClientRect()` rend des pixels à l'écran, marges et
+   zones de sécurité déjà déduites. Rendue tolérante : si une mesure est absurde (page pas encore
+   disposée), on ne touche à rien plutôt que de poser une valeur fausse. */
+function uiMapFit(){
+  try{
+    var wrap=document.getElementById('map-wrap'), svg=document.getElementById('solar-svg');
+    if(!wrap||!svg) return;
+    var bas=document.getElementById('bottom-bar');
+    var haut=wrap.getBoundingClientRect().top;
+    var plancher=(bas&&bas.offsetHeight)?bas.getBoundingClientRect().top:window.innerHeight;
+    var dispo=Math.floor(plancher-haut);
+    if(dispo>80){ wrap.style.maxHeight=dispo+'px'; wrap.style.height=dispo+'px'; }
+    var w=wrap.clientWidth||0, h=wrap.clientHeight||0;
+    if(w>40&&h>40){ svg.style.width=Math.round(w*uiMZ)+'px'; svg.style.height=Math.round(h*uiMZ)+'px'; }
+  }catch(e){}
+}
 function uiApplyMZ(){
   var wrap=document.getElementById('map-wrap');
   if(wrap)wrap.style.setProperty('--mz',uiMZ);
-  /* ON MESURE, ON POSE. `clientWidth/clientHeight` sont la taille INTÉRIEURE réelle du cadre, une
-     fois la mise en page faite : aucune ambiguïté possible. Le `<svg>` porte
-     `preserveAspectRatio="xMidYMid meet"`, donc à 1× le dessin tient ENTIER dans ces dimensions,
-     centré, sans déformation — quelle que soit la vue (globale en portrait, tactique en paysage).
-     Au-delà de 1×, la boîte dépasse le cadre et celui-ci défile. */
-  var svg=document.getElementById('solar-svg');
-  if(wrap&&svg){
-    var w=wrap.clientWidth||0, h=wrap.clientHeight||0;
-    if(w>0&&h>0){ svg.style.width=Math.round(w*uiMZ)+'px'; svg.style.height=Math.round(h*uiMZ)+'px'; }
-  }
+  uiMapFit();
   var lbl=document.getElementById('panel-label');
   if(lbl)lbl.textContent='Zoom '+uiMZ.toFixed(1).replace(/\.0$/,'')+'×';
   var l2=document.getElementById('mz-lbl');
   if(l2)l2.textContent=uiMZ.toFixed(1).replace(/\.0$/,'')+'×';
 }
 function uiZoom(d){
-  /* ⚠️ LE DÉZOOM S'ARRÊTAIT À 1×, ET 1× VEUT DIRE « la carte remplit la HAUTEUR ».
-     Sur un écran large, la carte fait alors quatre fois la largeur du cadre : impossible
-     de voir le système entier, et le bouton « − » ne faisait plus rien une fois à 1×.
-     On descend maintenant jusqu'à 0,3× — de quoi embrasser tout le système d'un coup —
-     avec un pas plus fin en bas de l'échelle, où chaque cran compte davantage. */
-  /* Depuis que la carte TIENT dans son cadre à 1×, « dézoomer » n'a plus de sens en dessous :
-     à 1× le système entier est déjà visible. L'échelle repart donc de 1 à 4. */
+  /* Échelle d'origine : 1× = la carte remplit la hauteur du cadre, jusqu'à 4×. */
   uiMZ=Math.max(1,Math.min(4,Math.round((uiMZ+d*0.5)*10)/10));
   uiApplyMZ();
 }
+
 
 /* Mesure la HAUTEUR des barres (ancrées en position:fixed) → le contenu central
    est calé entre les deux (padding de #game-wrap) et les modales s'y inscrivent.
@@ -1531,7 +1549,8 @@ if(window.visualViewport){
   window.visualViewport.addEventListener('scroll',syncFixedBars);
 }
 setAppHeight();
-try{ window.addEventListener('resize',function(){ try{ uiApplyMZ(); }catch(e){} }); }catch(e){}
+try{ window.addEventListener('resize',function(){ try{ uiMapFit(); }catch(e){} }); 
+      if(window.visualViewport)window.visualViewport.addEventListener('resize',function(){ try{ uiMapFit(); }catch(e){} }); }catch(e){}
 /* La carte affiche TOUJOURS le système entier (viewBox complet) + les "+" de route par-dessus tout */
 /* Vue carte : affiche toujours le système entier (viewBox complet) + zoom,
    puis dessine les "+" de création de route PAR-DESSUS tout (dans nodes-g). */
