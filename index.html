@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-07 · v9.4';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-07 · v9.8';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -546,7 +546,14 @@ body{max-width:var(--appw,480px);margin:0 auto;height:100dvh;height:100vh;positi
 #m-content{flex:1;min-height:0;overflow:hidden;position:relative;}
 /* padding-bottom : sans lui, le DERNIER bloc d'un panneau (ex. la 2e nation dans Empire, le bas de
    Diplomatie) restait masqué sous la barre du bas et le défilement ne descendait pas plus loin. */
-.m-panel{position:absolute;inset:0;overflow-y:auto;display:none;padding-bottom:96px;-webkit-overflow-scrolling:touch;}
+/* ⚠️ LA RÉSERVE DU BAS DOIT SUIVRE LA VRAIE HAUTEUR DE LA BARRE.
+   Elle valait 96 px en dur. Or la barre du bas mesure ~84 px et s'ajoute à la zone réservée de
+   l'iPhone (`env(safe-area-inset-bottom)`, jusqu'à 34 px) : la réserve manquait donc d'une
+   vingtaine de pixels sur mobile, et la dernière carte tech, la dernière ligne du journal, le bas
+   d'Empire et de Diplo restaient sous la barre, inatteignables au défilement.
+   Elle se calcule maintenant sur la hauteur MESURÉE de la barre (`--botband`, posée par
+   `uiSyncBands()`), plus la zone de sécurité, plus 28 px d'air pour qu'on voie bien que c'est fini. */
+.m-panel{position:absolute;inset:0;overflow-y:auto;display:none;padding-bottom:calc(var(--botband,84px) + env(safe-area-inset-bottom,0px) + 28px);-webkit-overflow-scrolling:touch;}
 .m-panel.active{display:block;}
 
 /* ═══ LA CARTE PREND TOUTE LA PLACE DISPONIBLE ═══════════════════════════════
@@ -651,7 +658,10 @@ body.vue-carte #top-bar,body.vue-carte #bottom-bar{border-radius:0;}
 .npop-btn{padding:11px 12px;font-size:.95em;}
 
 /* ---------- Onglet Techs ---------- */
-#mp-tech{padding:0;}
+/* ⚠️ CETTE LIGNE ANNULAIT LA RÉSERVE DU BAS. `padding:0` écrase le `padding-bottom` de `.m-panel`
+   — c'est pour cela que les cartes tech étaient les plus visiblement coupées des cinq onglets.
+   On ne remet donc à zéro que les côtés, et on garde la réserve en bas. */
+#mp-tech{padding:0 0 calc(var(--botband,84px) + env(safe-area-inset-bottom,0px) + 28px);}
 #mp-tech.active{display:flex;flex-direction:column;}
 #tech-area{height:auto!important;max-height:none!important;min-height:0!important;flex:1;border-top:none;}
 #tech-handle{display:none;}
@@ -698,7 +708,7 @@ body.vue-carte #top-bar,body.vue-carte #bottom-bar{border-radius:0;}
 .rbox .rv{font-size:1.1em;}
 
 /* ---------- Onglet Diplo (ex left-panel war/events) ---------- */
-#mp-diplo{background:#0a0a22;padding:2px;}
+#mp-diplo{background:#0a0a22;padding:2px 2px calc(var(--botband,84px) + env(safe-area-inset-bottom,0px) + 28px);}   /* idem : `padding:2px` écrasait la réserve du bas */
 #left-panel{width:auto!important;border-right:none;overflow:visible;}
 /* Diplomatie : 2 mini-barres par nation */
 .dip-help{font-size:.62em;color:#6a7a98;margin:2px 2px 8px;line-height:1.4;}
@@ -945,9 +955,17 @@ function lvEye(){
 function lvShowBuild(){
   try{
     const el=document.getElementById('lv-build'); if(!el)return;
-    const h=window.SOLAR_BUILD_HTML||null, j=window.SOLAR_BUILD_JS||null;
-    if(h&&j&&h!==j) el.innerHTML='<span style="color:#ff8a8a">Versions incohérentes — jeu : '+h+' · en ligne : '+j+'</span>';
-    else el.textContent='Version '+(h||'inconnue');
+    /* LES TROIS FICHIERS SONT COMPARÉS, pas deux. `moteur.js` — qui contient toutes les règles —
+       n'avait aucun marqueur : on pouvait donc tourner avec un moteur vieux de plusieurs versions
+       sans qu'aucun écran ne le dise. C'est ce qui a rendu indécidable le compte des cartes
+       Stratégie. Si l'un des trois diffère, on nomme LEQUEL. */
+    const h=window.SOLAR_BUILD_HTML||null, j=window.SOLAR_BUILD_JS||null, m=window.SOLAR_BUILD_MOTEUR||null;
+    const parts=[['page',h],['en ligne',j],['moteur',m]].filter(x=>x[1]);
+    const distinctes=[...new Set(parts.map(x=>x[1]))];
+    if(distinctes.length>1)
+      el.innerHTML='<span style="color:#ff8a8a">Versions incohérentes — '
+        +parts.map(x=>x[0]+' : '+x[1]).join(' · ')+' — recharge (Cmd+Maj+R) ou renvoie les fichiers manquants</span>';
+    else el.textContent='Version '+(h||m||'inconnue');
   }catch(e){}
 }
 // Auto-connexion au chargement si « se souvenir de moi » était coché et la session serveur est encore valide.
@@ -1052,7 +1070,10 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
           <filter id="glow2"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         </defs>
         <rect width="400" height="600" fill="url(#bg-grad)"/>
-        <image id="map-bg-img" href="assets/map/global.png" xlink:href="assets/map/global.png" x="0" y="0" width="400" height="600" preserveAspectRatio="xMidYMid slice"/>
+        <!-- Carte globale : `global2.webp` (2048 × 3072, rapport 2:3 exact, 677 Ko). Le WebP pèse trois
+           fois moins que le PNG d'origine (7,3 Mo) pour un rendu identique ; `global2.jpg` sert de repli
+           aux très vieux navigateurs. ⚠️ Changer ce dessin oblige à recalculer MAP_HOTSPOTS (moteur.js). -->
+        <image id="map-bg-img" href="assets/map/global2.webp" xlink:href="assets/map/global2.webp" x="0" y="0" width="400" height="600" preserveAspectRatio="xMidYMid slice"/>
         <g id="stars"></g>
         <g id="connections"></g>
         <g id="routes-ai"></g>

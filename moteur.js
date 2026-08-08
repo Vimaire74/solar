@@ -1,3 +1,11 @@
+/* ⚠️ MARQUEUR DE VERSION — À TENIR À JOUR À CHAQUE ENVOI.
+   `moteur.js` n'en avait AUCUN. Conséquence vécue le 2026-08-07 : Marc constate 3 cartes Stratégie
+   là où le code en prévoit 5, et il est impossible de dire si le code fautif est celui qu'on lit ou
+   une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
+   identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
+   compare : si l'un des trois diffère, il l'affiche en rouge. */
+const SOLAR_BUILD_MOTEUR = '2026-08-07 · v9.8';
+try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
    ----------------------------------------------------------------------------
@@ -1900,11 +1908,31 @@ function _runStrategyDraftAfterAnnounce(){
      réalité l'ordre naturel des nations, et la règle du plus faible n'était plus appliquée depuis
      que `calcVP` a cessé de rendre un simple nombre (rétablissement du détail des VP).
      Le `.total` est donc indispensable — c'est lui, le classement. */
+  /* ORDRE EXACT DEMANDÉ PAR MARC (2026-08-07), du plus faible au plus fort, dans cet ordre de
+     départage — chaque critère ne servant qu'en cas d'égalité parfaite sur le précédent :
+        1. moins de points de victoire        2. moins de jetons militaires
+        3. moins de colonies                  4. moins de routes
+        5. moins de revenu (matériaux + énergie)
+     Les deux derniers critères manquaient : à égalité de VP et de jetons — fréquent au tour 1, où
+     tout le monde est à 0 — l'ordre retombait sur l'ordre de déclaration des nations, c'est-à-dire
+     le joueur local en premier. Ce n'était pas « le plus faible d'abord », c'était « toi d'abord ». */
+  const _revenu=p=>{
+    try{ if(typeof _netIncome==='function'){ const n=_netIncome(p)||{}; return (n.materials||0)+(n.energy||0); } }catch(e){}
+    return ((p.rpt&&p.rpt.materials)||0)+((p.rpt&&p.rpt.energy)||0);
+  };
+  const _criteres=p=>[calcVP(p).total,(p.forceTokens||0),(p.colonies||[]).length,(p.routes||[]).length,_revenu(p)];
   const order=nations.slice().sort((a,b)=>{
-    const va=calcVP(a).total, vb=calcVP(b).total;
-    if(va!==vb) return va-vb;                                   // moins de VP → choisit avant
-    return (a.forceTokens||0)-(b.forceTokens||0);               // à égalité : le moins armé d'abord
+    const ca=_criteres(a), cb=_criteres(b);
+    for(let i=0;i<ca.length;i++) if(ca[i]!==cb[i]) return ca[i]-cb[i];   // croissant : le plus faible choisit avant
+    return 0;
   });
+  /* L'ordre est ÉCRIT dans le journal : c'était invérifiable, donc indiscutable dans les deux sens.
+     Marc : « y a toujours un bug sur la détermination du joueur le plus faible » — sans trace, ni
+     lui ni moi ne pouvions le prouver. Maintenant si l'ordre est faux, il se voit. */
+  try{
+    addLog('🃏 Ordre du draft Stratégie (du plus faible au plus fort) : '
+      + order.map((p,i)=>(i+1)+'. '+p.civ.name+' ('+calcVP(p).total+' VP, '+(p.forceTokens||0)+'⚔️)').join(' · '),'dim');
+  }catch(e){}
   /* TAILLE DE LA PIOCHE — constante à tous les tours (choix de Marc, 2026-08-07 : option « b »).
      AVANT : `nations + (tour===1 ? 3 : 2)`. La pioche perdait donc une carte entre le tour 1 et le
      tour 2, et ne la retrouvait jamais. Marc, en voyant le choix rétrécir : « j'ai demandé ça
@@ -1915,6 +1943,9 @@ function _runStrategyDraftAfterAnnounce(){
      pioche DE DÉPART rétrécisse d'un tour à l'autre. */
   const poolSize=Math.min(STRATEGY_CARDS.length, nations.length+2);
   G._stratPool=shuffle([...STRATEGY_CARDS]).slice(0,poolSize);
+  // Tracé aussi : « je vois 3 cartes » et « le code en prépare 5 » ne peuvent plus rester une
+  // discussion d'opinion. Si le journal dit 5 et que l'écran en montre 3, le défaut est APRÈS ici.
+  try{ addLog('🃏 Pioche Stratégie : '+poolSize+' cartes pour '+nations.length+' nations ('+nations.length+' + 2, plafonné à '+STRATEGY_CARDS.length+').','dim'); }catch(e){}
   G._stratOrder=order;
   G._stratPlayerRank=order.indexOf(G.player)+1;G._stratTotal=order.length;
   G.ais.forEach(a=>a._draftedStrat=null);
@@ -2004,7 +2035,22 @@ function _tensionMiniHtml(){
 }
 function showStrategyModal(){
   if(typeof _ilHide==='function')_ilHide();
-  const pool=G._stratPool||shuffle([...STRATEGY_CARDS]).slice(0,3);
+  /* ⚠️ CE REPLI MENTAIT, ET C'EST PROBABLEMENT LE DÉFAUT VU PAR MARC.
+     Il valait `slice(0,3)` : si `G._stratPool` était absent pour une raison quelconque, la fenêtre
+     affichait TROIS cartes tirées au hasard — un nombre qui n'a aucun fondement dans les règles —
+     sans le moindre avertissement. Et juste en dessous, `G._stratPlayerRank||1` affichait « 1er ».
+     Les deux symptômes rapportés (« il n'y a que 3 choix » et « c'était marqué 1er sur 3 ») sont
+     exactement ce que produit ce repli. Il fabriquait une partie plausible mais fausse.
+     Désormais : on reconstruit une pioche de la BONNE taille (nations + 2), et on l'écrit dans le
+     journal. Un repli doit être bruyant, jamais crédible. */
+  let pool=G._stratPool;
+  if(!Array.isArray(pool)||!pool.length){
+    const _n=[G.player].concat(G.ais||[]).length;
+    const _t=Math.min(STRATEGY_CARDS.length,_n+2);
+    pool=shuffle([...STRATEGY_CARDS]).slice(0,_t);
+    G._stratPool=pool;
+    try{ addLog('⚠️ Pioche Stratégie absente au moment de l\'affichage — reconstruite à '+_t+' cartes ('+_n+' nations + 2). À signaler : le draft n\'a pas été préparé normalement.','red'); }catch(e){}
+  }
   const el=document.getElementById('strat-options');
   el.innerHTML=pool.map(c=>`<div class="strat-opt" id="strat-opt-${c.id}" onclick="selectStrategy('${c.id}')">
     <div class="so-emoji">${c.emoji}</div>
@@ -2012,8 +2058,15 @@ function showStrategyModal(){
     <div class="so-desc">${c.desc}</div>
   </div>`).join('');
   _selectedStratId=null;const _scb=document.getElementById('strat-confirm-btn');if(_scb)_scb.disabled=true;
-  const rank=G._stratPlayerRank||1,total=G._stratTotal||([G.player,...G.ais].length);
-  document.getElementById('strat-sub').innerHTML='Draft : à toi en '+rank+(rank===1?'er':'e')+'/'+total+'.'+_tensionMiniHtml();
+  /* Le rang ne se DEVINE pas : `||1` affichait « 1er » quand l'information manquait, ce qui est la
+     pire valeur possible — c'est celle qu'on croit sur parole. On le recalcule, et à défaut on dit
+     franchement qu'on ne sait pas. */
+  const _tous=[G.player].concat(G.ais||[]);
+  let rank=G._stratPlayerRank;
+  if(!rank&&Array.isArray(G._stratOrder)){ const i=G._stratOrder.indexOf(G.player); if(i>=0) rank=i+1; }
+  const total=G._stratTotal||_tous.length;
+  const rangTxt=rank?(rank+(rank===1?'er':'e')+'/'+total):('position inconnue sur '+total);
+  document.getElementById('strat-sub').innerHTML='Draft : à toi en '+rangTxt+' — '+pool.length+' carte(s) proposée(s).'+_tensionMiniHtml();
   document.getElementById('strategy-modal').classList.remove('hidden');
   if(typeof _syncEndBtn==='function')_syncEndBtn();
 }
@@ -5780,30 +5833,69 @@ const MAP_SECTORS={
    nexus:[{fromNode:'triton',toNode:'titan',to:'saturne',next:'Titan',xy:[36,300]}],
    band:{a:[55,398],b:[362,500],w:64,n:62,warm:false,name:'Ceinture de Kuiper',lab:[210,556]}},
 };
+/* ─── ZONES CLIQUABLES DE LA CARTE GLOBALE ────────────────────────────────────
+   Coordonnées dans l'espace du `viewBox` (400 × 600), pas en pixels : elles ne dépendent donc pas
+   de la taille d'affichage, mais elles dépendent du CADRAGE du dessin.
+   RECALCULÉES le 2026-08-07 pour `global2.webp`, qui montre enfin toute la ceinture de Kuiper.
+   Le nouveau dessin est un dézoom UNIFORME autour du Soleil : une seule transformation a donc suffi
+   pour les dix, au lieu de dix relevés à l'œil —
+        nouveau = Soleil + (ancien − Soleil) × 0,77,  avec Soleil ≈ (200, 245).
+   Vérifié planète par planète sur l'image : Uranus, Jupiter, Neptune, Saturne, Terre, Mars et Vénus
+   tombent tous à moins de 10 px de leur position mesurée. Les rayons sont réduits en proportion,
+   et deux zones ont été replacées à la main car le dézoom les faisait chevaucher une planète :
+   la Ceinture (descendue sur l'arc gauche, dégagé) et Kuiper (remontée sur l'anneau extérieur). */
 const MAP_HOTSPOTS=[
- {x:144,y:190,r:22,label:'Mercure',lp:'below',sector:'interne',node:'lune'},
- {x:114,y:228,r:22,label:'Vénus',lp:'below',sector:'interne',node:'lune'},
- {x:182,y:324,r:24,label:'Terre',lp:'right',sector:'interne',node:'lune'},
- {x:269,y:323,r:22,label:'Mars',lp:'right',sector:'interne',node:'phobos'},
- {x:336,y:227,r:30,label:'Jupiter',lp:'below',sector:'jupiter',node:'jorbital1'},
- {x:106,y:386,r:30,label:'Saturne',lp:'below',sector:'saturne',node:'titan'},
- {x:119,y:92,r:24,label:'Uranus',lp:'right',sector:'externe',node:'triton'},
- {x:314,y:457,r:24,label:'Neptune',lp:'right',sector:'externe',node:'triton'},
- {x:66,y:245,r:32,label:'Ceinture',lp:'right',sector:'jupiter',node:'ceres'},
- {x:199,y:65,r:32,label:'Kuiper',lp:'below',sector:'externe',node:'pluto'},
+ {x:157,y:203,r:18,label:'Mercure',lp:'below',sector:'interne',node:'lune'},
+ {x:134,y:232,r:18,label:'Vénus',lp:'below',sector:'interne',node:'lune'},
+ {x:186,y:306,r:20,label:'Terre',lp:'right',sector:'interne',node:'lune'},
+ {x:253,y:305,r:19,label:'Mars',lp:'right',sector:'interne',node:'phobos'},
+ {x:305,y:231,r:26,label:'Jupiter',lp:'below',sector:'jupiter',node:'jorbital1'},
+ {x:128,y:354,r:26,label:'Saturne',lp:'below',sector:'saturne',node:'titan'},
+ {x:138,y:127,r:20,label:'Uranus',lp:'right',sector:'externe',node:'triton'},
+ {x:288,y:408,r:20,label:'Neptune',lp:'right',sector:'externe',node:'triton'},
+ {x:97,y:275,r:24,label:'Ceinture',lp:'right',sector:'jupiter',node:'ceres'},
+ {x:200,y:95,r:26,label:'Kuiper',lp:'below',sector:'externe',node:'pluto'},
 ];
 function setSector(k){G.mapView=k;closePopup();render();}
-function backToMap(){G.mapView='global';closePopup();render();}
+function backToMap(){
+  /* ⚠️ La vue globale repart à 1×, sinon elle hérite du zoom posé en entrant sur une planète.
+     (Piège rencontré ici : `backToMap` tenait sur UNE ligne ; ajouter un commentaire `//` en fin
+     de ligne a fait disparaître tout ce qui suivait, accolade fermante comprise. `node --check`
+     l'a vu tout de suite — mais seulement parce que je l'ai lancé.) */
+  try{ if(typeof uiMZ!=='undefined'){ uiMZ=1; if(typeof uiApplyMZ==='function')uiApplyMZ(); } }catch(e){}
+  G.mapView='global';closePopup();render();
+}
 // Ouvre la 2e carte (système entier scrollable, dessin index.html) centrée sur la planète cliquée.
-function openNodeMap(nodeId){ G.mapView='zoom'; G._zoomNode=nodeId||null; closePopup(); render(); setTimeout(()=>scrollToNode(G._zoomNode),120); }
+/* ⚠️ CLIQUER UNE PLANÈTE DOIT ZOOMER DESSUS.
+   Depuis que la carte TIENT entièrement dans son cadre à 1×, il n'y a plus rien à faire défiler :
+   `scrollToNode` calculait un décalage, le trouvait nul, et la vue restait sur le système entier.
+   On pose donc explicitement un niveau de zoom en arrivant, puis on centre. C'était gratuit avant
+   parce que la carte débordait toujours — ce n'est plus le cas, il faut le demander. */
+const ZOOM_PLANETE=3;   // ~un tiers du système visible : le voisinage de la planète, pas tout
+function openNodeMap(nodeId){
+  G.mapView='zoom'; G._zoomNode=nodeId||null; closePopup(); render();
+  try{ if(typeof uiMZ!=='undefined'){ uiMZ=ZOOM_PLANETE; if(typeof uiApplyMZ==='function')uiApplyMZ(); } }catch(e){}
+  setTimeout(()=>scrollToNode(G._zoomNode),120);
+}
 function scrollToNode(nodeId){
-  const wrap=document.getElementById('map-wrap'); if(!wrap)return; const n=NODES[nodeId]; if(!n)return;
-  const svg=document.getElementById('solar-svg');
-  const vb=((svg&&svg.getAttribute('viewBox'))||'0 175 2020 490').split(' ').map(Number);
-  const fx=Math.max(0,Math.min(1,(n.x-vb[0])/vb[2])), fy=Math.max(0,Math.min(1,(n.y-vb[1])/vb[3]));
-  const left=Math.max(0,wrap.scrollWidth*fx-wrap.clientWidth/2), top=Math.max(0,wrap.scrollHeight*fy-wrap.clientHeight/2);
+  const wrap=document.getElementById('map-wrap'); if(!wrap)return;
+  const n=NODES[nodeId]; if(!n)return;
+  const svg=document.getElementById('solar-svg'); if(!svg)return;
+  const vb=((svg.getAttribute('viewBox'))||'0 175 2020 490').split(' ').map(Number);
+  /* ⚠️ LE DESSIN N'OCCUPE PAS TOUTE LA BOÎTE. `preserveAspectRatio="xMidYMid meet"` le met à
+     l'échelle pour qu'il tienne, puis le CENTRE : il reste donc des bandes vides sur un axe. Le
+     calcul précédent supposait que le dessin remplissait la boîte, et visait donc à côté dès que
+     les deux proportions différaient — c'est-à-dire presque toujours. On refait le calcul du
+     navigateur : échelle, puis bandes, puis position réelle du nœud en pixels. */
+  const bw=svg.clientWidth||wrap.clientWidth, bh=svg.clientHeight||wrap.clientHeight;
+  if(!bw||!bh)return;
+  const k=Math.min(bw/vb[2], bh/vb[3]);
+  const ox=(bw-vb[2]*k)/2, oy=(bh-vb[3]*k)/2;
+  const px=ox+(n.x-vb[0])*k, py=oy+(n.y-vb[1])*k;
+  const left=Math.max(0,px-wrap.clientWidth/2), top=Math.max(0,py-wrap.clientHeight/2);
   try{ wrap.scrollTo({left,top,behavior:'smooth'}); }catch(e){ wrap.scrollLeft=left; wrap.scrollTop=top; }
 }
+
 function renderMap(){
   // La colonne s'élargit sur l'onglet Carte : on le vérifie ici aussi, car la partie démarre sur la
   // carte sans passer par `uiTab` (sinon elle resterait à l'étroit au tout premier affichage).
