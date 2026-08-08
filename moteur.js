@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-08 · v9.15';
+const SOLAR_BUILD_MOTEUR = '2026-08-08 · v9.18';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -227,7 +227,10 @@ const STRATEGY_CARDS=[
   {id:'st6',name:'Mobilisation',emoji:'📣',desc:'+1 AC ce tour',acBonus:1},
   {id:'st7',name:'Effort de Guerre',emoji:'🗡️',desc:'+1 jeton Force immédiat (conservable)',forceKeep:1},
   {id:'st9',name:'Calmer les tensions',emoji:'🕊️',desc:'−3 tension vers une nation choisie',calmTension:3},
-  {id:'st8',name:'Consolidation',emoji:'🛡️',desc:'+1<i class=ri-morale></i>, −1<i class=ri-energy></i> entretien',res:{morale:1},upkeepDiscount:1},
+  /* Consolidation : ressources immédiates au lieu d'une remise d'entretien (Marc, 2026-08-08).
+     La remise faisait doublon avec Biosphère Autonome, qui donne désormais exactement la même chose
+     de façon permanente — une carte à usage unique ne pouvait pas rivaliser. */
+  {id:'st8',name:'Consolidation',emoji:'🛡️',desc:'+1<i class=ri-morale></i> +1<i class=ri-energy></i>',res:{morale:1,energy:1}},
 ];
 const DISCOVERY_TILES=[
   {id:'dt1',name:'Gisement Riche',emoji:'⛏️',desc:'+2<i class=ri-materials></i> immédiats.',res:{materials:2}},
@@ -408,8 +411,8 @@ const EVENTS=[
    resolve(G){const h=_evTop(function(p){return p.colonies.length;});return 'Ruée Minière — '+_evAwardVP(h,6);}},
   {id:'storm',type:'menace',name:'Tempêtes Solaires',emoji:'🌩️',preview:'Sans IA Défensive, chaque nation perd 1 jeton Force, 1 route et 2<i class=ri-materials></i>.',
    resolve(G){let n=0;const pProt=hasSpec(G.player,'storm_immune');for(const p of allPlayers()){if(hasSpec(p,'storm_immune'))continue;p.forceTokens=Math.max(0,(p.forceTokens||0)-1);if(p.routes&&p.routes.length){p.routes.pop();updateConnections(p);}p.res.materials=Math.max(0,(p.res.materials||0)-2);n++;}return (pProt?'Tu as réussi à te protéger. ':'')+'Tempêtes Solaires — '+n+' nation(s) touchée(s) : −1 jeton, −1 route, −2<i class=ri-materials></i>.';}},
-  {id:'pirates',type:'menace',name:'Prolifération des pirates',emoji:'☠️',preview:'Les pirates frappent les routes de la nation la plus riche en <i class=ri-materials></i> : les routes sans jeton sont détruites ; celles avec ont 50% de chance d\'être perdues, mais 2 au maximum.',
-   resolve(G){const h=_evTop(function(p){return p.res.materials||0;});if(h.length!==1)return 'Prolifération des pirates — aucune cible claire.';const tgt=h[0];let unp=0,prot=0;const keep=[];for(const r of tgt.routes){if((r.tokens||0)>0){/* protégée : 50% chacune, MAX 2 perdues */ if(prot<2&&Math.random()<0.5){tgt.forceCooldown.push({count:r.tokens,returnTurn:getCooldownTurn(tgt)});prot++;}else keep.push(r);}else unp++;/* non protégée : détruite */}tgt.routes=keep;updateConnections(tgt);if((unp+prot)===0)return 'Prolifération des pirates — '+_evName(tgt)+' est la nation la plus riche en <i class=ri-materials></i> et devient la cible des pirates, mais AUCUNE route n\'est perdue.';
+  {id:'pirates',type:'menace',name:'Prolifération des pirates',emoji:'☠️',preview:'Les pirates frappent les routes de la nation la plus riche en <i class=ri-materials></i> : les routes sans jeton NI technologie de protection sont détruites ; celles avec un jeton ont 50% de chance d\'être perdues, mais 2 au maximum.',
+   resolve(G){const h=_evTop(function(p){return p.res.materials||0;});if(h.length!==1)return 'Prolifération des pirates — aucune cible claire.';const tgt=h[0];let unp=0,prot=0,tech=0;const keep=[];for(const r of tgt.routes){if((r.tokens||0)>0){/* jeton posé : 50% chacune, MAX 2 perdues */ if(prot<2&&Math.random()<0.5){tgt.forceCooldown.push({count:r.tokens,returnTurn:getCooldownTurn(tgt)});prot++;}else keep.push(r);}else if(routeProtegee(tgt,r)){keep.push(r);tech++;/* protégée par une TECHNOLOGIE : elle n'a pas besoin de jeton */}else unp++;/* ni jeton ni technologie : détruite */}tgt.routes=keep;updateConnections(tgt);if(tech)addLog('🛡️ '+tech+' route(s) de '+_evName(tgt)+' épargnée(s) — protégées par une technologie, sans jeton nécessaire.','gold');if((unp+prot)===0)return 'Prolifération des pirates — '+_evName(tgt)+' est la nation la plus riche en <i class=ri-materials></i> et devient la cible des pirates, mais AUCUNE route n\'est perdue.';
     return 'Prolifération des pirates — '+_evName(tgt)+' est visé (nation la plus riche en <i class=ri-materials></i>) et perd '+(unp+prot)+' route(s) : '+unp+' sans jeton détruite(s)'+(prot?', '+prot+' protégée(s) pillée(s) (max 2 — jetons en récupération)':'')+'.';}},
   {id:'sci',type:'competition',name:'Conférence Scientifique Solaire',emoji:'🔬',preview:'La nation avec la plus grande production de <i class=ri-science></i> gagne +6 VP.',
    resolve(G){const h=_evTop(_sciProd);return 'Conférence Scientifique — '+_evAwardVP(h,6);}},
@@ -449,6 +452,22 @@ function maxAffordableTokens(p){
   return Math.max(0,Math.min(mat,en));
 }
 function _sciProd(p){var s=(p.rpt&&p.rpt.science)||0;for(var i=0;i<p.colonies.length;i++){var c=p.colonies[i];if(!c.connected)continue;var n=NODES[c.nodeId];if(!n||n.decorative)continue;if((n.res||{}).science)s+=n.res.science;if(c.level>=3)s+=2;else if(c.level>=2)s+=1;}if(p.investBonus&&p.investBonus.sciBonus)s+=p.investBonus.sciBonus;return s;}
+/* ─── UNE ROUTE EST-ELLE PROTÉGÉE ? ────────────────────────────────────────────
+   ⚠️ DÉFAUT SIGNALÉ PAR MARC LE 2026-08-08, ET C'ÉTAIT UN PIÈGE TENDU PAR LE JEU LUI-MÊME.
+   Trois technologies protègent les routes : IA Défensive (`ia_immune`), Lien Empathe
+   (`empath_routes`) et Réseau Orbital (`intel_2`). Les deux premières RETIRENT explicitement tes
+   jetons des routes au moment où tu les acquiers — c'est leur intérêt : récupérer ces jetons pour
+   le combat. Or l'événement « Prolifération des pirates » ne regardait QUE `r.tokens > 0` :
+   il détruisait donc toutes les routes que la technologie venait de dégarnir. Marc en a perdu
+   trois d'un coup, précisément parce qu'il avait pris la bonne technologie.
+   La protection existait pourtant déjà — dans l'avancée normale des pirates (`ia_immune`,
+   `intel_2`) et dans l'attaque de route en guerre (`ia_immune`, `empath_routes`). Trois endroits,
+   trois listes différentes, et l'événement n'en avait aucune. Un seul test désormais, partagé. */
+function routeProtegee(p, r){
+  if(!p) return false;
+  if((r&&r.tokens||0)>0) return true;                     // un jeton posé protège, comme avant
+  return hasSpec(p,'ia_immune')||hasSpec(p,'empath_routes')||hasSpec(p,'intel_2');
+}
 function _evTop(statFn){const all=allPlayers();let mx=-Infinity;for(const p of all){const s=statFn(p);if(s>mx)mx=s;}if(mx<=0)return[];return all.filter(function(p){return statFn(p)===mx;});}
 function _evAwardVP(holders,vp){if(holders.length===0)return 'personne (aucune production).';if(holders.length>=3)return 'personne — trop d\'égalités ('+holders.length+' nations).';holders.forEach(function(p){p.tempVP=(p.tempVP||0)+vp;});return holders.map(_evName).join(' & ')+' → +'+vp+' VP';}
 function _evCommResolve(G){for(const ai of G.ais){setTens('player',ai.civ.id,Math.max(0,getTens('player',ai.civ.id)-2));setTens(ai.civ.id,'player',Math.max(0,getTens(ai.civ.id,'player')-2));}for(const p of allPlayers()){const c=getResCapFor(p);p.res.materials=Math.min(c.materials,(p.res.materials||0)+2);}return 'Sommet commercial — tension −2 avec chaque nation, +2<i class=ri-materials></i> pour toutes.';}
@@ -3214,7 +3233,7 @@ function _applyMoraleFlags(){
 function doMaintenance(){
   const result={energyCost:0,matCost:0,routeEnergyCost:0,routeMatGain:0,moraleLostCols:0,moraleLostRoutes:0};
   for(const p of allPlayers()){
-    const disc=(p.stratBonus&&p.stratBonus.upkeepDiscount)||0;
+    const disc=(p.stratBonus&&p.stratBonus.upkeepDiscount)||0;   // ⚠️ plus AUCUNE carte ne pose ce bonus depuis que Consolidation a changé : mécanique conservée, mais actuellement inutilisée
     /* ENTRETIEN D'UNE COLONIE HORS BASE (barème révisé par Marc le 2026-08-07) :
          Nv.1 → 1⚡          Nv.2 → 1⚡ + 1🪨          Nv.3 → 1⚡ + 2🪨
        AVANT, l'énergie suivait le niveau (1, 2 puis 3⚡) : monter ses colonies coûtait si cher en
@@ -4277,7 +4296,7 @@ function resolveRouteAttack(attacker,defender,route,commit){
   const rn=(NODES[route.from]?.name||route.from)+'→'+(NODES[route.to]?.name||route.to);
   const youAtk=(attacker===G.player);
   const atkName=youAtk?'Tu':(attacker.civ.emoji+' '+attacker.civ.name);
-  const techProt=hasSpec(defender,'empath_routes')||hasSpec(defender,'ia_immune'); // Liens Empathes / IA Défensive : jeton non perdable
+  const techProt=routeProtegee(defender,{tokens:0}); // même définition que partout ailleurs (voir routeProtegee)
   const tok=route.tokens||0;
   if(techProt){addLog('🛡️ Route '+rn+' protégée (tech, jeton non perdable) — attaque sans effet.',youAtk?'red':'gold');return {held:true};}
   if(tok>=1&&commit<=1){addLog('🛡️ Route '+rn+' défendue par son jeton — tient contre 1 jeton.',youAtk?'red':'gold');return {held:true};}
@@ -6139,8 +6158,10 @@ function renderTechTree(){
          La carte reste ENTIÈRE : on ne replie plus rien, on ne cache rien. Un coin replié en haut à
          droite, comme on marque une page dans un livre, dit « celle-ci, tu ne peux pas encore ».
          La raison précise est dans l'info-bulle et sur la grande carte.
-         (Version précédente : la carte était réduite à une bande fine. C'était une autre idée que
-         celle de Marc — « replier » voulait dire corner le coin, pas replier la carte.) */
+         ⚠️ `techLockReason` ne rend une raison QUE pour un prérequis manquant — palier non ouvert,
+         T2 de la branche absente, branche réservée. Une technologie déjà acquise ou déjà prise par
+         une autre nation ne passe donc PAS par ici : elle garde ses propres marques (✓ et ⛔).
+         C'est voulu (Marc, 2026-08-08) : deux signalétiques sur la même carte se neutralisent. */
       const _raisonLock=(typeof techLockReason==='function')?techLockReason(card,G.player):null;
       const _cornee=!!(_raisonLock&&!G.player.cards.find(c=>c.id===card.id));
       const exclusive=isTechExclusive(card);
@@ -6264,7 +6285,7 @@ function renderTechTree(){
           <div class="gc-header"><span class="gc-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2">${card.name}</span></div>
           <div class="gc-art" style="${CARD_ART.has(card.id)?`background:#0a0a18 url('assets/cards/${card.id}.png') center/cover no-repeat`:`background:${artBg}`}">${CARD_ART.has(card.id)?'':card.emoji}${(card.repeatable||card.perTurn)?'<span style="position:absolute;top:1px;right:3px;font-size:.55em;color:#ffaa44">∞</span>':''}</div>
           <div class="gc-body"><div class="tc-effect" style="color:#8898b8">${card.effect}</div>
-          <div class="gc-cost">${taken?'<span style="color:#ff6060;font-size:.8em">Acquis</span>':!_reqOk?'<span style="color:#cc7744;font-size:.72em">🔒 '+(CARDS_POOL.find(c=>c.id===card.reqCard)?.name||'tech requise')+'</span>':canBuy?'<span class="res-tag energy" style="font-size:.85em">'+_acN+'AC</span> '+costHtmlStr:'<span style="color:#5a6a8a">'+_acN+'AC '+Object.entries(cost).map(([res,a])=>rLabel(res)+' '+a).join(' ')+'</span>'}</div></div>
+          <div class="gc-cost">${taken?'<span style="color:#ff6060;font-size:.8em">Acquis</span>':!_reqOk?'<span style="color:#cc7744;font-size:.72em">🔒 '+(CARDS_POOL.find(c=>c.id===card.reqCard)?.name||'tech requise')+'</span>':canBuy?'<span class="res-tag energy" style="font-size:.85em">'+_acN+'AC</span> '+costHtmlStr:'<span class="res-tag energy" style="font-size:.85em;opacity:.6">'+_acN+'AC</span> <span style="font-size:.82em">'+Object.entries(cost).map(([res,a])=>{const _ok=(G.player.res[res]||0)>=a;return '<span style="color:'+(_ok?'#8898b8':'#ff7744')+'">'+a+rEmoji(res)+'</span>';}).join(' ')+'</span>'   /* ⚠️ ICÔNES, PAS DES MOTS : cette branche — la seule où le joueur ne peut pas payer — écrivait « Énergie 2 Matériaux 3 » via rLabel(), alors que les trois autres branches utilisent rEmoji(). D'où des cartes qui changeaient d'écriture selon qu'on avait les moyens ou non. En prime, on colore en rouge la ressource qui manque, comme partout ailleurs. */}</div></div>
         </div>`;
       }
     }

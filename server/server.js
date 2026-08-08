@@ -811,8 +811,17 @@ function recover(g, tag, e) {
    La clé se règle par la variable d'environnement ADMIN_KEY. Valeur par défaut « marci » pendant
    le rodage, à la demande de Marc — À REMPLACER par quelque chose de long avant d'ouvrir le jeu
    à des inconnus : « marci » est devinable en quelques essais. */
-const ADMIN_KEY = process.env.ADMIN_KEY || 'marci';
+/* ⚠️ AUCUNE CLÉ PAR DÉFAUT DANS LE CODE — LE DÉPÔT EST PUBLIC.
+   Il y avait ici `process.env.ADMIN_KEY || 'marci'`. Sur un dépôt public, une clé de repli n'est pas
+   un secret : elle est PUBLIÉE. Tant que Coolify fournit `ADMIN_KEY`, le repli ne sert à rien ; le
+   jour où cette variable disparaît — nouvelle instance, migration, nettoyage des variables — les
+   pages de service se rouvriraient avec une clé que n'importe qui peut lire sur GitHub. Un piège
+   différé, et c'est moi qui l'avais posé.
+   Sans `ADMIN_KEY`, les pages de service sont donc TOTALEMENT fermées : aucune clé ne les ouvre.
+   En cas de doute, fermé — c'est le seul réglage qui ne se dégrade pas tout seul avec le temps. */
+const ADMIN_KEY = process.env.ADMIN_KEY || '';
 function cleValide(url) {
+  if (!ADMIN_KEY) return false;   // pas de clé configurée = pages de service désactivées
   try { return (new URL(url, 'http://x').searchParams.get('key') || '') === ADMIN_KEY; } catch (e) { return false; }
 }
 function refuser(res) {   // 404 volontaire : on ne confirme pas l'existence de la page

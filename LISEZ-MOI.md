@@ -31,25 +31,47 @@ C'est exactement ce qui avait produit le `MOTEUR INTROUVABLE : /app/moteur.js`.
 | Dockerfile Location | `/server/Dockerfile` |
 | Base Directory | `/` |
 | Volume persistant | `/data` |
-| Variable d'environnement | `ADMIN_KEY` = ta clé (défaut : `marci`) |
+| Variable d’environnement | `ADMIN_KEY` = ta clé — **obligatoire**, aucun défaut dans le code |
 
 ⚠️ **Le volume `/data` ne doit JAMAIS être effacé à un redéploiement** : il contient les comptes,
 les sessions et les **parties en cours** (`/data/games/`).
 
 ## Les pages de service sont sous clé
 
-Depuis ce lot, toutes les adresses qui ne servent pas le jeu exigent `?key=…` et renvoient
-« page inexistante » sans clé valable :
+Toutes les adresses qui ne servent pas le jeu exigent `?key=…` et renvoient « page inexistante »
+sans clé valable. Seul `/health` reste ouvert : Coolify s'en sert pour savoir si le serveur est
+vivant, et il ne révèle que le nombre de parties.
 
-    https://live.solar-game.com/debug?key=marci      → parties en cours
-    https://live.solar-game.com/stats?key=marci      → archives et statistiques
-    https://live.solar-game.com/mailtest?key=marci   → diagnostic des emails
-    https://live.solar-game.com/bot?code=XXXX&key=marci   → inviter le bot dans une partie
-    https://live.solar-game.com/admin/reset?key=marci     → remise à zéro (efface tout)
+    https://live.solar-game.com/debug?key=VOTRE_CLE      → parties en cours
+    https://live.solar-game.com/stats?key=VOTRE_CLE      → archives et statistiques
+    https://live.solar-game.com/mailtest?key=VOTRE_CLE   → diagnostic des emails
+    https://live.solar-game.com/bot?code=XXXX&key=VOTRE_CLE   → inviter le bot dans une partie
+    https://live.solar-game.com/admin/reset?key=VOTRE_CLE      → remise à zéro (efface tout)
 
-Seul `/health` reste ouvert : Coolify s'en sert pour savoir si le serveur est vivant, et il ne
-révèle que le nombre de parties.
+**La clé vient UNIQUEMENT de la variable d'environnement `ADMIN_KEY`, dans Coolify.** Il n'y a
+aucune valeur par défaut dans le code, et c'est délibéré : le dépôt est **public**, donc toute clé
+écrite dans le code serait publiée sur GitHub. Sans `ADMIN_KEY` définie, ces pages sont
+**totalement fermées** — aucune clé ne les ouvre. En cas de doute, fermé.
 
-> **`marci` est une clé de rodage.** Elle se devine en quelques essais. Avant d'ouvrir le jeu à des
-> inconnus, pose une vraie valeur dans `ADMIN_KEY` (une trentaine de caractères au hasard) — c'est
-> une ligne à changer dans Coolify, rien à toucher dans le code.
+Après avoir changé `ADMIN_KEY`, il faut **redéployer ou redémarrer** l'application pour qu'elle soit
+relue.
+
+---
+
+## ⚠️ À FAIRE AVANT D'OUVRIR LE JEU AU PUBLIC
+
+Ces points sont acceptables pendant le rodage entre amis. Ils ne le sont plus dès que des inconnus
+peuvent créer un compte.
+
+**1. Changer `ADMIN_KEY`.** La clé actuelle (`Solar-RaZ-2026`) est courte, lisible et construite sur
+le nom du projet — elle se devine. Remplace-la par une trentaine de caractères au hasard, range-la
+dans un gestionnaire de mots de passe, et enregistre les URL complètes en favoris plutôt que de la
+retaper. Ce qu'elle protège : la liste des parties en cours et leurs codes, les archives, l'envoi de
+courrier depuis le domaine, et la **remise à zéro complète** (`/admin/reset`, qui efface comptes,
+parties et archives sans confirmation).
+
+**2. Vérifier qu'elle n'a jamais été écrite dans un fichier envoyé sur GitHub.** Une clé publiée une
+fois reste dans l'historique du dépôt même après suppression.
+
+**3. Envisager de désactiver `/admin/reset` en production.** Même sous clé, une adresse qui efface
+tout d'un seul appel n'a pas grand-chose à faire sur un serveur ouvert.
