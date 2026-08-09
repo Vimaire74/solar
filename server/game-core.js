@@ -87,6 +87,7 @@ const FONCTIONS_MOTEUR_REQUISES = [
   // Sans elle, le serveur ne verrait qu'UNE question alors que le moteur en pose plusieurs :
   // les autres joueurs attendraient un message qui n'arriverait jamais. Mieux vaut refuser de démarrer.
   'fluxQuestionsEnAttente',
+  'defenseIA',   // sans elle, le serveur retomberait sur l'ancienne formule sans que personne ne le voie
   /* Assaut du joueur : le SERVEUR délègue à ces fonctions pour que la défense d'un humain lui soit
      réellement demandée. Si elles disparaissaient, on retomberait dans « l'IA joue à sa place ». */
   'stAssautJoueurChoisi', 'stAssautJoueurResoudre',
@@ -203,8 +204,13 @@ const ACTIONS = {
        ══════════════════════════════════════════════════════════════════════════════════════ */
     const defenseurHumain = !!(owner && owner._isAI === false);
     if (!defenseurHumain) {
-      // Défense IA DÉTERMINISTE = ce qu'elle peut payer (exactement ce que la modale affiche).
-      G._aiWarCommitted = Math.max(0, Math.min(owner.forceTokens || 0, owner.res.materials || 0, owner.res.energy || 0));
+      /* Défense d'une nation tenue par l'ordinateur : règle unique, définie dans le MOTEUR
+         (`defenseIA`) — elle tient compte de la menace, du niveau de la colonie, et de ce que le
+         Réseau Orbital lui apprend. Le serveur ne recalcule rien : il appelle. Deux implémentations
+         d'une même règle finissent toujours par diverger, on l'a déjà payé plusieurs fois ici. */
+      G._aiWarCommitted = (typeof sb.defenseIA === 'function')
+        ? sb.defenseIA(owner, p, node)
+        : Math.max(0, Math.min(owner.forceTokens || 0, owner.res.materials || 0, owner.res.energy || 0));
     }
     if (p && (p.acLeft || 0) > 0) p.acLeft -= 1; // l'assaut coûte 1 AC
     p._attacksThisTurn = (p._attacksThisTurn || 0) + 1;

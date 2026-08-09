@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-08 · v9.21';
+const SOLAR_BUILD_MOTEUR = '2026-08-08 · v9.23';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -4799,6 +4799,45 @@ function journalCombat(p,engages,gagne,puissance,detailPuissance){
     +' · jetons : '+sort
     +(techs.length?' · techs : '+techs.join(', '):' · aucune tech de combat'),'dim');
 }
+/* ─── DÉFENSE D'UNE NATION TENUE PAR L'ORDINATEUR ──────────────────────────────
+   Règle posée par Marc le 2026-08-08. Elle remplace `min(jetons, matériaux, énergie)` — qui
+   engageait TOUT, sans jamais regarder la menace : une nation se ruinait contre une attaque d'un
+   seul jeton, et abandonnait une colonie vitale dès qu'il lui manquait un matériau.
+
+   Ce qu'elle sait de l'ennemi :
+     · avec RÉSEAU ORBITAL (`intel_2`) → la force EXACTE ; elle place le juste nécessaire ;
+     · sans → l'estimation à ±3 du menu Empire. Elle SURÉVALUE (+3) pour ce qui compte — capitale et
+       niveau 3 — et SOUS-évalue (−3) pour le reste, quitte à perdre une colonie mineure.
+
+   Ce qu'elle engage :
+     · capitale  : estimation MOINS les 10 jetons de garnison automatique — donc souvent rien. Sans
+                   cette soustraction, une capitale deviendrait imprenable et la règle « on peut
+                   assaillir une capitale » redeviendrait théorique ;
+     · niveau 3  : la force ennemie estimée ;
+     · niveau 2  : la moitié ;
+     · niveau 1  : 2 jetons ;
+     · 2 colonies ou moins : tout ce qu'elle peut payer — dos au mur, on ne calcule plus.
+   Et si elle ne peut pas atteindre ce chiffre, elle engage quand même la MOITIÉ de ce qu'elle peut
+   payer : mieux vaut faire saigner l'assaillant que céder gratuitement. */
+function defenseIA(def, atk, nodeId){
+  if(!def||!def.civ) return 0;
+  const payable=Math.max(0,Math.min(def.forceTokens||0, def.res.materials||0, def.res.energy||0));
+  if(payable<=0) return 0;
+  const cols=def.colonies||[];
+  if(cols.length<=2) return payable;                       // dos au mur
+  const col=cols.find(c=>c.nodeId===nodeId);
+  const niveau=col?(col.level||1):1;
+  const capitale=(nodeId===def.civ.home);
+  let est=0, exact=false;
+  try{ const pf=perceivedForce(def,atk); est=pf.val||0; exact=!!pf.exact; }catch(e){ est=(atk&&atk.forceTokens)||0; }
+  let cible;
+  if(capitale)      cible=Math.max(0,(exact?est:est+3)-10);   // la garnison de 10 fait déjà le gros du travail
+  else if(niveau>=3)cible=(exact?est:est+3);
+  else if(niveau===2)cible=Math.ceil((exact?est:Math.max(0,est-3))/2);
+  else              cible=2;
+  if(cible<=payable) return Math.max(0,Math.min(cible,payable));
+  return Math.floor(payable/2);                            // hors de portée : on fait saigner
+}
 function resolveWarCombat(playerCommitted){
   const warEnemy=G.warWith?G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0]:G.ais[0];
   const pBonus=(G.player.stratBonus&&G.player.stratBonus.combatBonus)||0;
@@ -5284,7 +5323,19 @@ function doAITurn(aiPlayer,oneShot){
       return;
     }
     // Guerre jouable → conserver les ressources, monter en puissance, et assaillir dès que possible.
-    ai._warConserve=true;ai._warRecapture=target;ai._warAggressor=aggressor;
+    /* CIBLE DE LA CONTRE-ATTAQUE (Marc, 2026-08-08) : la colonie qu'on vient de lui prendre, SAUF si
+       une colonie ennemie de NIVEAU 3 est plus proche de son territoire — reprendre coûte le même
+       AC, autant viser ce qui rapporte le plus. Sans colonie de niveau 3 chez l'ennemi, elle
+       revient à la colonie perdue. La distance se mesure depuis SES propres colonies. */
+    let _cible=target;
+    try{
+      if(ai._enemy&&typeof getNodeDistance==='function'){
+        const _dist=id=>Math.min(...(ai.colonies||[]).map(c=>{const d=getNodeDistance(c.nodeId,id);return (d==null||d<0)?99:d;}).concat([99]));
+        const _nv3=(ai._enemy.colonies||[]).filter(c=>(c.level||1)>=3).map(c=>({id:c.nodeId,d:_dist(c.nodeId)})).sort((a,b)=>a.d-b.d)[0];
+        if(_nv3 && (!target || _nv3.d < _dist(target))) _cible=_nv3.id;
+      }
+    }catch(e){}
+    ai._warConserve=true;ai._warRecapture=_cible;ai._warAggressor=aggressor;
   })();
   // ── L'IA peut DÉTRUIRE une de tes routes non protégées (tactique de guerre, cap 2 attaques/tour) ──
   (function aiRouteRaid(){
@@ -5479,10 +5530,23 @@ function doAITurn(aiPlayer,oneShot){
     return best;
   }
   function _econBranches(){
-    if(ai.civ.id==='jupiteriens')return['mines_energie','sciences_exp'];
-    if(ai.civ.id==='ceinturiens')return['sciences_exp','navigation'];
-    if(isMartien)return['navigation','expansion','mines_energie'];
-    return['expansion','sciences_exp','navigation']; // Terriens & défaut
+    /* ⚠️ UNE NATION ATTAQUÉE CHANGE DE PRIORITÉS (Marc, 2026-08-08).
+       Tant qu'elle est en guerre ou qu'une nation lui est hostile, elle vise d'abord
+       « navigation » (IA de Navigation : coût de guerre divisé par deux) puis « ia_renseignement »
+       (Réseau Orbital : la force adverse EXACTE, donc une défense au juste nécessaire — et IA
+       Défensive, qui protège ses routes). Sans ces deux branches, sa nouvelle défense reste aveugle
+       et chère : elle surévalue de 3 à chaque combat et paie plein tarif.
+       Ce n'est pas un abandon de son économie — l'ordre normal suit derrière. */
+    const _normal =
+      (ai.civ.id==='jupiteriens') ? ['mines_energie','sciences_exp'] :
+      (ai.civ.id==='ceinturiens') ? ['sciences_exp','navigation'] :
+      (isMartien)                 ? ['navigation','expansion','mines_energie'] :
+                                    ['expansion','sciences_exp','navigation'];
+    let _menacee=false;
+    try{ _menacee=!!(ai._enemy || (typeof _warOf==='function' && _warOf(ai.civ.id)) || (ai._warAggressor)); }catch(e){}
+    if(!_menacee) return _normal;
+    const _guerre=['navigation','ia_renseignement'];
+    return _guerre.concat(_normal.filter(b=>_guerre.indexOf(b)<0));
   }
   function _raidUtil(){
     const _e=ai._enemy;if(!_e)return 0;
@@ -6296,10 +6360,10 @@ function renderTechTree(){
       const badgeCol=taken?'#ff6060':isCurrentForm?'#88ccff':border;
       const govTag=isGov?'<span style="font-size:.5em;background:#1c3a6a;color:#9cc8ff;border-radius:3px;padding:0 3px;margin-left:3px;vertical-align:middle">GOV</span>':'';
       if(compact){
-        html+=`<div class="gcard gc-compact${isCurrentForm?' gc-mine':''}" onclick="showMarketDetail('${card.id}')" style="border-top:2px solid ${border};opacity:${taken?.4:1}">
+        html+=`<div class="gcard gc-compact${isCurrentForm?' gc-mine':''}${(taken&&!(card.repeatable||card.perTurn))?' gc-corne no-buy':''}" onclick="showMarketDetail('${card.id}')" style="border-top:2px solid ${border}">
           <div class="gc-header"><span class="gc-name">${card.emoji} ${card.name}${govTag}</span><span class="gc-cost">${taken?'✗':isCurrentForm?'✓':canBuy?'1AC '+costStr:'—'}</span></div></div>`;
       } else {
-        html+=`<div class="gcard${isCurrentForm?' gc-mine':''}" onclick="showMarketDetail('${card.id}')" style="border-top:2px solid ${border};cursor:pointer;opacity:${taken?.4:1}">
+        html+=`<div class="gcard${isCurrentForm?' gc-mine':''}${(taken&&!(card.repeatable||card.perTurn))?' gc-corne no-buy':''}" onclick="showMarketDetail('${card.id}')" style="border-top:2px solid ${border};cursor:pointer">
           <div class="gc-header"><span class="gc-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2">${card.name}${govTag}</span></div>
           <div class="gc-art${CARD_ART.has(card.id)?' gc-illus':''}" style="${CARD_ART.has(card.id)?`background:#0a0a18 url('assets/cards/${card.id}.png') center/cover no-repeat`:`background:${artBg}`}">${CARD_ART.has(card.id)?'':card.emoji}<span style="position:absolute;top:1px;right:2px;font-size:.55em;color:${badgeCol}">${badge}</span></div>
           <div class="gc-body"><div class="tc-effect" style="color:#8898b8">${card.effect}</div>
@@ -6326,11 +6390,22 @@ function renderTechTree(){
       const canBuy=!taken&&_reqOk&&G.phase==='actions'&&G.player.acLeft>=_acN&&Object.entries(cost).every(([res,a])=>(G.player.res[res]||0)>=a);
       const border=TYPE_COLORS[card.type]||'#2a2a5a';
       const artBg=border+'20';
+      /* ⚠️ LE ROULEAU AUSSI SUR LES CARTES ÉCO&SOC ET MILITAIRES (Marc, 2026-08-08).
+         Elles n'avaient qu'une opacité de 0,4 posée EN LIGNE — qui écrasait au passage
+         l'uniformisation des trois niveaux, un style en ligne l'emportant sur une feuille de style.
+         Deux motifs de blocage : la technologie requise manque, ou l'action a déjà été utilisée.
+         ⚠️ JAMAIS pour les cartes RÉPÉTABLES (Capture d'astéroïdes) ni celles jouables à chaque tour
+         (Investissement dans la Recherche) : elles restent achetables plusieurs fois, donc jamais
+         enroulées. On s'appuie sur `taken`, que le jeu calcule DÉJÀ en tenant compte de ces deux
+         cas — plutôt que de réécrire la règle et risquer de la faire diverger. */
+      const _repet=!!(card.repeatable||card.perTurn);
+      const _gcBloque=!_repet&&(taken||!_reqOk);
+      const _gcCls=(_gcBloque?' gc-corne no-buy':'')+(mine?' gc-mine':'');
       if(compact){
-        r+=`<div class="gcard gc-compact${mine?' gc-mine':''}" onclick="showGeneralDetail('${card.id}')" style="border-top:2px solid ${border};opacity:${taken?.4:1}">
+        r+=`<div class="gcard gc-compact${_gcCls}" onclick="showGeneralDetail('${card.id}')" style="border-top:2px solid ${border}">
           <div class="gc-header"><span class="gc-name">${card.emoji} ${card.name}</span><span class="gc-cost">${taken?'✗':!_reqOk?'🔒':canBuy?_acN+'AC':'—'}</span></div></div>`;
       } else {
-        r+=`<div class="gcard${mine?' gc-mine':''}" onclick="showGeneralDetail('${card.id}')" style="border-top:2px solid ${border};cursor:pointer;opacity:${taken?.4:1}">
+        r+=`<div class="gcard${_gcCls}" onclick="showGeneralDetail('${card.id}')" style="border-top:2px solid ${border};cursor:pointer">
           <div class="gc-header"><span class="gc-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2">${card.name}</span></div>
           <div class="gc-art${CARD_ART.has(card.id)?' gc-illus':''}" style="${CARD_ART.has(card.id)?`background:#0a0a18 url('assets/cards/${card.id}.png') center/cover no-repeat`:`background:${artBg}`}">${CARD_ART.has(card.id)?'':card.emoji}${(card.repeatable||card.perTurn)?'<span style="position:absolute;top:1px;right:3px;font-size:.55em;color:#ffaa44">∞</span>':''}</div>
           <div class="gc-body"><div class="tc-effect" style="color:#8898b8">${card.effect}</div>
@@ -7507,8 +7582,13 @@ function confirmAttack(){
   G.player.forceCooldown.push({count:sent,returnTurn:getCooldownTurn(G.player)});
   G.player.spentThisTurn+=1+sent;
   // Défense IA DÉTERMINISTE (plus d'aléatoire) : garnison de base (1) + ce que l'IA peut PAYER (1🪨+1⚡/jeton).
+  /* ⚠️ CHEMIN SOLO — MÊME RÈGLE QUE LE SERVEUR. Il calculait ici sa propre défense
+     (`min(jetons, matériaux, énergie)`), donc solo et en ligne divergeaient sur le même combat.
+     `defenseIA` est désormais la SEULE définition ; les jetons engagés et ceux payés sont le même
+     nombre, ce qui n'était pas garanti avant. */
   const atkAi=G.ais.find(ai=>ai.colonies.find(c=>c.nodeId===_attackTargetNode))||G.ais[0];
-  const aiAfford=atkAi?Math.max(0,Math.min(atkAi.forceTokens||0,atkAi.res.materials||0,atkAi.res.energy||0)):0;
+  const aiAfford=atkAi?((typeof defenseIA==='function')?defenseIA(atkAi,G.player,_attackTargetNode)
+                                                      :Math.max(0,Math.min(atkAi.forceTokens||0,atkAi.res.materials||0,atkAi.res.energy||0))):0;
   const aiDef=1/*garnison de base*/+aiAfford;
   if(atkAi&&aiAfford>0&&typeof applyCombatEngage==='function')applyCombatEngage(atkAi,aiAfford,effAtk<=aiDef); // l'IA paie sa défense engagée
   let resultMsg='';let resultCls='';

@@ -170,15 +170,69 @@ function writeArch(user, list) {
   try { fs.writeFileSync(archFile(user), JSON.stringify(list.slice(0, 10), null, 1)); } // 10 parties max, plus récente en tête
   catch (e) { console.error('writeArch:', e.message); }
 }
+/* ─── LE RAPPORT DE FIN DE PARTIE ─────────────────────────────────────────────
+   Demande de Marc (2026-08-08) : l'email doit contenir le CALCUL COMPLET des scores, puis le
+   rapport de bug éventuel, puis le journal entier — dans cet ordre.
+   Avant, il ne contenait qu'un classement en trois lignes : impossible de comprendre après coup
+   d'où venaient les points, ni de relire une partie pour y chercher une anomalie. */
+function corpsRapport(entry) {
+  const L = [];
+  L.push('Partie ' + entry.code + ' — terminée le ' + entry.dateFr + (entry.turn ? ' (tour ' + entry.turn + ')' : ''));
+  L.push('Joueurs : ' + entry.joueurs.map(j => j.civ + (j.user ? ' = ' + j.user : ' (IA)')).join(' · '));
+  L.push('');
+  L.push('═══════════ CALCUL FINAL DES POINTS DE VICTOIRE ═══════════');
+  for (let i = 0; i < entry.scores.length; i++) {
+    const s = entry.scores[i], d = s.detail || {};
+    L.push('');
+    L.push((i + 1) + '. ' + s.name + (s.user ? ' (' + s.user + ')' : ' (IA)') + ' — TOTAL ' + s.vp + ' VP');
+    L.push('     Colonies ............... ' + (d.colVP || 0));
+    L.push('     Routes ................. ' + (d.routeVP || 0));
+    L.push('     Cartes ................. ' + (d.cardsVP || 0));
+    L.push('     Bonus technologiques ... ' + (d.techBonusVP || 0));
+    L.push('     Revenus par tour ....... ' + (d.rptVP || 0));
+    L.push('     Agenda' + (s.agenda ? ' (' + s.agenda + ')' : '') + ' ......... ' + (d.agendasVP || 0));
+    L.push('     Événements ............. ' + (d.evtVP || 0));
+    L.push('     Bonus divers ........... ' + (d.extraVP || 0));
+  }
+  L.push('');
+  L.push('═══════════ RAPPORT DE BUG ═══════════');
+  if (!entry.bugs || !entry.bugs.length) L.push('(aucun rapport signalé pour cette partie)');
+  else for (const b of entry.bugs) {
+    L.push('');
+    L.push('— ' + (b.dateFr || '') + ' par ' + (b.user || 'anonyme') + ' :');
+    L.push(String(b.text || '').split('\n').map(x => '   ' + x).join('\n'));
+  }
+  L.push('');
+  L.push('═══════════ JOURNAL COMPLET DE LA PARTIE ═══════════');
+  L.push('(' + (entry.journal || []).length + ' lignes, du début à la fin)');
+  L.push('');
+  for (const l of (entry.journal || [])) L.push(l);
+  L.push('');
+  L.push('Merci d\'avoir joué !');
+  return L.join('\n');
+}
 function archiveGame(g) {
   let scores = [], journal = [], turn = null;
   try {
     const sb = g.driver.sb, G = g.driver.state();
     turn = G.turn;
-    scores = [G.player, ...G.ais].map(p => ({ civId: p.civ.id, name: p.civ.name, vp: sb.calcVP(p).total }))
-      .sort((a, b) => b.vp - a.vp);
+    const parUser = {};
+    for (const s of g.seats) if (s.user) parUser[s.civId] = s.user;
+    /* DÉTAIL COMPLET, pas seulement le total : `calcVP` rend déjà toute la ventilation, elle était
+       simplement jetée ici alors que l'écran de fin l'affiche. */
+    scores = [G.player, ...G.ais].map(p => {
+      const d = sb.calcVP(p) || {};
+      return {
+        civId: p.civ.id, name: p.civ.name, vp: d.total || 0,
+        user: parUser[p.civ.id] || null,
+        agenda: (p.agenda && p.agenda.name) || null,
+        detail: { colVP: d.colVP || 0, routeVP: d.routeVP || 0, cardsVP: d.cardsVP || 0,
+                  techBonusVP: d.techBonusVP || 0, rptVP: d.rptVP || 0, agendasVP: d.agendasVP || 0,
+                  evtVP: d.evtVP || 0, extraVP: d.extraVP || 0 }
+      };
+    }).sort((a, b) => b.vp - a.vp);
     journal = (G.log || []).slice(0, 400).map(l => plainText((l && l.msg) || l)).reverse();
-  } catch (e) {}
+  } catch (e) { console.error('archiveGame:', e.message); }
   const endedAt = Date.now();
   const humans = g.seats.filter(s => !s.ai && s.user);
   const entry = {
@@ -186,14 +240,12 @@ function archiveGame(g) {
     joueurs: g.seats.map(s => ({ civ: s.civId, ai: !!s.ai, user: s.user || null })),
     scores, journal, bugs: (g._bugs || [])
   };
-  const tableau = scores.map((s, i) => '  ' + (i + 1) + '. ' + s.name + ' — ' + s.vp + ' VP').join('\n');
+  const corps = corpsRapport(entry);
   for (const s of humans) {
     const list = readArch(s.user); list.unshift(entry); writeArch(s.user, list);
-    sendMail(s.user, 'Solar — fin de partie ' + g.code + ' (' + entry.dateFr + ')',
-      'Partie ' + g.code + ' terminée le ' + entry.dateFr + '.\n\nSCORES :\n' + tableau + '\n\nMerci d\'avoir joué !');
+    sendMail(s.user, 'Solar — fin de partie ' + g.code + ' (' + entry.dateFr + ')', corps);
   }
-  sendMail(ADMIN_MAIL, 'Solar — partie terminée ' + g.code,
-    'Partie ' + g.code + ' — ' + entry.dateFr + '\nJoueurs : ' + entry.joueurs.map(j => j.civ + (j.user ? ('=' + j.user) : '(IA)')).join(', ') + '\n\nSCORES :\n' + tableau);
+  sendMail(ADMIN_MAIL, 'Solar — partie terminée ' + g.code, corps);
   return entry;
 }
 const USERS_FILE = path.join(DATA, 'users.json');
@@ -1115,6 +1167,20 @@ wss.on('connection', (ws) => {
           } catch (e) {}
           sendMail(ADMIN_MAIL, '🐞 Solar Conquest — BUG signalé par ' + who,
             'Le ' + rec.dateFr + '\nJoueur : ' + who + '\nPartie : ' + (g ? g.code : '—') + '\n\n--- Message ---\n' + txt);
+          /* ⚠️ LE RAPPORT ARRIVE APRÈS L'EMAIL DE FIN DE PARTIE, PAS AVANT.
+             Le signalement se saisit sur l'écran de fin — donc quelques secondes à quelques minutes
+             après l'archivage, qui a déjà envoyé le rapport complet. Attendre ce bug avant d'envoyer
+             l'email n'a pas de sens : on ne sait pas s'il viendra. On renvoie donc le rapport COMPLET
+             une seconde fois, cette fois avec le signalement à sa place — entre les scores et le
+             journal, comme demandé. Le joueur reçoit deux messages ; le second remplace le premier. */
+          try {
+            const listMaj = readArch(who);
+            if (listMaj.length && listMaj[0].scores && listMaj[0].scores.length) {
+              const maj = corpsRapport(listMaj[0]);
+              sendMail(who, 'Solar — fin de partie ' + listMaj[0].code + ' (avec ton signalement)', maj);
+              sendMail(ADMIN_MAIL, 'Solar — partie ' + listMaj[0].code + ' + signalement', maj);
+            }
+          } catch (e) { console.error('bug_report renvoi:', e.message); }
           sendTo(ws, { t: 'notice', kind: 'info', payload: { msg: 'Merci ! Ton signalement a été transmis.' } });
           break;
         }
