@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-08 · v9.28';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
+const SOLAR_BUILD_JS = '2026-08-08 · v9.31';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :
@@ -600,22 +600,71 @@ function showInvestReal(pending, lvl){
 // et le journal. La fonction est conservée vide car le serveur peut encore émettre ce type de notice.
 function showResultToast(){ /* volontairement vide */ }
 
-// ── Pop-up rouge : ce que font les AUTRES (bot, IA) pendant la partie ──
+// ── Pop-up rouge : ce que font les AUTRES nations pendant la partie ──
+/* ⚠️ RÉÉCRIT LE 2026-08-08 (Marc : « trop d'information en trop peu de temps »).
+   Le toast reprenait les lignes du journal telles quelles, y compris « ↳ X paie : 1 AC −5🔬 » : deux
+   lignes par action, dont une de comptabilité qu'on n'a pas le temps de lire en cinq secondes. Et il
+   occupait toute la largeur, sous la barre du haut qu'il chevauchait à moitié.
+   Désormais : une ligne par action, « Nation — verbe complément », rien d'autre. Les coûts restent
+   dans le journal, consultable à froid. Rien n'est affiché pour TA propre nation : tu viens de le
+   faire, tu le sais. */
+const _TOAST_IGNORE=/^↳|paie\s*:|^💰|^📊|^⚙️/;
+function _toastLigne(t){
+  let x=String(t||'').replace(/<[^>]+>/g,'').trim();
+  if(!x||_TOAST_IGNORE.test(x)) return null;
+  /* ⚠️ AUCUN ÉMOJI DANS CETTE FENÊTRE (Marc, 2026-08-08). Je n'enlevais que celui de TÊTE de ligne ;
+     il en restait au milieu — le drapeau de la nation, et l'icône de la carte achetée
+     (« Jupitériens — achète 🌐 Communications Instantanées »). On les retire tous, d'un coup, par
+     leurs plages Unicode : pictogrammes, symboles divers, drapeaux, flèches décoratives et
+     sélecteurs de variante. Il ne reste que du texte. */
+  x=x.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{FE0F}\u{20E3}\u{200D}]/gu,'');
+  /* ⚠️ NE PAS BALAYER U+2200–U+2BFF EN BLOC : le signe moins « − » est U+2212 et s'y trouve.
+     Mon premier essai effaçait donc les valeurs négatives — « −2 moral » devenait « 2 moral »,
+     c'est-à-dire l'inverse. On ne retire que les plages réellement décoratives. */
+  x=x.replace(/\s{2,}/g,' ').trim();
+  // « Jupitériens achète X » → « Jupitériens — achète X ». Le tiret sépare l'acteur de l'action.
+  const m=x.match(/^([^\s]*\s*)?(Terriens|Martiens|Jupitériens|Ceinturiens)\s+(.*)$/);
+  if(m) x=m[2]+' — '+m[3];
+  return x;
+}
 function showLogToast(txts){
-  // SÉQUENÇAGE : si le toast VERT (ta nation) est encore affiché, on diffère celui des autres nations
-  // au lieu de le superposer (les deux étaient au même endroit → chevauchement).
+  const lignes=(txts||[]).map(_toastLigne).filter(Boolean)
+    .filter(l=>!(STATE.myCiv && l.indexOf(civLabel(STATE.myCiv).replace(/^\S+\s*/,''))===0));  // rien sur MA nation
+  if(!lignes.length) return;
   const wait=(window._scGreenUntil||0)-Date.now();
   if(wait>0){ setTimeout(()=>{ try{ showLogToast(txts); }catch(e){} }, wait+120); return; }
   let p=document.getElementById('sc-logtoast');
-  // Seule fenêtre ajoutée CONSERVÉE (Marc : « garde celles en rouge ») = ce que font les AUTRES nations.
-  // Mise en PLEINE LARGEUR pour s'aligner sur les fenêtres du jeu (plus de bandeau étroit flottant).
-  if(!p){ injectStyles(); p=el('<div id="sc-logtoast" style="position:fixed;top:78px;left:8px;right:8px;z-index:8650;background:#2a0e14;border:2px solid #c0392b;border-radius:12px;padding:10px 14px;box-sizing:border-box;color:#ffd7d0;font:600 .85em system-ui;box-shadow:0 10px 30px rgba(0,0,0,.55);line-height:1.4"></div>'); document.body.appendChild(p); p.onclick=()=>{ p.style.display='none'; }; }
-  p._buf=(p._buf||[]).concat(txts).slice(-4); // les 4 dernières lignes
-  p.innerHTML=p._buf.map(t=>'• '+t).join('<br>');
+  /* Moitié de la largeur disponible, centré, DANS la zone de jeu — plus sous la barre du haut, qu'il
+     recouvrait. `--topband` est la hauteur mesurée de cette barre. */
+  if(!p){ injectStyles(); p=el('<div id="sc-logtoast" style="position:fixed;top:calc(var(--topband,56px) + 46px);left:50%;transform:translateX(-50%);'
+    +'width:min(50%,420px);z-index:8650;background:#2a0e14;border:2px solid #c0392b;border-radius:12px;padding:9px 13px;'
+    +'color:#ffd7d2;font:600 .82em/1.5 system-ui;box-shadow:0 8px 28px rgba(0,0,0,.55);display:none;text-align:left"></div>');
+    document.body.appendChild(p); }
+  p._buf=(p._buf||[]).concat(lignes).slice(-4);
+  p.innerHTML=p._buf.join('<br>');
   p.style.display='block';
   clearTimeout(p._timer);
   p._timer=setTimeout(()=>{ p.style.display='none'; p._buf=[]; }, 5000);
 }
+/* ── Annonce VERTE : ce que TU viens de gagner (raid réussi, action gratuite) ───────────────────
+   Elle manquait : un raid rapportait des ressources sans que rien ne le dise à l'écran, et une
+   action gratuite se validait en silence. Même durée que le toast rouge, mais en bas à droite —
+   à l'emplacement du bouton Valider, là où l'œil est déjà. */
+function showGainToast(html){
+  if(!html) return;
+  let p=document.getElementById('sc-gaintoast');
+  if(!p){ p=el('<div id="sc-gaintoast" style="position:fixed;right:12px;bottom:calc(var(--botband,84px) + 14px);'
+    +'z-index:8660;max-width:min(60vw,340px);background:#0d2a16;border:2px solid #3fbf6a;border-radius:12px;padding:9px 13px;'
+    +'color:#d6ffe4;font:600 .82em/1.5 system-ui;box-shadow:0 8px 28px rgba(0,0,0,.55);display:none;text-align:left"></div>');
+    document.body.appendChild(p); }
+  p._buf=(p._buf||[]).concat([html]).slice(-3);
+  p.innerHTML=p._buf.join('<br>');
+  p.style.display='block';
+  window._scGreenUntil=Date.now()+5000;   // le toast rouge attend son tour (ils se chevauchaient)
+  clearTimeout(p._timer);
+  p._timer=setTimeout(()=>{ p.style.display='none'; p._buf=[]; }, 5000);
+}
+try{ window.showGainToast=showGainToast; }catch(e){}
 
 // Affiche la VRAIE modale d'événement du jeu (#event-modal / #event-announce-modal) au lieu d'un bandeau.
 // Retourne true si la modale existe (sinon repli sur le bandeau). Restaure le visuel d'origine des événements.

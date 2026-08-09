@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-08 · v9.28';
+const SOLAR_BUILD_MOTEUR = '2026-08-08 · v9.31';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -4032,6 +4032,16 @@ function pirateCommerce(p){
   for(let i=0;i<n;i++){const r=['energy','materials','science'][Math.floor(Math.random()*3)];p.res[r]=Math.min(caps[r]!=null?caps[r]:9999,(p.res[r]||0)+1);got.push(r);}
   return got; // tableau des ressources reçues (0, 1 ou 2)
 }
+/* ─── ANNONCE VERTE : CE QUE TU VIENS DE GAGNER ────────────────────────────────
+   Demande de Marc (2026-08-08). Deux moments passaient jusqu'ici en silence à l'écran : le butin
+   d'un raid, et la validation d'une action gratuite (pouvoir de nation). Le journal les notait, mais
+   il faut aller le consulter — or ce sont précisément les instants où l'on veut un retour immédiat.
+   Le client affiche cette annonce en bas à droite, à l'emplacement du bouton Valider, cinq secondes,
+   comme le bandeau rouge des autres nations. En solo (pas de couche en ligne) elle est simplement
+   ignorée : le journal reste la source. */
+function gainToast(html){
+  try{ if(typeof window!=='undefined'&&typeof window.showGainToast==='function') window.showGainToast(html); }catch(e){}
+}
 function useAbility(){
   if(G.phase!=='actions')return;
   if(_scGuard())return;
@@ -4046,11 +4056,14 @@ function useAbility(){
     showForgeChoiceModal(eligible); return; // le coût est prélevé au moment du choix (_forgeUpgrade)
   }
   saveUndo();p.acLeft-=ab.ac;for(const[r,a]of Object.entries(ab.cost))p.res[r]-=a;p.abilityUsed=true;
-  if(p.civ.id==='terriens'){addGovPts(p,3);addLog('💫 Diplomatie Verte : +3 pts Gov','gold');addAction('💫','Diplomatie Verte',0,{materials:3},'+3 pts Gov');}
-  else if(p.civ.id==='martiens'){p.acLeft+=1;p.acMax+=1;addLog('💫 Surtension : +1 AC ce tour','gold');addAction('💫','Surtension',0,{energy:2},'+1 AC');}
+  if(p.civ.id==='terriens'){const _lv0=p.gov_level;addGovPts(p,3);addLog('💫 Diplomatie Verte : +3 pts Gov','gold');
+    gainToast(p.civ.name+' — +3 en gouvernement'+(p.gov_level>_lv0?', passe Nv.'+p.gov_level:''));addAction('💫','Diplomatie Verte',0,{materials:3},'+3 pts Gov');}
+  else if(p.civ.id==='martiens'){p.acLeft+=1;p.acMax+=1;addLog('💫 Surtension : +1 AC ce tour','gold');
+    gainToast(p.civ.name+' — gagne une action');addAction('💫','Surtension',0,{energy:2},'+1 AC');}
   else if(p.civ.id==='ceinturiens'){
     const got=pirateCommerce(p);
-    if(got.length){const em=got.map(rEmoji).join('');addLog('💫 Commerce avec les pirates : contrebande → +'+em,'gold');addAction('💫','Commerce avec les pirates',0,{},'+'+em);}
+    if(got.length){const em=got.map(rEmoji).join('');addLog('💫 Commerce avec les pirates : contrebande → +'+em,'gold');
+      gainToast(p.civ.name+' — gagne '+got.map(r=>'1'+rEmoji(r)).join(' '));addAction('💫','Commerce avec les pirates',0,{},'+'+em);}
     else{addLog('💫 Commerce avec les pirates : les pirates n\'ont rien pu piller ce tour (rien reçu).','dim');addAction('💫','Commerce avec les pirates',0,{},'Rien');}
   }
   scArmConfirm('💫 Pouvoir',[]);
@@ -4073,6 +4086,7 @@ function _forgeUpgrade(nodeId){
   p.acLeft-=ab.ac;for(const[r,a]of Object.entries(ab.cost))p.res[r]-=a;p.abilityUsed=true;
   col.level++;updateConnections(p);
   addLog('💫 Forge Orbitale : '+NODES[nodeId].name+' → Nv.'+col.level,'gold');
+  gainToast(p.civ.name+' — améliore '+NODES[nodeId].name+' Nv.'+col.level);
   addAction('💫','Forge Orbitale',0,{materials:1,energy:1},NODES[nodeId].name+' Nv.'+col.level);
   scArmConfirm('💫 Forge '+NODES[nodeId].name,[{kind:'pt',icon:rEmoji('science'),val:1}]);
   render();
@@ -4139,6 +4153,9 @@ function doRaidTarget(aiId,nodeId){
     addTens('player',target.civ.id,1);
     addLog('⚔️ Raid sur '+target.civ.emoji+' '+target.civ.name+' ! +'+(stolen.join('')||'rien')+(enCost>0?' (−1<i class=ri-energy></i>)':'')+' ('+tc+' jeton en CD, tension +2)','green');
     addAction('💰','Raid '+target.civ.emoji,1,{},'Volé : '+(stolen.join('')||'rien'));
+    /* Le butin s'affiche à l'écran, pas seulement au journal : c'est le seul retour immédiat sur une
+       action qu'on vient de payer en jetons. */
+    gainToast(p.civ.name+' — raid sur '+target.civ.name+' : '+(stolen.length?'+'+stolen.join(' +'):'aucun butin'));
     render();
   }catch(e){console.error('doRaidTarget',e);}
 }
