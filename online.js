@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-08 · v9.31';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
+const SOLAR_BUILD_JS = '2026-08-09 · v9.34';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :
@@ -113,11 +113,12 @@ function handle(m){
       STATE.isHost = (m.game.host === STATE.user);
       try{ localStorage.setItem('sc_ws_game', m.game.code); }catch(e){}
       if (m.game.status === 'lobby') renderWait();
-      else if (m.game.status === 'playing' && !STATE.started){ STATE.started = true; installIntercepts(); hideOverlay(); revealGameUI(); reqState(true); send({t:'resync'}); }
+      else if (m.game.status === 'playing' && !STATE.started){ STATE.started = true; installIntercepts(); concederVisible(true); hideOverlay(); revealGameUI(); reqState(true); send({t:'resync'}); }
       break;
     case 'started':
       STATE.started = true;
       installIntercepts();
+      concederVisible(true);   // « Concéder » n'a de sens qu'en ligne, partie lancée
       hideOverlay(); revealGameUI();
       status('Partie lancée — synchronisation…');
       reqState(true);
@@ -134,6 +135,15 @@ function handle(m){
       break;
     case 'vote':
       absenceVoteEtat(m);
+      break;
+    case 'concede_vote':   // quelqu'un a concédé : à nous de dire si la partie continue
+      concedePanel(m);
+      break;
+    case 'concede_wait':   // on a répondu, on attend les autres
+      concedeAttente(m.manquants||[]);
+      break;
+    case 'concede_done':   // c'est tranché
+      concedeFini(m);
       break;
     case 'decision':
       bandeauATonTour(false);   // une question remplace le tour d'action
@@ -245,7 +255,7 @@ function handle(m){
       STATE.started=false; STATE._myTurn=false; STATE._confirmPending=false;
       STATE.game=null; STATE.myCiv=null;
       try{ localStorage.removeItem('sc_ws_game'); }catch(e){}
-      hideWaitBlock(); hideConfirmBar(); turnBar(false); closeDecision();
+      hideWaitBlock(); hideConfirmBar(); turnBar(false); closeDecision(); concedeFermer(); concederVisible(false);
       status(m.by && m.by!==STATE.user ? (m.by+' a quitté — retour au lobby') : 'Partie quittée.');
       screenLobby();
       break;
@@ -817,7 +827,7 @@ function sendAction(action){
   STATE._myTurn=false;
   closeDecision(); turnBar(false);
   bandeauATonTour(false);   // ← tu viens de jouer : le badge s'éteint sans attendre un message du serveur
-  window._scOnPass=null;
+  window._scOnPass=null; window._scOnSkip=null;
   send({t:'act', action});
   showWaitBlock(); status('Coup envoyé…');
   // anti-flicker : redemander l'état autoritaire rapidement (le round-trip est court),
@@ -1042,11 +1052,12 @@ function turnBar(show){
   const b=document.getElementById('sc-turnbar'); if(b)b.remove();
 }
 function onMyActionTurn(){
-  STATE._myTurn = true;
+  STATE._myTurn = true;   // ⚠️ AVANT badgeTour : c'est cette valeur qui décide d'afficher PASSER
   hideWaitBlock(); closeDecision(); hideStatus();
   bandeauATonTour(true);   // « A TOI DE JOUER », en haut, en majuscules (demande de Marc)
   reqState(true);                                   // état frais → plateau à jour
-  window._scOnPass = ()=> sendAction({type:'pass'}); // le bouton « Fin de Tour » du jeu = passer
+  window._scOnPass = ()=> sendAction({type:'pass'}); // le bouton « Fin de Tour » du jeu = passer TOUTE la manche
+  window._scOnSkip = ()=> sendAction({type:'skip'}); // le bouton PASSER = renoncer à UNE action, on rejoue au tour suivant
   turnBar(true);
   // RAPPEL DU POUVOIR GRATUIT — déclenché quand il te reste **1 AC** (donc AVANT ta dernière action),
   // pendant ta phase de jeu où tu peux encore l'utiliser. Avant, il se déclenchait à 0 AC, c'est-à-dire
@@ -1102,6 +1113,8 @@ function actionMenu(){
 
 // ───────────────────────── UI overlay (repris de la v1, transport en moins) ─────────────────────────
 function el(html){ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstChild; }
+/* Les noms de joueurs viennent d'ailleurs (comptes) : ils ne sont JAMAIS insérés bruts dans du HTML. */
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function injectStyles(){
   if (document.getElementById('sc-online-css')) return;
   const s=document.createElement('style'); s.id='sc-online-css';
@@ -1171,6 +1184,87 @@ function absenceBanner(m){
 }
 function hideAbsence(){ const b=document.getElementById('sc-absence'); if(b) b.remove(); }
 
+/* ═══════════════ CONCÉDER LA VICTOIRE ═══════════════
+   Le bouton est dans le journal. Il n'existe QU'EN LIGNE : en solo il n'y a personne à qui
+   concéder, et « Recommencer à zéro » fait déjà ce qu'il faut.
+
+   ⚠️ Cette fenêtre a son PROPRE calque (#sc-concede), délibérément séparé de #sc-decision.
+   Une concession peut tomber pendant qu'on a une question de jeu à l'écran : réutiliser le
+   calque des décisions écraserait cette question, et le joueur ne la reverrait jamais. */
+function concederVisible(oui){ const b=document.getElementById('conceder-btn'); if(b) b.style.display = oui ? 'block' : 'none'; }
+window.scConcede = function(){
+  if(!STATE.game || !STATE.started){ alert('Aucune partie en cours.'); return; }
+  const ok = confirm('CONCÉDER LA VICTOIRE\n\n'
+    + 'Tu renonces à la victoire et tu quittes définitivement cette partie.\n\n'
+    + 'Les autres joueurs choisiront alors, à l\'unanimité, si la partie continue avec une IA '
+    + 'à ta place ou si elle s\'arrête là.\n\nConfirmer ?');
+  if(!ok) return;
+  send({t:'concede'});
+  concedePanelHTML('<h2>🏳️ Tu as concédé</h2>'
+    + '<p style="color:#c7d4ee;font-size:.9em;line-height:1.5">Les autres joueurs décident si la partie '
+    + 'continue avec une IA à ta place, ou si elle s\'arrête.</p>'
+    + '<div id="sc-concede-etat" style="color:#9fb4d8;font-size:.84em;margin-top:10px">En attente de leur réponse…</div>');
+};
+function concedePanelHTML(html){
+  let p=document.getElementById('sc-concede');
+  if(!p){ p=el('<div id="sc-concede"></div>'); document.body.appendChild(p); }
+  // z-index AU-DESSUS de #sc-decision (375) : la concession suspend la partie, elle passe devant.
+  p.style.cssText='position:fixed;left:0;right:0;top:0;bottom:0;z-index:8600;background:rgba(4,4,18,.94);'
+    +'backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:10px;overflow-y:auto';
+  p.innerHTML='<div style="background:#0c0c24;border:2px solid #c85050;border-radius:16px;padding:22px 26px;'
+    +'width:min(94vw,460px);color:#e6ecff;font-family:system-ui,sans-serif;text-align:center;'
+    +'box-shadow:0 20px 60px rgba(0,0,0,.92);box-sizing:border-box">'+html+'</div>';
+  return p;
+}
+function concedeFermer(){ const p=document.getElementById('sc-concede'); if(p) p.remove(); }
+function concedePanel(m){
+  if(!m || !m.civId) return;
+  if(m.civId===STATE.myCiv) return;            // c'est MOI qui ai concédé : mon panneau est déjà affiché
+  if(m.dejaChoisi){ concedeAttente(null); return; }
+  concedePanelHTML('<h2 style="margin:0 0 12px;color:#ffd0d0;font-size:1.25em">🏳️ '
+      + esc(m.qui||'Un joueur') + ' concède la victoire</h2>'
+    + '<p style="color:#c7d4ee;font-size:.92em;line-height:1.5;margin:0 0 16px">Il quitte la partie. '
+    + 'Sa nation, <b>' + esc(m.nation||'') + '</b>, est encore sur le plateau.<br>Que faites-vous ?</p>'
+    + '<button id="sc-cc-ia" style="display:block;width:100%;margin:7px 0;padding:12px;border-radius:10px;border:1px solid #3f7a4a;'
+    + 'background:#14301c;color:#cdf0d6;font:700 .95em system-ui;cursor:pointer">🤖 Continuer — une IA reprend sa nation</button>'
+    + '<button id="sc-cc-stop" style="display:block;width:100%;margin:7px 0;padding:12px;border-radius:10px;border:1px solid #7a3f3f;'
+    + 'background:#301414;color:#f0cdcd;font:700 .95em system-ui;cursor:pointer">🛑 Arrêter la partie maintenant</button>'
+    + '<div style="color:#8fa2c4;font-size:.78em;margin-top:12px;line-height:1.45">L\'accord de tous les joueurs '
+    + 'restants est nécessaire. En cas de désaccord, la partie continue avec l\'IA.<br>'
+    + 'Si vous arrêtez, les scores sont calculés en l\'état et l\'email de fin part normalement.</div>'
+    + '<div id="sc-concede-etat" style="color:#9fb4d8;font-size:.82em;margin-top:8px"></div>');
+  const rep=(choix)=>{
+    send({t:'concede_choice', choix});
+    document.getElementById('sc-cc-ia').disabled=true; document.getElementById('sc-cc-stop').disabled=true;
+    document.getElementById('sc-cc-ia').style.opacity=.5; document.getElementById('sc-cc-stop').style.opacity=.5;
+    concedeAttente(null);
+  };
+  document.getElementById('sc-cc-ia').onclick=()=>rep('ia');
+  document.getElementById('sc-cc-stop').onclick=()=>rep('stop');
+}
+function concedeAttente(manquants){
+  const d=document.getElementById('sc-concede-etat'); if(!d) return;
+  d.textContent = (manquants && manquants.length)
+    ? 'En attente de : ' + manquants.join(', ')
+    : 'Réponse enregistrée. En attente des autres joueurs…';
+}
+function concedeFini(m){
+  concedeFermer();
+  const jeSuisLePartant = (m && m.civId===STATE.myCiv);
+  if(m && m.issue==='ia'){
+    if(jeSuisLePartant){
+      concedePanelHTML('<h2 style="margin:0 0 12px;color:#ffd0d0">🏳️ Tu as quitté la partie</h2>'
+        + '<p style="color:#c7d4ee;font-size:.92em;line-height:1.5">Une IA a repris ta nation ; la partie continue sans toi.</p>'
+        + '<button onclick="location.reload()" style="margin-top:14px;padding:11px 20px;border-radius:10px;border:0;'
+        + 'background:linear-gradient(135deg,#2f6fd0,#1f4fa0);color:#fff;font:700 .95em system-ui;cursor:pointer">Retour à l\'accueil</button>');
+    }else{
+      showLogToast(['🤖 Une IA reprend la nation du joueur parti — la partie continue.']);
+    }
+    return;
+  }
+  // 'stop' : le message 'over' arrive juste après et affiche l'écran de fin. On ne fait rien de plus.
+}
+
 /* ─── BILAN DE FIN DE TOUR : QUI N'A PAS ENCORE CLIQUÉ ───
    Le bilan est désormais MULTI-ACTIF : le tour ne repart qu'au dernier clic (demande de Marc).
    Sans ce bandeau, celui qui a déjà cliqué reste devant un écran figé sans comprendre : il croit
@@ -1214,6 +1308,14 @@ function _estIA(civId){
 }
 /* qui : 'moi' | un civId | null (rien à afficher) */
 function badgeTour(qui){
+  /* Le bouton PASSER n'apparaît QUE pendant TON tour d'action — pas quand une question t'est posée
+     (là, il faut répondre, pas passer) ni quand c'est le tour d'un autre. */
+  const _pb=document.getElementById('passer-btn');
+  if(_pb){
+    _pb.classList.toggle('on', qui==='moi' && !!STATE._myTurn);
+    /* PASSER ≠ Fin de Tour : il renonce à UNE action (_scOnSkip), pas à la manche entière (_scOnPass). */
+    if(!_pb._lie){ _pb._lie=true; _pb.onclick=()=>{ if(typeof window._scOnSkip==='function') window._scOnSkip(); }; }
+  }
   const b=document.getElementById('a-toi-badge');
   const tb=document.getElementById('top-bar');
   const vieux=document.getElementById('sc-a-toi'); if(vieux)vieux.remove();   // résidu d'une version précédente

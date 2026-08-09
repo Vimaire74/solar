@@ -120,6 +120,14 @@ class GameDriver {
     if(this.isAI(civId)) throw new Error(civId+' est une IA');
     const me = this.activate(civId);
     const before = this.sb.__G.log ? this.sb.__G.log.length : 0;
+    if(action && action.type==='skip'){   // renoncer à UN coup (cf. act()) : consomme 1 AC, ne sort pas de la manche
+      if((me.acLeft||0)>0) me.acLeft-=1;
+      try{ this.sb.addLog(((me.civ&&me.civ.name)||civId)+' passe une action.'); }catch(e){}
+      this._emitLog(before);
+      if(me.acLeft<=0) me._passedRound=true;
+      this._advance();
+      return {civId, passed:me._passedRound};
+    }
     if(action && action.type && action.type!=='pass'){
       this.engine.apply(action);
     }
@@ -336,6 +344,22 @@ class GameDriver {
     if(!nat || nat.civ.id!==civId) throw new Error('pas le tour d\'action de '+civId);
     this.activate(civId);
     const G=this.sb.__G;
+    /* PASSER UNE SEULE ACTION (bouton PASSER, demande de Marc 2026-08-09).
+       À NE PAS CONFONDRE avec 'pass' (bouton « Fin de Tour »), qui sort de la manche ENTIÈRE :
+       'skip' renonce à CE coup-ci, rend la main au joueur suivant, et on rejouera au passage suivant.
+       L'AC est bel et bien consommé, et c'est délibéré : `roundComplete()` exige que TOUS aient
+       `_passedRound`. Un « skip » gratuit permettrait donc de passer indéfiniment et la manche ne se
+       terminerait jamais. Consommer l'AC garantit la terminaison (à 0 AC, on sort de la manche). */
+    if(action && action.type==='skip'){
+      const b0 = G.log?G.log.length:0;
+      if((nat.acLeft||0)>0) nat.acLeft-=1;
+      try{ this.sb.addLog(((nat.civ&&nat.civ.name)||civId)+' passe une action.'); }catch(e){}
+      this._emitLog(b0);
+      this._lastActionLog=[];
+      if(nat.acLeft<=0) nat._passedRound=true;
+      this._advanceActor();
+      return this.pump();
+    }
     const confirmable = !nat._isAI && this._isConfirmable(action);
     const snap = confirmable ? this._snap() : null;    // photo AVANT l'action (pour annuler)
     const before=G.log?G.log.length:0;

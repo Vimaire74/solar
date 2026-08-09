@@ -606,6 +606,80 @@ function remplacerParIA(g, cible) {
   } catch (e) { console.error('remplacerParIA:', e.message); }
 }
 
+/* ===================== CONCÉDER LA VICTOIRE =====================
+   Marc, 2026-08-09 : « ajouter un bouton : Concéder la victoire pour annuler sa
+   participation au jeu. Les autres joueurs éventuels peuvent alors voir une fenêtre qui
+   annonce cela et choisir si ils continuent avec une IA qui joue la nation dont le joueur
+   est parti ou si le jeu s'arrête. »
+
+   À NE PAS CONFONDRE avec le vote de remplacement d'un ABSENT, juste au-dessus. Là, on
+   soupçonne quelqu'un d'être parti et on attend une échéance avant d'oser le remplacer.
+   Ici, le joueur annonce LUI-MÊME son départ : il n'y a rien à supposer et rien à attendre,
+   seulement une question à poser aux autres.
+
+   Règles retenues avec Marc le 2026-08-09 :
+     · les humains restants tranchent, à l'UNANIMITÉ (même règle que le remplacement) ;
+     · désaccord → on continue avec une IA : c'est l'issue qui ne détruit la partie de
+       personne, alors qu'« arrêter » l'impose à tout le monde ;
+     · « on arrête » → fin NORMALE : scores complets, archive et emails, comme au tour 10.
+       C'est un choix explicite de Marc : la partie a été jouée, elle compte ;
+     · plus aucun humain présent à qui demander → fin normale aussi. Remplacer par une IA
+       donnerait une partie entièrement automatique que personne ne regarde. */
+function nomNation(g, civId) {
+  try { const n = g.driver && g.driver.nation(civId); if (n && n.civ) return n.civ.name; } catch (e) {}
+  return String(civId || '?');
+}
+/* Écrit dans le VRAI journal de partie : il part donc aussi dans /debug, dans l'archive et
+   dans l'email de fin. Une concession doit laisser une trace, sinon le classement final
+   devient incompréhensible pour ceux qui le reçoivent. */
+function journaliserPartie(g, msg, cls) {
+  const e = { msg, cls: cls || 'gold' };
+  try { g.driver.sb.addLog(msg, e.cls); } catch (err) {}
+  broadcast(g, { t: 'log', entries: [e] });
+}
+function conceder(g, civId) {
+  if (!g || g.status !== 'playing') return { ok: false, msg: 'la partie n\'est pas en cours' };
+  const s = g.seats.find(x => x.civId === civId);
+  if (!s || s.ai) return { ok: false, msg: 'siège inconnu, ou déjà tenu par une IA' };
+  if (g.concede) return { ok: false, msg: 'une concession est déjà en cours' };
+  journaliserPartie(g, '🏳️ ' + nomSiege(g, civId) + ' (' + nomNation(g, civId) + ') concède la victoire et quitte la partie.');
+  const restants = humainsPresentsSauf(g, civId).map(x => x.civId);
+  g.concede = { cible: civId, choix: {} };
+  broadcast(g, { t: 'concede_vote', civId, qui: nomSiege(g, civId), nation: nomNation(g, civId), restants });
+  if (!restants.length) { trancherConcession(g, 'stop', 'plus aucun joueur humain'); return { ok: true }; }
+  return { ok: true };
+}
+/* Un des restants a choisi. Unanimité requise ; un seul restant → son choix suffit.
+   `restants` est RECALCULÉ à chaque vote, et pas figé à l'ouverture : si quelqu'un se
+   déconnecte entre-temps, on resterait sinon à attendre indéfiniment son avis. */
+function choixConcession(g, votantCiv, choix) {
+  if (!g.concede) return { ok: false, msg: 'aucune concession en cours' };
+  if (votantCiv === g.concede.cible) return { ok: false, msg: 'tu ne décides pas de ta propre concession' };
+  if (choix !== 'ia' && choix !== 'stop') return { ok: false, msg: 'choix inconnu' };
+  g.concede.choix[votantCiv] = choix;
+  const restants = humainsPresentsSauf(g, g.concede.cible).map(x => x.civId);
+  const manquants = restants.filter(c => !g.concede.choix[c]);
+  broadcast(g, { t: 'concede_wait', manquants: manquants.map(c => nomSiege(g, c)) });
+  if (manquants.length) return { ok: true, encore: manquants.length };
+  const avis = restants.map(c => g.concede.choix[c]);
+  const stop = avis.length > 0 && avis.every(x => x === 'stop');
+  trancherConcession(g, stop ? 'stop' : 'ia', stop ? 'décision unanime' : (avis.every(x => x === 'ia') ? 'décision unanime' : 'pas d\'unanimité : la partie continue'));
+  return { ok: true, encore: 0 };
+}
+function trancherConcession(g, issue, motif) {
+  if (!g.concede) return;
+  const cible = g.concede.cible;
+  g.concede = null;
+  broadcast(g, { t: 'concede_done', issue, civId: cible, motif: motif || '' });
+  if (issue === 'ia') {
+    journaliserPartie(g, '🤖 ' + nomNation(g, cible) + ' est repris par une IA — la partie continue.');
+    remplacerParIA(g, cible);   // solde aussi la question ou le tour d'action laissé en plan
+    return;
+  }
+  journaliserPartie(g, '🛑 Les joueurs restants arrêtent la partie. Les scores sont calculés en l\'état.');
+  try { route(g, { kind: 'over' }); } catch (e) { console.error('concession/arrêt:', e.message); }
+}
+
 /* Le cœur : appliquer le résultat de pump() → router vers les clients. */
 /* ASSAINISSEMENT DES RÉPONSES CLIENT (vague A du lot 16).
    Le serveur vérifiait déjà QUI répond (le siège doit être le destinataire de la décision), mais pas
@@ -646,6 +720,13 @@ function renvoyerLaMain(g, s, ws) {
       sendTo(ws, { t: 'vote', cible: g.voteOuvert, pour: g.vote.pour.slice(), requis,
                    manquants: requis.filter(c => !g.vote.pour.includes(c)) });
     }
+  }
+  // Idem pour une CONCESSION en cours : sans cela, celui qui revient ne verrait jamais la question,
+  // et la partie resterait suspendue à un avis qu'on ne lui a pas demandé.
+  if (g.concede) {
+    const cible = g.concede.cible;
+    sendTo(ws, { t: 'concede_vote', civId: cible, qui: nomSiege(g, cible), nation: nomNation(g, cible),
+                 restants: humainsPresentsSauf(g, cible).map(x => x.civId), dejaChoisi: !!g.concede.choix[s.civId] });
   }
 }
 
@@ -1317,7 +1398,7 @@ wss.on('connection', (ws) => {
             g._actingCiv = s.civId;                       // auteur de l'action (exclu du journal diffusé)
             const rr = g.driver.act(s.civId, m.action || { type: 'pass' });
             const act = m.action || {};
-            if (act.type && act.type !== 'pass') {
+            if (act.type && act.type !== 'pass' && act.type !== 'skip') {   // 'skip' = renoncer à un coup : rien à annoncer
               const lines = (g.driver._lastActionLog || []).map(x => plainText(x)).filter(Boolean);
               const warn = lines.filter(x => /⚠️|pas assez|impossible|déjà|non adjacent|invalide|refuse/i.test(x));
               if (warn.length) sendTo(ws, { t: 'notice', kind: 'info', payload: { msg: warn[0] } });
@@ -1338,6 +1419,26 @@ wss.on('connection', (ws) => {
           }
           catch (e) { err(e.message.split('\n')[0]); recover(g, 'act', e); }
           finally { g._actingCiv = null; }   // ← relâché même si l'action a échoué (voir plus haut)
+          break;
+        }
+
+        case 'concede': { // {t:'concede'} — le joueur quitte la partie de son plein gré
+          if (!requireAuth() || !requireGame()) break;
+          const g = games.get(sess.game);
+          const s = seatOf(g, ws) || seatOf(g, sess.user);
+          if (!g.driver || !s) return err('pas dans cette partie');
+          const r = conceder(g, s.civId);
+          if (!r.ok) return err(r.msg);
+          break;
+        }
+
+        case 'concede_choice': { // {t:'concede_choice', choix:'ia'|'stop'} — avis d'un joueur restant
+          if (!requireAuth() || !requireGame()) break;
+          const g = games.get(sess.game);
+          const s = seatOf(g, ws) || seatOf(g, sess.user);
+          if (!g.driver || !s) return err('pas dans cette partie');
+          const r = choixConcession(g, s.civId, m.choix);
+          if (!r.ok) return err(r.msg);
           break;
         }
 

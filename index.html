@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-08 · v9.31';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-09 · v9.34';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -56,7 +56,16 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
   border-radius:6px;padding:2px 7px;font:800 .55em/1.1 system-ui;letter-spacing:.08em;
   white-space:nowrap;pointer-events:none;}
 #a-toi-badge.on{display:block;}
-#top-bar.a-toi .mtb-line2{padding-right:54px;}   /* classe posée par le client, plutôt que `:has()` : même effet, aucune dépendance à la version du navigateur */
+/* Le bouton se place à GAUCHE du badge, dans la même bande, hors du flux : la barre du haut ne
+   change donc pas de hauteur, et la deuxième ligne réserve déjà la place à droite. */
+#passer-btn{display:none;position:absolute;right:62px;bottom:5px;z-index:2;
+  background:linear-gradient(135deg,#7a3f1f,#5a2d14);color:#ffe0cc;border:1px solid #b5673a;
+  border-radius:6px;padding:2px 8px;font:800 .55em/1.1 system-ui;letter-spacing:.08em;
+  white-space:nowrap;cursor:pointer;}
+#passer-btn:active{transform:scale(.96);}
+#passer-btn.on{display:block;}
+#top-bar.a-toi .mtb-line2{padding-right:118px;}   /* place réservée pour le badge ET le bouton */
+
 #top-bar{display:flex;align-items:center;gap:10px;padding:6px 14px;background:#0a0a22;border-bottom:1px solid #1a1a3a;flex-shrink:0;min-height:38px}
 .gtitle{font-weight:700;font-size:.95em;color:#4a9eff;letter-spacing:2px}
 #turn-disp{color:#ffd700;font-weight:700;font-size:.85em;min-width:70px}
@@ -1098,6 +1107,11 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
     <!-- « À TOI » : DANS la barre du haut, à droite, sous le bouton Capacité (demande de Marc).
          Posé ici et pas en flottant : un élément flottant se superpose forcément à quelque chose. -->
     <span id="a-toi-badge">À TOI</span>
+    <!-- Passer son tour d'action. Demande de Marc (2026-08-08) : « parfois on ne peut plus rien
+         jouer » — plus d'AC, plus de ressources, plus de case atteignable. Le bouton « Fin de Tour »
+         du jeu existait mais il faut le chercher ; ici il est juste à côté du badge, là où l'œil est
+         déjà quand c'est à toi. Il n'apparaît QUE pendant ton tour d'action. -->
+    <button id="passer-btn" type="button">PASSER</button>
   </div>
 </div>
 <div id="game-wrap" style="display:none">
@@ -1124,9 +1138,11 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
       <a href="regles.html" target="_blank" rel="noopener" style="display:inline-block;background:linear-gradient(135deg,#d09a2e,#a8761a);color:#fff;text-decoration:none;font-weight:800;font-size:.92em;padding:8px 15px;border-radius:9px;border:2px solid #ffd98a;box-shadow:0 2px 10px rgba(0,0,0,.45)">📖 Règles du jeu</a>
     </div>
     <div class="log-tools" style="display:flex;gap:6px;padding:7px;flex-wrap:wrap;border-bottom:1px solid #1a1a3a;background:#080820;position:sticky;top:0;z-index:2">
+      <!-- « Envoyer par email » et « .txt » RETIRÉS (Marc, 2026-08-09) : inutiles, « Copier le log » suffit. -->
       <button class="abtn" style="flex:1;min-width:90px" onclick="copyLogText()">📋 Copier le log</button>
-      <button class="abtn" style="flex:1;min-width:90px" onclick="emailLog()">📧 Envoyer par email</button>
-      <button class="abtn" style="flex:1;min-width:80px" onclick="downloadLog()">💾 .txt</button>
+      <!-- CONCÉDER : n'apparaît qu'EN LIGNE (online.js le démasque). En solo il n'y a personne à qui
+           concéder, et le bouton « Recommencer à zéro » ci-dessus fait déjà l'affaire. -->
+      <button class="abtn" id="conceder-btn" type="button" style="flex:1;min-width:90px;display:none;background:linear-gradient(135deg,#7a1f1f,#4a1010);border-color:#c85050;color:#ffd0d0;font-weight:800" onclick="scConcede()">🏳️ Concéder la victoire</button>
     </div>
     <div id="log-legend" class="log-legend"></div><div id="log-content" class="open"></div>
   </div>
