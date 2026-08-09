@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-08 · v9.19';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-08 · v9.21';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -136,7 +136,7 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
 #tech-handle:hover::before{background:#4a9eff}
 #tech-hdr{display:flex;align-items:center;gap:8px;padding:3px 10px;border-bottom:1px solid #1a1a3a;flex-shrink:0}
 #tech-hdr span{font-size:.7em;text-transform:uppercase;color:#7880a0;letter-spacing:1px}
-#tech-body{flex:1;overflow-y:auto;padding:4px 6px;display:flex;flex-direction:column;gap:3px}
+#tech-body{flex:1;overflow-y:auto;padding:4px 6px calc(var(--botband,84px) + env(safe-area-inset-bottom,0px) + 32px);display:flex;flex-direction:column;gap:3px}   /* la réserve est ICI : c'est ce bloc qui défile */
 .tb-row{display:flex;align-items:center;gap:4px}
 .tb-label{width:100px;flex-shrink:0;font-size:.65em;font-weight:700;display:flex;align-items:center;gap:4px;padding:2px 4px;border-radius:4px}
 .tb-bonus-star{font-size:.75em;color:#ffd700}
@@ -148,7 +148,17 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
    par une opacité très basse, ce qui rendait le texte illisible sur un écran peu lumineux. On garde
    la distinction visuelle (carte éteinte, non cliquable) mais avec une opacité bien plus haute et un
    texte éclairci : on doit pouvoir LIRE une techno avant de pouvoir l'acheter. */
-.tcard.tlocked{opacity:.62;cursor:default;background:#15153a}
+/* ═══ TROIS NIVEAUX DE LUMIÈRE, ET TROIS SEULEMENT (validé par Marc le 2026-08-08) ═══
+     achetable 1,00 · à toi 0,86 · tout le reste 0,72
+   Il y avait auparavant trois valeurs incohérentes pour des situations qui disent toutes la même
+   chose au joueur — « pas maintenant » : verrouillée 0,62, trop chère 0,85, prise 0,62. Un seul
+   niveau désormais. Les écarts sont volontairement faibles : ce qui distingue vraiment les états,
+   c'est la bordure bleue, le « À toi » vert et le rouleau — la lumière ne fait que du renfort.
+   L'opacité porte sur la CARTE ENTIÈRE, donc l'illustration suit automatiquement. */
+.tcard.tlocked,.tcard.ttaken,.tcard.tcantbuy{opacity:.72;background:#15153a}
+.tcard.tlocked,.tcard.ttaken{cursor:default}
+.tcard.tc-mine{opacity:.86}
+.tcard.tavail,.tcard.tbonus{opacity:1}
 .tcard.tlocked .tc-name,.tcard.tlocked .tc-effect{color:#b6c4e2}
 .tcard.tavail{border-color:#3a5a8a}
 .tcard.tcantbuy{border-color:#7a5520;opacity:.85}
@@ -198,7 +208,13 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
   pointer-events:none;border-left:1px solid #3a4a78;
   background:linear-gradient(90deg,#0d1326 0%,#1b2440 20%,#2e3c62 48%,#1b2440 76%,#0a0f1e 100%)}
 .tcard.tc-corne .tc-header,.tcard.tc-corne .tc-body,.tcard.tc-corne .tc-art{padding-right:32px}
-.tcard.tc-corne .tc-name,.tcard.tc-corne .tc-effect{opacity:.42}
+/* ⚠️ PAS DE SECONDE ATTÉNUATION — ELLES SE MULTIPLIENT.
+   J'avais posé `opacity:.42` sur le texte, valeur choisie sur une maquette où la carte était à
+   pleine luminosité. Mais dans le jeu, une carte à prérequis manquant porte DÉJÀ `.tlocked`, qui
+   applique `opacity:.62` à toute la carte. Les deux se multiplient : 0,62 × 0,42 = 0,26. Le texte
+   tombait à un contraste de 1,84:1 sur le fond, contre 4,61:1 pour une carte verrouillée ordinaire
+   — en dessous de tout seuil de lisibilité, et c'est ce que Marc a vu.
+   Le rouleau EST le signal ; l'atténuation existe déjà. On ne rajoute rien. */
 .tcard.tc-corne .tc-cost{opacity:1}
 /* Cartes compactes : rouleau plus fin, elles sont deux fois moins hautes. */
 .tcard.tc-corne.tc-compact::before{right:16px;width:7px}
@@ -212,7 +228,8 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
 .gen-label{width:100px;flex-shrink:0;font-size:.65em;color:#5a6a8a;display:flex;align-items:center;padding:2px 4px}
 .gcard{flex:1;min-width:0;background:#0d0d22;border:1px solid #2a2a5a;border-radius:5px;cursor:pointer;transition:all .15s;overflow:hidden}
 .gcard:hover:not(.no-buy){border-color:#4a9eff}
-.gcard.no-buy{opacity:.68;cursor:default} /* était .4 : illisible sur écran peu lumineux */
+.gcard.no-buy{opacity:.72;cursor:default}   /* même niveau que les cartes tech inaccessibles */
+.gcard.gc-mine{opacity:.86}   /* « à toi » : légèrement en retrait, comme dans la rivière tech */
 .gc-header{display:flex;align-items:center;justify-content:space-between;padding:3px 5px;background:#07071a;font-size:.62em;min-height:20px}
 .gc-art{position:relative;height:42px;display:flex;align-items:center;justify-content:center;font-size:18px}
 .gc-body{padding:2px 5px 4px;font-size:.59em;line-height:1.3}
@@ -560,7 +577,19 @@ body{max-width:var(--appw,480px);margin:0 auto;height:100dvh;height:100vh;positi
    d'Empire et de Diplo restaient sous la barre, inatteignables au défilement.
    Elle se calcule maintenant sur la hauteur MESURÉE de la barre (`--botband`, posée par
    `uiSyncBands()`), plus la zone de sécurité, plus 28 px d'air pour qu'on voie bien que c'est fini. */
-.m-panel{position:absolute;inset:0;overflow-y:auto;display:none;padding-bottom:calc(var(--botband,84px) + env(safe-area-inset-bottom,0px) + 28px);-webkit-overflow-scrolling:touch;}
+/* ⚠️ LA RÉSERVE VA SUR LE CONTENU QUI DÉFILE, PAS SUR LE CADRE.
+   Marc : « tu as mis un espace dans la zone centrale qui réduit la hauteur de la rivière ». Il a
+   raison, et c'était mon erreur d'analyse : j'avais posé un `padding-bottom` sur le panneau, qui est
+   un conteneur en FLEX pour l'onglet Tech. Sur un conteneur flex, le padding RETIRE de la hauteur
+   disponible aux enfants — la rivière perdait donc 110 px, et l'espace gagné en bas ne servait à
+   rien. Ce n'est pas un problème de place, c'est un problème de DÉFILEMENT : il faut que le contenu
+   puisse défiler un peu plus loin, pas que le cadre rétrécisse. La réserve appartient donc à la
+   LISTE qui défile, pas au panneau qui la contient. */
+.m-panel{position:absolute;inset:0;overflow-y:auto;display:none;-webkit-overflow-scrolling:touch;}
+/* Fin de contenu : de quoi faire défiler au-delà de la barre du bas, sur tous les onglets qui
+   défilent d'un bloc (Empire, Diplo, Journal). Mesurée, pas devinée : hauteur réelle de la barre
+   plus la zone de sécurité de l'iPhone. */
+#mp-empire,#mp-diplo,#mp-journal{padding-bottom:calc(var(--botband,84px) + env(safe-area-inset-bottom,0px) + 32px);}
 .m-panel.active{display:block;}
 
 /* ═══ LA CARTE PREND TOUTE LA PLACE DISPONIBLE ═══════════════════════════════
@@ -668,13 +697,13 @@ body.vue-carte #top-bar,body.vue-carte #bottom-bar{border-radius:0;}
 /* ⚠️ CETTE LIGNE ANNULAIT LA RÉSERVE DU BAS. `padding:0` écrase le `padding-bottom` de `.m-panel`
    — c'est pour cela que les cartes tech étaient les plus visiblement coupées des cinq onglets.
    On ne remet donc à zéro que les côtés, et on garde la réserve en bas. */
-#mp-tech{padding:0 0 calc(var(--botband,84px) + env(safe-area-inset-bottom,0px) + 28px);}
+#mp-tech{padding:0;}   /* colonne flex : tout padding ici RÉTRÉCIT la rivière. La réserve est sur #tech-body, qui défile. */
 #mp-tech.active{display:flex;flex-direction:column;}
 #tech-area{height:auto!important;max-height:none!important;min-height:0!important;flex:1;border-top:none;}
 #tech-handle{display:none;}
 #tech-hdr{padding:7px 10px;}
 #tech-hdr span:first-child{font-size:.82em;}
-#tech-body{gap:8px;padding:8px;}
+#tech-body{gap:8px;padding:8px 8px calc(var(--botband,84px) + env(safe-area-inset-bottom,0px) + 32px);}   /* idem sur mobile : la réserve suit le bloc qui défile */
 /* rangées de branches -> empilées, lisibles */
 .tb-row{flex-direction:column;align-items:stretch;gap:5px;background:#0b0b22;border:1px solid #1a1a3a;border-radius:10px;padding:8px;}
 .tb-label{width:auto!important;font-size:.82em!important;padding:3px 6px;border-radius:6px;}
@@ -815,7 +844,12 @@ body{font-size:16px;}
 .tcard .tc-name{font-size:1.55em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;}
 .tcard .tc-header{font-size:.78em;}
 /* Carte tech illustrée : l'illustration remplit la zone d'art (plus haute) */
-.tc-art.tc-illus{height:150px!important;width:100%;background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;font-size:0;}
+/* ═══ MÊME HAUTEUR D'ILLUSTRATION DANS LES TROIS RIVIÈRES (Marc, 2026-08-08) ═══
+   La rivière Tech montrait ses illustrations sur 150 px ; Éco&Soc et Militaire se contentaient de
+   50 px, hérités de l'époque où il n'y avait qu'une seule rivière et où ces cartes n'étaient qu'une
+   liste. Maintenant qu'il y en a trois, autant montrer les images dans les trois. */
+.tc-art.tc-illus,.gc-art.gc-illus{height:150px!important;width:100%;background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;font-size:0;}
+.gcard{display:flex;flex-direction:column;}   /* la carte suit la hauteur de son illustration */
 
 /* 2c) Cartes CIVIQUES & MILITAIRES : même traitement que les techs (titres gros, pleine largeur, 1 ligne) */
 .gcard .gc-name{font-size:1.5em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;}

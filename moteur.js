@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-08 · v9.19';
+const SOLAR_BUILD_MOTEUR = '2026-08-08 · v9.21';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -6235,7 +6235,11 @@ function renderTechTree(){
       // Symbole seul (large), le mot en info-bulle : « Pris » écrit en tout petit était illisible.
       if(playerOwned)statusBadge=`<span class="tc-taken-badge tb-mine" title="Tu possèdes cette technologie">✓</span>`;
       else if(exclusiveTaken)statusBadge=`<span class="tc-taken-badge tb-taken" title="Déjà prise par une autre nation — plus disponible">⛔</span>`;
-      const lockOverlay=!isTechAvailable(card,G.player)?`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;background:rgba(0,0,0,.18)">🔒</div>`:'';
+      /* ⚠️ PLUS DE CADENAS SUR L'ILLUSTRATION (Marc, 2026-08-08). Il était redondant — la carte porte
+         déjà son atténuation, son rouleau et le texte du prérequis — et sa qualité de rendu jurait
+         avec les illustrations. Le voile noir qui l'accompagnait assombrissait l'image une seconde
+         fois, par-dessus l'opacité de la carte. */
+      const lockOverlay='';
       // Always open detail on click — no direct buy
       const onclick=`showTechDetail('${card.id}')`;
       if(compact){
@@ -6297,7 +6301,7 @@ function renderTechTree(){
       } else {
         html+=`<div class="gcard${isCurrentForm?' gc-mine':''}" onclick="showMarketDetail('${card.id}')" style="border-top:2px solid ${border};cursor:pointer;opacity:${taken?.4:1}">
           <div class="gc-header"><span class="gc-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2">${card.name}${govTag}</span></div>
-          <div class="gc-art" style="${CARD_ART.has(card.id)?`background:#0a0a18 url('assets/cards/${card.id}.png') center/cover no-repeat`:`background:${artBg}`}">${CARD_ART.has(card.id)?'':card.emoji}<span style="position:absolute;top:1px;right:2px;font-size:.55em;color:${badgeCol}">${badge}</span></div>
+          <div class="gc-art${CARD_ART.has(card.id)?' gc-illus':''}" style="${CARD_ART.has(card.id)?`background:#0a0a18 url('assets/cards/${card.id}.png') center/cover no-repeat`:`background:${artBg}`}">${CARD_ART.has(card.id)?'':card.emoji}<span style="position:absolute;top:1px;right:2px;font-size:.55em;color:${badgeCol}">${badge}</span></div>
           <div class="gc-body"><div class="tc-effect" style="color:#8898b8">${card.effect}</div>
           <div class="gc-cost">${taken?'<span style="color:#ff6060;font-size:.8em">Déjà utilisé</span>':isCurrentForm?'<span style="color:#88ccff;font-size:.8em">Forme actuelle</span>':canBuy?'<span class="res-tag energy" style="font-size:.85em">1AC</span> '+costHtml(cost):'<span style="color:#5a6a8a">'+costStr+'</span>'}</div></div>
         </div>`;
@@ -6328,7 +6332,7 @@ function renderTechTree(){
       } else {
         r+=`<div class="gcard${mine?' gc-mine':''}" onclick="showGeneralDetail('${card.id}')" style="border-top:2px solid ${border};cursor:pointer;opacity:${taken?.4:1}">
           <div class="gc-header"><span class="gc-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2">${card.name}</span></div>
-          <div class="gc-art" style="${CARD_ART.has(card.id)?`background:#0a0a18 url('assets/cards/${card.id}.png') center/cover no-repeat`:`background:${artBg}`}">${CARD_ART.has(card.id)?'':card.emoji}${(card.repeatable||card.perTurn)?'<span style="position:absolute;top:1px;right:3px;font-size:.55em;color:#ffaa44">∞</span>':''}</div>
+          <div class="gc-art${CARD_ART.has(card.id)?' gc-illus':''}" style="${CARD_ART.has(card.id)?`background:#0a0a18 url('assets/cards/${card.id}.png') center/cover no-repeat`:`background:${artBg}`}">${CARD_ART.has(card.id)?'':card.emoji}${(card.repeatable||card.perTurn)?'<span style="position:absolute;top:1px;right:3px;font-size:.55em;color:#ffaa44">∞</span>':''}</div>
           <div class="gc-body"><div class="tc-effect" style="color:#8898b8">${card.effect}</div>
           <div class="gc-cost">${taken?'<span style="color:#ff6060;font-size:.8em">Acquis</span>':!_reqOk?'<span style="color:#cc7744;font-size:.72em">🔒 '+(CARDS_POOL.find(c=>c.id===card.reqCard)?.name||'tech requise')+'</span>':canBuy?'<span class="res-tag energy" style="font-size:.85em">'+_acN+'AC</span> '+costHtmlStr:'<span class="res-tag energy" style="font-size:.85em;opacity:.6">'+_acN+'AC</span> <span style="font-size:.82em">'+Object.entries(cost).map(([res,a])=>{const _ok=(G.player.res[res]||0)>=a;return '<span style="color:'+(_ok?'#8898b8':'#ff7744')+'">'+a+rEmoji(res)+'</span>';}).join(' ')+'</span>'   /* ⚠️ ICÔNES, PAS DES MOTS : cette branche — la seule où le joueur ne peut pas payer — écrivait « Énergie 2 Matériaux 3 » via rLabel(), alors que les trois autres branches utilisent rEmoji(). D'où des cartes qui changeaient d'écriture selon qu'on avait les moyens ou non. En prime, on colore en rouge la ressource qui manque, comme partout ailleurs. */}</div></div>
         </div>`;
@@ -7302,7 +7306,7 @@ function showTechDetail(cardId){
   else if(playerOwned)takenBadgeHtml=`<span class="td-taken-badge" id="td-taken">✓ Toi</span>`;
   else if(exclusiveTaken)takenBadgeHtml=`<span class="td-taken-badge" id="td-taken">${aiOwnedCiv?aiOwnedCiv.civ.emoji:'🤖'} IA</span>`;
   else if(!exclusive&&aiOwned)takenBadgeHtml=`<span class="td-taken-badge" id="td-taken" style="background:#4a3060;color:#c0a0ff">${aiOwnedCiv?aiOwnedCiv.civ.emoji:''} IA aussi</span>`;
-  const lockOverlay=!isTechAvailable(card)?'<div style="position:absolute;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-size:28px">🔒</div>':'';
+  const lockOverlay='';   // carte détaillée : plus de cadenas non plus (voir la rivière)
   artEl.innerHTML=`<span class="td-tier-badge" id="td-tier">${card.tier?'T'+card.tier:'Général'}</span>${CARD_ART.has(cardId)?'':`<span id="td-emoji">${card.emoji}</span>`}${takenBadgeHtml}${lockOverlay}`;
   document.getElementById('td-name').textContent=card.name;
   document.getElementById('td-branch').innerHTML=branch?(branch.emoji+' '+branch.label+(G.player.civ.techBonus===card.branch?' — ★ Bonus nation -1<i class=ri-science></i>':'')):card.type||'';
