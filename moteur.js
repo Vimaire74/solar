@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-09 · v9.34';
+const SOLAR_BUILD_MOTEUR = '2026-08-09 · v9.36';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -138,7 +138,7 @@ const CARD_ART=new Set(['bio1','prop1','drones1','quant1','bio2','nav2','hyper3'
 const CARDS_POOL=[
   // ── EXPANSION ────────────────────────────────────────────────────────────────
   {id:'bio1',branch:'expansion',tier:1,type:'colonization',name:'Biosphère Autonome',emoji:'🏗️',
-   effect:'Entretien des colonies : −1<i class=ri-energy></i>/tour',spec:'upkeep_e_disc',
+   effect:'Tes colonies de <b>niveau 1</b> ne coûtent plus aucun entretien en <i class=ri-energy></i>.',spec:'upkeep_e_disc',
    cost:{materials:2,science:1},vp:1},
   {id:'bio2',branch:'expansion',tier:2,type:'colonization',name:'Biosphère Avancée',emoji:'🌱',
    effect:'Tes colonies ne coûtent PLUS AUCUN entretien (ni <i class=ri-energy></i> ni <i class=ri-materials></i>). Supprime le malus moral des colonies difficiles.',spec:'bio2_bonus',
@@ -3233,7 +3233,16 @@ function _applyMoraleFlags(){
 function doMaintenance(){
   const result={energyCost:0,matCost:0,routeEnergyCost:0,routeMatGain:0,moraleLostCols:0,moraleLostRoutes:0};
   for(const p of allPlayers()){
-    const disc=(p.stratBonus&&p.stratBonus.upkeepDiscount)||0;   // ⚠️ plus AUCUNE carte ne pose ce bonus depuis que Consolidation a changé : mécanique conservée, mais actuellement inutilisée
+    /* ⚠️ DÉFAUT CORRIGÉ LE 2026-08-09 (signalé par Marc : « Biosphère Autonome semble ne plus
+       fonctionner »). Il ne le semblait pas : elle ne fonctionnait pas. `disc` ne comptait que
+       `stratBonus.upkeepDiscount` — un bonus que PLUS AUCUNE carte ne pose depuis que Consolidation
+       a changé — et oubliait `upkeep_e_disc`, la remise de Biosphère Autonome. La remise était donc
+       bien déduite dans les DEUX endroits qui AFFICHENT l'entretien (le bilan et le revenu net),
+       mais pas ici, le seul endroit qui le PRÉLÈVE : le joueur lisait −2⚡ et payait −3⚡.
+       C'est la maladie connue des trois copies du même barème (voir les avertissements en regard
+       dans `_netIncome` et dans l'affichage) : une correction faite dans deux copies sur trois.
+       La remise porte sur le TOTAL d'entretien, pas sur chaque colonie. */
+    const disc=((p.stratBonus&&p.stratBonus.upkeepDiscount)||0);   // ⚠️ plus aucune carte ne pose ce bonus depuis que Consolidation a changé : mécanique conservée, actuellement inutilisée. La remise de Biosphère Autonome, elle, est PAR COLONIE — voir la boucle ci-dessous.
     /* ENTRETIEN D'UNE COLONIE HORS BASE (barème révisé par Marc le 2026-08-07) :
          Nv.1 → 1⚡          Nv.2 → 1⚡ + 1🪨          Nv.3 → 1⚡ + 2🪨
        AVANT, l'énergie suivait le niveau (1, 2 puis 3⚡) : monter ses colonies coûtait si cher en
@@ -3257,10 +3266,16 @@ function doMaintenance(){
        Avant, l'exemption était partagée entre Biosphère Avancée (énergie, Nv2-3) et Terraformation
        (tout, Nv2-3) : deux technologies qui se marchaient dessus. Désormais l'exemption appartient
        à Biosphère Avancée SEULE, et Terraformation ne s'occupe plus que des revenus. */
+    /* BIOSPHÈRE AUTONOME (règle fixée par Marc le 2026-08-09) : −1⚡ PAR COLONIE DE NIVEAU 1.
+       Comme une colonie coûte 1⚡ quel que soit son niveau, cela revient à dire que les colonies
+       de niveau 1 ne coûtent plus rien en énergie. La remise précédente (−1⚡ sur le total) était
+       trop faible : « sinon ça reste difficile ». ⚠️ MÊME RÈGLE dans les deux autres copies du
+       barème (`_netIncome` et l'affichage du bilan) — voir les avertissements en regard. */
+    const _bio1=hasSpec(p,'upkeep_e_disc');
     for(const col of extraCols){
       if(_bio) continue;                              // Biosphère Avancée : aucune colonie n'est facturée
-      const lvl=col.level;
-      totalEnergy+=1;                                 // 1⚡ par colonie, quel que soit le niveau
+      const lvl=col.level||1;
+      if(!(_bio1&&lvl<=1)) totalEnergy+=1;            // 1⚡ par colonie, sauf Nv1 avec Biosphère Autonome
       totalMat+=lvl>=3?2:(lvl>=2?1:0);
     }
     if(freeUpk){totalEnergy=0;totalMat=0;p.investBonus2.freeUpkeep--;}
@@ -3376,11 +3391,12 @@ function revenueBreakdownHTML(p){
      Trois implémentations d'un même barème, c'est deux de trop — mais les fusionner touche à
      l'affichage, au net et au prélèvement en même temps. En attendant, elles sont au moins
      identiques, et chacune renvoie aux deux autres. */
-  let upE=0,upM=0;const _terraU=hasSpec(p,'terra3'),_bioU=hasSpec(p,'bio2_bonus');for(const c of extraCols){if(_bioU)continue;/*Biosphère Avancée : aucun entretien*/const lvl=c.level||1;upE+=1;upM+=lvl>=3?2:lvl>=2?1:0;}
-  /* Biosphère Autonome : −1⚡ sur le TOTAL d'entretien (pas par colonie), comme la carte
-     Consolidation. Elle remplace l'ancienne remise de −1⚡ à la colonisation, qui ne servait qu'une
-     fois par colonie et devenait sans objet dès qu'on cessait de s'étendre. */
-  upE=Math.max(0,upE-((p.stratBonus&&p.stratBonus.upkeepDiscount)||0)-(hasSpec(p,'upkeep_e_disc')?1:0));
+  let upE=0,upM=0;const _terraU=hasSpec(p,'terra3'),_bioU=hasSpec(p,'bio2_bonus'),_bio1U=hasSpec(p,'upkeep_e_disc');
+  for(const c of extraCols){if(_bioU)continue;/*Biosphère Avancée : aucun entretien*/const lvl=c.level||1;if(!(_bio1U&&lvl<=1))upE+=1;/*Biosphère Autonome : Nv1 gratuit en ⚡*/upM+=lvl>=3?2:lvl>=2?1:0;}
+  /* Biosphère Autonome : −1⚡ PAR COLONIE DE NIVEAU 1 (Marc, 2026-08-09), donc appliquée dans la
+     boucle ci-dessus et pas ici. La remise `upkeepDiscount` de stratBonus, elle, reste un forfait
+     sur le total — mais plus aucune carte ne la pose depuis que Consolidation a changé. */
+  upE=Math.max(0,upE-((p.stratBonus&&p.stratBonus.upkeepDiscount)||0));
   if(p.investBonus2&&(p.investBonus2.freeUpkeep||0)>0)mal.push('🏙️ Entretien colonies : gratuit ('+p.investBonus2.freeUpkeep+' tour(s) restants)');
   else if(upE||upM)mal.push('🏙️ Entretien colonies : '+[upE?'−'+upE+'<i class=ri-energy></i>':'',upM?'−'+upM+'<i class=ri-materials></i>':''].filter(Boolean).join(' '));
   const nr=p.routes.length;
@@ -3445,11 +3461,11 @@ function _netIncome(p){
   /* ⚠️ MÊME BARÈME QUE `doMaintenance` — c'est une SECONDE implémentation du même calcul, et elle a
      déjà divergé par le passé (bug du revenu net, une semaine perdue). Toute modification du barème
      doit toucher LES DEUX. 1⚡ par colonie quel que soit le niveau, matériaux 0/1/2. */
-  let upE=0,upM=0; for(const c of extraCols){if(_bio)continue;/*Biosphère Avancée : aucun entretien*/const lvl=c.level||1; upE+=1; upM+=lvl>=3?2:lvl>=2?1:0;}
-  /* Biosphère Autonome : −1⚡ sur le TOTAL d'entretien (pas par colonie), comme la carte
-     Consolidation. Elle remplace l'ancienne remise de −1⚡ à la colonisation, qui ne servait qu'une
-     fois par colonie et devenait sans objet dès qu'on cessait de s'étendre. */
-  upE=Math.max(0,upE-((p.stratBonus&&p.stratBonus.upkeepDiscount)||0)-(hasSpec(p,'upkeep_e_disc')?1:0));
+  const _bio1N=hasSpec(p,'upkeep_e_disc');
+  let upE=0,upM=0; for(const c of extraCols){if(_bio)continue;/*Biosphère Avancée : aucun entretien*/const lvl=c.level||1; if(!(_bio1N&&lvl<=1))upE+=1;/*Biosphère Autonome : Nv1 gratuit en ⚡*/ upM+=lvl>=3?2:lvl>=2?1:0;}
+  /* Biosphère Autonome : −1⚡ PAR COLONIE DE NIVEAU 1 (Marc, 2026-08-09) — appliquée dans la boucle
+     ci-dessus. Ne reste ici que le forfait `upkeepDiscount`, que plus aucune carte ne pose. */
+  upE=Math.max(0,upE-((p.stratBonus&&p.stratBonus.upkeepDiscount)||0));
   if(p.investBonus2&&(p.investBonus2.freeUpkeep||0)>0){upE=0;upM=0;}
   g.energy-=upE; g.materials-=upM;
   const nr=p.routes.length; if(!hasSpec(p,'route_force_free')) g.energy-=nr; g.materials+=nr; // route : −1⚡ +1🪨
