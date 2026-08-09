@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-08 · v9.23';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
+const SOLAR_BUILD_JS = '2026-08-08 · v9.27';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :

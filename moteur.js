@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-08 · v9.23';
+const SOLAR_BUILD_MOTEUR = '2026-08-08 · v9.27';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -4870,8 +4870,18 @@ function resolveWarCombat(playerCommitted){
   // 15 jetons contre un ennemi sans défense ne coûtait qu'1 jeton (bug signalé par Marc). Les jetons
   // engagés quittent le pool ; en cas de VICTOIRE la moitié revient tout de suite (cf. applyCombatEngage).
   const _atkUsed=engagedP;
-  if(engagedP>0)addLog('⚔️ Coût combat (toi) : '+_atkUsed+' jeton(s) engagé(s) — 1<i class=ri-materials></i> +1<i class=ri-energy></i> par jeton (−'+_atkUsed+'<i class=ri-materials></i> −'+_atkUsed+'<i class=ri-energy></i>)','dim');
-  if(aiEngaged>0)addLog('🛡️ '+warEnemy.civ.emoji+' '+warEnemy.civ.name+' engage '+aiEngaged+' jeton(s) en défense (−'+aiEngaged+'<i class=ri-materials></i> −'+aiEngaged+'<i class=ri-energy></i>).','dim');
+  /* ⚠️ CES DEUX ANNONCES IGNORAIENT « IA DE NAVIGATION » (coût de guerre divisé par deux).
+     Dans le log de Marc : « Coût combat : 19 jetons (−19🪨 −19⚡) » alors que 9🪨 et 10⚡ étaient
+     réellement prélevés. Le journal annonçait donc un prix qu'il ne payait pas — de quoi croire à
+     un défaut de comptabilité alors que le prélèvement, lui, était juste. On calcule ici EXACTEMENT
+     ce que `applyCombatEngage` va retirer : moitié arrondie en bas sur les matériaux, en haut sur
+     l'énergie (la demi-part est toujours portée par l'énergie). */
+  const _prix=(p,e)=>{const h=(typeof hasSpec==='function'&&hasSpec(p,'nav2_war'));
+    return {m:h?Math.floor(e/2):e, e:h?Math.ceil(e/2):e, demi:h};};
+  if(engagedP>0){const _c=_prix(G.player,_atkUsed);
+    addLog('⚔️ Coût combat (toi) : '+_atkUsed+' jeton(s) engagé(s) — −'+_c.m+'<i class=ri-materials></i> −'+_c.e+'<i class=ri-energy></i>'+(_c.demi?' (IA de Navigation : coût divisé par deux)':''),'dim');}
+  if(aiEngaged>0){const _d=_prix(warEnemy,aiEngaged);
+    addLog('🛡️ '+warEnemy.civ.emoji+' '+warEnemy.civ.name+' engage '+aiEngaged+' jeton(s) en défense (−'+_d.m+'<i class=ri-materials></i> −'+_d.e+'<i class=ri-energy></i>'+(_d.demi?', coût divisé par deux':'')+').','dim');}
   if(engagedP>0)applyCombatEngage(G.player,_atkUsed,!aWin); // coût + récupération pour _atkUsed jetons (la garnison compte toujours comme défense)
   applyCombatEngage(warEnemy,aiEngaged,!pWin);
   /* LE COMPTE RENDU, DES DEUX CÔTÉS. Écrit APRÈS l'application des coûts : les nombres tracés sont
@@ -4880,8 +4890,12 @@ function resolveWarCombat(playerCommitted){
     const _dp=[]; if(pBonus)_dp.push('+'+pBonus+' stratégie'); if(pEmpathBonus)_dp.push('+'+pEmpathBonus+' empathes'); if(_cruOn)_dp.push('+'+(G.player.cruiserPower||5)+' supercroiseur');
     journalCombat(G.player,_atkUsed,!aWin,pPow,_dp.join(' '));
     const _dd=[]; if(aEmpathBonus)_dd.push('+'+aEmpathBonus+' empathes'); if(_aiCru)_dd.push('+'+(warEnemy.cruiserPower||5)+' supercroiseur');
-    const _gar=(typeof garrisonOf==='function')?garrisonOf(warEnemy,targetAvantNettoyage):0; if(_gar)_dd.push('+'+_gar+' garnison');
-    if(_homeDef)_dd.push('+10 capitale');
+    /* ⚠️ MON PROPRE DÉFAUT, VU DANS LE LOG : « puissance 18 (+10 garnison +10 capitale) » — 8+10+10
+       ferait 28, pas 18. `garrisonOf` rend DÉJÀ 10 pour une capitale ; j'affichais la même garnison
+       deux fois. La puissance calculée était juste, c'est l'explication qui était fausse — le pire
+       cas pour qui relit un log en cherchant une anomalie. */
+    const _gar=(typeof garrisonOf==='function')?garrisonOf(warEnemy,targetAvantNettoyage):0;
+    if(_gar)_dd.push('+'+_gar+(_homeDef?' garnison de capitale':' garnison'));
     journalCombat(warEnemy,aiEngaged,!pWin,aPow,_dd.join(' '));
   }catch(e){}
   const _rcw=_warBetween(_moiId(),G.warWith);if(_rcw){_rcw.turnsLeft--;G.warTurnsLeft=_rcw.turnsLeft;}else G.warTurnsLeft--;let txt,cls;
@@ -5250,7 +5264,20 @@ function doAITurn(aiPlayer,oneShot){
     ai.spentThisTurn+=1+raidTok+raidEn;
     const targets=['energy','materials'].filter(r=>(_e.res[r]||0)>0);let stolen=[];
     const maxSteal=hasSpec(_e,'ia_immune')?0:hasSpec(_e,'intel_1')?1:2;
-    if(maxSteal===0){addLog('🛡️ IA Défensive : raid bloqué !','gold');return true;}
+    if(maxSteal===0){
+      /* ⚠️ LE RAID BLOQUÉ COÛTE, MAIS LE JOURNAL NE LE DISAIT PAS.
+         Le prélèvement a lieu quelques lignes plus haut — 1 AC et les jetons partent en récupération —
+         puis cette branche sortait AVANT `G.aiActions.push(...)`. Dans le log de Marc, les Martiens
+         semblaient donc raider gratuitement tour après tour : sept « raid bloqué » sans une seule
+         ligne de coût. Le coût était bien payé ; rien ne le prouvait.
+         On l'écrit, et on applique aussi la tension : subir une tentative de pillage fâche, qu'elle
+         ait réussi ou non — elle était jusqu'ici sans conséquence diplomatique. */
+      addLog('🛡️ IA Défensive : raid de '+ai.civ.emoji+' '+ai.civ.name+' bloqué — il perd quand même 1 AC et '+raidTok+' jeton(s) (récupération).','gold');
+      G.warRisk=Math.min(10,(G.warRisk||0)+1);
+      addTens(_e.civ.id,ai.civ.id,1);
+      G.aiActions.push({emoji:'🛡️',name:'Raid bloqué',desc:'−1 AC −'+raidTok+' jeton(s), aucun butin'});
+      return true;
+    }
     for(let i=0;i<maxSteal&&targets.length>0;i++){const r=targets[Math.floor(Math.random()*targets.length)];_e.res[r]=Math.max(0,(_e.res[r]||0)-1);ai.res[r]=(ai.res[r]||0)+1;stolen.push(rEmoji(r));if(_e.res[r]===0)targets.splice(targets.indexOf(r),1);}
     G.warRisk=Math.min(10,(G.warRisk||0)+2);
     addTens(_e.civ.id,ai.civ.id,2); // l'ennemi (humain) est en colère contre cette IA
@@ -5817,7 +5844,7 @@ function doEndGame(){
     fetch('api/save_result.php',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',
       body:JSON.stringify({myCiv:G.player.civ.id,myCivName:G.player.civ.name,won:_win,turns:G.turn,players:_players,
         game_code:(window._scGameCode||''),
-        log:(function(){try{return buildJournalReport().split('\n').slice(0,400).reverse();}catch(e){return(G.log||[]).slice(0,150).map(x=>String((x&&x.msg)||x).replace(/<[^>]+>/g,''));}})()})}).catch(()=>{});
+        log:(function(){try{return buildJournalReport().split('\n').reverse();}catch(e){return(G.log||[]).map(x=>String((x&&x.msg)||x).replace(/<[^>]+>/g,''));}})()   /* journal ENTIER */})}).catch(()=>{});
   }catch(e){}
   setTimeout(()=>{
     const win=pVP.total>=aVP.total;
@@ -6359,11 +6386,18 @@ function renderTechTree(){
       const badge=isCurrentForm?'✓':isRepeat?'∞':isGov?'GOV':'1×';
       const badgeCol=taken?'#ff6060':isCurrentForm?'#88ccff':border;
       const govTag=isGov?'<span style="font-size:.5em;background:#1c3a6a;color:#9cc8ff;border-radius:3px;padding:0 3px;margin-left:3px;vertical-align:middle">GOV</span>':'';
+      /* ⚠️ TROIS ÉTATS À DISTINGUER, ET UN SEUL L'ÉTAIT.
+         · déjà prise et non répétable → ROULEAU (`taken` est déjà faux pour les répétables, la garde
+           que j'avais ajoutée en plus était inutile et masquait le cas des cartes `calmAction`) ;
+         · pas les moyens (ressources, AC, ou hors phase d'actions) → simplement ATTÉNUÉE, jamais
+           enroulée : demain tu pourras l'acheter, le rouleau dirait le contraire ;
+         · achetable → pleine lumière. */
+      const _cls=(taken?' gc-corne no-buy':(!canBuy&&!isCurrentForm?' no-buy':''))+(isCurrentForm?' gc-mine':'');
       if(compact){
-        html+=`<div class="gcard gc-compact${isCurrentForm?' gc-mine':''}${(taken&&!(card.repeatable||card.perTurn))?' gc-corne no-buy':''}" onclick="showMarketDetail('${card.id}')" style="border-top:2px solid ${border}">
+        html+=`<div class="gcard gc-compact${_cls}" onclick="showMarketDetail('${card.id}')" style="border-top:2px solid ${border}">
           <div class="gc-header"><span class="gc-name">${card.emoji} ${card.name}${govTag}</span><span class="gc-cost">${taken?'✗':isCurrentForm?'✓':canBuy?'1AC '+costStr:'—'}</span></div></div>`;
       } else {
-        html+=`<div class="gcard${isCurrentForm?' gc-mine':''}${(taken&&!(card.repeatable||card.perTurn))?' gc-corne no-buy':''}" onclick="showMarketDetail('${card.id}')" style="border-top:2px solid ${border};cursor:pointer">
+        html+=`<div class="gcard${_cls}" onclick="showMarketDetail('${card.id}')" style="border-top:2px solid ${border};cursor:pointer">
           <div class="gc-header"><span class="gc-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2">${card.name}${govTag}</span></div>
           <div class="gc-art${CARD_ART.has(card.id)?' gc-illus':''}" style="${CARD_ART.has(card.id)?`background:#0a0a18 url('assets/cards/${card.id}.png') center/cover no-repeat`:`background:${artBg}`}">${CARD_ART.has(card.id)?'':card.emoji}<span style="position:absolute;top:1px;right:2px;font-size:.55em;color:${badgeCol}">${badge}</span></div>
           <div class="gc-body"><div class="tc-effect" style="color:#8898b8">${card.effect}</div>
@@ -6398,9 +6432,16 @@ function renderTechTree(){
          (Investissement dans la Recherche) : elles restent achetables plusieurs fois, donc jamais
          enroulées. On s'appuie sur `taken`, que le jeu calcule DÉJÀ en tenant compte de ces deux
          cas — plutôt que de réécrire la règle et risquer de la faire diverger. */
+      /* ⚠️ MON ERREUR : LE PRÉREQUIS NE DÉPEND PAS DE LA RÉPÉTABILITÉ.
+         J'avais écrit `!répétable && (prise || prérequis manquant)`. Or les cartes militaires SONT
+         répétables — les IA achètent des Drones de Combat à chaque tour dans les logs. Le garde-fou
+         destiné aux seules cartes « déjà prises » annulait donc AUSSI le rouleau des cartes bloquées
+         par un prérequis, qui sont justement les plus nombreuses côté militaire. D'où : aucune carte
+         militaire enroulée, alors que c'est le cas le plus visible du jeu.
+         Une technologie manquante bloque une carte, qu'elle soit répétable ou non. */
       const _repet=!!(card.repeatable||card.perTurn);
-      const _gcBloque=!_repet&&(taken||!_reqOk);
-      const _gcCls=(_gcBloque?' gc-corne no-buy':'')+(mine?' gc-mine':'');
+      const _gcBloque=(!_reqOk)||(taken&&!_repet);
+      const _gcCls=(_gcBloque?' gc-corne no-buy':(!canBuy?' no-buy':''))+(mine?' gc-mine':'');
       if(compact){
         r+=`<div class="gcard gc-compact${_gcCls}" onclick="showGeneralDetail('${card.id}')" style="border-top:2px solid ${border}">
           <div class="gc-header"><span class="gc-name">${card.emoji} ${card.name}</span><span class="gc-cost">${taken?'✗':!_reqOk?'🔒':canBuy?_acN+'AC':'—'}</span></div></div>`;
@@ -7650,7 +7691,13 @@ function renderLogLegend(){
 }
 function addLog(msg,cls=''){
   if(G)G._lastProgress=Date.now(); // battement de cœur pour le chien de garde anti-blocage
-  G.log.unshift({msg,cls});if(G.log.length>80)G.log.pop();
+  /* ⚠️ LE JOURNAL N'EST PLUS TRONQUÉ (Marc, 2026-08-08 : « le journal doit être entier »).
+     Il gardait 80 lignes et jetait les plus anciennes : une partie de dix tours n'en conservait donc
+     que les deux derniers. Impossible de refaire un calcul depuis le début, ni de retrouver l'origine
+     d'un écart de jetons — c'est exactement ce qui m'a empêché d'analyser sa partie.
+     Une partie est bornée à dix tours : le journal l'est donc aussi, quelques centaines de lignes.
+     Rien ne justifiait ce plafond. */
+  G.log.unshift({msg,cls});
   const el=document.getElementById('log-content');
   if(el)el.innerHTML=G.log.map(e=>`<div class="log-e ${e.cls}">${_logColorNations(e.msg)}</div>`).join('');
 }

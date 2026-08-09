@@ -231,7 +231,7 @@ function archiveGame(g) {
                   evtVP: d.evtVP || 0, extraVP: d.extraVP || 0 }
       };
     }).sort((a, b) => b.vp - a.vp);
-    journal = (G.log || []).slice(0, 400).map(l => plainText((l && l.msg) || l)).reverse();
+    journal = (G.log || []).map(l => plainText((l && l.msg) || l)).reverse();   // archive et email : journal ENTIER
   } catch (e) { console.error('archiveGame:', e.message); }
   const endedAt = Date.now();
   const humans = g.seats.filter(s => !s.ai && s.user);
@@ -1102,8 +1102,8 @@ const server = http.createServer((req, res) => {
         // état des guerres : qui, cible de reconquête IA, tours restants, agresseur
         wars = (G.wars || []).map(w => ({ entre: (w.a || '?') + '↔' + (w.b || w.aiId || '?'), aiId: w.aiId,
           reconqCible: w.aiRecaptureTarget || null, toursRestants: w.turnsLeft, live: !!w.live, wins: w.wins, agresseurIA: !!w.aiAggressor, aFrappeCeTour: !!w._aiAssaultedThisTurn }));
-        // journal COMPLET (jusqu'à 200 lignes), remis dans l'ordre chronologique
-        journal = (G.log || []).slice(0, 200).map(l => plainText((l && l.msg) || l).slice(0, 180)).reverse();
+        // journal COMPLET — sans aucune troncature, remis dans l'ordre chronologique
+        journal = (G.log || []).map(l => plainText((l && l.msg) || l)).reverse();   // ENTIER, et sans couper les lignes : une ligne tronquée à 180 caractères perdait la fin du compte rendu de combat
         // trace de guerre dédiée (capture/reprise/combat/défense) — sous-ensemble du journal filtré
         warTrace = journal.filter(l => /captur|reprend|assaut|combat|défense|defense|guerre|paix|pill|raid|jeton/i.test(l));
       } catch (e) {}

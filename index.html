@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-08 · v9.23';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-08 · v9.27';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -239,7 +239,10 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
 .gen-label{width:100px;flex-shrink:0;font-size:.65em;color:#5a6a8a;display:flex;align-items:center;padding:2px 4px}
 .gcard{flex:1;min-width:0;background:#0d0d22;border:1px solid #2a2a5a;border-radius:5px;cursor:pointer;transition:all .15s;overflow:hidden}
 .gcard:hover:not(.no-buy){border-color:#4a9eff}
-.gcard.no-buy{opacity:.72;cursor:default}   /* même niveau que les cartes tech inaccessibles */
+.gcard.no-buy{opacity:.72}   /* même niveau que les cartes tech inaccessibles */
+/* ⚠️ Seules les cartes ENROULÉES perdent le curseur : une carte qu'on ne peut pas encore PAYER
+   reste cliquable — on veut pouvoir lire son détail pour décider si on économise pour elle. */
+.gcard.gc-corne{cursor:default}
 .gcard.gc-mine{opacity:.86}   /* « à toi » : légèrement en retrait, comme dans la rivière tech */
 .gc-header{display:flex;align-items:center;justify-content:space-between;padding:3px 5px;background:#07071a;font-size:.62em;min-height:20px}
 .gc-art{position:relative;height:42px;display:flex;align-items:center;justify-content:center;font-size:18px}
