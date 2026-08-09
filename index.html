@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-08 · v9.27';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-08 · v9.28';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -744,7 +744,13 @@ body.vue-carte #top-bar,body.vue-carte #bottom-bar{border-radius:0;}
 /* carte possédée par le joueur -> mise en valeur (vert) */
 .tcard.tc-mine,.gcard.gc-mine{border-color:#3fbf6a!important;background:linear-gradient(180deg,#0c2418,#0a1a12)!important;box-shadow:0 0 0 1px #3fbf6a55,0 0 10px rgba(63,191,106,.18)!important;opacity:1!important;}
 .tcard.tc-mine .tc-name{color:#9fe8b8;}
-.tcard.tc-mine .tc-art:not(.tc-illus),.gcard.gc-mine .gc-art{background:#0f3320!important;}
+/* ⚠️ LE FOND VERT « À TOI » NE DOIT PAS RECOUVRIR UNE ILLUSTRATION.
+   Le côté tech avait bien `:not(.tc-illus)` ; le côté Éco&Soc, non — il peignait du vert par-dessus
+   l'image de TOUTES les cartes possédées. Le défaut existait depuis toujours mais restait invisible :
+   la zone d'art faisait 50 px. En la passant à 150 px pour montrer les illustrations, il est devenu
+   un grand rectangle vert (capture de Marc : « Sénat Solaire », forme de gouvernement en cours).
+   La classe `gc-illus` n'existait pas quand cette règle a été écrite ; elle existe maintenant. */
+.tcard.tc-mine .tc-art:not(.tc-illus),.gcard.gc-mine .gc-art:not(.gc-illus){background:#0f3320!important;}
 
 /* ---------- Modale détail tech = plein écran ---------- */
 #tech-detail-modal{align-items:flex-end;}
