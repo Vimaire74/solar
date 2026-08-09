@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-08 · v9.18';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-08 · v9.19';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -186,17 +186,24 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
    idée, et ce n'était pas celle-là.)
    Le triangle est fait de deux moitiés : la partie « manquante » de la carte (fond du panneau) et le
    dos du papier replié, plus clair — c'est ce qui donne l'impression de relief. */
+/* ═══ CARTE INACCESSIBLE : LE BORD DROIT S'ENROULE ═══════════════════════════
+   Avant : un coin replié de 15 px, qu'on ne voyait pas. Marc voulait le BORD DROIT ENTIER enroulé,
+   comme un rouleau de parchemin qu'on n'a pas encore le droit de dérouler — visible d'un coup d'œil
+   dans une rivière de dix cartes. Uniquement pour un PRÉREQUIS MANQUANT : les technologies acquises
+   ou prises par une autre nation ont déjà leurs marques (✓ et ⛔). */
 .tcard.tc-corne{position:relative;overflow:hidden}
-.tcard.tc-corne::before{content:'';position:absolute;top:0;right:0;width:0;height:0;
-  border-left:15px solid transparent;border-top:15px solid #0b0b18;z-index:3;pointer-events:none}
-.tcard.tc-corne::after{content:'';position:absolute;top:0;right:0;width:0;height:0;
-  border-right:15px solid transparent;border-bottom:15px solid #46567e;z-index:4;pointer-events:none;
-  filter:drop-shadow(-1px 1px 1px rgba(0,0,0,.55))}
-/* Le nom reste lisible : on lui laisse la place du coin replié. */
-.tcard.tc-corne .tc-name{padding-right:15px}
-/* En mode compact la carte fait 22 px de haut : une corne de 15 px la mangerait. On la réduit. */
-.tcard.tc-corne.tc-compact::before{border-left-width:9px;border-top-width:9px}
-.tcard.tc-corne.tc-compact::after{border-right-width:9px;border-bottom-width:9px}
+.tcard.tc-corne::before{content:'';position:absolute;top:0;right:26px;bottom:0;width:10px;z-index:3;
+  pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,0),rgba(0,0,0,.45))}
+.tcard.tc-corne::after{content:'';position:absolute;top:0;right:0;bottom:0;width:26px;z-index:4;
+  pointer-events:none;border-left:1px solid #3a4a78;
+  background:linear-gradient(90deg,#0d1326 0%,#1b2440 20%,#2e3c62 48%,#1b2440 76%,#0a0f1e 100%)}
+.tcard.tc-corne .tc-header,.tcard.tc-corne .tc-body,.tcard.tc-corne .tc-art{padding-right:32px}
+.tcard.tc-corne .tc-name,.tcard.tc-corne .tc-effect{opacity:.42}
+.tcard.tc-corne .tc-cost{opacity:1}
+/* Cartes compactes : rouleau plus fin, elles sont deux fois moins hautes. */
+.tcard.tc-corne.tc-compact::before{right:16px;width:7px}
+.tcard.tc-corne.tc-compact::after{width:16px}
+.tcard.tc-corne.tc-compact .tc-header{padding-right:20px}
 .tcard.tc-compact{display:flex;align-items:center;padding:0;height:22px}
 .tcard.tc-compact .tc-header{flex:1;background:transparent;min-height:unset;height:100%;padding:2px 5px}
 .tcard.tc-compact .tc-art,.tcard.tc-compact .tc-body{display:none}

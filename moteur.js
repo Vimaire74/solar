@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-08 · v9.18';
+const SOLAR_BUILD_MOTEUR = '2026-08-08 · v9.19';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -4765,6 +4765,40 @@ function declareWar(reason,declaredBy='other',aiId=null){
   if(_broken.length){let _tk=0;_broken.forEach(r=>_tk+=(r.tokens||0));if(_tk>0)G.player.forceTokens+=_tk;updateConnections(G.player);addLog('🛤️ '+_broken.length+' route(s) en territoire '+warEnName+' rompue(s)'+(_tk>0?' — '+_tk+' jeton(s) Force rendu(s)':'')+'.','red');}
   addLog('🚨 GUERRE DÉCLARÉE contre '+warEnName+' : '+reason,'red');
 }
+/* ─── LE JOURNAL DE COMBAT : TOUT CE QUI A ÉTÉ DÉPENSÉ, DES DEUX CÔTÉS ────────
+   Demande de Marc (2026-08-08) : « les jetons et ressources dépensées dans la guerre par les deux
+   parties devraient figurer dans le journal », avec les technologies possédées « pour qu'on puisse
+   savoir si quelque chose bugue ».
+   Le journal disait bien « X engage N jetons », mais jamais : ce qui est REVENU, ce qui est PERDU
+   pour de bon, d'où venait la puissance affichée (garnison, supercroiseur, bonus empathes), ni quelle
+   technologie modifiait le calcul. Impossible, en relisant un log, de dire si un chiffre était juste.
+   Maintenant chaque combat écrit une ligne par camp, et la ligne se suffit à elle-même. */
+function _techsCombat(p){
+  if(!p) return [];
+  const t=[];
+  if(hasSpec(p,'nav2_war')) t.push('Navigation (coût ÷2)');
+  if(hasSpec(p,'empath_routes')) t.push('Lien Empathe (+2⚔️)');
+  if(hasSpec(p,'empath_tele')) t.push('Télépathie (+2⚔️)');
+  if(hasSpec(p,'ia_immune')) t.push('IA Défensive');
+  if(typeof cruiserAvailable==='function'&&cruiserAvailable(p)) t.push('Supercroiseur');
+  return t;
+}
+/* Une ligne de journal par camp. `engages` = jetons mis dans la bataille ; `gagne` = ce camp l'a-t-il
+   emporté (détermine si la moitié revient tout de suite ou est perdue). */
+function journalCombat(p,engages,gagne,puissance,detailPuissance){
+  if(!p) return;
+  const e=Math.max(0,engages|0);
+  const demi=(typeof hasSpec==='function'&&hasSpec(p,'nav2_war'));
+  const cM=demi?Math.floor(e/2):e, cE=demi?Math.ceil(e/2):e;
+  const recup=e>0?Math.floor(e/2):0;
+  const sort=gagne ? (e-recup)+' revenu(s) tout de suite, '+recup+' en récupération'
+                   : recup+' PERDU(S) définitivement, '+(e-recup)+' en récupération';
+  const techs=_techsCombat(p);
+  addLog('📊 '+p.civ.emoji+' '+p.civ.name+' — '+e+' jeton(s) engagé(s) · coût −'+cM+'<i class=ri-materials></i> −'+cE+'<i class=ri-energy></i>'
+    +' · puissance '+puissance+(detailPuissance?' ('+detailPuissance+')':'')
+    +' · jetons : '+sort
+    +(techs.length?' · techs : '+techs.join(', '):' · aucune tech de combat'),'dim');
+}
 function resolveWarCombat(playerCommitted){
   const warEnemy=G.warWith?G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0]:G.ais[0];
   const pBonus=(G.player.stratBonus&&G.player.stratBonus.combatBonus)||0;
@@ -4790,6 +4824,7 @@ function resolveWarCombat(playerCommitted){
   const aPow=aiEngaged+aEmpathBonus+(_aiCru?(warEnemy.cruiserPower||5):0)+garrisonOf(warEnemy,_warAttackColonyTarget); // garnison auto : 1 colonie / 10 base
   G._aiWarCommitted=undefined;
   // Coût + récupération SYMÉTRIQUES (attaque ET défense) : 1<i class=ri-materials></i> +1<i class=ri-energy></i> par jeton engagé, jetons immobilisés (récupération / moitié perdue si défaite).
+  const targetAvantNettoyage=_warAttackColonyTarget;   // mémorisée : elle est effacée plus bas, or le journal en a besoin
   const pWin=pPow>aPow,aWin=aPow>pPow;
   // RÈGLE §14 : le coût est de 1🪨 +1⚡ PAR JETON ENGAGÉ — pas « par jeton adverse en défense ».
   // L'ancienne formule (min(engagés, défense+1)) rendait les assauts massifs QUASI GRATUITS : engager
@@ -4800,6 +4835,16 @@ function resolveWarCombat(playerCommitted){
   if(aiEngaged>0)addLog('🛡️ '+warEnemy.civ.emoji+' '+warEnemy.civ.name+' engage '+aiEngaged+' jeton(s) en défense (−'+aiEngaged+'<i class=ri-materials></i> −'+aiEngaged+'<i class=ri-energy></i>).','dim');
   if(engagedP>0)applyCombatEngage(G.player,_atkUsed,!aWin); // coût + récupération pour _atkUsed jetons (la garnison compte toujours comme défense)
   applyCombatEngage(warEnemy,aiEngaged,!pWin);
+  /* LE COMPTE RENDU, DES DEUX CÔTÉS. Écrit APRÈS l'application des coûts : les nombres tracés sont
+     donc ceux qui ont réellement été prélevés, pas une prévision. */
+  try{
+    const _dp=[]; if(pBonus)_dp.push('+'+pBonus+' stratégie'); if(pEmpathBonus)_dp.push('+'+pEmpathBonus+' empathes'); if(_cruOn)_dp.push('+'+(G.player.cruiserPower||5)+' supercroiseur');
+    journalCombat(G.player,_atkUsed,!aWin,pPow,_dp.join(' '));
+    const _dd=[]; if(aEmpathBonus)_dd.push('+'+aEmpathBonus+' empathes'); if(_aiCru)_dd.push('+'+(warEnemy.cruiserPower||5)+' supercroiseur');
+    const _gar=(typeof garrisonOf==='function')?garrisonOf(warEnemy,targetAvantNettoyage):0; if(_gar)_dd.push('+'+_gar+' garnison');
+    if(_homeDef)_dd.push('+10 capitale');
+    journalCombat(warEnemy,aiEngaged,!pWin,aPow,_dd.join(' '));
+  }catch(e){}
   const _rcw=_warBetween(_moiId(),G.warWith);if(_rcw){_rcw.turnsLeft--;G.warTurnsLeft=_rcw.turnsLeft;}else G.warTurnsLeft--;let txt,cls;
   const targetId=_warAttackColonyTarget;_warAttackColonyTarget=null;
   if(pPow>aPow){
