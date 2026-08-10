@@ -231,7 +231,14 @@ function archiveGame(g) {
                   evtVP: d.evtVP || 0, extraVP: d.extraVP || 0 }
       };
     }).sort((a, b) => b.vp - a.vp);
-    journal = (G.log || []).map(l => plainText((l && l.msg) || l)).reverse();   // archive et email : journal ENTIER
+    /* MÊME FORMAT ATTRIBUÉ que /debug : l'email de fin de partie et l'archive doivent permettre le
+       même travail de relecture. Un journal anonyme dans l'archive, c'est une partie qu'on ne peut
+       plus analyser une fois la partie effacée du serveur. */
+    journal = (G.log || []).map(l => {
+      const txt = plainText((l && l.msg) || l);
+      if (!l || typeof l !== 'object') return txt;
+      return ('T' + (l.turn !== undefined ? l.turn : '?')).padEnd(4) + String(l.civ || 'système').padEnd(12) + ' │ ' + txt;
+    }).reverse();   // archive et email : journal ENTIER
   } catch (e) { console.error('archiveGame:', e.message); }
   const endedAt = Date.now();
   const humans = g.seats.filter(s => !s.ai && s.user);
@@ -1169,7 +1176,7 @@ const server = http.createServer((req, res) => {
     for (const g of games.values()) {
       let turn = null, pend = null;
       try { turn = g.driver ? g.driver.state().turn : null; const p = g.driver && g.driver.state()._pending; if (p) pend = p.kind + '/' + ((typeof p.nation === 'object' && p.nation) ? p.nation.civ.id : p.nation); } catch (e) {}
-      let nations = [], journal = [], wars = [], phase = null, warTrace = [];
+      let nations = [], journal = [], wars = [], phase = null, warTrace = [], actions = [];
       try {
         const G = g.driver.state();
         phase = G.phase + (G._serverActionPhase ? '/actions' : '');
@@ -1183,12 +1190,30 @@ const server = http.createServer((req, res) => {
         // état des guerres : qui, cible de reconquête IA, tours restants, agresseur
         wars = (G.wars || []).map(w => ({ entre: (w.a || '?') + '↔' + (w.b || w.aiId || '?'), aiId: w.aiId,
           reconqCible: w.aiRecaptureTarget || null, toursRestants: w.turnsLeft, live: !!w.live, wins: w.wins, agresseurIA: !!w.aiAggressor, aFrappeCeTour: !!w._aiAssaultedThisTurn }));
-        // journal COMPLET — sans aucune troncature, remis dans l'ordre chronologique
-        journal = (G.log || []).map(l => plainText((l && l.msg) || l)).reverse();   // ENTIER, et sans couper les lignes : une ligne tronquée à 180 caractères perdait la fin du compte rendu de combat
+        /* JOURNAL COMPLET, CHAQUE LIGNE ATTRIBUÉE (Marc, 2026-08-09 : « change le log pour que
+           chaque action de chaque joueur puisse être identifiée pour que ce soit possible de
+           rejouer le jeu à partir du journal »).
+           Format : « T3 martiens │ 🏗️ Colonie sur Cérès ». Le tour et la nation sont des DONNÉES
+           posées par `addLog` (champs `turn` et `civ`), pas une tournure de phrase : elles ne
+           dépendent d'aucun point de vue. Sans elles, les lignes de la nation active étaient
+           anonymes et la partie n'était pas rejouable — c'est ce qui a bloqué l'analyse de CC36. */
+        const _ligne = l => {
+          const txt = plainText((l && l.msg) || l);
+          if (!l || typeof l !== 'object') return txt;
+          const t = (l.turn !== undefined) ? ('T' + l.turn) : '  ';
+          return t.padEnd(3) + ' ' + String(l.civ || 'système').padEnd(12) + ' │ ' + txt;
+        };
+        journal = (G.log || []).map(_ligne).reverse();   // ENTIER, et sans couper les lignes
         // trace de guerre dédiée (capture/reprise/combat/défense) — sous-ensemble du journal filtré
         warTrace = journal.filter(l => /captur|reprend|assaut|combat|défense|defense|guerre|paix|pill|raid|jeton/i.test(l));
+        /* TRACE D'ACTIONS structurée : ce que le journal raconte en français, `G._journal` le dit
+           en données (tour, nation, action, AC, coût, gain). C'est ELLE qui permet un rejeu fidèle ;
+           le texte, lui, reste destiné à l'œil humain. Elle existait déjà — elle n'était simplement
+           exposée nulle part. */
+        actions = (G._journal || []).map(a => ({ t: a.turn, nat: a.nat, act: a.name,
+          ac: a.ac || 0, cout: a.cost || {}, gain: a.gain || '', guerre: !!a.war, auto: !!a.auto }));
       } catch (e) {}
-      out.push({ code: g.code, status: g.status, turn, phase, lastRoute: g.lastRoute ? (g.lastRoute.kind + '/' + (g.lastRoute.civId || '')) : null, pending: pend,
+      out.push({ code: g.code, status: g.status, turn, phase, actions, lastRoute: g.lastRoute ? (g.lastRoute.kind + '/' + (g.lastRoute.civId || '')) : null, pending: pend,
                  seats: g.seats.map(s => ({ civ: s.civId, ai: s.ai, user: s.user, on: !!(s.ws && s.ws.readyState === 1) })),
                  nations, wars, warTrace, journal });
     }

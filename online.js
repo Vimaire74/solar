@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-09 · v9.36';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
+const SOLAR_BUILD_JS = '2026-08-09 · v9.43';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :
@@ -590,11 +590,20 @@ function showInvestReal(pending, lvl){
   const optsEl=document.getElementById(two?'inv2-opts':'inv-opts'), modal=document.getElementById(two?'invest2-modal':'invest-modal');
   if(!optsEl || !modal) return false;
   const selFn=two?'selectInvestment2':'selectInvestment';
-  optsEl.innerHTML=opts.map(c=>'<div class="inv-opt" onclick="'+selFn+'(\''+c.id+'\')">'
+  /* Les cartes impayables sont grisées et non cliquables, EXACTEMENT comme en solo. C'est le
+     moteur qui tranche (`payable`/`manque` arrivent dans la charge utile) : le client ne
+     recalcule rien, sinon la règle finirait par différer entre les deux modes.
+     `payable!==false` et non `payable` : un serveur d'une version antérieure n'envoie pas le
+     champ, et tout griser serait pire que ne rien griser. */
+  optsEl.innerHTML=opts.map(c=>{
+    const ok=(c.payable!==false);
+    return '<div class="inv-opt'+(ok?'':' inv-nope')+'"'+(ok?' onclick="'+selFn+'(\''+c.id+'\')"':'')+'>'
     +'<div class="inv-opt-emoji">'+(c.emoji||'')+'</div>'
     +'<div class="inv-opt-name">'+(c.name||c.id)+'</div>'
     +'<div class="inv-opt-benefit">✅ '+(c.benefit||'')+'</div>'
-    +'<div class="inv-opt-cost">⚠️ '+(c.contrepartie||'')+'</div></div>').join('');
+    +'<div class="inv-opt-cost">⚠️ '+(c.contrepartie||'')+'</div>'
+    +(ok?'':'<div class="inv-opt-cost" style="color:#ff8a8a;font-weight:700">🚫 Il te manque '+(c.manque||'')+'</div>')
+    +'</div>';}).join('');
   const aiEl=document.getElementById(two?'inv2-ai-pick':'inv-ai-pick');
   if(aiEl && Array.isArray(o.ai) && o.ai.length){
     const nm=(id)=>{ const x=opts.find(y=>y.id===id); return x?((x.emoji||'')+' '+x.name):id; };
@@ -1504,7 +1513,7 @@ function askLocalDecision(pending){
   return new Promise(resolve=>{
     const o=pending.payload||{}; const k=pending.kind;
     const done=(ans)=>{ closeDecision(); resolve(ans); };
-    const TITLES={raid_target:'💰 Quelle nation piller ?',accord_request:'🤝 Proposition d\'accord commercial',agenda:'Choisis ton agenda secret',strategy:'Carte Stratégie',strategy_calm:'Calmer une tension',invest1:'Investissement (Niv.1)',invest2:'Investissement (Niv.2)',espionage:'Espionnage : branche à copier',extrasolar:'Exploration extra-solaire',empath_copy:'Télépathie : carte à copier',ai_dyson:'Sphère de Dyson adverse',dyson_build:'Ta Sphère de Dyson',peace_offer:'Offre de paix',war_combat:'Combat',accord_confirm:'Accord commercial',defense:'Défense !',peace_answer:'🕊️ Proposition de paix'};
+    const TITLES={raid_target:'💰 Quelle nation piller ?',accord_request:'🤝 Proposition d\'accord commercial',agenda:'Choisis ton agenda secret',strategy:'Carte Stratégie',strategy_calm:'Calmer une tension',invest1:'Investissement (Niv.1)',invest2:'Investissement (Niv.2)',espionage:'🕵️ Espionnage : quelle filière copies-tu ?',extrasolar:'Exploration extra-solaire',empath_copy:'Télépathie : carte à copier',ai_dyson:'Sphère de Dyson adverse',dyson_build:'Ta Sphère de Dyson',peace_offer:'Offre de paix',war_combat:'Combat',accord_confirm:'Accord commercial',defense:'Défense !',peace_answer:'🕊️ Proposition de paix'};
     let body='<h2>'+(TITLES[k]||k)+'</h2>';
     if(k==='defense'){
       // CHOIX TACTIQUE DE DÉFENSE : combien de jetons engager (0 = ne pas défendre) + Supercroiseur éventuel.

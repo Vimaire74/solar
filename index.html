@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-09 · v9.36';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-09 · v9.43';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -424,6 +424,10 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
 .inv-ai-pick{background:#1a1a0a;border:1px solid #5a4a0a;border-radius:8px;padding:7px 12px;margin-bottom:14px;font-size:.8em;color:#cc9944;text-align:left}
 .inv-opts{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-bottom:10px;max-height:46vh;overflow-y:auto}
 .inv-opt{width:112px;padding:8px 7px;background:#0f0f2a;border:2px solid #2a3a5a;border-radius:9px;cursor:pointer;text-align:center;transition:all .2s;position:relative}
+/* Investissement qu'on n'a pas les moyens de payer : même atténuation que les cartes verrouillées
+   de la rivière (.72), pour que « inaccessible » ait UNE seule apparence dans tout le jeu. */
+.inv-opt.inv-nope{opacity:.72;cursor:not-allowed;border-color:#4a2a2a;background:#15102a}
+.inv-opt.inv-nope:hover{border-color:#4a2a2a}
 .inv-opt:hover:not(.inv-taken){border-color:#ffd700;background:#1a1a08;transform:translateY(-2px)}
 .inv-opt.inv-taken{opacity:.35;cursor:default;border-color:#3a3a3a}
 .inv-opt-emoji{font-size:1.7em;margin-bottom:5px}

@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-09 · v9.36';
+const SOLAR_BUILD_MOTEUR = '2026-08-09 · v9.43';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -253,55 +253,38 @@ const AGENDAS_POOL=[
   {id:'ag14',name:'Opulence Matérielle',emoji:'🪨',desc:'Toutes les cartes tech qui génèrent <i class=ri-materials></i> → +12 VP',score(p){const matCards=CARDS_POOL.filter(c=>c.rGain&&(c.rGain.materials||0)>0).map(c=>c.id);return matCards.length>0&&matCards.every(id=>p.cards.find(c=>c.id===id||c.id===id+'_esp'))?12:0;}},
 ];
 const INVESTMENT_CARDS=[
-  {id:'inv_esp',name:'Espionnage',emoji:'🕵️',
-   benefit:'Copie toutes les cartes d\'une branche ennemie au choix',
-   contrepartie:'+6 risque de guerre envers la nation ciblée',
-   applyBenefit(G,p){
-     // Pour le joueur : géré via showEspionageChoiceModal (interception dans applyInvestments)
-     // Pour l'IA : copie automatiquement la branche la plus fournie de l'adversaire
-     if(p!==G.player){
-       const enemy=G.player;
-       const branches={};
-       for(const c of enemy.cards){if(c.branch)branches[c.branch]=(branches[c.branch]||0)+1;}
-       const topBranch=Object.entries(branches).sort((a,b)=>b[1]-a[1])[0];
-       if(!topBranch)return;
-       const branchCards=enemy.cards.filter(c=>c.branch===topBranch[0]);
-       for(const c of branchCards){
-         if(!p.cards.find(x=>x.id===c.id+'_esp')){
-           const copy={...c,id:c.id+'_esp',espCopy:true};
-           p.cards.push(copy);applyCard(copy,p);
-         }
-       }
-       addLog('🤖 Espionnage IA : copie de la branche '+topBranch[0]+' ('+branchCards.length+' carte(s))','dim');
-     }
-   },
-   applyCost(G,p){
-     /* Tension PAR PAIRE : la nation espionnée en veut à l'espion (voir `applyEspionageChoice`). */
-     const _c=(typeof _espCible==='function')?_espCible():null;
-     if(_c&&typeof addTens==='function')addTens(_c.civ.id,p.civ.id,4);
-     G.warRisk=Math.min(10,(G.warRisk||0)+4);
-     if(G.ais&&G.ais.includes(p))addLog('🕵️ Espionnage de '+p.civ.name+(_c?' contre '+_c.civ.name:'')+' — tension +4.','red');
-   }
+  {id:'inv_esp',name:'Espionnage',emoji:'🕵️',cout:{},
+   benefit:'À la fin des tours 3, 4 et 5 : copie TOUTE une filière technologique des autres nations',
+   contrepartie:'+4 tension envers chaque nation copiée',
+   /* ⚠️ CETTE CARTE N'A AUCUN EFFET AU MOMENT DE SA RÉSOLUTION, et c'est voulu (Marc, 2026-08-09).
+      Tout se joue aux fins de tour 3, 4 et 5, dans `stEspionnage` — pour l'humain comme pour l'IA,
+      par le même chemin. Avant, `applyBenefit` contenait une copie SÉPARÉE de la règle réservée aux
+      IA, qui pillait toujours `G.player` : à quatre joueurs, une IA espionnait donc systématiquement
+      celui qui se trouvait être « le joueur » au moment du calcul, quelle que soit sa position.
+      Et `applyCost` posait la tension sur une « cible » désignée d'office, parfois une nation à qui
+      on n'avait rien pris. Les deux ont été supprimées : une seule règle, un seul endroit. */
+   applyBenefit(G,p){ /* rien ici : voir stEspionnage */ },
+   applyCost(G,p){ /* la tension est posée à la copie, sur les nations réellement pillées */ }
   },
-  {id:'inv_ind',name:'Industrialisation Lourde',emoji:'🏭',
+  {id:'inv_ind',name:'Industrialisation Lourde',emoji:'🏭',cout:{morale:3},
    benefit:'Revenus +4<i class=ri-materials></i>/tour (T3→T5)',
    contrepartie:'−3<i class=ri-morale></i>',
    applyBenefit(G,p){if(!p.investBonus)p.investBonus={};p.investBonus.matBonus=4;if(p===G.player)addLog('🏭 Industrialisation : +4<i class=ri-materials></i>/tour !','gold');},
    applyCost(G,p){p.res.morale=Math.max(0,(p.res.morale||0)-3);if(p===G.player)addLog('🏭 Industrialisation : −3<i class=ri-morale></i> (pollution massive)','red');}
   },
-  {id:'inv_rec',name:'Recherche Intensive',emoji:'🔬',
+  {id:'inv_rec',name:'Recherche Intensive',emoji:'🔬',cout:{materials:3,energy:1},
    benefit:'Revenus +3<i class=ri-science></i>/tour (T3→T5)',
    contrepartie:'−3<i class=ri-materials></i> −1<i class=ri-energy></i>',
    applyBenefit(G,p){if(!p.investBonus)p.investBonus={};p.investBonus.sciBonus=3;if(p===G.player)addLog('<i class=ri-science></i> Recherche Intensive : +3<i class=ri-science></i>/tour !','gold');},
    applyCost(G,p){p.res.materials=Math.max(0,(p.res.materials||0)-3);p.res.energy=Math.max(0,(p.res.energy||0)-1);if(p===G.player)addLog('<i class=ri-science></i> Recherche Intensive : −3<i class=ri-materials></i> −1<i class=ri-energy></i>','red');}
   },
-  {id:'inv_agr',name:'Agriculture Durable',emoji:'🌾',
+  {id:'inv_agr',name:'Agriculture Durable',emoji:'🌾',cout:{materials:2,science:1},
    benefit:'+2<i class=ri-morale></i>/tour (T3→T5)',
    contrepartie:'−2<i class=ri-materials></i> −1<i class=ri-science></i>',
    applyBenefit(G,p){if(!p.investBonus)p.investBonus={};p.investBonus.moraleBonus=2;if(p===G.player)addLog('🌾 Agriculture Durable : +2<i class=ri-morale></i>/tour !','gold');},
    applyCost(G,p){p.res.materials=Math.max(0,(p.res.materials||0)-2);p.res.science=Math.max(0,(p.res.science||0)-1);if(p===G.player)addLog('🌾 Agriculture Durable : −2<i class=ri-materials></i> −1<i class=ri-science></i>','red');}
   },
-  {id:'inv_exp',name:'Expansion Rapide',emoji:'🚀',
+  {id:'inv_exp',name:'Expansion Rapide',emoji:'🚀',cout:{morale:1,materials:1,energy:1},
    benefit:'1 colonisation + 1 route gratuites (T3)',
    contrepartie:'−1<i class=ri-morale></i> −1<i class=ri-materials></i> −1<i class=ri-energy></i>',
    applyBenefit(G,p){
@@ -313,19 +296,19 @@ const INVESTMENT_CARDS=[
   },
 ];
 const INVESTMENT_CARDS_2=[
-  {id:'inv2_war',name:'Stratégie Guerrière',emoji:'⚔️',
+  {id:'inv2_war',name:'Stratégie Guerrière',emoji:'⚔️',cout:{materials:4,energy:2},
    benefit:'Jetons retournent en 1 tour (au lieu de 2) — T7→T9',
    contrepartie:'−4<i class=ri-materials></i> −2<i class=ri-energy></i> immédiat',
    applyBenefit(G,p){if(!p.investBonus2)p.investBonus2={};p.investBonus2.fastCooldown=true;p.investBonus2.turnsLeft=4;if(p===G.player)addLog('⚔️ Stratégie Guerrière : jetons reviennent en 1 tour !','gold');},
    applyCost(G,p){p.res.materials=Math.max(0,(p.res.materials||0)-4);p.res.energy=Math.max(0,(p.res.energy||0)-2);if(p===G.player)addLog('⚔️ Stratégie Guerrière : −4<i class=ri-materials></i> −2<i class=ri-energy></i>','red');}
   },
-  {id:'inv2_comfort',name:'Confort de la Population',emoji:'🕊️',
+  {id:'inv2_comfort',name:'Confort de la Population',emoji:'🕊️',cout:{materials:4},
    benefit:'+4<i class=ri-morale></i>/tour pendant 3 tours',
    contrepartie:'−4<i class=ri-materials></i> immédiat',
    applyBenefit(G,p){if(!p.investBonus2)p.investBonus2={};p.investBonus2.moraleFlat=4;p.investBonus2.turnsLeft=4;if(p===G.player)addLog('🕊️ Confort : +4<i class=ri-morale></i>/tour pendant 3 tours !','gold');},
    applyCost(G,p){p.res.materials=Math.max(0,(p.res.materials||0)-4);if(p===G.player)addLog('🕊️ Confort : −4<i class=ri-materials></i>','red');}
   },
-  {id:'inv2_colonies',name:'Colonies Avancées',emoji:'🏗️',
+  {id:'inv2_colonies',name:'Colonies Avancées',emoji:'🏗️',cout:{energy:3},/* le ÷2 des matériaux est toujours payable : seul le −3⚡ peut manquer */
    benefit:'Toutes tes colonies déjà possédées → niveau max (entretien payant normalement).',
    contrepartie:'<i class=ri-materials></i> ÷2 + −3<i class=ri-energy></i> immédiat',
    applyBenefit(G,p){
@@ -342,7 +325,7 @@ const INVESTMENT_CARDS_2=[
      if(p===G.player)addLog('🏗️ Colonies Avancées : <i class=ri-materials></i> ÷2, −3<i class=ri-energy></i>','red');
    }
   },
-  {id:'inv2_union',name:'Union Sacrée',emoji:'🧠',
+  {id:'inv2_union',name:'Union Sacrée',emoji:'🧠',cout:{materials:3,science:4},
    benefit:'Branche Empathes débloquée (exclusive 3 tours, puis accessible à tous)',
    contrepartie:'−3<i class=ri-materials></i> −4<i class=ri-science></i> immédiat',
    applyBenefit(G,p){
@@ -466,7 +449,30 @@ function _sciProd(p){var s=(p.rpt&&p.rpt.science)||0;for(var i=0;i<p.colonies.le
 function routeProtegee(p, r){
   if(!p) return false;
   if((r&&r.tokens||0)>0) return true;                     // un jeton posé protège, comme avant
-  return hasSpec(p,'ia_immune')||hasSpec(p,'empath_routes')||hasSpec(p,'intel_2');
+  return routesProtegeesParTech(p);
+}
+/* La nation a-t-elle une technologie qui protège TOUTES ses routes, jeton ou pas ?
+   ⚠️ Marc, 2026-08-09 : « le lien empathe gère toujours pas les attaques de pirates !! Ça
+   considère les routes pas défendues. » Exact, et c'est ma faute : en créant `routeProtegee` la
+   veille pour l'ÉVÉNEMENT pirate, j'avais laissé `advancePirates` — l'attaque pirate de CHAQUE
+   fin de tour — avec sa propre liste `ia_immune || intel_2`, sans Lien Empathe. Or Lien Empathe
+   retire justement les jetons des routes : la technologie créait donc elle-même les routes que
+   les pirates allaient détruire. Le piège exact que la correction de la veille devait supprimer,
+   à l'endroit que j'avais oublié.
+   La règle est maintenant écrite UNE fois. Les quatre endroits qui la lisaient chacun à leur
+   façon (événement pirate, pirates de fin de tour, attaque de route en guerre, raid IA sur route)
+   appellent tous ceci. */
+function routesProtegeesParTech(p){
+  return !!p && (hasSpec(p,'ia_immune')||hasSpec(p,'empath_routes')||hasSpec(p,'intel_2'));
+}
+/* Le nom des technologies effectivement possédées, pour que le journal dise POURQUOI c'est protégé.
+   Un « protégé » sans raison laisse le joueur croire à un caprice du jeu. */
+function techsProtegeantRoutes(p){
+  const t=[];
+  if(hasSpec(p,'ia_immune')) t.push('IA Défensive');
+  if(hasSpec(p,'empath_routes')) t.push('Lien Empathe');
+  if(hasSpec(p,'intel_2')) t.push('Réseau Orbital');
+  return t;
 }
 function _evTop(statFn){const all=allPlayers();let mx=-Infinity;for(const p of all){const s=statFn(p);if(s>mx)mx=s;}if(mx<=0)return[];return all.filter(function(p){return statFn(p)===mx;});}
 function _evAwardVP(holders,vp){if(holders.length===0)return 'personne (aucune production).';if(holders.length>=3)return 'personne — trop d\'égalités ('+holders.length+' nations).';holders.forEach(function(p){p.tempVP=(p.tempVP||0)+vp;});return holders.map(_evName).join(' & ')+' → +'+vp+' VP';}
@@ -562,7 +568,7 @@ function _evCommPick(aiId){
   const nomSuite=fluxDonnees().suiteAccord;   // le NOM, avant que `_accordSuite()` ne le consomme
   const done=_accordSuite()||_evCommDone;_evCommDone=null;_evCloseOverlay();
   const prop=G.player; // le proposant est la nation active AU MOMENT du choix : on le capture
-  if(!aiId){addLog('🤝 Sommet commercial : aucun accord conclu.','dim');_appelerSuite(done);return;}
+  if(!aiId){addLog('🤝 '+G.player.civ.emoji+' '+G.player.civ.name+' — sommet commercial : aucun accord signé.','dim');_appelerSuite(done);return;}
   const ai=(typeof allPlayers==='function'?allPlayers():G.ais).find(function(a){return a&&a.civ&&a.civ.id===aiId;});
   if(!ai){_appelerSuite(done);return;}
   // Partenaire HUMAIN en ligne → on lui DEMANDE son accord.
@@ -649,7 +655,10 @@ function _evDiploConfirm(){
     addLog('🕊️ Pacte de non-agression avec '+ai.civ.emoji+' '+ai.civ.name+' (4 tours).','gold');
   }
   _evCloseOverlay();
-  if(made===0)addLog('🕊️ Sommet diplomatique : tension −5 partout (aucun pacte conclu).','dim');
+  /* Le journal est PARTAGÉ : « aucun pacte conclu » sans nom laissait croire que PERSONNE n'avait
+     rien signé, alors que deux lignes plus haut deux pactes venaient d'être annoncés par un autre
+     joueur (log de Marc, partie CC36). On nomme la nation. */
+  if(made===0)addLog('🕊️ '+G.player.civ.emoji+' '+G.player.civ.name+' — sommet diplomatique : aucun pacte signé (tension −5 tout de même).','dim');
   _appelerSuite(done);
 }
 /* ============================================================ STATE ============================================================ */
@@ -920,6 +929,31 @@ function syncWarState(){
    supprimer la guerre de deux AUTRES nations). */
 function _warIndexBetween(idA,idB){ return (G.wars||[]).findIndex(w=>w&&((w.a===idA&&w.b===idB)||(w.a===idB&&w.b===idA))); }
 function _moiId(){ return (G.player&&G.player.civ&&G.player.civ.id)||null; }
+/* ═══════ LE BONUS DE COMBAT D'UNE NATION, LU SUR SES CARTES ═══════
+   Marc, 2026-08-09 : « ma consigne est claire depuis le début, pas de loose end. »
+
+   AVANT. Lien Empathe et Télépathie déclarent chacune `combatBonus:2`. `applyCard` rangeait
+   cette valeur dans `p.combatBonus`… que RIEN ne lisait, et que le début de tour remettait à
+   zéro. Le +2 fonctionnait quand même, mais par un autre chemin : ONZE copies de
+   `bonusCombatCartes(p)`, écrites à la main dans les
+   calculs de puissance, les estimations et l'affichage.
+   Conséquences : le chiffre 2 vivait à onze endroits (le changer voulait dire les trouver tous),
+   et une carte future portant `combatBonus` sans ligne dédiée n'aurait rien fait, en silence.
+
+   MAINTENANT. Une seule fonction, qui additionne ce que les CARTES déclarent. Le champ
+   `combatBonus` redevient la source de vérité, comme `forceBonus` ou `warForce` le sont déjà.
+   Les copies d'espionnage portent le champ : elles donnent donc le bonus, comme avant. */
+function bonusCombatCartes(p){
+  if(!p||!p.cards)return 0;
+  let t=0; for(const c of p.cards) t+=(c&&c.combatBonus)||0;
+  return t;
+}
+/* Cette nation est-elle en guerre ? À ne PAS confondre avec `G.warState`, qui ne dit que
+   « la nation actuellement active est-elle en guerre » — donc dépend du point de vue. */
+function estEnGuerre(p){
+  const id=(p&&p.civ&&p.civ.id)||null;
+  return !!id && (G.wars||[]).some(w=>w&&(w.a===id||w.b===id));
+}
 function mesGuerres(civId){
   const id=civId||((G.player&&G.player.civ&&G.player.civ.id)||null);
   return (G.wars||[]).filter(w=>w&&(w.a===id||w.b===id));
@@ -1078,7 +1112,7 @@ function mkPlayer(civId){
     forceTokens:civ.startForce-(civ.extraStartCols?civ.extraStartCols.length:0),forceCooldown:[],cards:[],
     colonies:startCols,
     routes:startRoutes,rpt:{},govRpt:0,tempVP:0,abilityUsed:false,
-    spentThisTurn:0,bonusMat:false,stratBonus:null,combatBonus:0,
+    spentThisTurn:0,bonusMat:false,stratBonus:null,
     wormholeUsed:false,_resCap:0,investBonus2:null,recentLosses:new Map()};
 }
 function initTechResize(){
@@ -1511,13 +1545,55 @@ function stAgendaRecu(ans, civId){
   stAgendaSuivant();
 }
 /* ============================================================ INVESTMENT ============================================================ */
+/* ═══════ INVESTISSEMENTS : PEUT-ON PAYER ? (Marc, 2026-08-09) ═══════
+   « il faudrait aussi que le jeu évalue la possibilité de les payer au moment du choix
+   et bloquer ce qui peut pas être payé. »
+
+   Le défaut : chaque `applyCost` retirait sa contrepartie en `Math.max(0, …)`. Sans les
+   ressources, le compteur s'arrêtait à zéro et le joueur encaissait le bénéfice GRATUITEMENT.
+   Le champ `cout` déclare maintenant la contrepartie sous forme de DONNÉE, à côté du texte
+   `contrepartie` qui, lui, ne sert qu'à l'affichage. Les deux doivent rester d'accord.
+
+   Deux contrôles, comme Marc l'a demandé :
+     · au CHOIX (fin du tour 2 ou 6) — la carte est grisée et non cliquable ;
+     · au PRÉLÈVEMENT (tour 3 ou 7) — on revérifie, car le joueur a pu tout dépenser entre-temps.
+   « Payable » signifie ici : avoir la ressource. On n'interdit pas de tomber à zéro moral —
+   c'est un choix légitime, même s'il déclenche la guerre civile. */
+function investCoutDe(card){ return (card&&card.cout)||{}; }
+function investPayable(card,p){
+  const c=investCoutDe(card);
+  for(const r in c){ if((p.res[r]||0) < c[r]) return false; }
+  return true;
+}
+function investManque(card,p){
+  const c=investCoutDe(card), m=[];
+  for(const r in c){ const d=c[r]-(p.res[r]||0); if(d>0) m.push(d+(typeof rEmoji==='function'?rEmoji(r):r)); }
+  return m;
+}
+/* Applique une carte d'investissement APRÈS avoir revérifié qu'elle est payable.
+   Rend true si elle a pris effet. Un seul chemin pour les deux niveaux et pour l'espionnage :
+   c'est ce qui garantit qu'on ne peut pas oublier le contrôle à un endroit. */
+function investAppliquer(card,p){
+  if(!card) return false;
+  if(!investPayable(card,p)){
+    const m=investManque(card,p).join(' ');
+    addLog('💼 '+p.civ.emoji+' '+p.civ.name+' — '+card.emoji+' '+card.name
+      +' ne prend PAS effet : il manque '+m+' au moment du prélèvement.','red');
+    if(typeof _journalAuto==='function')_journalAuto(p.civ.name,'Investissement sans effet',card.name+' — il manque '+m);
+    return false;
+  }
+  card.applyBenefit(G,p); card.applyCost(G,p);
+  return true;
+}
 function showInvestmentModal(){
   if(typeof _ilHide==='function')_ilHide();
   // Chaque IA choisit STRATÉGIQUEMENT (le joueur choisit en dernier)
   for(const a of G.ais)a._inv1=chooseInvestmentForAI(a,1);
   G.aiInvest=G.ais[0]?G.ais[0]._inv1:null;   // ÉCHO d'affichage local — ne JAMAIS s'en servir pour une règle (dépend de la perspective)
   if(_decisionActive()){ // mode serveur : chaque HUMAIN choisit son investissement Niv.1 (les invités d'abord, puis l'hôte)
-    const _invOpts=INVESTMENT_CARDS.map(c=>({id:c.id,name:c.name,emoji:c.emoji,benefit:c.benefit,contrepartie:c.contrepartie}));
+    /* (Une variable `_invOpts` traînait ici, construite puis jamais utilisée : les options
+       envoyées viennent de `_invOptions(nation)`, plus bas. Supprimée — du code mort qui a
+       l'air d'être la source de vérité est pire que pas de code du tout.) */
     // ⚠️ LA FILE DES JOUEURS À INTERROGER VA DANS `G`, pas dans une fermeture (règle 3 du bloc @flux).
     // Avant, `_invQueue` et `_invAsk` vivaient dans cette portée : sauver la partie pendant que le
     // deuxième joueur choisissait son investissement, c'était perdre la file ET la suite.
@@ -1533,11 +1609,13 @@ function showInvestmentModal(){
   const opts=document.getElementById('inv-opts');
   opts.innerHTML=INVESTMENT_CARDS.map(c=>{
     const aiAlso=G.ais.some(a=>a._inv1===c.id); // non-exclusif : tu peux choisir le même qu'une IA
-    return`<div class="inv-opt" onclick="selectInvestment('${c.id}')">
+    const ok=investPayable(c,G.player), manque=investManque(c,G.player).join(' ');
+    return`<div class="inv-opt${ok?'':' inv-nope'}"${ok?` onclick="selectInvestment('${c.id}')"`:''}>
       <div class="inv-opt-emoji">${c.emoji}</div>
       <div class="inv-opt-name">${c.name}${aiAlso?' <span style="color:#cc9944;font-size:.82em">(IA aussi)</span>':''}</div>
       <div class="inv-opt-benefit">✅ ${c.benefit}</div>
       <div class="inv-opt-cost">⚠️ ${c.contrepartie}</div>
+      ${ok?'':'<div class="inv-opt-cost" style="color:#ff8a8a;font-weight:700">🚫 Il te manque '+manque+'</div>'}
     </div>`;
   }).join('');
   document.getElementById('invest-modal').classList.remove('hidden');
@@ -1575,13 +1653,16 @@ function showInvestmentModal2(){
   document.getElementById('inv2-ai-pick').innerHTML=G.ais.map(a=>{const c=INVESTMENT_CARDS_2.find(x=>x.id===a._inv2);return '🤖 '+a.civ.emoji+' <strong>'+a.civ.name+'</strong> : '+(c?c.emoji+' '+c.name:'—');}).join('<br>');
   document.getElementById('inv2-ai-pick').classList.remove('hidden');
   document.getElementById('inv2-ai-pick').innerHTML+=_tensionMiniHtml();
-  document.getElementById('inv2-opts').innerHTML=INVESTMENT_CARDS_2.map(card=>`
-    <div class="inv-opt" onclick="selectInvestment2('${card.id}')">
+  document.getElementById('inv2-opts').innerHTML=INVESTMENT_CARDS_2.map(card=>{
+    const ok=investPayable(card,G.player), manque=investManque(card,G.player).join(' ');
+    return `
+    <div class="inv-opt${ok?'':' inv-nope'}"${ok?` onclick="selectInvestment2('${card.id}')"`:''}>
       <div class="inv-opt-emoji">${card.emoji}</div>
       <div class="inv-opt-name">${card.name}</div>
       <div class="inv-opt-benefit">${card.benefit}</div>
       <div class="inv-opt-cost">⚠️ ${card.contrepartie}</div>
-    </div>`).join('');
+      ${ok?'':'<div class="inv-opt-cost" style="color:#ff8a8a;font-weight:700">🚫 Il te manque '+manque+'</div>'}
+    </div>`;}).join('');
   document.getElementById('invest2-modal').classList.remove('hidden');
 }
 function selectInvestment2(cardId){
@@ -1597,8 +1678,11 @@ function applyInvestments2(){
   if(G.invest2Applied)return;G.invest2Applied=true;
   const pCard=INVESTMENT_CARDS_2.find(c=>c.id===G.player._inv2);
   const aCard=INVESTMENT_CARDS_2.find(c=>c.id===(G.ais[0]&&G.ais[0]._inv2));   // affichage seulement
-  if(pCard){pCard.applyBenefit(G,G.player);pCard.applyCost(G,G.player);}
-  for(const a of G.ais){const ac=INVESTMENT_CARDS_2.find(c=>c.id===a._inv2);if(ac){ac.applyBenefit(G,a);ac.applyCost(G,a);}}
+  /* Revérification au PRÉLÈVEMENT : le choix date du tour 6, on est au tour 7, le joueur a pu
+     tout dépenser entre-temps. `investAppliquer` refuse alors la carte au lieu d'en offrir le
+     bénéfice avec une contrepartie ramenée à zéro (voir le bandeau d'`investPayable`). */
+  if(pCard) investAppliquer(pCard,G.player);
+  for(const a of G.ais){const ac=INVESTMENT_CARDS_2.find(c=>c.id===a._inv2);if(ac) investAppliquer(ac,a);}
   if(pCard)_journalAuto(G.player.civ.name,'Résolution investissement Niv.2',pCard.name);
   for(const a of G.ais){const ac3=INVESTMENT_CARDS_2.find(c=>c.id===a._inv2);if(ac3)_journalAuto(a.civ.name,'Résolution investissement Niv.2',ac3.name);}
 }
@@ -1710,7 +1794,17 @@ function applyDysonClose(){
     const names=G._dysonWarTargets.map(id=>{const ai=G.ais.find(a=>a.civ.id===id);return ai?ai.civ.emoji+' '+ai.civ.name:id;}).join(', ');
     addLog('<i class=ri-energy></i> Sphère de Dyson : '+names+' refus — Guerre !','red');
     G.warRisk=10;
-    for(const _tgt of G._dysonWarTargets){declareWar('Sphère de Dyson — Guerre pour le contrôle de l\'énergie solaire !','dyson',_tgt);const _dw=_warBetween(_moiId(),_tgt);if(_dw)_dw.aiAggressor=true;} // TOUTES les nations refusantes entrent en guerre ET t'assaillent (agresseurs engagés)
+    /* ⚠️ QUI EST L'AGRESSEUR ? Marc, 2026-08-09 : « dans sphère de Dyson seul le joueur qui a fait
+       la Tech Dyson peut faire la guerre et décider d'attaquer des colonies, ça devrait être
+       l'inverse, on était en guerre les deux contre lui. »
+       C'est juste : celui qui bâtit la Sphère s'arroge un monopole, ceux qui REFUSENT lui déclarent
+       la guerre. Ce sont donc EUX les agresseurs, et c'est à eux que la fenêtre d'assaut doit
+       s'ouvrir. Le bâtisseur se défend. On nomme donc l'agresseur — la nation refusante — au lieu
+       de l'étiquette `'dyson'`, que chaque lecteur interprétait comme « moi ». */
+    for(const _tgt of G._dysonWarTargets){
+      declareWar('Sphère de Dyson — Guerre pour le contrôle de l\'énergie solaire !','dyson',_tgt,_tgt);
+      const _dw=_warBetween(_moiId(),_tgt); if(_dw)_dw.aiAggressor=true; // la refusante s'engage vraiment (au moins un assaut)
+    }
   } else {
     addLog('<i class=ri-energy></i> Sphère de Dyson : toutes les nations acceptent le monopole énergétique.','gold');
   }
@@ -1767,96 +1861,143 @@ function aiDysonDecide(war){
   }
   if(typeof cb==='function')cb();else render();
 }
-/* La nation espionnée, RECALCULÉE depuis le curseur (jamais `G.ais[0]`, qui dépend du point de vue).
-   À défaut de cible désignée, on prend la nation la plus avancée en technologies : c'est celle qui
-   vaut la peine d'être espionnée, et c'est un choix explicable — contrairement à « la première ». */
-function _espCible(){
-  const d=(typeof fluxDonnees==='function')?fluxDonnees():{};
-  const tous=(typeof allPlayers==='function'?allPlayers():[G.player].concat(G.ais||[])).filter(n=>n&&n!==G.player);
-  if(d.espionCible){ const c=tous.find(n=>n.civ.id===d.espionCible); if(c)return c; }
-  let best=null,bn=-1;
-  for(const n of tous){ const k=(n.cards||[]).filter(c=>c.branch).length; if(k>bn){bn=k;best=n;} }
-  return best||tous[0]||null;
+/* ═══════════════════ ESPIONNAGE — TROIS FILIÈRES, AUX TOURS 3, 4 ET 5 ═══════════════════
+   Règle fixée par Marc le 2026-08-09 : « Espionnage ne permet pas de choisir chaque fin de
+   tour 3/4/5 la branche qu'on veut copier. On devrait pouvoir voir les tech développées par
+   les autres dans les diverses branches à chaque fin de tour, avec un choix par filière. »
+
+   CE QUI A CHANGÉ. Avant : UN choix unique, au tour 3, sur UNE seule nation « cible » — celle
+   que le jeu jugeait la plus avancée. Au tour 3 presque personne n'a deux technologies dans la
+   même filière, donc l'investissement était le plus souvent gâché ; d'où le report bricolé
+   (`_espEnAttente`) qui n'a jamais vraiment réglé le problème, il l'a déplacé.
+
+   MAINTENANT : à la fin des tours 3, 4 et 5, on voit les technologies de TOUTES les autres
+   nations regroupées par filière, et on en copie une, entière. Trois fenêtres, trois filières —
+   ou la même filière plusieurs fois, ce qui n'a d'intérêt que si elle s'est enrichie entre-temps.
+   Le report n'a plus lieu d'être : il n'y a plus rien à rattraper.
+
+   TENSION : chaque nation à qui on a effectivement pris quelque chose en veut à l'espion (+4).
+   On ne fâche donc plus une nation dont on n'a rien copié — c'était le cas avant, la « cible »
+   étant désignée d'office. */
+const ESP_TOURS=[3,4,5];
+/* Les technologies des AUTRES, regroupées par filière. Chaque entrée dit aussi de QUI elles
+   viennent : c'est ce qui permet de n'appliquer la tension qu'aux nations réellement pillées. */
+function espFilieres(espion){
+  const par={};
+  for(const n of allPlayers()){
+    if(!n||n===espion) continue;
+    for(const c of (n.cards||[])){
+      if(!c.branch) continue;
+      if(c.espCopy) continue;                 // on ne copie pas une copie : sinon l'espionnage se propage
+      if(espion.cards.find(x=>x.id===c.id||x.id===c.id+'_esp')) continue;   // déjà à nous
+      (par[c.branch]||(par[c.branch]=[])).push({carte:c, de:n});
+    }
+  }
+  return par;
 }
+function _espOptions(espion){
+  const par=espFilieres(espion);
+  /* `desc` est construit ICI, dans le moteur, et pas dans chaque interface : c'est la même
+     phrase en solo et en ligne. Deux rendus de la même liste finiraient par diverger — c'est
+     exactement ce qui est arrivé au calcul des revenus. */
+  return Object.keys(par).map(b=>{
+    const liste=par[b].map(x=>x.carte.emoji+' '+x.carte.name+' ('+x.de.civ.name+')');
+    return { branch:b, name:(BRANCH_NAMES[b]||b), cards:liste, n:par[b].length,
+             desc:liste.join(', ')+' — '+par[b].length+' carte(s)' };
+  }).sort((a,b)=>b.n-a.n);
+}
+/* Copie effective. Rend le nombre de cartes prises. */
+function espCopier(espion,branchId){
+  const par=espFilieres(espion), lot=par[branchId]||[];
+  const laises=new Set();
+  let pris=0;
+  for(const {carte,de} of lot){
+    const copie={...carte, id:carte.id+'_esp', espCopy:true};
+    espion.cards.push(copie); applyCard(copie,espion); pris++;
+    laises.add(de.civ.id);
+    addLog('🕵️ '+espion.civ.emoji+' '+espion.civ.name+' copie '+carte.emoji+' '+carte.name
+      +' à '+de.civ.name,'gold');
+  }
+  /* La tension ne frappe QUE les nations effectivement copiées, et elle est nommée dans le
+     journal : une nation doit pouvoir comprendre pourquoi elle en veut à quelqu'un. */
+  for(const cid of laises){
+    if(typeof addTens==='function') addTens(cid, espion.civ.id, 4);
+    const victime=allPlayers().find(n=>n.civ.id===cid);
+    addLog('🕵️ '+(victime?victime.civ.emoji+' '+victime.civ.name:cid)+' a détecté l\'espionnage de '
+      +espion.civ.name+' — tension +4 envers lui.','red');
+    if(typeof _journalAuto==='function')_journalAuto(espion.civ.name,'Espionnage détecté',(victime?victime.civ.name:cid)+' : tension +4');
+  }
+  if(pris) G.warRisk=Math.min(10,(G.warRisk||0)+2);
+  return pris;
+}
+/* L'IA prend la filière la plus fournie — même règle que l'humain, sans fenêtre. */
+function espChoixIA(espion){
+  const opts=_espOptions(espion);
+  if(!opts.length){ addLog('🕵️ '+espion.civ.name+' — rien à espionner ce tour.','dim'); return; }
+  espCopier(espion,opts[0].branch);
+}
+/* ÉTAT DE FLUX — appelé à la fin de chaque tour, juste avant le bilan.
+   Les humains sont interrogés EN MÊME TEMPS (même raison que l'agenda et les investissements :
+   le choix est secret et indépendant, faire la queue ne fait que rallonger le tour). */
+function stEspionnage(){
+  const d=fluxDonnees();
+  if(ESP_TOURS.indexOf(G.turn)<0){ stBilanDeTour(); return; }
+  const candidats=allPlayers().filter(p=>p&&p._inv1==='inv_esp'&&p._espTour!==G.turn);
+  for(const p of candidats) p._espTour=G.turn;         // une seule fois par tour, quoi qu'il arrive
+  for(const p of candidats.filter(p=>p._isAI)) espChoixIA(p);
+  const humains=candidats.filter(p=>!p._isAI);
+  const local=(G.player&&G.player.civ)?G.player.civ.id:null;
+  d.espRestants=humains.map(p=>p.civ.id);
+  if(!d.espRestants.length){ stBilanDeTour(); return; }
+  for(const p of humains){
+    const opts=_espOptions(p);
+    if(!opts.length){
+      addLog('🕵️ '+p.civ.emoji+' '+p.civ.name+' — aucune technologie à copier ce tour.','dim');
+      const i=d.espRestants.indexOf(p.civ.id); if(i>=0) d.espRestants.splice(i,1);
+      continue;
+    }
+    const charge={tour:G.turn, restants:ESP_TOURS.filter(t=>t>G.turn).length, options:opts};
+    if(p.civ.id===local) _emitDecision('espionage', p, charge, 'stEspionnageRecu', 'adEspionnage');
+    else _emitRemote('espionage', p, charge, 'stEspionnageRecu', 'adEspionnage');
+  }
+  if(!d.espRestants.length){ stBilanDeTour(); return; }
+}
+function adEspionnage(ans){ return (ans&&ans.branch)||null; }
+function stEspionnageRecu(ans, civId){
+  const d=fluxDonnees();
+  const cid=civId||(ans&&ans._civ)||null;
+  const nat=allPlayers().find(p=>p.civ.id===cid)||G.player;
+  const branche=(ans&&ans.branch)||null;
+  if(nat&&branche) espCopier(nat,branche);
+  const rest=d.espRestants;
+  if(Array.isArray(rest)){
+    const i=rest.indexOf(nat?nat.civ.id:cid); if(i>=0) rest.splice(i,1);
+    if(rest.length) return;                            // les autres n'ont pas encore choisi
+  }
+  d.espRestants=null;
+  stBilanDeTour();
+}
+/* Fenêtre SOLO. En ligne, c'est online.js qui rend la même charge utile. */
 function showEspionageChoiceModal(){
-  const enemy=_espCible();
-  if(!enemy){ addLog('🕵️ Espionnage : aucune nation à espionner.','dim'); _finishInvestmentsAfterEspionage(); return; }
-  if(typeof fluxDonnees==='function')fluxDonnees().espionCible=enemy.civ.id;   // figé pour la réponse
-  // Regrouper les cartes ennemies par branche
-  const branches={};
-  for(const c of enemy.cards){
-    if(!c.branch)continue;
-    if(!branches[c.branch])branches[c.branch]=[];
-    branches[c.branch].push(c);
-  }
-  const entries=Object.entries(branches);
-  if(!entries.length){
-    // Pas de branche disponible — applique automatiquement le coût sans bénéfice
-    const inv=INVESTMENT_CARDS.find(c=>c.id==='inv_esp');
-    if(inv)inv.applyCost(G,G.player);
-    addLog('🕵️ Espionnage : aucune branche ennemie à copier !','dim');
-    _finishInvestmentsAfterEspionage();
-    return;
-  }
-  const civName=enemy.civ.emoji+' '+enemy.civ.name;
-  if(_decisionActive()){ // mode serveur : router le choix de branche à espionner
-    _emitDecision('espionage', G.player,
-      {target:enemy.civ.id, options:entries.map(([branchId,cards])=>({branch:branchId, name:BRANCH_NAMES[branchId]||branchId, cards:cards.map(c=>c.name)}))},
-      applyEspionageChoice, (ans)=>(ans&&ans.branch)||entries[0][0]);
-    return;
-  }
+  const opts=_espOptions(G.player);
+  if(!opts.length){ addLog('🕵️ Espionnage : aucune technologie à copier pour l\'instant.','dim'); return; }
   document.getElementById('espionage-modal-sub').textContent=
-    'Copie une branche de '+civName+' (+6 risque de guerre).';
-  const opts=entries.map(([branchId,cards])=>{
-    const branchName=BRANCH_NAMES[branchId]||branchId;
-    const cardList=cards.map(c=>c.emoji+' '+c.name).join(', ');
-    return `<div class="inv-opt" onclick="applyEspionageChoice('${branchId}')">
-      <div class="inv-opt-emoji">${cards[0].emoji||'<i class=ri-science></i>'}</div>
-      <div class="inv-opt-name">${branchName}</div>
-      <div class="inv-opt-benefit">${cardList}</div>
-      <div class="inv-opt-cost">${cards.length} carte(s)</div>
-    </div>`;
-  }).join('');
-  document.getElementById('espionage-branch-opts').innerHTML=opts;
+    'Choisis une filière : tu copies TOUTES les technologies que les autres nations y ont développées.';
+  document.getElementById('espionage-branch-opts').innerHTML=opts.map(o=>
+    `<div class="inv-opt" onclick="applyEspionageChoice('${o.branch}')">
+      <div class="inv-opt-emoji">🕵️</div>
+      <div class="inv-opt-name">${o.name}</div>
+      <div class="inv-opt-benefit">${o.desc}</div>
+    </div>`).join('');
   document.getElementById('espionage-modal').classList.remove('hidden');
 }
 function applyEspionageChoice(branchId){
-  document.getElementById('espionage-modal').classList.add('hidden');
-  const enemy=_espCible();
-  if(!enemy){ _finishInvestmentsAfterEspionage(); return; }
-  const branchCards=enemy.cards.filter(c=>c.branch===branchId);
-  for(const c of branchCards){
-    if(!G.player.cards.find(x=>x.id===c.id+'_esp')){
-      const copy={...c,id:c.id+'_esp',espCopy:true};
-      G.player.cards.push(copy);applyCard(copy,G.player);
-      addLog('🕵️ Espionnage : copie '+c.emoji+' '+c.name,'gold');
-    }
-  }
-  /* COÛT — TENSION RÉELLE ENVERS L'ESPION (corrigé le 2026-08-07, signalé par Marc : « espionnage
-     n'a pas créé de tension chez l'autre joueur contre ma nation »).
-     AVANT : `G.warRisk += 8` — un compteur GLOBAL de la partie, qui ne rendait personne hostile.
-     MAINTENANT : la nation espionnée en veut à l'espion, nommément. L'espionnage est un acte
-     diplomatique : la cible le VOIT (ligne de journal explicite), sinon elle subirait une hostilité
-     qu'elle ne peut pas s'expliquer. */
-  const civName=enemy.civ.emoji+' '+enemy.civ.name;
-  if(typeof addTens==='function')addTens(enemy.civ.id,G.player.civ.id,4);
-  G.warRisk=Math.min(10,(G.warRisk||0)+4);   // la galaxie se tend aussi, mais moitié moins qu'avant
-  addLog('🕵️ Espionnage de '+G.player.civ.emoji+' '+G.player.civ.name+' contre '+civName
-    +' — '+civName+' l\'a détecté : tension +4 envers '+G.player.civ.name+'.','red');
-  if(typeof _journalAuto==='function')_journalAuto(G.player.civ.name,'Espionnage détecté',civName+' : tension +4');
-  G.player._espFait=true; G.player._espEnAttente=false;
-  _finishInvestmentsAfterEspionage();
+  const el=document.getElementById('espionage-modal'); if(el) el.classList.add('hidden');
+  espCopier(G.player,branchId);
 }
-function _finishInvestmentsAfterEspionage(){
-  // Appliquer l'investissement IA si nécessaire, puis le modal de confirmation
-  const aCard=INVESTMENT_CARDS.find(c=>c.id===(G.ais[0]&&G.ais[0]._inv1));   // affichage seulement
-  for(const a of G.ais){const ac=INVESTMENT_CARDS.find(c=>c.id===a._inv1);if(ac){ac.applyBenefit(G,a);ac.applyCost(G,a);}}
-  addLog('💼 Tour 3 : effets Investissement Niv.1 appliqués — actifs jusqu\'au tour 10 !','gold');
-  const pCard=INVESTMENT_CARDS.find(c=>c.id===G.player._inv1);
-  if(pCard)_journalAuto(G.player.civ.name,'Résolution investissement Niv.1',pCard.name);
-  for(const a of G.ais){const ac2=INVESTMENT_CARDS.find(c=>c.id===a._inv1);if(ac2)_journalAuto(a.civ.name,'Résolution investissement Niv.1',ac2.name);}
-  if(pCard)showInvestmentActiveModal(pCard,aCard);
-}
+/* (`_finishInvestmentsAfterEspionage` supprimée : elle n'existait que pour rattraper le flux
+   après la fenêtre d'espionnage du tour 3. Cette fenêtre a été déplacée aux fins de tours 3, 4
+   et 5, et `applyInvestments` suit désormais un chemin unique.) */
 const BRANCH_NAMES={
   expansion:'Expansion',
   navigation:'Navigation & Moteurs',
@@ -1868,31 +2009,15 @@ const BRANCH_NAMES={
 };
 function applyInvestments(){
   if(G.investApplied)return;G.investApplied=true;
-  // Espionnage joueur : interception pour choix de branche
-  /* ESPIONNAGE — ACTIVATION DIFFÉRÉE (décisions de Marc, 2026-08-07).
-     Copier une BRANCHE ne vaut rien tant que personne n'a deux technologies dans la même : au tour 3
-     c'est presque toujours le cas, et l'investissement était gâché. Le joueur peut donc ATTENDRE.
-     Règles fixées par Marc : différé possible pour l'Espionnage SEUL ; date limite la fin du TOUR 3,
-     après quoi il s'active AUTOMATIQUEMENT (ni perdu ni remboursé) ; un RAPPEL à chaque fin de tour
-     tant qu'il n'est pas activé.
-     ⚠️ Le marqueur vit dans la NATION (`_espEnAttente`), jamais dans `G` : c'est exactement le piège
-     qui a fait confondre les investissements de deux joueurs (voir `selectInvestment`). */
-  if(G.player._inv1==='inv_esp' && G.player._espFait!==true && G.turn<3 && G.player._espEnAttente!==false){
-    G.player._espEnAttente=true;
-    addLog('🕵️ Espionnage en réserve — tu peux l\'activer quand une nation aura deux technologies '
-      +'dans la même branche. Activation automatique à la fin du tour 3.','gold');
-    _finishInvestmentsAfterEspionage();
-    return;
-  }
-  if(G.player._inv1==='inv_esp'){
-    // L'IA applique son investissement en arrière-plan maintenant, le joueur choisit
-    showEspionageChoiceModal();
-    return; // Le reste se fait dans applyEspionageChoice/_finishInvestmentsAfterEspionage
-  }
+  /* L'ESPIONNAGE NE S'INTERCEPTE PLUS ICI. Il se joue aux fins de tour 3, 4 et 5 (`stEspionnage`).
+     Le mécanisme de report (`_espEnAttente`, `_espFait`, `_finishInvestmentsAfterEspionage`) existait
+     parce qu'un choix unique au tour 3 tombait presque toujours trop tôt ; avec trois occasions
+     échelonnées, il n'a plus d'objet et a été supprimé. */
   const pCard=INVESTMENT_CARDS.find(c=>c.id===G.player._inv1);
   const aCard=INVESTMENT_CARDS.find(c=>c.id===(G.ais[0]&&G.ais[0]._inv1));     // affichage seulement
-  if(pCard){pCard.applyBenefit(G,G.player);pCard.applyCost(G,G.player);}
-  for(const a of G.ais){const ac=INVESTMENT_CARDS.find(c=>c.id===a._inv1);if(ac){ac.applyBenefit(G,a);ac.applyCost(G,a);}}
+  // Revérification au prélèvement (même raison qu'au Niv.2, voir `applyInvestments2`).
+  if(pCard) investAppliquer(pCard,G.player);
+  for(const a of G.ais){const ac=INVESTMENT_CARDS.find(c=>c.id===a._inv1);if(ac) investAppliquer(ac,a);}
   // Niv.1 : actif T3→T5 (3 tours) — turnsLeft=4 pour compenser le décompte immédiat dans startTurn
   for(const p of allPlayers()){if(p.investBonus)p.investBonus.turnsLeft=4;}
   addLog('💼 Tour 3 : effets Investissement Niv.1 appliqués — actifs T3→T5 !','gold');
@@ -2235,7 +2360,7 @@ function _startTurnPrep(){
   G.player._attacksThisTurn=0;G.ais.forEach(ai=>{ai._attacksThisTurn=0;});
   if(G.player.bonusMat){G.player.res.materials+=1;G.player.bonusMat=false;addLog('🔀 Bonus : +1<i class=ri-materials></i>','green');}
   G.ais.forEach(ai=>{if(ai.bonusMat){ai.res.materials+=1;ai.bonusMat=false;}});
-  G.player.spentThisTurn=0;G.player.combatBonus=0;G.ais.forEach(ai=>{ai.spentThisTurn=0;ai.combatBonus=0;});
+  G.player.spentThisTurn=0;G.ais.forEach(ai=>{ai.spentThisTurn=0;});   // `combatBonus` n'est plus un accumulateur de nation (voir bonusCombatCartes)
   // Retours récupération jetons
   for(const p of allPlayers()){
     const rec=p.forceCooldown.filter(fc=>fc.returnTurn<=G.turn);
@@ -2271,9 +2396,18 @@ function _startTurnBegin(){
   for(const p of allPlayers()){
     if(p.investBonus&&p.investBonus.turnsLeft!==undefined){
       p.investBonus.turnsLeft--;
-      if(p.investBonus.turnsLeft<=0){
+      /* `<=0` restait vrai à chaque tour suivant : le journal de Marc affichait « Investissement
+         Niv.1 expiré » aux tours 6, 7 ET 8. On ne l'annonce qu'au tour où il expire vraiment, et
+         `turnsLeft` est ensuite figé à 0 pour ne plus jamais repasser ici. */
+      if(p.investBonus.turnsLeft===0){
+        /* ⚠️ `matBonus` et `sciBonus` MANQUAIENT à cette liste (corrigé le 2026-08-09).
+           Industrialisation Lourde et Recherche Intensive ne s'arrêtaient donc JAMAIS : leur texte
+           annonce « T3→T5 », le journal disait « actifs jusqu'au tour 10 », et le code les laissait
+           courir jusqu'à la fin. Trois versions différentes de la même règle, dans le même jeu.
+           Marc a tranché le 2026-08-09 : TROIS TOURS, comme le texte des cartes. */
         p.investBonus.matX2=false;p.investBonus.sciX2=false;p.investBonus.matHalf=false;p.investBonus.moraleBonus=0;
-        if(p===G.player)addLog('⌛ Investissement Niv.1 expiré (T3→T5 couverts).','dim');
+        p.investBonus.matBonus=0;p.investBonus.sciBonus=0;
+        addLog('⌛ '+p.civ.emoji+' '+p.civ.name+' — investissement Niv.1 expiré (T3→T5 couverts).','dim');
       }
     }
   }
@@ -2281,9 +2415,13 @@ function _startTurnBegin(){
   for(const p of allPlayers()){
     if(p.investBonus2&&p.investBonus2.turnsLeft!==undefined){
       p.investBonus2.turnsLeft--;
-      if(p.investBonus2.turnsLeft<=0){
-        p.investBonus2.fastCooldown=false;p.investBonus2.moraleX2=false;
-        if(p===G.player)addLog('⌛ Investissement Niv.2 expiré (T7→T9 couverts).','dim');
+      if(p.investBonus2.turnsLeft===0){   // même correction qu'au Niv.1 : annoncé une seule fois
+        /* Même oubli qu'au Niv.1 : `moraleFlat` (Confort Population, +4❤️/tour) et `unionSacree`
+           ne figuraient pas ici. Confort dure trois tours comme les autres. `unionSacree` n'est
+           PAS remis à zéro : il débloque la branche Empathes, et une branche débloquée le reste
+           — l'annuler retirerait au joueur des cartes déjà achetées. */
+        p.investBonus2.fastCooldown=false;p.investBonus2.moraleX2=false;p.investBonus2.moraleFlat=0;
+        addLog('⌛ '+p.civ.emoji+' '+p.civ.name+' — investissement Niv.2 expiré (T7→T9 couverts).','dim');
       }
     }
   }
@@ -2418,7 +2556,11 @@ function stAssautJoueurResoudre(){
    On interroge d'abord les joueurs DISTANTS un par un, puis le joueur local.
    Chaque étape porte un nom, donc la file ET la suite survivent à une sauvegarde. */
 function _invCartes(){ return (fluxDonnees().niveauInvest===2)?INVESTMENT_CARDS_2:INVESTMENT_CARDS; }
-function _invOptions(){ return _invCartes().map(c=>({id:c.id,name:c.name,emoji:c.emoji,benefit:c.benefit,contrepartie:c.contrepartie})); }
+/* `payable`/`manque` sont calculés PAR NATION et partent au client : le grisage des cartes
+   impayables doit être le MÊME en solo et en ligne, sinon la règle dépend du mode de jeu. */
+function _invOptions(nat){ const p=nat||G.player;
+  return _invCartes().map(c=>({id:c.id,name:c.name,emoji:c.emoji,benefit:c.benefit,contrepartie:c.contrepartie,
+    payable:investPayable(c,p),manque:investManque(c,p).join(' ')})); }
 function _invChamp(){ return (fluxDonnees().niveauInvest===2)?'_inv2':'_inv1'; }
 /* TOUS LES HUMAINS CHOISISSENT LEUR INVESTISSEMENT EN MÊME TEMPS.
    Même raison que l'agenda : le choix est secret et indépendant, faire la queue n'apportait rien.
@@ -2435,8 +2577,8 @@ function stInvestDemander(){
   for(const civId of tous){
     const nat=(civId===local)?G.player:G.ais.find(a=>a.civ.id===civId);
     if(!nat){ const r=d.investRestants; const i=r.indexOf(civId); if(i>=0)r.splice(i,1); continue; }
-    if(civId===local) _emitDecision(kind, nat, {ai:G.ais.filter(a=>a._isAI!==false).map(a=>({civ:a.civ.id,pick:a[champ]})), options:_invOptions()}, 'stInvestRecu', null);
-    else _emitRemote(kind, nat, {options:_invOptions()}, 'stInvestRecu');
+    if(civId===local) _emitDecision(kind, nat, {ai:G.ais.filter(a=>a._isAI!==false).map(a=>({civ:a.civ.id,pick:a[champ]})), options:_invOptions(nat)}, 'stInvestRecu', null);
+    else _emitRemote(kind, nat, {options:_invOptions(nat)}, 'stInvestRecu');
   }
   if(!d.investRestants.length) _investTermine();
 }
@@ -2523,6 +2665,11 @@ fluxDeclarer('runStrategyDraft', typeof runStrategyDraft==='function'?runStrateg
 fluxDeclarer('stAccordsSuivant', stAccordsSuivant);
 fluxDeclarer('stInvestDemander', stInvestDemander);
 fluxDeclarer('stInvestRecu', stInvestRecu);
+/* ESPIONNAGE — trois états nommés, comme tout le reste : une question posée en fin de tour 3, 4
+   ou 5 peut très bien traverser une sauvegarde avant d'être répondue. */
+fluxDeclarer('stEspionnage', stEspionnage);
+fluxDeclarer('stEspionnageRecu', stEspionnageRecu);
+fluxDeclarer('adEspionnage', adEspionnage);
 fluxDeclarer('adCarteInvestissement', adCarteInvestissement);
 fluxDeclarer('selectInvestment', typeof selectInvestment==='function'?selectInvestment:stRien);
 fluxDeclarer('selectInvestment2', typeof selectInvestment2==='function'?selectInvestment2:stRien);
@@ -2654,7 +2801,10 @@ function guerrePaixRepondue(peaceResult){
     // Si c'est l'AUTRE nation qui a déclaré la guerre, c'est ELLE qui attaque : tu n'as alors que le
     // choix DÉFENSIF (combien de jetons engager, déployer ou non ton Supercroiseur) — ce qui permet la
     // guerre d'usure : sur-défendre pour lui coûter ses jetons et attendre d'être en position d'attaquer.
-    const _jeSuisAgresseur=(war.declaredBy==='player'||war.declaredBy==='dyson');
+    /* On compare des IDENTIFIANTS, plus des étiquettes. Repli sur l'ancien test UNIQUEMENT pour
+       les parties sauvegardées avant le 2026-08-09, dont les guerres n'ont pas `agresseurCiv`. */
+    const _jeSuisAgresseur = war.agresseurCiv ? (war.agresseurCiv===_moiId())
+                                              : (war.declaredBy==='player');
     if(!_jeSuisAgresseur){ guerreAssautIAPuisSuivante(); return; }
     showWarCombatModal('guerreCombatLiveChoisi');
     return;
@@ -2776,7 +2926,7 @@ function guerreCombatClassiqueChoisi(playerCommitted){
 function guerreRaison(){ const w=guerreObjet(); return (w&&w.reason)||G._warDeclareReason||'Tensions trop élevées'; }
 function guerreEtapeFraiche(){
   const war=guerreObjet(), warEnName=guerreEnnemiNom();
-  if(war&&(war.declaredBy==='player'||war.declaredBy==='dyson')){
+  if(war && (war.agresseurCiv ? (war.agresseurCiv===_moiId()) : (war.declaredBy==='player'))){
     showWarModal('⚔️ Guerre déclarée vs '+warEnName+' !','<strong>'+guerreRaison()+'</strong><br><br>Assaille une colonie ennemie, ou tiens ta position.',null);
     // TU es l'agresseur (ex. refus de la Sphère de Dyson) → tu dois pouvoir ATTAQUER TOUT DE SUITE.
     // Avant : simple message d'info puis passage au tour suivant, sans jamais de fenêtre de combat (bug Marc).
@@ -2837,26 +2987,15 @@ function stFinDeTour(){
   // ORDRE (Marc) : l'ÉVÉNEMENT de fin de tour — son RÉSULTAT à valider, ou son ACTION (accords
   // commerciaux / diplomatiques) — est présenté AVANT le bilan de fin de tour. Le plafonnement des
   // ressources se fait au DÉBUT du tour suivant (continueAfterEOT).
-  _resolveEndTurnEvent('stBilanDeTour');
+  /* L'espionnage s'intercale ENTRE l'événement et le bilan : aux tours 3, 4 et 5, celui qui a
+     pris cet investissement choisit la filière qu'il copie (voir `stEspionnage`). Aux autres
+     tours, l'état passe directement au bilan. */
+  _resolveEndTurnEvent('stEspionnage');
 }
-function stBilanDeTour(){ _espionnageRappel(); const e=G._lastEOT||{}; showEOTModal(e.maint,e.revs,null,null); }
-/* RAPPEL DE FIN DE TOUR pour l'espionnage encore en réserve, et activation d'office au tour 3.
-   Sans rappel, un investissement mis de côté s'oublie — et c'est justement pour ne PAS l'oublier
-   que Marc a demandé le report. Au tour 3 le message annonce que c'est le DERNIER. */
-function _espionnageRappel(){
-  for(const p of (typeof allPlayers==='function'?allPlayers():[G.player])){
-    if(!p||p._isAI||p._inv1!=='inv_esp'||p._espFait||p._espEnAttente!==true)continue;
-    if(G.turn>=3){
-      p._espEnAttente=false;
-      addLog('🕵️ '+p.civ.emoji+' '+p.civ.name+' — dernier tour pour l\'espionnage : il s\'active MAINTENANT.','red');
-      if(p===G.player&&typeof showEspionageChoiceModal==='function'){ p._espFait=true; showEspionageChoiceModal(); }
-    }else{
-      addLog('🕵️ '+p.civ.emoji+' '+p.civ.name+' — espionnage toujours en réserve. Il s\'activera '
-        +'automatiquement à la fin du tour 3'+(G.turn===2?' — c\'est le PROCHAIN tour.':'.'),'gold');
-    }
-  }
-}
-fluxDeclarer('_espionnageRappel', _espionnageRappel);
+function stBilanDeTour(){ const e=G._lastEOT||{}; showEOTModal(e.maint,e.revs,null,null); }
+/* (`_espionnageRappel` supprimée : elle rappelait qu'un espionnage était « en réserve » et
+   l'activait d'office à la fin du tour 3. Avec trois occasions échelonnées — tours 3, 4 et 5 —
+   il n'y a plus rien à mettre en réserve ni à rattraper.) */
 /* Sphère de Dyson construite par une IA ce tour → on demande son avis au joueur AVANT les guerres
    (son refus peut précisément déclencher une guerre, qui doit alors entrer dans la file). */
 function stDysonPuisGuerres(){
@@ -3178,13 +3317,27 @@ function advancePirates(){
   // Chaque route NON protégée a sa PROPRE chance d'attaque, croissante chaque tour jusqu'à 100%.
   const chance=Math.min(1,0.10+G.turn*0.10); // T1=20% … T9=100%
   let attacked=false;
-  for(const p of allPlayers()){
-    if(p.civ.id==='ceinturiens')continue; // les pirates ne pillent pas les Ceinturiens (ils font du commerce avec eux)
-    if(hasSpec(p,'ia_immune')||hasSpec(p,'intel_2')){if(p===G.player)addLog('🛡️ Routes immunisées contre les pirates (Réseau Orbital / IA Défensive).','gold');continue;}
+  /* Ces trois phases (pirates, entretien, revenus) tournent nation par nation, mais TOUTES sous la
+     perspective de l'humain principal : sans marquage, leurs lignes lui auraient été attribuées.
+     On nomme donc l'auteur à chaque tour de boucle — c'est la nation traitée, pas celle activée. */
+  for(const p of allPlayers()) logAuteur(p, ()=>{
+    if(p.civ.id==='ceinturiens')return; // les pirates ne pillent pas les Ceinturiens (ils font du commerce avec eux)
+    /* ⚠️ ICI était le défaut signalé par Marc le 2026-08-09. Cette ligne testait
+       `ia_immune || intel_2` — sa PROPRE liste, sans Lien Empathe — alors que la règle partagée
+       existait déjà juste à côté depuis la veille. Le message ne part plus au seul `G.player`,
+       pour la même raison qu'au message de destruction plus bas : à plusieurs humains, l'autre
+       ne voyait rien. */
+    if(routesProtegeesParTech(p)){
+      if(p.routes.length) addLog('🛡️ Routes de '+p.civ.emoji+' '+p.civ.name+' immunisées contre les pirates ('
+        +techsProtegeantRoutes(p).join(', ')+').','gold');
+      return;   // ⚠️ `return` et non `continue` : le corps de boucle est passé en fonction (voir logAuteur)
+    }
     // Routes non protégées (sans jeton Force) : chacune risque d'être pillée ET DÉTRUITE (à reconstruire).
     // Une route est protégée si elle a un jeton OU si un allié a déjà un jeton sur le même segment (surveillance partagée).
     const _guarded=function(r){return allPlayers().some(function(o){return o!==p&&o.routes.some(function(or){return (or.tokens||0)>0&&((or.from===r.from&&or.to===r.to)||(or.from===r.to&&or.to===r.from));});});};
-    const unprotected=p.routes.filter(r=>(r.tokens||0)===0&&!_guarded(r));
+    // `routeProtegee` = jeton posé OU technologie de protection. Plus de test « r.tokens===0 » en
+    // dur ici : c'est ce raccourci qui ignorait les technologies (voir le bandeau ci-dessus).
+    const unprotected=p.routes.filter(r=>!routeProtegee(p,r)&&!_guarded(r));
     const hitRoutes=unprotected.filter(()=>Math.random()<chance);
     if(hitRoutes.length){
       p.routes=p.routes.filter(r=>!hitRoutes.includes(r));updateConnections(p);
@@ -3205,7 +3358,7 @@ function advancePirates(){
     // (Règle voulue par Marc : les pirates de FIN DE TOUR n'attaquent QUE les routes non protégées,
     //  JAMAIS les colonies. La branche « raid sur colonie » a été retirée. L'événement « Prolifération
     //  des pirates » reste distinct.)
-  }
+  });
   if(attacked){
     // Risque guerre +1 avec Ceinturiens (lore : ils soutiennent les pirates en secret)
     const ceinturAI=G.ais.find(a=>a.civ.id==='ceinturiens');
@@ -3347,38 +3500,15 @@ function revenueBreakdownHTML(p){
   if(!p||!p.colonies)return '';
   const E={energy:'<i class=ri-energy></i>',materials:'<i class=ri-materials></i>',science:'<i class=ri-science></i>',morale:'<i class=ri-morale></i>'};
   const fmt=o=>['materials','energy','science','morale'].filter(r=>o[r]).map(r=>(o[r]>0?'+':'')+o[r]+E[r]).join(' ')||'—';
-  const g={energy:0,materials:0,science:0,morale:0};const inc=[],mal=[];
-  // colonies connectées
-  for(const c of p.colonies){
-    if(!c.connected)continue;const n=NODES[c.nodeId];if(!n||n.decorative)continue;
-    const _mult=c.level>=3?2:(c.level>=2?1.5:1);
-    const o={};for(const r in n.res){const _v=Math.floor(n.res[r]*_mult);o[r]=(o[r]||0)+_v;g[r]=(g[r]||0)+_v;}
-    if(c.level>=3){o.morale=(o.morale||0)+2;g.morale+=2;}else if(c.level>=2){o.morale=(o.morale||0)+1;g.morale+=1;}
-    if(hasSpec(p,'terra3')&&(c.level||1)>=2){o.materials=(o.materials||0)+1;o.morale=(o.morale||0)+1;g.materials+=1;g.morale+=1;}   // Terraformation : colonies de niveau 2 ou 3 seulement
-    let lv=0;if(c.level>=3)lv=2;else if(c.level>=2)lv=1;if(lv){o.science=(o.science||0)+lv;g.science+=lv;}
-    inc.push('🏙️ '+(n.name||c.nodeId)+' (Nv.'+(c.level||1)+') : '+fmt(o));
-  }
-  // colonies connectées via réseau étranger
-  for(const c of p.colonies){
-    if(!c.foreignConnected)continue;const n=NODES[c.nodeId];if(!n||n.decorative)continue;
-    const o={};for(const r in n.res){o[r]=(o[r]||0)+n.res[r];g[r]=(g[r]||0)+n.res[r];}
-    o.morale=(o.morale||0)-1;g.morale-=1;g.materials=Math.max(0,g.materials-1);
-    inc.push('🔗 '+(n.name||c.nodeId)+' (connexion étrangère) : '+fmt(o)+' <span style="color:#ff8a8a">−1<i class=ri-morale></i> −1<i class=ri-materials></i></span>');
-  }
-  // accords commerciaux
-  if(G.commercialAccords&&G.commercialAccords.length>0){const k=G.commercialAccords.length;g.materials+=k;g.morale+=k;inc.push('🤝 Accords commerciaux ×'+k+' : +'+k+'<i class=ri-materials></i> +'+k+'<i class=ri-morale></i>');}
-  // revenus permanents (techs/cartes)
-  if(p.rpt){const o={};let any=false;for(const r in p.rpt)if(p.rpt[r]){o[r]=p.rpt[r];g[r]=(g[r]||0)+p.rpt[r];any=true;}if(any)inc.push('<i class=ri-science></i> Bonus techs/cartes : '+fmt(o));}
-  // investissements
-  if(p.investBonus&&(p.investBonus.turnsLeft===undefined||p.investBonus.turnsLeft>0)){
-    if(p.investBonus.matX2&&g.materials){g.materials=Math.floor(g.materials*2);inc.push('🏭 Industrialisation : <i class=ri-materials></i> ×2');}
-    if(p.investBonus.sciX2&&g.science){g.science=Math.floor(g.science*2);inc.push('<i class=ri-science></i> Recherche Intensive : <i class=ri-science></i> ×2');}
-    if(p.investBonus.matHalf&&g.materials){g.materials=Math.floor(g.materials/2);mal.push('🏗️ Colonies Avancées : <i class=ri-materials></i> ÷2');}
-    if(p.investBonus.moraleBonus){g.morale+=p.investBonus.moraleBonus;inc.push('🌾 Agriculture Durable : +'+p.investBonus.moraleBonus+'<i class=ri-morale></i>');}
-  }
-  if(p.investBonus2&&(p.investBonus2.turnsLeft===undefined||p.investBonus2.turnsLeft>0)){
-    if(p.investBonus2.moraleX2&&g.morale){g.morale=Math.floor(g.morale*2);inc.push('🕊️ Confort Population : <i class=ri-morale></i> ×2');}
-  }
+  /* ⚠️ CETTE INFOBULLE AVAIT SA PROPRE VERSION DES REVENUS, et il lui manquait six règles (voir
+     `revenusBruts`). Elle ne calcule plus : elle demande le calcul officiel ET son détail poste
+     par poste, puis se contente de le mettre en forme. C'est ce que Marc a demandé — corriger le
+     mauvais code, sans toucher à celui qui marchait. */
+  const _postes=[];
+  const g=revenusBruts(p,{detail:_postes});
+  for(const _r of ['energy','materials','science','morale']) if(g[_r]===undefined) g[_r]=0;
+  const inc=_postes.filter(x=>Object.keys(x.o).length).map(x=>x.label+' : '+fmt(x.o));
+  const mal=[];
   // ── ENTRETIEN & MALUS PERMANENTS ──
   const extraCols=p.colonies.filter(c=>c.nodeId!==p.civ.home);   // exception « stations orbitales joviennes » supprimée (voir doMaintenance)
   /* ⚠️ TROISIÈME COPIE DU MÊME BARÈME, ET ELLE AVAIT DIVERGÉ.
@@ -3402,7 +3532,7 @@ function revenueBreakdownHTML(p){
   const nr=p.routes.length;
   if(nr){if(hasSpec(p,'route_force_free'))mal.push('🛤️ Routes ×'+nr+' : entretien gratuit (Hyperpropulsion) +'+nr+'<i class=ri-materials></i>');else mal.push('🛤️ Routes ×'+nr+' : −'+nr+'<i class=ri-energy></i> +'+nr+'<i class=ri-materials></i>');}
   if(p.govFormUpkeep){const o={};for(const r in p.govFormUpkeep)o[r]=-p.govFormUpkeep[r];mal.push('🗳️ Forme de gouvernement : '+fmt(o)+'/tour');}
-  if(hasSpec(p,'empath_tele')&&G.warState==='active')mal.push('🧬 Télépathie (en guerre) : −2<i class=ri-morale></i>/tour');
+  if(hasSpec(p,'empath_tele')&&estEnGuerre(p))mal.push('🧬 Télépathie (en guerre) : −2<i class=ri-morale></i>/tour');   // par NATION, pas par perspective
   const m=(p.res.morale||0);
   if(m===0)mal.push('💥 Moral 0 : GUERRE CIVILE — aucun revenu ce tour !');
   else if(m===1)mal.push('⚠️ Moral 1 : revenus ÷2 ce tour');
@@ -3427,36 +3557,24 @@ function revenueBreakdownHTML(p){
 // règles de moral incluses). Sert à l'aperçu barre du haut + menu Empire. Estimation (≈) : l'entretien
 // routes suppose toutes les routes alimentées ; les pénalités de moral pour entretien impayé ne sont pas déduites.
 function _netIncome(p){
-  const g={energy:0,materials:0,science:0,morale:0};
+  /* ⚠️ CE CALCUL AVAIT SA PROPRE VERSION DES REVENUS, et il lui manquait six règles : les passifs
+     Ceinturiens et Jupitériens, Industrialisation, Recherche Intensive, Confort de la Population et
+     Démocratie Directe. La barre du haut et le menu Empire annonçaient donc au joueur un revenu
+     qu'il ne touchait pas. Il ne calcule plus rien : il lit `revenusBruts`, la version qui crédite
+     vraiment. La suite — moral et entretien — lui appartient toujours. */
+  const g=(!p||!p.civ)?{energy:0,materials:0,science:0,morale:0}:revenusBruts(p);
   if(!p||!p.civ) return g;
-  const _terra=hasSpec(p,'terra3'),_bio=hasSpec(p,'bio2_bonus');
-  for(const c of p.colonies){
-    if(!c.connected) continue; const n=NODES[c.nodeId]; if(!n||n.decorative) continue;
-    const mult=c.level>=3?2:(c.level>=2?1.5:1);
-    for(const r in n.res) g[r]=(g[r]||0)+Math.floor(n.res[r]*mult);
-    if(c.level>=3){g.morale+=2;g.science+=2;} else if(c.level>=2){g.morale+=1;g.science+=1;}
-    /* ⚠️ QUATRIÈME COPIE DES REVENUS PAR COLONIE — je l'avais manquée en corrigeant les trois autres,
-       et le contrôle chiffré l'a immédiatement montrée : Biosphère Avancée donnait encore +1🪨 par
-       colonie, et Terraformation payait même les colonies de niveau 1. Chercher par le NOM de la
-       technologie plutôt que par la ligne exacte aurait évité l'oubli. */
-    if(_terra&&(c.level||1)>=2){g.materials+=1;g.morale+=1;}   // Terraformation : niveau 2 ou 3 seulement
-  }
-  if(G.commercialAccords&&G.commercialAccords.length){g.materials+=G.commercialAccords.length;g.morale+=G.commercialAccords.length;}
-  if(p.civ.id==='ceinturiens') g.energy+=1;
-  if(p.civ.id==='jupiteriens') g.energy+=1;   // réacteurs joviens : +1⚡/tour, indépendant des colonies
-  if(p.rpt) for(const r in p.rpt) g[r]=(g[r]||0)+(p.rpt[r]||0);
-  if(p.investBonus&&(p.investBonus.turnsLeft===undefined||p.investBonus.turnsLeft>0)){
-    if(p.investBonus.matX2&&g.materials>0) g.materials=Math.floor(g.materials*2);
-    if(p.investBonus.sciX2&&g.science>0) g.science=Math.floor(g.science*2);
-    if(p.investBonus.matHalf&&g.materials>0) g.materials=Math.floor(g.materials/2);
-    if(p.investBonus.moraleBonus) g.morale+=p.investBonus.moraleBonus;
-  }
-  if(p.investBonus2&&(p.investBonus2.turnsLeft===undefined||p.investBonus2.turnsLeft>0)&&p.investBonus2.moraleX2&&g.morale>0) g.morale=Math.floor(g.morale*2);
+  for(const _r of ['energy','materials','science','morale']) if(g[_r]===undefined) g[_r]=0;
   // Règles de moral (appliquées aux REVENUS) : 0 = guerre civile (rien), 1 = ÷2.
   const m=(p.res.morale||0);
   if(m===0){ g.energy=0;g.materials=0;g.science=0;g.morale=0; }
   else if(m===1){ for(const r of ['energy','materials','science','morale']) g[r]=Math.floor((g[r]||0)/2); }
   // ENTRETIEN (déduit après) — colonies hors base
+  /* Ces deux drapeaux étaient déclarés en tête de la partie « revenus », qui a migré dans
+     `revenusBruts`. Le barème d'entretien, lui, est resté ici : il faut donc les redéclarer.
+     (Sans ça : « _bio is not defined » — attrapé par la mesure, pas par la lecture.) */
+  const _terra=hasSpec(p,'terra3'),_bio=hasSpec(p,'bio2_bonus');
+  void _terra;
   const extraCols=p.colonies.filter(c=>c.nodeId!==p.civ.home);   // exception « stations orbitales joviennes » supprimée (voir doMaintenance)
   /* ⚠️ MÊME BARÈME QUE `doMaintenance` — c'est une SECONDE implémentation du même calcul, et elle a
      déjà divergé par le passé (bug du revenu net, une semaine perdue). Toute modification du barème
@@ -3486,82 +3604,129 @@ function _showRevTip(){
 }
 function _hideRevTip(){const d=document.getElementById('rev-tip');if(d)d.remove();}
 function _wireRevTip(){const el=document.getElementById('top-res');if(!el)return;el.style.cursor='help';el.title='';el.onmouseenter=_showRevTip;el.onmouseleave=_hideRevTip;el.onclick=function(){document.getElementById('rev-tip')?_hideRevTip():_showRevTip();};}
+/* ═══════════ LES REVENUS BRUTS D'UNE NATION — UNE SEULE VÉRITÉ ═══════════
+   Marc, 2026-08-09 : « Rustine ne me plaira jamais. Mais fusion ne doit pas perdre le code qui
+   fonctionne bien. J'aurais dit plutôt corriger le mauvais code. »
+
+   C'est exactement ce qui est fait ici. Le calcul ci-dessous est celui de `doRevenues` — le code
+   qui CRÉDITE réellement les ressources, donc celui qui a toujours eu raison. Il n'a pas été
+   réécrit : il a été DÉPLACÉ, tel quel, dans une fonction sans effet de bord. `doRevenues`
+   l'appelle et se contente ensuite de ce qui lui appartient : plafonds, moral, jetons, journal.
+
+   Les deux calculs FAUTIFS — l'infobulle « Revenu par tour » et l'estimation du revenu net —
+   avaient chacun leur propre version, et il leur manquait six règles : les passifs Ceinturiens et
+   Jupitériens, Industrialisation, Recherche Intensive, Confort de la Population et Démocratie
+   Directe. Ils ne calculent plus rien : ils lisent celle-ci.
+
+   CE QUI N'EST **PAS** ICI, et c'est délibéré :
+     · les PLAFONDS de ressources et la règle de moral (÷2, guerre civile) — elles s'appliquent au
+       moment du versement, et l'estimation les traite autrement (elle regarde le moral courant,
+       `doRevenues` regarde le drapeau posé au tour précédent). Mélanger les deux changerait le jeu ;
+     · l'ENTRETIEN, qui est un prélèvement, pas un revenu.
+
+   ⚠️ POINT À TRANCHER, laissé EXACTEMENT tel quel pour ne rien changer au jeu sans décision :
+   le revenu des colonies connectées via un réseau ÉTRANGER n'est compté que `if(p===G.player)`,
+   c'est-à-dire pour la seule nation active. À plusieurs joueurs, les autres n'en touchent donc
+   rien. Cela ressemble beaucoup à la maladie de la perspective globale, mais le corriger
+   MODIFIERAIT les revenus en partie : à signaler à Marc, pas à décider seul.
+
+   `opts.journal(msg, cls)` reçoit les lignes de journal (vide par défaut : un affichage ne doit
+   rien écrire dans le journal). `opts.detail` reçoit le détail poste par poste, pour l'infobulle. */
+function revenusBruts(p, opts){
+  const _o=opts||{}, _j=_o.journal||function(){}, _d=_o.detail||null;
+  const _det=(label,o)=>{ if(_d) _d.push({label:label,o:o}); };
+  const gains={};
+  // Colonies connectées via réseau étranger (accord commercial) — malus
+  if(p===G.player){
+    for(const col of p.colonies){
+      if(!col.foreignConnected)continue;
+      const node=NODES[col.nodeId];
+      if(node.decorative)continue;
+      for(const[r,a]of Object.entries(node.res)){gains[r]=(gains[r]||0)+a;}
+      // Malus connexion étrangère : −1<i class=ri-morale></i> −1<i class=ri-materials></i> (min 0<i class=ri-materials></i>)
+      gains.morale=(gains.morale||0)-1;
+      const matGain=gains.materials||0;
+      gains.materials=Math.max(0,matGain-1);
+        _j('🔗 '+node.name+' (connexion étrangère) — revenus avec malus −1<i class=ri-morale></i> −1<i class=ri-materials></i>','dim');
+    }
+  }
+  for(const col of p.colonies){
+    if(!col.connected)continue;
+    const node=NODES[col.nodeId];
+    if(node.decorative)continue;
+    // v18 : ressources du nœud × niveau (×1 / ×1,5 / ×2)
+    const _mult=col.level>=3?2:(col.level>=2?1.5:1);
+    const _av={}; for(const _k of ['energy','materials','science','morale']) _av[_k]=gains[_k]||0;
+    for(const[r,a]of Object.entries(node.res)){
+      gains[r]=(gains[r]||0)+Math.floor(a*_mult);
+    }
+    // v18 : bonus moral RÉCURRENT par niveau — Nv2 +1<i class=ri-morale></i>/tour, Nv3 +2<i class=ri-morale></i>/tour
+    if(col.level>=3)gains.morale=(gains.morale||0)+2;
+    else if(col.level>=2)gains.morale=(gains.morale||0)+1;
+    // Terraformation : +1🪨 +1❤️/tour par colonie de NIVEAU 2 OU 3 (plus au niveau 1)
+    if(hasSpec(p,'terra3')&&(col.level||1)>=2){gains.materials=(gains.materials||0)+1;gains.morale=(gains.morale||0)+1;}
+    // Hub technologique : savoir par niveau (conservé pour ne pas assécher la science)
+    if(col.level>=3)gains.science=(gains.science||0)+2;
+    else if(col.level>=2)gains.science=(gains.science||0)+1;
+    // (Retiré : plus de jeton Force par nœud stratégique/tour. Désormais +1 jeton UNE FOIS à l'acquisition d'une colonie.)
+    { const _o={}; for(const _k of ['energy','materials','science','morale']){const _d2=(gains[_k]||0)-_av[_k]; if(_d2)_o[_k]=_d2;}
+      _det('🏙️ '+((NODES[col.nodeId]&&NODES[col.nodeId].name)||col.nodeId)+' (Nv.'+(col.level||1)+')',_o); }
+  }
+  // Accord commercial actif : +1<i class=ri-materials></i> +1<i class=ri-morale></i> par accord (les deux nations)
+  if(G.commercialAccords.length>0){
+    gains.materials=(gains.materials||0)+G.commercialAccords.length;
+    gains.morale=(gains.morale||0)+G.commercialAccords.length;
+    _det('🤝 Accords commerciaux ×'+G.commercialAccords.length,{materials:G.commercialAccords.length,morale:G.commercialAccords.length});
+    if(p===G.player)  _j('🤝 Accord commercial : +'+G.commercialAccords.length+'<i class=ri-materials></i> +'+G.commercialAccords.length+'<i class=ri-morale></i>','dim');
+  }
+  if(p.civ.id==='ceinturiens'){gains.energy=(gains.energy||0)+1;_det('☠️ Réserves de la Ceinture',{energy:1});} // réserves de la ceinture
+  /* JUPITÉRIENS (règle de Marc, 2026-08-07) : +1⚡/tour dès le premier tour, quel que soit le
+     nombre de colonies. Remplace l'ancien « +1⚡ par colonie jovienne », qui récompensait
+     l'expansion deux fois — une fois par les ressources du nœud, une fois par le pouvoir — et
+     rendait la nation d'autant plus forte qu'elle était déjà en avance. */
+  if(p.civ.id==='jupiteriens'){gains.energy=(gains.energy||0)+1;_det('🟠 Réacteurs joviens',{energy:1});}  // réacteurs joviens
+  {const _o={};for(const[r,a]of Object.entries(p.rpt)){gains[r]=(gains[r]||0)+a;if(a)_o[r]=a;}if(Object.keys(_o).length)_det('🔬 Bonus techs/cartes',_o);}
+  // Bonus investissement Niv.1 (actif si turnsLeft > 0 ou non défini)
+  if(p.investBonus&&(p.investBonus.turnsLeft===undefined||p.investBonus.turnsLeft>0)){
+    if(p.investBonus.matX2&&gains.materials){const before=gains.materials;gains.materials=Math.floor(gains.materials*2);if(p===G.player)  _j('🏭 Industrialisation active : <i class=ri-materials></i>×2 ('+before+'→'+gains.materials+')','dim');}
+    if(p.investBonus.sciX2&&gains.science){const before=gains.science;gains.science=Math.floor(gains.science*2);if(p===G.player)  _j('<i class=ri-science></i> Recherche Intensive active : <i class=ri-science></i>×2 ('+before+'→'+gains.science+')','dim');}
+    if(p.investBonus.matHalf&&gains.materials){gains.materials=Math.floor(gains.materials/2);}
+    if(p.investBonus.moraleBonus){gains.morale=(gains.morale||0)+p.investBonus.moraleBonus;if(p===G.player)  _j('🌾 Agriculture Durable : +'+p.investBonus.moraleBonus+'<i class=ri-morale></i>','dim');}
+    if(p.investBonus.matBonus){gains.materials=(gains.materials||0)+p.investBonus.matBonus;_det('🏭 Industrialisation Lourde',{materials:p.investBonus.matBonus});}
+    if(p.investBonus.sciBonus){gains.science=(gains.science||0)+p.investBonus.sciBonus;_det('🔬 Recherche Intensive',{science:p.investBonus.sciBonus});}
+  }
+  // Bonus investissement Niv.2
+  if(p.investBonus2&&(p.investBonus2.turnsLeft===undefined||p.investBonus2.turnsLeft>0)){
+    // moraleX2 : gains de moral doublés
+    if(p.investBonus2.moraleX2&&gains.morale){const before=gains.morale;gains.morale=Math.floor(gains.morale*2);if(p===G.player)  _j('🕊️ Confort Population actif : <i class=ri-morale></i>×2 ('+before+'→'+gains.morale+')','dim');}
+    if(p.investBonus2.moraleFlat){gains.morale=(gains.morale||0)+p.investBonus2.moraleFlat;_det('🕊️ Confort de la Population',{morale:p.investBonus2.moraleFlat});}
+  }
+  // Empathes T1 : +1<i class=ri-energy></i> par tranche de 2 routes
+  if(hasSpec(p,'empath_routes')&&p.routes.length>=2){
+    const _e=Math.floor(p.routes.length/2);
+    gains.energy=(gains.energy||0)+_e;_det('🔮 Réseau Empathique ('+p.routes.length+' routes)',{energy:_e});
+  }
+  // Empathes T3 : −2<i class=ri-morale></i>/tour si guerre active
+  /* ⚠️ `G.warState` est GLOBAL : il vaut « active » dès que la nation ACTIVE est en guerre,
+     pas la nation `p` qu'on est en train de payer. À trois joueurs, une nation télépathe EN
+     PAIX perdait donc 2 moral par tour parce qu'une AUTRE se battait — et, symétriquement,
+     une télépathe en guerre n'y échappait quand la nation active était en paix. Même maladie
+     que l'étiquette « dyson » : une donnée globale lue comme si elle parlait de p.
+     (Signalé par Marc le 2026-08-09 : « si ça se trouve le problème est le même ». Il l'était.) */
+  if(hasSpec(p,'empath_tele')&&estEnGuerre(p)){
+    gains.morale=(gains.morale||0)-2;_det('🧬 Télépathie (en guerre)',{morale:-2});
+  }
+  if(p.govFormMorale){gains.morale=(gains.morale||0)+p.govFormMorale;_det('🗳️ Forme de gouvernement',{morale:p.govFormMorale});} // Démocratie Directe : +1<i class=ri-morale></i>/tour
+  return gains;
+}
 function doRevenues(){
   let playerGains={};
   for(const p of allPlayers()){
     if(p._civilWar){p._civilWar=false;continue;}
-    const gains={};
     const caps=getResCapFor(p);
-    // Colonies connectées via réseau étranger (accord commercial) — malus
-    if(p===G.player){
-      for(const col of p.colonies){
-        if(!col.foreignConnected)continue;
-        const node=NODES[col.nodeId];
-        if(node.decorative)continue;
-        for(const[r,a]of Object.entries(node.res)){gains[r]=(gains[r]||0)+a;}
-        // Malus connexion étrangère : −1<i class=ri-morale></i> −1<i class=ri-materials></i> (min 0<i class=ri-materials></i>)
-        gains.morale=(gains.morale||0)-1;
-        const matGain=gains.materials||0;
-        gains.materials=Math.max(0,matGain-1);
-        addLog('🔗 '+node.name+' (connexion étrangère) — revenus avec malus −1<i class=ri-morale></i> −1<i class=ri-materials></i>','dim');
-      }
-    }
-    for(const col of p.colonies){
-      if(!col.connected)continue;
-      const node=NODES[col.nodeId];
-      if(node.decorative)continue;
-      // v18 : ressources du nœud × niveau (×1 / ×1,5 / ×2)
-      const _mult=col.level>=3?2:(col.level>=2?1.5:1);
-      for(const[r,a]of Object.entries(node.res)){
-        gains[r]=(gains[r]||0)+Math.floor(a*_mult);
-      }
-      // v18 : bonus moral RÉCURRENT par niveau — Nv2 +1<i class=ri-morale></i>/tour, Nv3 +2<i class=ri-morale></i>/tour
-      if(col.level>=3)gains.morale=(gains.morale||0)+2;
-      else if(col.level>=2)gains.morale=(gains.morale||0)+1;
-      // Terraformation : +1🪨 +1❤️/tour par colonie de NIVEAU 2 OU 3 (plus au niveau 1)
-      if(hasSpec(p,'terra3')&&(col.level||1)>=2){gains.materials=(gains.materials||0)+1;gains.morale=(gains.morale||0)+1;}
-      // Hub technologique : savoir par niveau (conservé pour ne pas assécher la science)
-      if(col.level>=3)gains.science=(gains.science||0)+2;
-      else if(col.level>=2)gains.science=(gains.science||0)+1;
-      // (Retiré : plus de jeton Force par nœud stratégique/tour. Désormais +1 jeton UNE FOIS à l'acquisition d'une colonie.)
-    }
-    // Accord commercial actif : +1<i class=ri-materials></i> +1<i class=ri-morale></i> par accord (les deux nations)
-    if(G.commercialAccords.length>0){
-      gains.materials=(gains.materials||0)+G.commercialAccords.length;
-      gains.morale=(gains.morale||0)+G.commercialAccords.length;
-      if(p===G.player)addLog('🤝 Accord commercial : +'+G.commercialAccords.length+'<i class=ri-materials></i> +'+G.commercialAccords.length+'<i class=ri-morale></i>','dim');
-    }
-    if(p.civ.id==='ceinturiens')gains.energy=(gains.energy||0)+1; // réserves de la ceinture
-    /* JUPITÉRIENS (règle de Marc, 2026-08-07) : +1⚡/tour dès le premier tour, quel que soit le
-       nombre de colonies. Remplace l'ancien « +1⚡ par colonie jovienne », qui récompensait
-       l'expansion deux fois — une fois par les ressources du nœud, une fois par le pouvoir — et
-       rendait la nation d'autant plus forte qu'elle était déjà en avance. */
-    if(p.civ.id==='jupiteriens')gains.energy=(gains.energy||0)+1;  // réacteurs joviens
-    for(const[r,a]of Object.entries(p.rpt))gains[r]=(gains[r]||0)+a;
-    // Bonus investissement Niv.1 (actif si turnsLeft > 0 ou non défini)
-    if(p.investBonus&&(p.investBonus.turnsLeft===undefined||p.investBonus.turnsLeft>0)){
-      if(p.investBonus.matX2&&gains.materials){const before=gains.materials;gains.materials=Math.floor(gains.materials*2);if(p===G.player)addLog('🏭 Industrialisation active : <i class=ri-materials></i>×2 ('+before+'→'+gains.materials+')','dim');}
-      if(p.investBonus.sciX2&&gains.science){const before=gains.science;gains.science=Math.floor(gains.science*2);if(p===G.player)addLog('<i class=ri-science></i> Recherche Intensive active : <i class=ri-science></i>×2 ('+before+'→'+gains.science+')','dim');}
-      if(p.investBonus.matHalf&&gains.materials){gains.materials=Math.floor(gains.materials/2);}
-      if(p.investBonus.moraleBonus){gains.morale=(gains.morale||0)+p.investBonus.moraleBonus;if(p===G.player)addLog('🌾 Agriculture Durable : +'+p.investBonus.moraleBonus+'<i class=ri-morale></i>','dim');}
-      if(p.investBonus.matBonus)gains.materials=(gains.materials||0)+p.investBonus.matBonus;
-      if(p.investBonus.sciBonus)gains.science=(gains.science||0)+p.investBonus.sciBonus;
-    }
-    // Bonus investissement Niv.2
-    if(p.investBonus2&&(p.investBonus2.turnsLeft===undefined||p.investBonus2.turnsLeft>0)){
-      // moraleX2 : gains de moral doublés
-      if(p.investBonus2.moraleX2&&gains.morale){const before=gains.morale;gains.morale=Math.floor(gains.morale*2);if(p===G.player)addLog('🕊️ Confort Population actif : <i class=ri-morale></i>×2 ('+before+'→'+gains.morale+')','dim');}
-      if(p.investBonus2.moraleFlat)gains.morale=(gains.morale||0)+p.investBonus2.moraleFlat;
-    }
-    // Empathes T1 : +1<i class=ri-energy></i> par tranche de 2 routes
-    if(hasSpec(p,'empath_routes')&&p.routes.length>=2){
-      gains.energy=(gains.energy||0)+Math.floor(p.routes.length/2);
-    }
-    // Empathes T3 : −2<i class=ri-morale></i>/tour si guerre active
-    if(hasSpec(p,'empath_tele')&&G.warState==='active'){
-      gains.morale=(gains.morale||0)-2;
-    }
-    if(p.govFormMorale)gains.morale=(gains.morale||0)+p.govFormMorale; // Démocratie Directe : +1<i class=ri-morale></i>/tour
+    /* LE CALCUL EST DANS `revenusBruts` — c'est CE code-ci qui y a été déplacé, sans modification.
+       `doRevenues` garde ce qui est de son ressort : plafonds, moral, jetons, conquête, journal. */
+    const gains=revenusBruts(p,{journal:(m,c)=>addLog(m,c)});
     if(p._halfResources){
       p._halfResources=false;
       for(const r of Object.keys(gains))gains[r]=Math.floor((gains[r]||0)/2);
@@ -3744,7 +3909,10 @@ function applyCard(card,p){
   if(card.forceBonus)p.forceTokens+=card.forceBonus;
   if(card.forceTemp){p.forceTokens+=card.forceTemp;p.milLoseNext=(p.milLoseNext||0)+(card.forceLoseNext||0);} // renforts temporaires (dissous au tour suivant)
   if(card.warForce){p.hasCruiser=true;p.cruiserPower=card.warForce;} // Supercroiseur : possédé ; déployé à la demande en guerre (5 jetons insécables, coût 5<i class=ri-materials></i> 5<i class=ri-energy></i>)
-  if(card.combatBonus)p.combatBonus=(p.combatBonus||0)+card.combatBonus;
+  /* `card.combatBonus` n'est plus RECOPIÉ dans la nation : il est lu directement sur les cartes
+     par `bonusCombatCartes(p)`. Un accumulateur qu'il fallait remettre à zéro chaque tour, que
+     personne ne lisait, et qui donnait l'illusion que le champ servait — c'était le piège. */
+  void card.combatBonus;
   if(card.rGain)for(const[r,a]of Object.entries(card.rGain)){p.rpt[r]=(p.rpt[r]||0)+a;}
   if(card.resGain)for(const[r,a]of Object.entries(card.resGain)){const caps=getResCapFor(p);p.res[r]=Math.min(caps[r]||10,(p.res[r]||0)+a);}
   if(card.govPts)addGovPts(p,card.govPts);
@@ -4348,7 +4516,9 @@ function attackEnemyRoute(aiId,ri){
   // il reste limité naturellement par les AC, les jetons Force et le coût en ressources de chaque combat.
   if(G.player.acLeft<1){addLog('⚠️ Attaque de route : besoin 1 AC.','red');return;}
   const route=ai.routes[ri];if(!route)return;
-  if(hasSpec(ai,'empath_routes')||hasSpec(ai,'ia_immune')){addLog('🛡️ Routes de '+ai.civ.name+' protégées par une tech — inattaquables.','red');return;}
+  // Liste divergente corrigée le 2026-08-09 : elle oubliait Réseau Orbital (`intel_2`), qui protège
+  // pourtant les routes partout ailleurs. Une seule règle : `routesProtegeesParTech`.
+  if(routesProtegeesParTech(ai)){addLog('🛡️ Routes de '+ai.civ.name+' protégées ('+techsProtegeantRoutes(ai).join(', ')+') — inattaquables.','red');return;}
   const need=((route.tokens||0)>=1)?2:1; // route protégée par un jeton → 2 jetons pour la briser
   if((G.player.forceTokens||0)<need){addLog('⚠️ Il te faut '+need+' jeton(s) Force pour cette route'+(((route.tokens||0)>=1)?' (protégée par un jeton)':'')+'.','red');return;}
   undoStack=[];
@@ -4362,8 +4532,8 @@ function resolveAiAssault(ai,targetId,commit){
   const p=ai._enemy||G.player;const war=_warBetween(ai.civ.id,p.civ.id)||_warBetween(_moiId(),ai.civ.id);if(!war)return;
   war.aiAggressor=false; // « au moins un assaut » effectué → ensuite comportement normal (paix si elle ne peut pas gagner)
   war._aiAssaultedThisTurn=true; // l'IA a déjà frappé ce tour → pas de second assaut en fin de tour
-  const aEmpath=(hasSpec(ai,'empath_routes')?2:0)+(hasSpec(ai,'empath_tele')?2:0);
-  const pEmpath=(hasSpec(p,'empath_routes')?2:0)+(hasSpec(p,'empath_tele')?2:0);
+  const aEmpath=bonusCombatCartes(ai);
+  const pEmpath=bonusCombatCartes(p);
   const _cruDef=cruiserAvailable(p)&&cruiserAfford(p); // le croiseur défend automatiquement s'il est dispo et qu'on peut payer
   if(_cruDef){const _cc=cruiserPay(p);addLog('⚓ Supercroiseur en défense (+'+(p.cruiserPower||5)+'⚔️, '+_cc+').','gold');}
   // Défense : on n'engage que les jetons qu'on peut PAYER (1<i class=ri-materials></i>+1<i class=ri-energy></i> chacun) — règle stricte.
@@ -4467,7 +4637,7 @@ function showAiAssaultDefenseModal(ai,target,aiCommit,done,defender){
       null, 'adDefenseContreIA');
     return;
   }
-  const pEmp=(hasSpec(p,'empath_routes')?2:0)+(hasSpec(p,'empath_tele')?2:0);
+  const pEmp=bonusCombatCartes(p);
   const cruAvail=cruiserAvailable(p)&&cruiserAfford(p);
   G._aiAssaultCtx={aiId:ai.civ.id,target,aiCommit,done};
   const tgtLabel=target.type==='colony'?('🏙️ Colonie '+target.name+' (Nv.'+(target.obj.level||1)+')'):('🛤️ Route '+target.name);
@@ -4497,8 +4667,8 @@ function confirmAiAssaultDefense(){
 }
 function resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,defender){
   const p=defender||G.player;const war=_warBetween(ai.civ.id,p.civ.id)||_warOf(ai.civ.id);
-  const pEmp=(hasSpec(p,'empath_routes')?2:0)+(hasSpec(p,'empath_tele')?2:0);
-  const aEmp=(hasSpec(ai,'empath_routes')?2:0)+(hasSpec(ai,'empath_tele')?2:0);
+  const pEmp=bonusCombatCartes(p);
+  const aEmp=bonusCombatCartes(ai);
   // Le Supercroiseur ne se déploie plus tout seul : en ligne c'est le CHOIX du défenseur (G._defCruiserChoice).
   // En solo, comportement d'origine conservé (auto s'il défend avec au moins 1 jeton).
   const _cruChoice=G._defCruiserChoice; G._defCruiserChoice=undefined;
@@ -4769,11 +4939,21 @@ function updateWarRisk(){
   else if(G.warRisk>0&&!G.warState)G.warRisk=Math.max(0,G.warRisk-1);
   if(G.warRisk>=10&&!G.warState)declareWar('Tensions au maximum ('+G.warRisk+'/10) !');
 }
-function declareWar(reason,declaredBy='other',aiId=null){
+/* ⚠️ `agresseurCiv` AJOUTÉ LE 2026-08-09 (défaut signalé par Marc sur la Sphère de Dyson).
+   `declaredBy` est une ÉTIQUETTE relative au lecteur : `'player'` veut dire « moi », et pour la
+   Sphère de Dyson l'étiquette était `'dyson'`, considérée comme « moi » PAR TOUT LE MONDE. Le test
+   `declaredBy==='player'||declaredBy==='dyson'` rendait donc agresseur quiconque le lisait — la
+   maladie de la perspective globale décrite dans docs/ARCHITECTURE_AVENIR.md §2.
+   On mémorise maintenant l'agresseur par son IDENTIFIANT DE NATION. Une seule vérité, la même
+   pour les quatre joueurs, et qui survit à une sauvegarde. */
+function declareWar(reason,declaredBy='other',aiId=null,agresseurCiv=null){
   const tgtId=aiId||G.warWith||(G.ais[0]?.civ.id);
   if(!tgtId)return;
   if(_warBetween(_moiId(),tgtId))return; // déjà en guerre avec cette IA
-  const newWar=_attachWar({a:G.player.civ.id,b:tgtId,winsBy:{[G.player.civ.id]:0,[tgtId]:0},turnsLeft:99,justDeclared:true,reason,declaredBy,live:true,aiRecaptureTarget:null});
+  /* À défaut d'agresseur explicite : `'player'` = celui qui déclare (moi), sinon la cible.
+     C'est exactement ce que faisait l'ancien test, sans dépendre du point de vue du lecteur. */
+  const _agr=agresseurCiv||((declaredBy==='player')?G.player.civ.id:tgtId);
+  const newWar=_attachWar({a:G.player.civ.id,b:tgtId,winsBy:{[G.player.civ.id]:0,[tgtId]:0},turnsLeft:99,justDeclared:true,reason,declaredBy,agresseurCiv:_agr,live:true,aiRecaptureTarget:null});
   newWar.focusColony=G._warFocusColony||null;G._warFocusColony=null; // colonie visée par l'assaut (memo #11)
   G.wars.push(newWar);
   G._warDeclareReason=reason;G._warDeclaredBy=declaredBy;
@@ -4874,8 +5054,8 @@ function defenseIA(def, atk, nodeId){
 function resolveWarCombat(playerCommitted){
   const warEnemy=G.warWith?G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0]:G.ais[0];
   const pBonus=(G.player.stratBonus&&G.player.stratBonus.combatBonus)||0;
-  const pEmpathBonus=(hasSpec(G.player,'empath_routes')?2:0)+(hasSpec(G.player,'empath_tele')?2:0);
-  const aEmpathBonus=(hasSpec(warEnemy,'empath_routes')?2:0)+(hasSpec(warEnemy,'empath_tele')?2:0);
+  const pEmpathBonus=bonusCombatCartes(G.player);
+  const aEmpathBonus=bonusCombatCartes(warEnemy);
   // On ne peut engager QUE ce qu'on possède ET ce qu'on peut PAYER (1🪨 +1⚡ par jeton — règle §14).
   // Sans ce plafond, on pouvait « engager » 15 jetons sans en avoir les moyens (bug signalé par Marc).
   let engagedP=(playerCommitted!==undefined)?playerCommitted:G.player.forceTokens;
@@ -5042,6 +5222,12 @@ function chooseInvestmentForAI(ai,level){
       case 'inv2_colonies': s+=belowMax*1.5; break;
       case 'inv2_union': s+=sci>=1?3:1; break;
     }
+    /* L'IA ne choisit pas une carte qu'elle ne pourra pas payer (Marc, 2026-08-09) : le
+       joueur, lui, ne peut plus la choisir — les deux doivent obéir à la même règle, sinon
+       l'IA gagnerait des bénéfices gratuits que l'humain n'a plus le droit de prendre.
+       ⚠️ Le choix a lieu au tour 2 et le prélèvement au tour 3 : ce contrôle ne garantit
+       donc rien, il évite seulement les choix absurdes. Le vrai filet est `investAppliquer`. */
+    if(!investPayable(card,ai)) s=-99;
     if(s>bestS){bestS=s;best=card;}
   }
   return best.id;
@@ -5072,6 +5258,12 @@ function aiBuyMilitary(ai,card){
   G.aiActions.push({emoji:card.emoji,name:'Achète '+card.name,desc:card.effect});
 }
 function doAITurn(aiPlayer,oneShot){
+  /* Tout ce que cette fonction journalise appartient à CETTE IA. Sans ce marquage, ses lignes
+     étaient attribuées à `G.player` — c'est-à-dire à l'humain que le serveur avait activé, ce qui
+     est exactement le contraire de la vérité. */
+  return logAuteur(aiPlayer, ()=>_doAITurnInterne(aiPlayer,oneShot));
+}
+function _doAITurnInterne(aiPlayer,oneShot){
   const ai=aiPlayer;G.aiActions=[];G._raidsThisTurn=[];ai._warConserve=false;ai._warRecapture=null;ai._warAggressor=false;ai._enemy=_aiResolveTarget(ai);ai._pForceEst=perceivedForce(ai,ai._enemy).val;
   // ── RÉSERVE DE GUERRE (point d'entrée) ──────────────────────────────────────────────────────────────
   // Un joueur humain en guerre ne dépense pas sa dernière énergie : il garde de quoi ENGAGER ses jetons
@@ -5404,7 +5596,7 @@ function doAITurn(aiPlayer,oneShot){
     if(!myWar)return;
     if((ai._attacksThisTurn||0)>=1||(ai.forceTokens||0)<1)return;
     const _e=ai._enemy;
-    if(hasSpec(_e,'empath_routes')||hasSpec(_e,'ia_immune'))return; // routes tech-protégées
+    if(routesProtegeesParTech(_e))return; // routes tech-protégées — même règle que partout (2026-08-09 : `intel_2` manquait)
     const targets=_e.routes.filter(r=>(r.tokens||0)===0);
     if(!targets.length)return;
     if(Math.random()<0.5){
@@ -5514,8 +5706,8 @@ function doAITurn(aiPlayer,oneShot){
     }
     if(!best)return false;
     const tens=getTens(ai.civ.id,best.civ.id);
-    const aEmpath=(hasSpec(ai,'empath_routes')?2:0)+(hasSpec(ai,'empath_tele')?2:0);
-    const dEmpath=(hasSpec(best,'empath_routes')?2:0)+(hasSpec(best,'empath_tele')?2:0);
+    const aEmpath=bonusCombatCartes(ai);
+    const dEmpath=bonusCombatCartes(best);
     const dCommit=Math.max(0,Math.min(best.forceTokens||0,best.res.materials||0,best.res.energy||0));
     const aPow=commit+aEmpath,dPow=dCommit+dEmpath+1/*garnison de base*/;
     ai.acLeft=Math.max(0,ai.acLeft-1);ai.spentThisTurn+=1+commit;ai._attacksThisTurn=(ai._attacksThisTurn||0)+1;
@@ -7150,7 +7342,7 @@ function _warShowAttackSlider(){
   if(Math.max(0,p.forceTokens-defFloor)>_afford)document.getElementById('wcm-info').innerHTML+=
     '<br><span style="color:#ff8866;font-size:.8em">⚠️ Limité à '+_afford+' jeton(s) : il faut 1<i class=ri-materials></i> +1<i class=ri-energy></i> par jeton engagé.</span>';
   // Bonus Empathes (gratuit, non gaspillable)
-  const _emp=(hasSpec(p,'empath_routes')?2:0)+(hasSpec(p,'empath_tele')?2:0);
+  const _emp=bonusCombatCartes(p);
   if(_emp>0)document.getElementById('wcm-info').innerHTML+='<br><span style="color:#c080ff;font-size:.82em">🔮 Bonus Empathes : +'+_emp+' (gratuit, non gaspillable)</span>';
   // Supercroiseur : déploiement à la demande
   G._cruiserDeployTemp=false;
@@ -7245,7 +7437,7 @@ function updateWarCombatSlider(){
   const p=G.player;
   const committed=parseInt(document.getElementById('wcm-slider').value);
   const stratBonus=(p.stratBonus&&p.stratBonus.combatBonus)||0;
-  const emp=(hasSpec(p,'empath_routes')?2:0)+(hasSpec(p,'empath_tele')?2:0);
+  const emp=bonusCombatCartes(p);
   const cruOn=!!G._cruiserDeployTemp&&cruiserAvailable(p)&&cruiserAfford(p);const cruPow=cruOn?(p.cruiserPower||5):0;
   const pPow=committed+stratBonus+emp+cruPow;
   document.getElementById('wcm-slider-val').textContent=committed;
@@ -7722,6 +7914,52 @@ function renderLogLegend(){
   const el=document.getElementById('log-legend');if(!el||!G||!G.player)return;
   el.innerHTML='<span style="color:#7880a0">Légende —</span> '+[G.player,...(G.ais||[])].map(p=>'<span style="color:'+p.civ.color+';font-weight:700;margin-right:9px;white-space:nowrap">'+p.civ.emoji+' '+p.civ.name+(p===G.player?' (toi)':'')+'</span>').join('');
 }
+/* ═════════ QUI A ÉCRIT CETTE LIGNE ? (Marc, 2026-08-09) ═════════
+   « change le log pour que chaque action de chaque joueur puisse être identifiée pour que ce
+   soit possible de rejouer le jeu à partir du journal. »
+
+   LE PROBLÈME. Le journal était un RÉCIT écrit du point de vue de la nation active : les autres
+   étaient nommées (« 🎯 ☠️ Ceinturiens — Stratégie… »), la nation active ne l'était pas
+   (« 🏗️ Colonie sur Cérès »). Comme le serveur bascule `G.player` d'une nation à l'autre, rien
+   ne permettait, en relisant, de savoir QUI avait colonisé quoi. C'est ce qui m'a empêché de
+   rejouer la partie CC36 : j'aurais dû deviner l'auteur de la moitié des lignes.
+
+   LA CORRECTION. Chaque entrée du journal porte désormais l'IDENTIFIANT de la nation qui l'a
+   produite (`civ`) et le tour (`turn`). C'est une DONNÉE, pas une tournure de phrase : elle ne
+   dépend d'aucun point de vue et survit à la sérialisation.
+
+   D'OÙ VIENT L'AUTEUR :
+     · `_auteurLog`, posé explicitement autour d'un bloc dont on sait à qui il appartient
+       (le tour d'une IA, une boucle d'entretien nation par nation) ;
+     · à défaut, `G.player` — qui est bien la nation agissante, en solo comme sur le serveur,
+       puisque le pilote active la nation avant d'appliquer son action.
+   ⚠️ `_auteurLog` est volontairement une variable de PORTÉE, pas un champ de `G` : elle ne vaut
+   que le temps d'un appel et `logAuteur` la restaure dans un `finally`. Rien à sauvegarder. */
+let _auteurLog=null;
+function logAuteur(qui, fn){
+  const av=_auteurLog;
+  _auteurLog=(qui&&qui.civ&&qui.civ.id)?qui.civ.id:(typeof qui==='string'?qui:null);
+  try{ return fn(); } finally { _auteurLog=av; }
+}
+function _logCivCourante(){
+  if(_auteurLog!==null) return _auteurLog;
+  try{ return (G&&G.player&&G.player.civ)?G.player.civ.id:null; }catch(e){ return null; }
+}
+/* Le préfixe « T3 Martiens │ », dans la couleur de la nation. Rendu SEULEMENT ici : le message
+   lui-même reste inchangé, pour que les rapports texte et les toasts ne s'en trouvent pas alourdis. */
+function _logPrefixe(e){
+  if(!e||typeof e!=='object')return '';
+  let nom='Système',coul='#8faacc';
+  try{
+    for(const p of [G.player].concat(G.ais||[])){
+      if(p&&p.civ&&p.civ.id===e.civ){ nom=p.civ.name; coul=p.civ.color; break; }
+    }
+  }catch(err){}
+  const t=(e.turn!==undefined&&e.turn!==null)?('T'+e.turn+' '):'';
+  return '<span style="opacity:.65;font-size:.85em">'+t+'</span>'
+       + '<span style="color:'+coul+';font-weight:700;font-size:.85em">'+nom+'</span>'
+       + '<span style="opacity:.45"> │ </span>';
+}
 function addLog(msg,cls=''){
   if(G)G._lastProgress=Date.now(); // battement de cœur pour le chien de garde anti-blocage
   /* ⚠️ LE JOURNAL N'EST PLUS TRONQUÉ (Marc, 2026-08-08 : « le journal doit être entier »).
@@ -7730,9 +7968,15 @@ function addLog(msg,cls=''){
      d'un écart de jetons — c'est exactement ce qui m'a empêché d'analyser sa partie.
      Une partie est bornée à dix tours : le journal l'est donc aussi, quelques centaines de lignes.
      Rien ne justifiait ce plafond. */
-  G.log.unshift({msg,cls});
+  /* `civ` = QUI, `turn` = QUAND. Les deux sont indispensables pour rejouer une partie depuis le
+     journal ; les ajouter ici plutôt qu'aux ~600 appels d'`addLog` garantit qu'aucune ligne n'y
+     échappe — y compris celles qu'on écrira demain. */
+  G.log.unshift({msg,cls,civ:_logCivCourante(),turn:(G&&G.turn)||0});
   const el=document.getElementById('log-content');
-  if(el)el.innerHTML=G.log.map(e=>`<div class="log-e ${e.cls}">${_logColorNations(e.msg)}</div>`).join('');
+  /* Chaque ligne affiche discrètement son tour et sa nation. Le journal en jeu devient lisible
+     comme un compte rendu de partie : « T3 Martiens │ … ». Même information que dans /debug et
+     dans le rapport copié — un seul format, trois endroits. */
+  if(el)el.innerHTML=G.log.map(e=>`<div class="log-e ${e.cls}">${_logPrefixe(e)}${_logColorNations(e.msg)}</div>`).join('');
 }
 // Peut-on encore jouer une action ce tour ? (utilisé pour détecter un blocage « plus de ressources »)
 function _scCanPlayerAct(){
