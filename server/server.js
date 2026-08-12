@@ -150,6 +150,11 @@ function frDate(ts) { // date + heure au format FRANÇAIS (jj/mm/aaaa hh:mm)
 function isEmail(x) { return /^[^@\s]+@[^@\s.]+\.[a-z]{2,}$/i.test(String(x || '')); }
 const _mailErrors = []; // dernières erreurs d'envoi, affichées dans /stats (diagnostic sans ouvrir les logs)
 function noteMailError(msg) { _mailErrors.unshift(frDate(Date.now()) + ' — ' + msg); _mailErrors.splice(12); }
+/* Deux adresses sont-elles la même ? Comparaison insensible à la casse et aux espaces : c'est
+   suffisant ici, et c'est ce qui empêche d'envoyer deux fois le même rapport à la même personne. */
+function memeAdresse(a, b) {
+  return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+}
 function sendMail(to, subject, text) {
   const line = '\n===== ' + frDate(Date.now()) + ' — À: ' + to + ' — ' + subject + ' =====\n' + text + '\n';
   try { fs.appendFileSync(OUTBOX, line); } catch (e) {}
@@ -252,7 +257,10 @@ function archiveGame(g) {
     const list = readArch(s.user); list.unshift(entry); writeArch(s.user, list);
     sendMail(s.user, 'Solar — fin de partie ' + g.code + ' (' + entry.dateFr + ')', corps);
   }
-  sendMail(ADMIN_MAIL, 'Solar — partie terminée ' + g.code, corps);
+  /* La copie ADMIN n'est envoyée que si l'administrateur n'est pas DÉJÀ dans la partie : sinon il
+     reçoit deux fois le même rapport. (Marc, 2026-08-10 : « je reçois 5-6 mails avec les
+     résultats ». Il est à la fois joueur et administrateur — d'où les doublons.) */
+  if (!humans.some(s => memeAdresse(s.user, ADMIN_MAIL))) sendMail(ADMIN_MAIL, 'Solar — partie terminée ' + g.code, corps);
   return entry;
 }
 const USERS_FILE = path.join(DATA, 'users.json');
@@ -1271,8 +1279,11 @@ wss.on('connection', (ws) => {
             if (list.length) { list[0].bugs = (list[0].bugs || []).concat([rec]); writeArch(who, list); }
             else writeArch(who, [{ code: g ? g.code : '—', endedAt: rec.at, dateFr: rec.dateFr, scores: [], journal: [], bugs: [rec] }]);
           } catch (e) {}
-          sendMail(ADMIN_MAIL, '🐞 Solar Conquest — BUG signalé par ' + who,
-            'Le ' + rec.dateFr + '\nJoueur : ' + who + '\nPartie : ' + (g ? g.code : '—') + '\n\n--- Message ---\n' + txt);
+          /* ⚠️ L'ANCIEN COURRIER « 🐞 BUG signalé » A ÉTÉ SUPPRIMÉ. Il ne contenait rien que le
+             rapport complet envoyé juste après ne contienne déjà — le signalement y figure, entre
+             les scores et le journal. C'était un message de plus pour rien.
+             Compte des envois AVANT / APRÈS, pour un joueur qui est aussi l'administrateur :
+               fin de partie : 2 → 1 · signalement : 3 → 1. Total 5 → 2. */
           /* ⚠️ LE RAPPORT ARRIVE APRÈS L'EMAIL DE FIN DE PARTIE, PAS AVANT.
              Le signalement se saisit sur l'écran de fin — donc quelques secondes à quelques minutes
              après l'archivage, qui a déjà envoyé le rapport complet. Attendre ce bug avant d'envoyer
@@ -1284,7 +1295,8 @@ wss.on('connection', (ws) => {
             if (listMaj.length && listMaj[0].scores && listMaj[0].scores.length) {
               const maj = corpsRapport(listMaj[0]);
               sendMail(who, 'Solar — fin de partie ' + listMaj[0].code + ' (avec ton signalement)', maj);
-              sendMail(ADMIN_MAIL, 'Solar — partie ' + listMaj[0].code + ' + signalement', maj);
+              // Copie administrateur SEULEMENT s'il n'est pas déjà l'auteur du signalement.
+              if (!memeAdresse(who, ADMIN_MAIL)) sendMail(ADMIN_MAIL, 'Solar — partie ' + listMaj[0].code + ' + signalement', maj);
             }
           } catch (e) { console.error('bug_report renvoi:', e.message); }
           sendTo(ws, { t: 'notice', kind: 'info', payload: { msg: 'Merci ! Ton signalement a été transmis.' } });

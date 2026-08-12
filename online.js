@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-09 · v9.43';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
+const SOLAR_BUILD_JS = '2026-08-12 · v9.46';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :
@@ -344,7 +344,7 @@ function onDecision(pending){
   if(pending.kind==='forced_war' && showForcedWarReal(pending)){ STATE._realDecide=finish; return; }
   if(pending.kind==='route_capture' && showRouteCaptureReal(pending)){ STATE._realDecide=finish; return; }
   if(pending.kind==='accord_confirm' && showAccordReal(pending)){ STATE._realDecide=finish; return; }
-  if(pending.kind==='espionage' && showOptsReal(pending,'espionage-modal','espionage-branch-opts','branch')){ STATE._realDecide=finish; return; }
+  if(pending.kind==='espionage' && showOptsReal(pending,'espionage-modal','espionage-branch-opts','id')){ STATE._realDecide=finish; return; }
   if(pending.kind==='empath_copy' && showOptsReal(pending,'empath-copy-modal','empath-copy-opts','cardId',true)){ STATE._realDecide=finish; return; }
   // Événements interactifs : VRAIES fenêtres du jeu (les overrides _evCommPick/_evDiploConfirm envoient la réponse).
   if(pending.kind==='event_comm' && typeof window.showCommEventModal==='function'){ window._scDiploSel={}; STATE._realDecide=finish; try{ showCommEventModal(function(){}); return; }catch(e){ STATE._realDecide=null; } }
@@ -514,7 +514,9 @@ function showOptsReal(pending, modalId, contId, key, allowNone){
   const o=pending.payload||{}, opts=o.options||[];
   const m=document.getElementById(modalId), cont=document.getElementById(contId); if(!m||!cont) return false;
   const go=(ans)=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide(ans); };
-  cont.innerHTML=opts.map((op,i)=>'<button class="inv-opt" data-i="'+i+'" style="cursor:pointer"><div class="inv-opt-name">'+(op.emoji||'')+' '+(op.name||op.id||op.branch)+'</div>'+(op.desc?'<div class="inv-opt-benefit">'+op.desc+'</div>':'')+'</button>').join('');
+  /* Les options d'espionnage sont longues (nation · catégorie · liste des technologies) : on laisse
+     le texte respirer et s'aligner à gauche, sinon la liste est illisible sur mobile. */
+  cont.innerHTML=opts.map((op,i)=>'<button class="inv-opt" data-i="'+i+'" style="cursor:pointer;width:100%;text-align:left;white-space:normal"><div class="inv-opt-name">'+(op.emoji||'')+' '+(op.name||op.id||op.branch)+'</div>'+(op.desc?'<div class="inv-opt-benefit" style="white-space:normal">'+op.desc+'</div>':'')+'</button>').join('');
   cont.querySelectorAll('.inv-opt[data-i]').forEach(b=>{ b.onclick=()=>{ const op=opts[parseInt(b.getAttribute('data-i'))]; const ans={}; ans[key]=(op[key]!==undefined?op[key]:(op.id!==undefined?op.id:op.branch)); go(ans); }; });
   m.classList.remove('hidden');
   return true;

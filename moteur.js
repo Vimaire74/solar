@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-09 · v9.43';
+const SOLAR_BUILD_MOTEUR = '2026-08-12 · v9.46';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -1722,6 +1722,26 @@ function applyEmpathCopy(cardId){
   addLog('🧬 Télépathie : effets de '+original.emoji+' '+original.name+' copiés (passifs uniquement)','gold');
   closePopup();render();
 }
+/* ═══ UNE NATION ACCEPTE-T-ELLE LE MONOPOLE DE LA SPHÈRE DE DYSON ? ═══
+   Cette règle vivait en dur dans `showDysonModal`, c'est-à-dire uniquement dans le cas où c'est
+   TOI qui bâtis. Quand une IA bâtissait, personne ne la posait aux autres IA : elles n'avaient ni
+   fenêtre, ni bonus, ni guerre — elles étaient simplement ignorées.
+   (Marc, 2026-08-12 : « tu es sûr que si l'IA ou un autre joueur accepte que tu la construises il
+   gagne le bonus de +3 en énergie ? » — la réponse était oui dans un sens, non dans l'autre.) */
+function dysonAccepte(nat, batisseurId){
+  if(!nat||!nat.civ) return true;
+  const tension=(typeof getTens==='function')?getTens(nat.civ.id, batisseurId):0;
+  const besoinEnergie=((nat.rpt&&nat.rpt.energy)||0)<2;
+  return (tension<3&&besoinEnergie)||tension<2;
+}
+/* Verse le +3⚡/tour du partage énergétique, une seule fois, et le journalise nommément. */
+function dysonPartage(nat){
+  if(!nat) return;
+  nat.rpt=nat.rpt||{};
+  nat.rpt.energy=(nat.rpt.energy||0)+3;
+  addLog('🔋 '+nat.civ.emoji+' '+nat.civ.name+' accepte le monopole — partage énergétique : '
+    +'+3<i class=ri-energy></i>/tour.','gold');
+}
 function showDysonModal(){
   document.getElementById('dyson-title').textContent='⚡ Sphère de Dyson construite !';
   document.getElementById('dyson-sub').innerHTML='Monopole énergétique (+5<i class=ri-energy></i>/tour). Les autres acceptent (+3<i class=ri-energy></i>/tour) ou c\'est la guerre.';
@@ -1731,7 +1751,7 @@ function showDysonModal(){
   for(const ai of G.ais){
     const tension=getTens(ai.civ.id,'player');
     const needsEnergy=(ai.rpt.energy||0)<2;
-    const accepts=(tension<3&&needsEnergy)||tension<2;
+    const accepts=dysonAccepte(ai, _moiId());   // même règle que lorsqu'une IA bâtit (voir dysonAccepte)
     const reason=accepts?(tension<2?'tension faible — pas de menace':'tension faible + besoin d\'énergie'):'tension élevée — refuse !';
     const color=accepts?'#80c880':'#ff8888';
     html+=`<div style="padding:8px 12px;border:1px solid ${color};border-radius:8px;margin-bottom:8px;color:${color};font-size:.88em">
@@ -1789,7 +1809,7 @@ function dysonRenounce(){
 }
 function applyDysonClose(){
   document.getElementById('dyson-modal').classList.add('hidden');
-  {const _refusing=G._dysonWarTargets||[];let _acc=0;for(const _ai of G.ais){if(!_refusing.includes(_ai.civ.id)){_ai.rpt.energy=(_ai.rpt.energy||0)+3;_acc++;}}if(_acc>0)addLog('🔋 '+_acc+' nation(s) acceptent le monopole et reçoivent +3<i class=ri-energy></i>/tour (partage énergétique).','dim');}
+  {const _refusing=G._dysonWarTargets||[];let _acc=0;for(const _ai of G.ais){if(!_refusing.includes(_ai.civ.id)){dysonPartage(_ai);_acc++;}}if(_acc>0)addLog('🔋 '+_acc+' nation(s) acceptent le monopole (+3<i class=ri-energy></i>/tour chacune).','dim');}
   if(G._dysonWarTargets&&G._dysonWarTargets.length>0){
     const names=G._dysonWarTargets.map(id=>{const ai=G.ais.find(a=>a.civ.id===id);return ai?ai.civ.emoji+' '+ai.civ.name:id;}).join(', ');
     addLog('<i class=ri-energy></i> Sphère de Dyson : '+names+' refus — Guerre !','red');
@@ -1848,7 +1868,7 @@ function aiDysonDecide(war){
   if(war){G.warRisk=10;declareWar('Sphère de Dyson ennemie — refus du monopole énergétique !','player',aiId);addLog('⚔️ Tu refuses la Sphère de Dyson — guerre déclarée !','red');}
   else{
     addLog('🤝 Tu acceptes le monopole énergétique de la Sphère de Dyson.','dim');
-    G.player.rpt.energy=(G.player.rpt.energy||0)+3;addLog('🔋 Partage énergétique : +3<i class=ri-energy></i>/tour pour toi.','gold');
+    dysonPartage(G.player);
     // Accepter le monopole = geste d'apaisement : termine toute guerre FRAÎCHEMENT déclarée avec le bâtisseur ce tour et calme la tension bilatérale.
     const _builder=G.ais.find(a=>a.civ.id===aiId);
     const _w=_warBetween(_moiId(),aiId);
@@ -1857,6 +1877,22 @@ function aiDysonDecide(war){
       setTens('player',aiId,2);setTens(aiId,'player',2);
       syncWarState();
       addLog('🕊️ Ton acceptation du monopole apaise '+(_builder?_builder.civ.emoji+' '+_builder.civ.name:'la nation')+' — la guerre est évitée.','gold');
+    }
+  }
+  /* ⚠️ LES AUTRES NATIONS EXISTENT AUSSI. Cette fonction ne traitait que `G.player` : quand une IA
+     bâtissait la Sphère, les DEUX autres IA n'étaient ni consultées, ni payées, ni fâchées — comme
+     si elles n'étaient pas dans la partie. On leur applique donc la même règle qu'à toi : celles qui
+     acceptent touchent leur +3⚡/tour, celles qui refusent déclarent la guerre au bâtisseur. */
+  {
+    const _bat=allPlayers().find(n=>n.civ.id===aiId);
+    for(const _n of allPlayers()){
+      if(!_n||_n===G.player||_n.civ.id===aiId) continue;      // toi : déjà traité ; le bâtisseur : pas concerné
+      if(dysonAccepte(_n, aiId)) dysonPartage(_n);
+      else {
+        if(typeof addTens==='function'){ addTens(_n.civ.id, aiId, 6); addTens(aiId, _n.civ.id, 6); }
+        addLog('⚔️ '+_n.civ.emoji+' '+_n.civ.name+' REFUSE le monopole de '
+          +(_bat?_bat.civ.emoji+' '+_bat.civ.name:aiId)+' — tension +6 entre elles.','red');
+      }
     }
   }
   if(typeof cb==='function')cb();else render();
@@ -1879,121 +1915,194 @@ function aiDysonDecide(war){
    TENSION : chaque nation à qui on a effectivement pris quelque chose en veut à l'espion (+4).
    On ne fâche donc plus une nation dont on n'a rien copié — c'était le cas avant, la « cible »
    étant désignée d'office. */
-const ESP_TOURS=[3,4,5];
-/* Les technologies des AUTRES, regroupées par filière. Chaque entrée dit aussi de QUI elles
-   viennent : c'est ce qui permet de n'appliquer la tension qu'aux nations réellement pillées. */
-function espFilieres(espion){
-  const par={};
+/* ═══════════════════ ESPIONNAGE — RÈGLE DE MARC, 2026-08-10 ═══════════════════
+   « Il doit montrer à la fin du tour 3 les tech possédées par les adversaires y compris IA.
+   Juste les titres et les catégories et les nations. Tu peux alors choisir de piller toute une
+   catégorie. Si un joueur en a 3 tu pompes les trois technologies d'un coup. Mais ça c'est une
+   cause de guerre alors disons tension +6 pour une tech, +8 pour deux tech et +10 pour trois
+   technologies. La jauge augmente chez la nation pillée pas chez toi. Donc guerre populaire
+   forcée. […] on devrait pouvoir choisir une tech à la fois, pas seulement une branche. »
+
+   CE QUI NE MARCHAIT PAS (partie 321D, « on choisit mais ça se valide pas, demande trois fois ») :
+     · LA VALIDATION. La question était émise avec un ADAPTATEUR (`adEspionnage`) qui transformait
+       la réponse en simple chaîne. La suite, elle, attendait un objet et lisait `ans.branch` —
+       donc `undefined`. Le choix partait bien, il n'était simplement jamais appliqué. Plus
+       d'adaptateur : la suite reçoit la réponse telle quelle.
+     · « TROIS FOIS ». La question revenait aux tours 3, 4 et 5. Une seule occasion désormais,
+       REPORTABLE tant qu'on veut — c'est le bouton « attendre un tour » qui manquait.
+     · « ON NE SAIT PAS À QUI SONT LES TECH ». Chaque ligne nomme la nation, la catégorie et les
+       technologies.
+
+   LA TENSION. Elle monte CHEZ LA VICTIME, envers l'espion — c'est elle qui a une raison d'en
+   vouloir, pas l'inverse. 1 tech → +6, 2 → +8, 3 ou plus → +10. À 10, la guerre populaire est
+   forcée : piller trois technologies d'un coup, c'est déclarer la guerre. */
+const ESP_TENSION={1:6,2:8};        // au-delà de 2 technologies : 10, donc guerre forcée
+function espTensionPour(n){ return n<=0?0:(ESP_TENSION[n]||10); }
+
+/* Ce que les AUTRES possèdent, regroupé par (nation, catégorie). On ne montre que ce qui est
+   copiable : leurs technologies de branche, hors copies d'espionnage et hors ce qu'on a déjà. */
+function espInventaire(espion){
+  const par=[];
   for(const n of allPlayers()){
     if(!n||n===espion) continue;
+    const parBranche={};
     for(const c of (n.cards||[])){
-      if(!c.branch) continue;
-      if(c.espCopy) continue;                 // on ne copie pas une copie : sinon l'espionnage se propage
+      if(!c.branch||c.espCopy) continue;
       if(espion.cards.find(x=>x.id===c.id||x.id===c.id+'_esp')) continue;   // déjà à nous
-      (par[c.branch]||(par[c.branch]=[])).push({carte:c, de:n});
+      (parBranche[c.branch]||(parBranche[c.branch]=[])).push(c);
     }
+    for(const b of Object.keys(parBranche)) par.push({nation:n, branch:b, cartes:parBranche[b]});
   }
   return par;
 }
+/* La liste proposée : d'abord les CATÉGORIES entières (le gros coup), puis les technologies UNE
+   PAR UNE (le coup discret), puis « attendre ». Chaque entrée porte un `id` — le serveur vérifie
+   que la réponse vient bien de la liste, et cela n'était pas possible sans identifiant. */
 function _espOptions(espion){
-  const par=espFilieres(espion);
-  /* `desc` est construit ICI, dans le moteur, et pas dans chaque interface : c'est la même
-     phrase en solo et en ligne. Deux rendus de la même liste finiraient par diverger — c'est
-     exactement ce qui est arrivé au calcul des revenus. */
-  return Object.keys(par).map(b=>{
-    const liste=par[b].map(x=>x.carte.emoji+' '+x.carte.name+' ('+x.de.civ.name+')');
-    return { branch:b, name:(BRANCH_NAMES[b]||b), cards:liste, n:par[b].length,
-             desc:liste.join(', ')+' — '+par[b].length+' carte(s)' };
-  }).sort((a,b)=>b.n-a.n);
+  const inv=espInventaire(espion), opts=[];
+  const tens=n=>' — tension +'+espTensionPour(n)+' chez la victime';
+  for(const e of inv.filter(x=>x.cartes.length>=2).sort((a,b)=>b.cartes.length-a.cartes.length)){
+    opts.push({ id:'lot:'+e.nation.civ.id+':'+e.branch, kind:'lot',
+      nation:e.nation.civ.id, branch:e.branch, ids:e.cartes.map(c=>c.id),
+      name:'📦 '+e.nation.civ.emoji+' '+e.nation.civ.name+' · '+(BRANCH_NAMES[e.branch]||e.branch)
+           +' — LA CATÉGORIE ENTIÈRE ('+e.cartes.length+')',
+      desc:e.cartes.map(c=>c.emoji+' '+c.name).join(', ')+tens(e.cartes.length) });
+  }
+  for(const e of inv){
+    for(const c of e.cartes){
+      opts.push({ id:'une:'+e.nation.civ.id+':'+c.id, kind:'une',
+        nation:e.nation.civ.id, branch:e.branch, ids:[c.id],
+        name:c.emoji+' '+c.name,
+        desc:e.nation.civ.emoji+' '+e.nation.civ.name+' · '+(BRANCH_NAMES[e.branch]||e.branch)+tens(1) });
+    }
+  }
+  if(opts.length) opts.push({ id:'attendre', kind:'attendre', ids:[],
+    name:'⏳ Attendre un tour',
+    desc:'Ne rien piller maintenant. La fenêtre reviendra à la fin du tour prochain — les autres '
+        +'auront peut-être développé davantage.' });
+  return opts;
 }
 /* Copie effective. Rend le nombre de cartes prises. */
-function espCopier(espion,branchId){
-  const par=espFilieres(espion), lot=par[branchId]||[];
-  const laises=new Set();
-  let pris=0;
-  for(const {carte,de} of lot){
+function espPiller(espion, opt){
+  if(!opt||!opt.ids||!opt.ids.length) return 0;
+  const victime=allPlayers().find(n=>n.civ.id===opt.nation);
+  if(!victime) return 0;
+  let pris=0; const noms=[];
+  for(const id of opt.ids){
+    const carte=(victime.cards||[]).find(c=>c.id===id);
+    if(!carte) continue;
+    if(espion.cards.find(x=>x.id===carte.id||x.id===carte.id+'_esp')) continue;
     const copie={...carte, id:carte.id+'_esp', espCopy:true};
     espion.cards.push(copie); applyCard(copie,espion); pris++;
-    laises.add(de.civ.id);
-    addLog('🕵️ '+espion.civ.emoji+' '+espion.civ.name+' copie '+carte.emoji+' '+carte.name
-      +' à '+de.civ.name,'gold');
+    noms.push((carte.emoji||'')+' <b>'+carte.name+'</b>'+(carte.effect?' — <span style="opacity:.8">'+carte.effect+'</span>':''));
+    addLog('🕵️ '+espion.civ.emoji+' '+espion.civ.name+' vole '+carte.emoji+' '+carte.name
+      +' à '+victime.civ.emoji+' '+victime.civ.name,'gold');
   }
-  /* La tension ne frappe QUE les nations effectivement copiées, et elle est nommée dans le
-     journal : une nation doit pouvoir comprendre pourquoi elle en veut à quelqu'un. */
-  for(const cid of laises){
-    if(typeof addTens==='function') addTens(cid, espion.civ.id, 4);
-    const victime=allPlayers().find(n=>n.civ.id===cid);
-    addLog('🕵️ '+(victime?victime.civ.emoji+' '+victime.civ.name:cid)+' a détecté l\'espionnage de '
-      +espion.civ.name+' — tension +4 envers lui.','red');
-    if(typeof _journalAuto==='function')_journalAuto(espion.civ.name,'Espionnage détecté',(victime?victime.civ.name:cid)+' : tension +4');
-  }
-  if(pris) G.warRisk=Math.min(10,(G.warRisk||0)+2);
+  if(!pris) return 0;
+  /* LA TENSION VA CHEZ LA VICTIME, envers l'espion — pas l'inverse (règle de Marc). C'est elle
+     qui a une raison d'en vouloir. À 10, la guerre populaire devient inévitable. */
+  const t=espTensionPour(pris);
+  if(typeof addTens==='function') addTens(victime.civ.id, espion.civ.id, t);
+  const niveau=(typeof getTens==='function')?getTens(victime.civ.id,espion.civ.id):t;
+  addLog('🕵️ '+victime.civ.emoji+' '+victime.civ.name+' a détecté l\'espionnage de '
+    +espion.civ.name+' — '+pris+' technologie(s) volée(s), tension +'+t+' envers lui ('+niveau+'/10).','red');
+  if(niveau>=10) addLog('🚨 Tension à 10 : la population de '+victime.civ.name+' exige la guerre contre '
+    +espion.civ.name+' !','red');
+  if(typeof _journalAuto==='function')_journalAuto(espion.civ.name,'Espionnage',pris+' tech volée(s) à '+victime.civ.name+' — tension +'+t);
+
+  /* ═══ LE RÉCAPITULATIF, AUX DEUX CAMPS (Marc, 2026-08-10) ═══
+     « je voulais voir un récapitulatif de ce qui a été volé et que ce soit indiqué au voleur et
+     au volé. » Sans cela, le bénéfice de l'investissement était invisible : le joueur ne savait
+     pas ce qu'il venait de gagner, et la victime ignorait pourquoi sa tension explosait.
+     `notifyNationHit` est le bon outil : il ouvre une fenêtre chez un HUMAIN, en solo comme en
+     ligne, et ne dérange pas les IA (tout reste au journal pour elles). */
+  const liste='• '+noms.join('<br>• ');
+  notifyNationHit(espion, '🕵️ Espionnage réussi',
+    '<b>'+pris+' technologie'+(pris>1?'s':'')+' volée'+(pris>1?'s':'')+'</b> à '
+    +victime.civ.emoji+' '+victime.civ.name+' :<br>'+liste
+    +'<br><br>Elles sont à toi dès maintenant, avec tous leurs effets.'
+    +'<br><span style="color:#ff9a8a">Contrepartie : tension +'+t+' chez '+victime.civ.name
+    +' envers toi ('+niveau+'/10)'+(niveau>=10?' — sa population exige la guerre.':'.')+'</span>');
+  notifyNationHit(victime, '🕵️ Tu as été espionné !',
+    victime.civ.name+' a découvert que '+espion.civ.emoji+' '+espion.civ.name
+    +' a dérobé <b>'+pris+' de tes technologie'+(pris>1?'s':'')+'</b> :<br>'+liste
+    +'<br><br>Tu les gardes — mais il les a aussi.'
+    +'<br><span style="color:#ff9a8a">Ta population lui en veut : tension +'+t+' ('+niveau+'/10)'
+    +(niveau>=10?'<br><b>À 10, la guerre est inévitable.</b>':'')+'</span>');
   return pris;
 }
-/* L'IA prend la filière la plus fournie — même règle que l'humain, sans fenêtre. */
+/* L'IA prend le plus gros lot disponible, sans fenêtre. Même règle que l'humain. */
 function espChoixIA(espion){
-  const opts=_espOptions(espion);
-  if(!opts.length){ addLog('🕵️ '+espion.civ.name+' — rien à espionner ce tour.','dim'); return; }
-  espCopier(espion,opts[0].branch);
+  const opts=_espOptions(espion).filter(o=>o.kind!=='attendre');
+  if(!opts.length){ addLog('🕵️ '+espion.civ.name+' — rien à espionner pour l\'instant.','dim'); return false; }
+  espPiller(espion,opts[0]);
+  espion._espFait=true;
+  return true;
 }
-/* ÉTAT DE FLUX — appelé à la fin de chaque tour, juste avant le bilan.
-   Les humains sont interrogés EN MÊME TEMPS (même raison que l'agenda et les investissements :
-   le choix est secret et indépendant, faire la queue ne fait que rallonger le tour). */
+/* ÉTAT DE FLUX — fin de chaque tour à partir du 3e, jusqu'à ce que l'espionnage soit utilisé. */
 function stEspionnage(){
   const d=fluxDonnees();
-  if(ESP_TOURS.indexOf(G.turn)<0){ stBilanDeTour(); return; }
-  const candidats=allPlayers().filter(p=>p&&p._inv1==='inv_esp'&&p._espTour!==G.turn);
-  for(const p of candidats) p._espTour=G.turn;         // une seule fois par tour, quoi qu'il arrive
+  if(G.turn<3){ stBilanDeTour(); return; }
+  const candidats=allPlayers().filter(p=>p&&p._inv1==='inv_esp'&&!p._espFait&&p._espTour!==G.turn);
+  for(const p of candidats) p._espTour=G.turn;      // une seule sollicitation par tour
   for(const p of candidats.filter(p=>p._isAI)) espChoixIA(p);
   const humains=candidats.filter(p=>!p._isAI);
   const local=(G.player&&G.player.civ)?G.player.civ.id:null;
-  d.espRestants=humains.map(p=>p.civ.id);
-  if(!d.espRestants.length){ stBilanDeTour(); return; }
+  d.espRestants=[];
   for(const p of humains){
     const opts=_espOptions(p);
     if(!opts.length){
-      addLog('🕵️ '+p.civ.emoji+' '+p.civ.name+' — aucune technologie à copier ce tour.','dim');
-      const i=d.espRestants.indexOf(p.civ.id); if(i>=0) d.espRestants.splice(i,1);
+      addLog('🕵️ '+p.civ.emoji+' '+p.civ.name+' — aucune technologie à voler pour l\'instant ; '
+        +'la fenêtre reviendra au prochain tour.','dim');
       continue;
     }
-    const charge={tour:G.turn, restants:ESP_TOURS.filter(t=>t>G.turn).length, options:opts};
-    if(p.civ.id===local) _emitDecision('espionage', p, charge, 'stEspionnageRecu', 'adEspionnage');
-    else _emitRemote('espionage', p, charge, 'stEspionnageRecu', 'adEspionnage');
+    d.espRestants.push(p.civ.id);
+    const charge={tour:G.turn, options:opts};
+    /* ⚠️ AUCUN ADAPTATEUR (5e argument à `null`). C'est un adaptateur qui a fait échouer la
+       validation dans la partie 321D : il rendait une chaîne, alors que la suite lit un objet. */
+    if(p.civ.id===local) _emitDecision('espionage', p, charge, 'stEspionnageRecu', null);
+    else _emitRemote('espionage', p, charge, 'stEspionnageRecu', null);
   }
   if(!d.espRestants.length){ stBilanDeTour(); return; }
 }
-function adEspionnage(ans){ return (ans&&ans.branch)||null; }
 function stEspionnageRecu(ans, civId){
   const d=fluxDonnees();
   const cid=civId||(ans&&ans._civ)||null;
   const nat=allPlayers().find(p=>p.civ.id===cid)||G.player;
-  const branche=(ans&&ans.branch)||null;
-  if(nat&&branche) espCopier(nat,branche);
+  const choisi=(ans&&(ans.id||ans.branch))||null;      // `branch` toléré : anciens clients
+  if(nat){
+    const opt=_espOptions(nat).find(o=>o.id===choisi);
+    if(!opt||opt.kind==='attendre'){
+      addLog('🕵️ '+nat.civ.emoji+' '+nat.civ.name+' — espionnage reporté : la fenêtre reviendra '
+        +'à la fin du tour prochain.','dim');
+    }else{
+      if(espPiller(nat,opt)>0) nat._espFait=true;
+    }
+  }
   const rest=d.espRestants;
   if(Array.isArray(rest)){
     const i=rest.indexOf(nat?nat.civ.id:cid); if(i>=0) rest.splice(i,1);
-    if(rest.length) return;                            // les autres n'ont pas encore choisi
+    if(rest.length) return;
   }
   d.espRestants=null;
   stBilanDeTour();
 }
-/* Fenêtre SOLO. En ligne, c'est online.js qui rend la même charge utile. */
+/* Fenêtre SOLO. En ligne, online.js rend la même charge utile. */
 function showEspionageChoiceModal(){
   const opts=_espOptions(G.player);
-  if(!opts.length){ addLog('🕵️ Espionnage : aucune technologie à copier pour l\'instant.','dim'); return; }
+  if(!opts.length){ addLog('🕵️ Espionnage : aucune technologie à voler pour l\'instant.','dim'); return; }
   document.getElementById('espionage-modal-sub').textContent=
-    'Choisis une filière : tu copies TOUTES les technologies que les autres nations y ont développées.';
+    'Vole une technologie, ou une catégorie entière chez une même nation. La tension monte CHEZ ELLE.';
   document.getElementById('espionage-branch-opts').innerHTML=opts.map(o=>
-    `<div class="inv-opt" onclick="applyEspionageChoice('${o.branch}')">
-      <div class="inv-opt-emoji">🕵️</div>
+    `<div class="inv-opt" onclick="applyEspionageChoice('${o.id}')">
       <div class="inv-opt-name">${o.name}</div>
       <div class="inv-opt-benefit">${o.desc}</div>
     </div>`).join('');
   document.getElementById('espionage-modal').classList.remove('hidden');
 }
-function applyEspionageChoice(branchId){
+function applyEspionageChoice(optId){
   const el=document.getElementById('espionage-modal'); if(el) el.classList.add('hidden');
-  espCopier(G.player,branchId);
+  stEspionnageRecu({id:optId}, G.player.civ.id);
 }
 /* (`_finishInvestmentsAfterEspionage` supprimée : elle n'existait que pour rattraper le flux
    après la fenêtre d'espionnage du tour 3. Cette fenêtre a été déplacée aux fins de tours 3, 4
@@ -2669,7 +2778,7 @@ fluxDeclarer('stInvestRecu', stInvestRecu);
    ou 5 peut très bien traverser une sauvegarde avant d'être répondue. */
 fluxDeclarer('stEspionnage', stEspionnage);
 fluxDeclarer('stEspionnageRecu', stEspionnageRecu);
-fluxDeclarer('adEspionnage', adEspionnage);
+/* `adEspionnage` supprimé : c'est lui qui cassait la validation (voir le bandeau de stEspionnage). */
 fluxDeclarer('adCarteInvestissement', adCarteInvestissement);
 fluxDeclarer('selectInvestment', typeof selectInvestment==='function'?selectInvestment:stRien);
 fluxDeclarer('selectInvestment2', typeof selectInvestment2==='function'?selectInvestment2:stRien);
