@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-12 · v9.46';
+const SOLAR_BUILD_MOTEUR = '2026-08-12 · v9.48';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -589,9 +589,17 @@ function _evCommPick(aiId){
     fluxDonnees().suiteAccord=nomSuite;   // remise en place : la suite du tour se joue APRÈS la réponse
     return;
   }
-  // Partenaire IA : règle existante — elle refuse si le proposant est trop en avance et qu'elle va bien.
-  const gap=calcVP(prop).total-calcVP(ai).total;const weak=(ai.res.morale||0)<=2||_forceTotal(ai)<3;
-  if(!weak&&gap>=8){addLog('🤝 '+ai.civ.emoji+' '+ai.civ.name+' refuse : tu es trop en avance ('+gap+' VP).','red');_appelerSuite(done);return;}
+  /* Partenaire IA : MÊME RÈGLE que celle qu'on appliquerait à un joueur (`accordAcceptable`).
+     Avant, cette fonction avait sa propre version — une IA pouvait donc accepter là où un humain
+     aurait refusé, et inversement. Deux règles pour la même question, c'est une de trop. */
+  const avis=accordAcceptable(ai,prop);
+  if(!avis.ok){
+    addLog('🤝 '+ai.civ.emoji+' '+ai.civ.name+' REFUSE l\'accord de '+prop.civ.emoji+' '+prop.civ.name
+      +' — '+avis.raison+'.','red');
+    if(typeof _emitNotice==='function')_emitNotice('accord_result', prop,
+      {title:'🤝 Accord refusé', body:ai.civ.emoji+' '+ai.civ.name+' a refusé : '+avis.raison+'.'}, 'stRien');
+    _appelerSuite(done);return;
+  }
   _evAccordConclude(prop,ai);
   _appelerSuite(done);
 }
@@ -600,6 +608,41 @@ function _evCommPick(aiId){
    diplomatique ne repartait pas. Le message d'erreur nommait la question perdue, mais c'est tout.
    Ces trois suites portent maintenant un nom, comme le reste du flux. */
 function stAccordCommChoisi(ans){ _evCommPick(ans&&ans.aiId?ans.aiId:null); }
+/* Réponse à un accord proposé PAR CLIC SUR UNE COLONIE (hors événement). Suite NOMMÉE : une
+   proposition peut rester en attente longtemps, et une fermeture ne survivrait pas à une
+   sauvegarde. Le coût n'est prélevé qu'ici, à l'acceptation — pas à la proposition. */
+function stAccordDirectReponse(ans){
+  const d=fluxDonnees();
+  const prop=allPlayers().find(p=>p.civ.id===d.accordProp);
+  const part=allPlayers().find(p=>p.civ.id===d.accordPart);
+  const nodeId=d.accordNode;
+  d.accordProp=null; d.accordPart=null; d.accordNode=null;
+  const ok=!!(ans&&(ans.value==='yes'||ans.targetId==='yes'||ans.id==='yes'||ans.accept===true));
+  if(!prop||!part){ return; }
+  if(!ok){
+    addLog('🤝 '+part.civ.emoji+' '+part.civ.name+' REFUSE l\'accord commercial de '
+      +prop.civ.emoji+' '+prop.civ.name+'.','red');
+    if(typeof _emitNotice==='function')_emitNotice('accord_result', prop,
+      {title:'🤝 Accord refusé', body:part.civ.emoji+' '+part.civ.name+' a refusé ton accord commercial. Tu ne perds rien.'}, 'stRien');
+    return;
+  }
+  // Accepté : c'est MAINTENANT que le proposant paie.
+  if((prop.res.materials||0)<2 || prop.acLeft<1){
+    addLog('🤝 '+prop.civ.emoji+' '+prop.civ.name+' n\'a plus les moyens de conclure l\'accord.','red');
+    return;
+  }
+  prop.acLeft-=1; prop.res.materials-=2; prop.spentThisTurn=(prop.spentThisTurn||0)+3;
+  part.res.materials=(part.res.materials||0)+2;
+  if(nodeId && !G.commercialAccords.includes(nodeId)) G.commercialAccords.push(nodeId);
+  setTens(prop.civ.id,part.civ.id,Math.max(0,getTens(prop.civ.id,part.civ.id)-3));
+  setTens(part.civ.id,prop.civ.id,Math.max(0,getTens(part.civ.id,prop.civ.id)-3));
+  if(typeof updateConnections==='function'){updateConnections(prop);updateConnections(part);}
+  addLog('🤝 Accord commercial conclu : '+prop.civ.emoji+' '+prop.civ.name+' ↔ '
+    +part.civ.emoji+' '+part.civ.name+' sur '+((NODES[nodeId]&&NODES[nodeId].name)||nodeId)
+    +' — il donne 2<i class=ri-materials></i>, tension −3 des deux côtés.','gold');
+  if(typeof _emitNotice==='function')_emitNotice('accord_result', prop,
+    {title:'🤝 Accord accepté', body:part.civ.emoji+' '+part.civ.name+' a ACCEPTÉ ton accord commercial.'}, 'stRien');
+}
 function stAccordReponse(ans){
   const d=fluxDonnees();
   const prop=allPlayers().find(p=>p.civ.id===d.accordProp);
@@ -646,6 +689,16 @@ function _evDiploConfirm(){
     const war=_warBetween(_moiId(),ai.civ.id);
     const needM=6; // coût uniforme : 6 matériaux par nation (plus de surcoût énergie en cas de guerre)
     if((G.player.res.materials||0)<needM){addLog('🕊️ Pas assez de matériaux pour le pacte avec '+ai.civ.name+' (6 requis).','red');continue;}
+    /* ⚠️ UN PACTE SE SIGNE À DEUX. Il s'appliquait sans que l'autre nation ait son mot à dire :
+       on payait 6🪨 et le pacte existait, même si la nation visée n'en voulait pas.
+       Elle peut désormais refuser, selon la même règle qu'un accord commercial — et l'on ne paie
+       pas un pacte refusé. (Un partenaire HUMAIN devrait recevoir une fenêtre : c'est le chantier
+       de diplomatie que Marc a mis à demain ; en attendant, la règle vaut au moins pour les IA.) */
+    const _avis=accordAcceptable(ai,G.player);
+    if(!_avis.ok){
+      addLog('🕊️ '+ai.civ.emoji+' '+ai.civ.name+' REFUSE le pacte de non-agression — '+_avis.raison+'.','red');
+      continue;
+    }
     G.player.res.materials-=needM;
     if(war)_evEndWarWith(ai.civ.id,4);
     G._nonAgg=G._nonAgg||{};G._nonAgg[ai.civ.id]=G.turn+4;
@@ -958,7 +1011,31 @@ function mesGuerres(civId){
   const id=civId||((G.player&&G.player.civ&&G.player.civ.id)||null);
   return (G.wars||[]).filter(w=>w&&(w.a===id||w.b===id));
 }
-function getNodeOwnerAI(nodeId){return G.ais.find(ai=>ai.colonies.some(c=>c.nodeId===nodeId))||null;}
+/* ⚠️ « OwnerAI » EST UN NOM MENSONGER, ET LE DÉFAUT ÉTAIT DANS LE NOM. Cette fonction ne cherchait
+   le propriétaire d'un nœud QUE parmi `G.ais` : la colonie d'un autre HUMAIN n'avait donc, aux yeux
+   du jeu, aucun propriétaire. Conséquence vécue par Marc (2026-08-12) : on proposait un accord
+   commercial sur la colonie d'un joueur, personne ne lui demandait rien, et il ne pouvait pas
+   cliquer sur « accepter » — l'accord se concluait tout seul.
+   `ownerNation` cherche parmi TOUTES les nations. `getNodeOwnerAI` reste, mais ne renvoie plus que
+   les IA, pour les rares endroits qui veulent vraiment « une IA » (l'ancien nom, l'ancien sens). */
+function ownerNation(nodeId){ return allPlayers().find(n=>n&&n.colonies&&n.colonies.some(c=>c.nodeId===nodeId))||null; }
+function getNodeOwnerAI(nodeId){const o=ownerNation(nodeId);return (o&&o._isAI!==false)?o:null;}
+/* Une nation accepte-t-elle un accord commercial ? Règle unique, humains comme IA — c'est ce qui
+   permet de DEMANDER à une IA au lieu de décider à sa place, et de lui laisser refuser.
+   Elle refuse si : guerre en cours, tension trop forte, ou si le proposant est déjà loin devant
+   et qu'elle-même se porte bien (elle n'a alors aucun intérêt à le renforcer). */
+function accordAcceptable(nat, proposant){
+  if(!nat||!proposant) return {ok:false, raison:'nation inconnue'};
+  if(_warBetween(nat.civ.id, proposant.civ.id)) return {ok:false, raison:'vous êtes en guerre'};
+  const tension=tensEff(nat.civ.id, proposant.civ.id);
+  if(tension>=7) return {ok:false, raison:'tensions trop élevées ('+tension+'/10)'};
+  try{
+    const mien=calcVP(nat).total, sien=calcVP(proposant).total;
+    const enForme=(nat.res.morale||0)>=4 && nat.colonies.length>=3;
+    if(sien>mien+15 && enForme) return {ok:false, raison:'tu es déjà trop en avance ('+sien+' VP contre '+mien+')'};
+  }catch(e){}
+  return {ok:true, raison:''};
+}
 function recomputeGov(p){
   const prev=p.gov_level;
   p.gov_pts=(p.govPermPts||0)+(p.govFormPts||0);
@@ -1059,13 +1136,23 @@ function perceivedForce(viewer,target){
   return{exact:false,val:G._fog.f[key]};
 }
 function allPlayers(){return [G.player,...G.ais];}
-// Cible principale d'une IA = nation HUMAINE la plus proche ayant des colonies.
-// Solo : l'unique humain est G.player → comportement identique. Multijoueur : la nation humaine la plus proche.
+/* ═══ LA CIBLE D'UNE NATION — N'IMPORTE QUELLE RIVALE, PAS « L'HUMAIN » ═══
+   Principe posé par Marc, rappelé le 2026-08-12 : « l'IA est une nation comme une autre ».
+
+   AVANT, cette fonction ne retenait que les nations HUMAINES (`_isAI === false`). Une IA ne
+   s'attaquait donc JAMAIS à une autre IA : elles se partageaient la carte en paix et se liguaient
+   de fait contre les joueurs. Dans la partie 321D, c'est ainsi que le Jupitérien a atteint 115 VP
+   sans jamais être inquiété par les deux autres IA — alors qu'il était de loin le plus menaçant.
+   C'était aussi une asymétrie MESURABLE : le résultat d'une partie changeait selon la nation
+   désignée « active » (voir `server/mesure_equivalence.js`).
+
+   MAINTENANT : la cible est la nation RIVALE la plus proche, humaine ou non. Le critère reste la
+   distance, comme avant — on ne change que le vivier. */
 function _aiResolveTarget(ai){
   const all=allPlayers();
-  let pool=all.filter(p=>p!==ai && p._isAI===false && p.colonies && p.colonies.length>0);
-  if(!pool.length)pool=all.filter(p=>p!==ai && p._isAI===false);
-  if(!pool.length)return G.player; // filet : aucun humain identifié
+  let pool=all.filter(p=>p!==ai && p.colonies && p.colonies.length>0);
+  if(!pool.length)pool=all.filter(p=>p!==ai);
+  if(!pool.length)return null; // seule nation en jeu : personne à viser
   let best=pool[0],bestD=99;
   for(const h of pool){
     let m=99;
@@ -2799,6 +2886,7 @@ fluxDeclarer('applyDysonClose', typeof applyDysonClose==='function'?applyDysonCl
 /* Sommets commercial et diplomatique. */
 fluxDeclarer('stAccordCommChoisi', stAccordCommChoisi);
 fluxDeclarer('stAccordReponse', stAccordReponse);
+fluxDeclarer('stAccordDirectReponse', stAccordDirectReponse);
 fluxDeclarer('stDiploChoisi', stDiploChoisi);
 fluxDeclarer('routeCaptureChoice', typeof routeCaptureChoice==='function'?routeCaptureChoice:stRien);
 fluxDeclarer('adChoixDeCombat', adChoixDeCombat);
@@ -4496,25 +4584,52 @@ function proposeAccord(nodeId){
   if(G.phase!=='actions')return;const node=NODES[nodeId];const p=G.player;
   if(p.acLeft<1){addLog('⚠️ Accord : besoin 1 AC.','red');return;}
   if((p.res.materials||0)<2){addLog('⚠️ Accord : besoin 2<i class=ri-materials></i> (donnés à l\'autre nation).','red');return;}
-  // Vérifier que l'IA propriétaire accepte (pas en guerre, tension < 7)
-  const accordAi=G.ais.find(ai=>ai.colonies.some(c=>c.nodeId===nodeId));
-  if(accordAi){
-    const atWar=_warBetween(_moiId(),accordAi.civ.id);
-    const tension=tensEff('player',accordAi.civ.id);
-    if(atWar){addLog('⚠️ '+accordAi.civ.emoji+' '+accordAi.civ.name+' refuse l\'accord — vous êtes en guerre !','red');return;}
-    if(tension>=7){addLog('⚠️ '+accordAi.civ.emoji+' '+accordAi.civ.name+' refuse l\'accord — tensions trop élevées ('+tension+'/10 ≥ 7).','red');return;}
+  /* ⚠️ UN ACCORD SE PROPOSE, IL NE S'IMPOSE PAS — ET CELA VAUT POUR TOUTES LES NATIONS.
+     Avant : le propriétaire était cherché parmi `G.ais` seulement. Sur la colonie d'un autre
+     HUMAIN, il n'y avait donc AUCUN propriétaire : aucune vérification, aucune demande, et
+     l'accord se concluait tout seul. C'est exactement ce que Marc a vécu — « l'autre joueur ne
+     peut pas cliquer sur accepter ».
+     Maintenant : on trouve le propriétaire quel qu'il soit, et on lui DEMANDE. Un humain reçoit
+     une fenêtre ; une IA décide par `accordAcceptable`, la même règle que celle qui s'appliquerait
+     à un joueur. Rien n'est prélevé tant que la réponse n'est pas arrivée. */
+  const proprio=ownerNation(nodeId);
+  if(proprio && proprio!==p){
+    if(_decisionActive() && proprio._isAI===false){
+      addLog('🤝 '+p.civ.emoji+' '+p.civ.name+' propose un accord commercial à '
+        +proprio.civ.emoji+' '+proprio.civ.name+' sur '+(node?node.name:nodeId)+' — en attente de sa réponse…','dim');
+      fluxDonnees().accordProp=p.civ.id;
+      fluxDonnees().accordPart=proprio.civ.id;
+      fluxDonnees().accordNode=nodeId;
+      _emitRemote('accord_request', proprio,
+        {title:'🤝 Proposition d\'accord commercial',
+         from:p.civ.id, fromName:p.civ.emoji+' '+p.civ.name,
+         texte:p.civ.emoji+' '+p.civ.name+' te propose un ACCORD COMMERCIAL sur '+(node?node.name:nodeId)
+              +' : +1<i class=ri-materials></i> +1<i class=ri-morale></i>/tour pour chacun, tension −3, '
+              +'et il te donne 2<i class=ri-materials></i> tout de suite.',
+         options:[{id:'yes',name:'✅ Accepter l\'accord'},{id:'no',name:'❌ Refuser'}]},
+        'stAccordDirectReponse', null);
+      return;   // ⚠️ on ne prélève RIEN ici : tout se fait à la réponse
+    }
+    const avis=accordAcceptable(proprio,p);
+    if(!avis.ok){
+      addLog('⚠️ '+proprio.civ.emoji+' '+proprio.civ.name+' refuse l\'accord — '+avis.raison+'.','red');
+      return;
+    }
   }
+  /* `accordAi` (qui ne pouvait être qu'une IA) est devenu `proprio` : la SUITE de cette fonction
+     s'en servait pour verser les 2🪨 et baisser la tension. Avec un propriétaire humain, elle ne
+     versait donc rien et ne calmait rien — la moitié invisible du même défaut. */
   undoStack=[];p.acLeft-=1;p.res.materials-=2;p.spentThisTurn+=3;
-  if(accordAi)accordAi.res.materials=(accordAi.res.materials||0)+2; // le matériau est DONNÉ à l'autre nation
+  if(proprio)proprio.res.materials=(proprio.res.materials||0)+2; // le matériau est DONNÉ à l'autre nation
   G.commercialAccords.push(nodeId);
   let tensionMsg='';
-  if(accordAi){
-    const pPrev=getTens('player',accordAi.civ.id), aPrev=getTens(accordAi.civ.id,'player');
-    setTens('player',accordAi.civ.id,Math.max(0,pPrev-3));
-    setTens(accordAi.civ.id,'player',Math.max(0,aPrev-3)); // −3 des DEUX côtés
-    tensionMsg=' — Tension −3 des deux côtés vs '+accordAi.civ.name;
+  if(proprio){
+    const pPrev=getTens('player',proprio.civ.id), aPrev=getTens(proprio.civ.id,'player');
+    setTens('player',proprio.civ.id,Math.max(0,pPrev-3));
+    setTens(proprio.civ.id,'player',Math.max(0,aPrev-3)); // −3 des DEUX côtés
+    tensionMsg=' — Tension −3 des deux côtés vs '+proprio.civ.name;
   }
-  addLog('🤝 Accord Commercial sur '+node.name+' — 2<i class=ri-materials></i> donnés à '+(accordAi?accordAi.civ.name:'l\'autre nation')+tensionMsg,'gold');
+  addLog('🤝 Accord Commercial sur '+node.name+' — 2<i class=ri-materials></i> donnés à '+(proprio?proprio.civ.name:'l\'autre nation')+tensionMsg,'gold');
   addAction('🤝','Accord '+node.name,1,{materials:2},'2 matériaux donnés'+tensionMsg);
   closePopup();render();
 }
@@ -5532,8 +5647,11 @@ function _doAITurnInterne(aiPlayer,oneShot){
   function tryColonize(){
     if(ai.acLeft<1)return false;
     const owned=new Set(ai.colonies.map(c=>c.nodeId));
-    const pOwned=new Set();for(const _h of allPlayers()){if(_h!==ai&&_h._isAI===false)for(const _c of _h.colonies)pOwned.add(_c.nodeId);} // nœuds des nations humaines (colonisables seulement si accord commercial)
-    const otherAiOwned=new Set();for(const _o of G.ais){if(_o!==ai)for(const _c of _o.colonies)otherAiOwned.add(_c.nodeId);} // ne pas coloniser un nœud déjà occupé par une AUTRE nation
+    /* Les nœuds occupés par une AUTRE nation, humaine ou IA — même règle pour tout le monde.
+       Avant : deux listes séparées, l'une pour « les humains », l'autre construite depuis `G.ais`
+       (donc dépendante de qui était actif). Une seule liste, un seul critère : « ce n'est pas moi ». */
+    const pOwned=new Set();for(const _h of allPlayers()){if(_h!==ai)for(const _c of _h.colonies)pOwned.add(_c.nodeId);}
+    const otherAiOwned=pOwned;
     if(!ai.recentLosses)ai.recentLosses=new Map();
     for(const[nid,until]of ai.recentLosses)if(G.turn>=until)ai.recentLosses.delete(nid);
     // Trouver le meilleur nœud adjacent selon le score (pas juste le premier)
@@ -5672,14 +5790,16 @@ function _doAITurnInterne(aiPlayer,oneShot){
       // automatique, le joueur ne pouvait jamais combattre — bug Marc après refus de la Sphère de Dyson).
       // Elle se contente de VOULOIR la paix ; le joueur tranchera dans la fenêtre de fin de tour (accepter ou
       // poursuivre, avec sa fenêtre d'attaque).
-      if(_e && _e._isAI===false){
-        ai._wantsPeace=true;
-        // Ne pas afficher ce message si « ai » est en fait la nation du JOUEUR (repli auto après déconnexion) :
-        // on lisait « 🌍 Terriens cherche la paix » alors que Terriens, c'est le joueur lui-même.
-        if(ai._isAI!==false)addLog('🕊️ '+ai.civ.emoji+' '+ai.civ.name+' cherche la paix — à toi de décider en fin de tour.','dim');
-        return;
-      }
-      if(typeof endWar==='function')endWar(ai.civ.id);
+      /* ⚠️ LA PAIX SE DEMANDE, ELLE NE SE DÉCRÈTE PAS — ET CELA VAUT ENTRE IA AUSSI.
+         Avant, une IA qui ne pouvait pas gagner mettait fin à la guerre TOUTE SEULE (« paix
+         blanche ») dès que son adversaire était une autre IA ; face à un humain, elle devait
+         demander. Deux poids, deux mesures : les guerres entre IA s'arrêtaient d'elles-mêmes,
+         celles contre un joueur non. Désormais elle VEUT la paix, quel que soit l'adversaire ;
+         c'est l'adversaire qui tranche (fenêtre pour un humain, `aiWarPolicy` pour une IA). */
+      ai._wantsPeace=true;
+      if(ai._isAI!==false) addLog('🕊️ '+ai.civ.emoji+' '+ai.civ.name+' cherche la paix avec '
+        +(_e?_e.civ.emoji+' '+_e.civ.name:'son adversaire')+'.','dim');
+      return;
       addLog('🕊️ '+ai.civ.emoji+' '+ai.civ.name+' propose la paix.','dim');
       return;
     }
