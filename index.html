@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-12 · v9.48';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-14 · v9.55';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -433,6 +433,11 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
 .inv-opt-emoji{font-size:1.7em;margin-bottom:5px}
 .inv-opt-name{font-size:.75em;font-weight:700;color:#c8d8f8;margin-bottom:3px}
 .inv-opt-benefit{font-size:.62em;color:#66cc66;line-height:1.3;margin-bottom:3px}
+/* Intertitre de la liste d'espionnage : une ligne par nation espionnée. Sans lui, la liste était
+   plate et une même nation revenait à deux endroits (retour de Marc, partie 0C10). */
+.esp-groupe{font-size:.68em;font-weight:700;color:#ffd479;letter-spacing:.03em;text-transform:uppercase;
+  margin:10px 0 5px;padding:4px 6px;border-left:3px solid #ffd479;background:rgba(255,212,121,.07);border-radius:0 4px 4px 0}
+.esp-groupe:first-child{margin-top:0}
 .inv-opt-cost{font-size:.6em;color:#ff8866;line-height:1.3}
 /* Route token modal */
 #route-token-modal{position:fixed;inset:0;background:rgba(4,4,18,.82);backdrop-filter:blur(5px);z-index:395;display:flex;align-items:center;justify-content:center}

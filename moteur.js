@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-12 · v9.48';
+const SOLAR_BUILD_MOTEUR = '2026-08-14 · v9.55';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -83,7 +83,7 @@ const CIVS={
   jupiteriens:{id:'jupiteriens',name:'Jupitériens',emoji:'🟠',color:'#FF9800',
     start:{energy:5,materials:2,science:3,morale:3},startForce:4,home:'io',
     techBonus:'mines_energie',
-    passive:'+1<i class=ri-energy></i>/tour dès le premier tour (réacteurs joviens). Base : Io.',
+    passive:'Base sur Io, le monde le plus riche en <i class=ri-energy></i> du système (3<i class=ri-energy></i>/tour dès le premier tour).',
     active:{name:'Forge Orbitale',desc:'Améliore une colonie joviène (Io/Europe/Ganymède/Callisto) 1→2 (0 AC, −1<i class=ri-materials></i> −1<i class=ri-energy></i>)',ac:0,cost:{materials:1,energy:1}}},
   ceinturiens:{id:'ceinturiens',name:'Ceinturiens',emoji:'☠️',color:'#AB47BC',
     start:{energy:6,materials:4,science:1,morale:2},startForce:3,home:'eris',
@@ -101,13 +101,13 @@ const NODES={
   // upgradeCost:'standard'=2AC / 'remote'=3AC | strategic:'full'=+1jeton/tour / 'half'=50%
   // Colonisation colonie 'remote' → −1<i class=ri-morale></i> one-time | Niv.1 → +1<i class=ri-morale></i> toutes | Niv.2 → +1<i class=ri-morale></i> si attractive, +2<i class=ri-morale></i> Callisto
   // ATTRACTIVE_COLS=['lune','europe','titan','encelade','triton']
-  lune:{id:'lune',name:'Lune',emoji:'🌕',color:'#B0BEC5',type:'moon',baseVP:2,maxLv:3,r:15,upgradeCost:'standard',strategic:'half',res:{energy:1,materials:2},x:420,y:475,conn:['phobos','ceres','deimos'],desc:'Satellite terrestre. Vue sur la Terre — habitat confortable.'},
-  phobos:{id:'phobos',name:'Phobos',emoji:'⚫',color:'#8D6E63',type:'moon',baseVP:2,maxLv:3,r:11,upgradeCost:'standard',strategic:'half',res:{energy:1,materials:2},x:552,y:282,conn:['lune','deimos','ceres'],desc:'Lune intérieure de Mars. Proche des routes de propulsion.'},
+  lune:{id:'lune',name:'Lune',emoji:'🌕',color:'#B0BEC5',type:'moon',baseVP:2,maxLv:3,r:15,upgradeCost:'standard',strategic:'half',res:{energy:1,materials:2},x:420,y:475,conn:['phobos','ceres','deimos','io','vesta'],desc:'Satellite terrestre. Vue sur la Terre — habitat confortable.'},
+  phobos:{id:'phobos',name:'Phobos',emoji:'⚫',color:'#8D6E63',type:'moon',baseVP:2,maxLv:3,r:11,upgradeCost:'standard',strategic:'half',res:{energy:1,materials:2},x:552,y:282,conn:['lune','deimos','ceres','vesta'],desc:'Lune intérieure de Mars. Proche des routes de propulsion.'},
   deimos:{id:'deimos',name:'Déimos',emoji:'🟤',color:'#795548',type:'moon',baseVP:1,maxLv:3,r:12,upgradeCost:'remote',strategic:null,res:{materials:1},x:452,y:322,conn:['phobos','lune'],desc:'Petite lune aride de Mars. Conditions difficiles.'},
   ceres:{id:'ceres',name:'Cérès',emoji:'⬜',color:'#CFD8DC',type:'dwarf_planet',baseVP:3,maxLv:3,r:21,upgradeCost:'standard',strategic:'full',res:{energy:1,materials:3},x:625,y:548,conn:['lune','phobos','vesta','io','ganymede'],desc:'Hub de la ceinture d\'astéroïdes. Carrefour stratégique des routes.'},
-  vesta:{id:'vesta',name:'Vesta',emoji:'🪨',color:'#78909C',type:'asteroid',baseVP:2,maxLv:3,r:17,upgradeCost:'remote',strategic:null,res:{materials:2},x:715,y:212,conn:['ceres','ganymede'],desc:'Grand astéroïde métallique. Éloigné des routes principales.'},
-  io:{id:'io',name:'Io',emoji:'🟡',color:'#FFD54F',type:'moon',baseVP:3,maxLv:3,r:15,upgradeCost:'standard',strategic:'half',res:{energy:3,materials:1},x:862,y:328,conn:['ceres','europe','ganymede'],desc:'Lune volcanique. Énergie géothermique intense.'},
-  europe:{id:'europe',name:'Europe',emoji:'🔵',color:'#42a5f5',type:'moon',baseVP:4,maxLv:3,r:15,upgradeCost:'remote',strategic:null,res:{energy:1,materials:1},x:1060,y:352,conn:['io','callisto','titan'],desc:'Océan sous-glaciaire. Paysage saisissant sous Jupiter. Radiation intense.'},
+  vesta:{id:'vesta',name:'Vesta',emoji:'🪨',color:'#78909C',type:'asteroid',baseVP:2,maxLv:3,r:17,upgradeCost:'remote',strategic:null,res:{materials:2},x:715,y:212,conn:['ceres','ganymede','phobos','io','europe','lune'],desc:'Grand astéroïde métallique. Éloigné des routes principales.'},
+  io:{id:'io',name:'Io',emoji:'🟡',color:'#FFD54F',type:'moon',baseVP:3,maxLv:3,r:15,upgradeCost:'standard',strategic:'half',res:{energy:3,materials:1},x:862,y:328,conn:['ceres','europe','ganymede','vesta','lune'],desc:'Lune volcanique. Énergie géothermique intense.'},
+  europe:{id:'europe',name:'Europe',emoji:'🔵',color:'#42a5f5',type:'moon',baseVP:4,maxLv:3,r:15,upgradeCost:'remote',strategic:null,res:{energy:1,materials:1},x:1060,y:352,conn:['io','callisto','titan','vesta'],desc:'Océan sous-glaciaire. Paysage saisissant sous Jupiter. Radiation intense.'},
   ganymede:{id:'ganymede',name:'Ganymède',emoji:'🟤',color:'#A1887F',type:'moon',baseVP:4,maxLv:3,r:18,upgradeCost:'standard',strategic:'full',res:{energy:1,materials:2},x:922,y:432,conn:['io','vesta','callisto','titan','ceres'],desc:'Plus grande lune du système. Hub jovien majeur, carrefour de routes.'},
   callisto:{id:'callisto',name:'Callisto',emoji:'🔘',color:'#607D8B',type:'moon',baseVP:3,maxLv:3,r:16,upgradeCost:'standard',strategic:'half',res:{energy:1,materials:2},x:1052,y:425,conn:['europe','ganymede','titan'],desc:'Hors de la radiation jovienne. Meilleur habitat humain du système jovien.'},
   /* ⚠️ « STATION JUPITER » N'EST PLUS QU'UN DESSIN (2026-08-07, décision de Marc).
@@ -130,7 +130,7 @@ const NODES={
   encelade:{id:'encelade',name:'Encelade',emoji:'❄️',color:'#E0F7FA',type:'moon',baseVP:3,maxLv:3,r:14,upgradeCost:'remote',strategic:null,res:{energy:1,materials:1},x:1325,y:580,conn:['titan','triton'],desc:'Geysers spectaculaires. Lune éloignée dans l\'ombre de Saturne.'},
   triton:{id:'triton',name:'Triton',emoji:'💜',color:'#7C4DFF',type:'moon',baseVP:4,maxLv:3,r:16,upgradeCost:'remote',strategic:'half',res:{energy:1,materials:1},x:1745,y:620,conn:['titan','pluto','eris','encelade'],desc:'Lune rétrograde de Neptune. Paysage unique — carrefour vers Kuiper.'},
   pluto:{id:'pluto',name:'Pluton',emoji:'🩶',color:'#90A4AE',type:'dwarf_planet',baseVP:4,maxLv:3,r:15,upgradeCost:'remote',strategic:null,res:{materials:1},x:1590,y:215,conn:['triton','eris','titan'],desc:'Porte de la ceinture de Kuiper. Très éloigné, conditions extrêmes.'},
-  eris:{id:'eris',name:'Éris',emoji:'⬡',color:'#B0BEC5',type:'dwarf_planet',baseVP:5,maxLv:3,r:17,upgradeCost:'remote',strategic:null,res:{materials:1},x:1790,y:190,conn:['pluto','triton'],desc:'Aux confins du système solaire. Ressources rares mais VP élevés.'},
+  eris:{id:'eris',name:'Éris',emoji:'⬡',color:'#B0BEC5',type:'dwarf_planet',baseVP:5,maxLv:3,r:17,upgradeCost:'remote',strategic:null,res:{materials:1,energy:1},x:1790,y:190,conn:['pluto','triton'],desc:'Aux confins du système solaire. Avant-poste visible d\'un réseau de colonies dispersées dans la Ceinture — VP élevés.'},
 };
 const TYPE_COLORS={economic:'#4CAF50',military:'#ef5350',technology:'#42a5f5',colonization:'#FF9800',government:'#AB47BC',civique:'#AB47BC',militaire:'#ef5350'};
 // Cartes disposant d'une illustration servie dans assets/cards/<id>.png (ajouter l'id au fil des illustrations)
@@ -508,7 +508,6 @@ function _evAccordAuto(kind,G){
 function _evEndWarWith(aiId,turns){
   const i=_warIndexBetween(_moiId(),aiId);if(i>=0)G.wars.splice(i,1);
   if(typeof halveTensions==='function')halveTensions('player',aiId);
-  G._peaceCooldown=G._peaceCooldown||{};G._peaceCooldown[aiId]=G.turn+(turns||3);
   if(typeof syncWarState==='function')syncWarState();
 }
 function _evOverlay(html){
@@ -520,7 +519,18 @@ function _evOverlay(html){
 }
 function _evCloseOverlay(){const m=document.getElementById('event-choice-modal');if(m)m.style.display='none';}
 function _evMyStats(){var p=G.player;return '<div style="font-size:.78em;color:#dfe8ff;background:#0e1630;border:1px solid #2a3a6a;border-radius:8px;padding:6px 9px;margin-bottom:8px"><b>'+p.civ.emoji+' '+p.civ.name+' (toi)</b> — 🏆 '+calcVP(p).total+' VP · ⚔️ '+p.forceTokens+' · '+(p.res.materials||0)+'<i class=ri-materials></i> '+(p.res.energy||0)+'<i class=ri-energy></i> '+(p.res.morale||0)+'<i class=ri-morale></i></div>';}
-function _evAiInfo(ai){var pf=perceivedForce(G.player,ai);var s='🏆 '+calcVP(ai).total+' VP · ⚔️ '+pf.val+(pf.exact?'':'±3');if(getIntelLevel(G.player)>=2)s+=' · '+(ai.res.materials||0)+'<i class=ri-materials></i> '+(ai.res.energy||0)+'<i class=ri-energy></i> '+(ai.res.morale||0)+'<i class=ri-morale></i>';return s;}
+/* ⚠️ « CE QUE JE SAIS D'ELLE » DÉPEND DE QUI REGARDE. Cette fiche lisait `G.player` : avec
+   plusieurs humains interrogés EN MÊME TEMPS, tous voyaient la force perçue et le niveau de
+   renseignement de la nation active, pas les leurs. L'observateur est maintenant explicite. */
+function _evAiInfo(ai,obs){var _o=obs||G.player;var pf=perceivedForce(_o,ai);var s='🏆 '+calcVP(ai).total+' VP · ⚔️ '+pf.val+(pf.exact?'':'±3');if(getIntelLevel(_o)>=2)s+=' · '+(ai.res.materials||0)+'<i class=ri-materials></i> '+(ai.res.energy||0)+'<i class=ri-energy></i> '+(ai.res.morale||0)+'<i class=ri-morale></i>';return s;}
+/* Les nations avec qui NAT peut encore signer — humaines comprises.
+   ⚠️ L'ancienne liste partait de `G.ais` : deux joueurs humains ne pouvaient donc JAMAIS se
+   proposer d'accord pendant un sommet, l'un n'apparaissait simplement pas dans la liste de l'autre. */
+function _evCommCandidats(nat){
+  return allPlayers().filter(function(o){
+    return o!==nat && !o.colonies.some(function(c){return G.commercialAccords.includes(c.nodeId);});
+  });
+}
 /* `onDone` est un NOM de suite (bloc @flux) : il se sauvegarde, une fonction non. */
 function showEventChoiceModal(ev,onDone){
   if(!ev){ if(onDone)fluxAppeler(onDone); return; }
@@ -548,7 +558,7 @@ function showCommEventModal(onDone){
 function _evAccordConclude(prop,part){
   if(!prop||!part)return;
   const col=part.colonies.find(function(c){return c.nodeId!==part.civ.home;})||part.colonies[0];
-  if(col&&!G.commercialAccords.includes(col.nodeId))G.commercialAccords.push(col.nodeId);
+  if(col)_accordEnregistrer(col.nodeId,prop,part);   // les DEUX signataires sont enregistrés
   const _w=(G.wars||[]).find(function(w){return (w.a===prop.civ.id&&w.b===part.civ.id)||(w.a===part.civ.id&&w.b===prop.civ.id);});
   if(_w&&typeof _evEndWarWith==='function')_evEndWarWith(part.civ.id,3);
   setTens(prop.civ.id,part.civ.id,Math.max(0,getTens(prop.civ.id,part.civ.id)-3));
@@ -564,13 +574,18 @@ function _evAccordConclude(prop,part){
    (accepter / refuser), et ce n'est qu'après sa réponse que l'accord est conclu. Il garde ensuite
    son propre tour de choix parmi les nations restantes. Les IA répondent selon la règle existante
    (refus si le proposant est trop en avance et qu'elles ne sont pas en difficulté). */
-function _evCommPick(aiId){
+function _evCommPick(aiId,propId){
+  const _simul=Array.isArray(fluxDonnees().accordsRestants);   // sommet simultané en cours ?
   const nomSuite=fluxDonnees().suiteAccord;   // le NOM, avant que `_accordSuite()` ne le consomme
-  const done=_accordSuite()||_evCommDone;_evCommDone=null;_evCloseOverlay();
-  const prop=G.player; // le proposant est la nation active AU MOMENT du choix : on le capture
-  if(!aiId){addLog('🤝 '+G.player.civ.emoji+' '+G.player.civ.name+' — sommet commercial : aucun accord signé.','dim');_appelerSuite(done);return;}
+  const done=_simul?null:(_accordSuite()||_evCommDone); if(!_simul)_evCommDone=null; _evCloseOverlay();
+  /* ⚠️ LE PROPOSANT N'EST PLUS « LA NATION ACTIVE ». Quand les joueurs sont interrogés en même
+     temps, `G.player` ne désigne plus celui dont on traite la réponse : deux réponses arrivant
+     coup sur coup auraient été attribuées à la même nation. Il est donc passé explicitement. */
+  const prop=(propId&&allPlayers().find(function(n){return n.civ.id===propId;}))||G.player;
+  const _suite=function(){ if(_simul)_accordsVerifierFin(); else _appelerSuite(done); };
+  if(!aiId){addLog('🤝 '+prop.civ.emoji+' '+prop.civ.name+' — sommet commercial : aucun accord signé.','dim');_suite();return;}
   const ai=(typeof allPlayers==='function'?allPlayers():G.ais).find(function(a){return a&&a.civ&&a.civ.id===aiId;});
-  if(!ai){_appelerSuite(done);return;}
+  if(!ai){_suite();return;}
   // Partenaire HUMAIN en ligne → on lui DEMANDE son accord.
   if(_decisionActive()&&!ai._isAI){
     addLog('🤝 '+prop.civ.emoji+' '+prop.civ.name+' propose un accord commercial à '+ai.civ.emoji+' '+ai.civ.name+' — en attente de sa réponse…','dim');
@@ -584,9 +599,15 @@ function _evCommPick(aiId){
        Une proposition d'accord peut rester en attente longtemps (le partenaire est peut-être parti
        dîner) : si le serveur redémarre entre-temps, une fermeture est perdue et la partie se fige
        sans un mot. Deux identifiants de nation, eux, se sauvegardent. */
-    fluxDonnees().accordProp=prop.civ.id;
-    fluxDonnees().accordPart=ai.civ.id;
-    fluxDonnees().suiteAccord=nomSuite;   // remise en place : la suite du tour se joue APRÈS la réponse
+    /* ⚠️ UNE SEULE PAIRE NE SUFFIT PLUS. `accordProp`/`accordPart` ne retenaient QU'UNE
+       proposition : avec des sommets simultanés, deux joueurs peuvent proposer en même temps et la
+       seconde proposition écrasait la première, qui restait sans réponse pour toujours. On tient
+       une LISTE de paires — deux identifiants par entrée, donc parfaitement sauvegardable. */
+    const _d=fluxDonnees();
+    _d.accordsPaires=_d.accordsPaires||[];
+    _d.accordsPaires.push({prop:prop.civ.id, part:ai.civ.id});
+    _d.accordProp=prop.civ.id; _d.accordPart=ai.civ.id;   // compat : parties enregistrées en cours
+    if(!_simul)_d.suiteAccord=nomSuite;   // la suite du tour se joue APRÈS la réponse
     return;
   }
   /* Partenaire IA : MÊME RÈGLE que celle qu'on appliquerait à un joueur (`accordAcceptable`).
@@ -598,16 +619,20 @@ function _evCommPick(aiId){
       +' — '+avis.raison+'.','red');
     if(typeof _emitNotice==='function')_emitNotice('accord_result', prop,
       {title:'🤝 Accord refusé', body:ai.civ.emoji+' '+ai.civ.name+' a refusé : '+avis.raison+'.'}, 'stRien');
-    _appelerSuite(done);return;
+    _suite();return;
   }
   _evAccordConclude(prop,ai);
-  _appelerSuite(done);
+  _suite();
 }
 /* ---- SUITES NOMMÉES DES FENÊTRES D'ACCORD (elles étaient des fermetures) ----
    Une fermeture ne se sauvegarde pas : une partie enregistrée pendant un sommet commercial ou
    diplomatique ne repartait pas. Le message d'erreur nommait la question perdue, mais c'est tout.
    Ces trois suites portent maintenant un nom, comme le reste du flux. */
-function stAccordCommChoisi(ans){ _evCommPick(ans&&ans.aiId?ans.aiId:null); }
+function stAccordCommChoisi(ans,civId){
+  const qui=civId||(ans&&ans._civ)||(G.player&&G.player.civ&&G.player.civ.id);
+  _accordsMarquerRepondu(qui);
+  _evCommPick(ans&&ans.aiId?ans.aiId:null, qui);
+}
 /* Réponse à un accord proposé PAR CLIC SUR UNE COLONIE (hors événement). Suite NOMMÉE : une
    proposition peut rester en attente longtemps, et une fermeture ne survivrait pas à une
    sauvegarde. Le coût n'est prélevé qu'ici, à l'acceptation — pas à la proposition. */
@@ -633,7 +658,7 @@ function stAccordDirectReponse(ans){
   }
   prop.acLeft-=1; prop.res.materials-=2; prop.spentThisTurn=(prop.spentThisTurn||0)+3;
   part.res.materials=(part.res.materials||0)+2;
-  if(nodeId && !G.commercialAccords.includes(nodeId)) G.commercialAccords.push(nodeId);
+  _accordEnregistrer(nodeId,prop,part);
   setTens(prop.civ.id,part.civ.id,Math.max(0,getTens(prop.civ.id,part.civ.id)-3));
   setTens(part.civ.id,prop.civ.id,Math.max(0,getTens(part.civ.id,prop.civ.id)-3));
   if(typeof updateConnections==='function'){updateConnections(prop);updateConnections(part);}
@@ -643,10 +668,55 @@ function stAccordDirectReponse(ans){
   if(typeof _emitNotice==='function')_emitNotice('accord_result', prop,
     {title:'🤝 Accord accepté', body:part.civ.emoji+' '+part.civ.name+' a ACCEPTÉ ton accord commercial.'}, 'stRien');
 }
-function stAccordReponse(ans){
+/* RÉPONSE À UN PACTE DE NON-AGRESSION PROPOSÉ À UN JOUEUR.
+   Suite NOMMÉE : une proposition peut rester en attente longtemps, et une fermeture ne survivrait
+   pas à une sauvegarde. Le coût n'est prélevé QU'ICI, à l'acceptation — comme pour l'accord
+   commercial direct. */
+function stPacteReponse(ans,civId){
   const d=fluxDonnees();
-  const prop=allPlayers().find(p=>p.civ.id===d.accordProp);
-  const part=allPlayers().find(p=>p.civ.id===d.accordPart);
+  const qui=civId||(ans&&ans._civ)||null;
+  const paires=d.accordsPaires||[];
+  const i=paires.findIndex(x=>x&&x.pacte&&x.part===qui);
+  const paire=i>=0?paires[i]:null;
+  if(i>=0)paires.splice(i,1);
+  const prop=paire?allPlayers().find(p=>p.civ.id===paire.prop):null;
+  const part=paire?allPlayers().find(p=>p.civ.id===paire.part):null;
+  const oui=!!(ans&&(ans.value==='yes'||ans.targetId==='yes'||ans.id==='yes'||ans.accept===true));
+  if(prop&&part){
+    if(!oui){
+      addLog('🕊️ '+part.civ.emoji+' '+part.civ.name+' REFUSE le pacte de '+prop.civ.emoji+' '+prop.civ.name+'.','red');
+      if(typeof _emitNotice==='function')_emitNotice('accord_result', prop,
+        {title:'🕊️ Pacte refusé', body:part.civ.emoji+' '+part.civ.name+' a refusé ton pacte. Tu ne paies rien.'}, 'stRien');
+    }else if((prop.res.materials||0)<6){
+      addLog('🕊️ '+prop.civ.emoji+' '+prop.civ.name+' n\'a plus les 6<i class=ri-materials></i> du pacte.','red');
+    }else{
+      prop.res.materials-=6;
+      const _i=_warIndexBetween(prop.civ.id,part.civ.id);
+      if(_i>=0){G.wars.splice(_i,1);halveTensions(prop.civ.id,part.civ.id);if(typeof syncWarState==='function')syncWarState();}
+      G._nonAgg=G._nonAgg||{};G._nonAgg[part.civ.id]=G.turn+4;
+      setTens(prop.civ.id,part.civ.id,0);setTens(part.civ.id,prop.civ.id,0);
+      const cap=getResCapFor(prop).morale, cap2=getResCapFor(part).morale;
+      prop.res.morale=Math.min(cap,(prop.res.morale||0)+1);
+      part.res.morale=Math.min(cap2,(part.res.morale||0)+1);
+      addLog('🕊️ Pacte de non-agression : '+prop.civ.emoji+' '+prop.civ.name+' ↔ '+part.civ.emoji+' '+part.civ.name+' (4 tours).','gold');
+      if(typeof _emitNotice==='function')_emitNotice('accord_result', prop,
+        {title:'🕊️ Pacte accepté', body:part.civ.emoji+' '+part.civ.name+' a ACCEPTÉ ton pacte de non-agression (4 tours).'}, 'stRien');
+    }
+  }
+  if(Array.isArray(d.accordsRestants)) _accordsVerifierFin();
+}
+function stAccordReponse(ans,civId){
+  const d=fluxDonnees();
+  /* On retrouve LA paire dont ce répondant est le partenaire — plusieurs propositions peuvent
+     être en vol en même temps. Les anciens champs uniques servent de repli pour une partie
+     enregistrée avant ce changement. */
+  const qui=civId||(ans&&ans._civ)||d.accordPart;
+  const paires=d.accordsPaires||[];
+  const i=paires.findIndex(x=>x&&x.part===qui);
+  const paire=i>=0?paires[i]:{prop:d.accordProp,part:d.accordPart};
+  if(i>=0)paires.splice(i,1);
+  const prop=allPlayers().find(p=>p.civ.id===paire.prop);
+  const part=allPlayers().find(p=>p.civ.id===paire.part);
   d.accordProp=null; d.accordPart=null;
   const ok=!!(ans&&(ans.value==='yes'||ans.targetId==='yes'||ans.id==='yes'||ans.accept===true));
   if(prop&&part){
@@ -658,12 +728,15 @@ function stAccordReponse(ans){
        body:(ok?part.civ.emoji+' '+part.civ.name+' a ACCEPTÉ ton accord commercial — +3 VP chacun, tension −3.'
               :part.civ.emoji+' '+part.civ.name+' a REFUSÉ ton accord commercial.')}, 'stRien');
   }
-  _appelerSuite(_accordSuite());
+  if(Array.isArray(d.accordsRestants)) _accordsVerifierFin();
+  else _appelerSuite(_accordSuite());
 }
-function stDiploChoisi(ans){
+function stDiploChoisi(ans,civId){
   _evDiploSel={};
   if(ans&&ans.selected){for(var i=0;i<ans.selected.length;i++)_evDiploSel[ans.selected[i]]=true;}
-  _evDiploConfirm();
+  const qui=civId||(ans&&ans._civ)||(G.player&&G.player.civ&&G.player.civ.id);
+  _accordsMarquerRepondu(qui);
+  _evDiploConfirm(qui);
 }
 function showDiploEventModal(onDone){
   fluxDonnees().suiteAccord=(typeof onDone==='string'&&onDone)?onDone:null; _evDiploDone=onDone;_evDiploSel={};
@@ -680,40 +753,72 @@ function showDiploEventModal(onDone){
 }
 function _evDiploToggle(aiId,on){_evDiploSel[aiId]=on;}
 function _evDiploNone(){_evDiploSel={};_evDiploConfirm();}
-function _evDiploConfirm(){
-  const done=_accordSuite()||_evDiploDone;_evDiploDone=null;
-  for(const ai of G.ais){setTens('player',ai.civ.id,Math.max(0,getTens('player',ai.civ.id)-5));setTens(ai.civ.id,'player',Math.max(0,getTens(ai.civ.id,'player')-5));}
+function _evDiploConfirm(propId){
+  /* ⚠️ LE SIGNATAIRE N'EST PLUS « LA NATION ACTIVE ». Cette fonction lisait `G.player` d'un bout à
+     l'autre : interrogés en même temps, deux joueurs auraient signé leurs pactes sur le dos du
+     même compte en banque. Le proposant est passé explicitement. */
+  const _simul=Array.isArray(fluxDonnees().accordsRestants);
+  const prop=(propId&&allPlayers().find(function(n){return n.civ.id===propId;}))||G.player;
+  const done=_simul?null:(_accordSuite()||_evDiploDone); if(!_simul)_evDiploDone=null;
+  const autres=allPlayers().filter(function(n){return n!==prop;});
+  for(const o of autres){setTens(prop.civ.id,o.civ.id,Math.max(0,getTens(prop.civ.id,o.civ.id)-5));setTens(o.civ.id,prop.civ.id,Math.max(0,getTens(o.civ.id,prop.civ.id)-5));}
   let made=0;
-  for(const ai of G.ais){
-    if(!_evDiploSel[ai.civ.id])continue;
-    const war=_warBetween(_moiId(),ai.civ.id);
+  for(const o of autres){
+    if(!_evDiploSel[o.civ.id])continue;
+    const war=_warBetween(prop.civ.id,o.civ.id);
     const needM=6; // coût uniforme : 6 matériaux par nation (plus de surcoût énergie en cas de guerre)
-    if((G.player.res.materials||0)<needM){addLog('🕊️ Pas assez de matériaux pour le pacte avec '+ai.civ.name+' (6 requis).','red');continue;}
+    if((prop.res.materials||0)<needM){addLog('🕊️ '+prop.civ.emoji+' '+prop.civ.name+' : pas assez de matériaux pour le pacte avec '+o.civ.name+' (6 requis).','red');continue;}
     /* ⚠️ UN PACTE SE SIGNE À DEUX. Il s'appliquait sans que l'autre nation ait son mot à dire :
        on payait 6🪨 et le pacte existait, même si la nation visée n'en voulait pas.
        Elle peut désormais refuser, selon la même règle qu'un accord commercial — et l'on ne paie
        pas un pacte refusé. (Un partenaire HUMAIN devrait recevoir une fenêtre : c'est le chantier
-       de diplomatie que Marc a mis à demain ; en attendant, la règle vaut au moins pour les IA.) */
-    const _avis=accordAcceptable(ai,G.player);
-    if(!_avis.ok){
-      addLog('🕊️ '+ai.civ.emoji+' '+ai.civ.name+' REFUSE le pacte de non-agression — '+_avis.raison+'.','red');
+       de diplomatie que Marc a mis à plus tard ; en attendant, la règle vaut au moins pour les IA.) */
+    /* UN PARTENAIRE HUMAIN REÇOIT UNE VRAIE FENÊTRE.
+       ⚠️ IL N'EN AVAIT AUCUNE. Le pacte s'appliquait à lui sans qu'on lui demande : seules les IA
+       avaient le droit de refuser. C'est le dernier des trois accords où un joueur subissait la
+       décision d'un autre (Marc, 2026-08-14 : « il faut absolument que le multijoueur humain
+       tourne et qu'on ait plus ces bugs de ne pas être notifié des propositions »).
+       Rien n'est prélevé ici : les 6🪨 ne partent qu'à l'acceptation, dans `stPacteReponse`. */
+    if(_decisionActive()&&!o._isAI){
+      const _d2=fluxDonnees();
+      _d2.accordsPaires=_d2.accordsPaires||[];
+      _d2.accordsPaires.push({prop:prop.civ.id, part:o.civ.id, pacte:true});
+      addLog('🕊️ '+prop.civ.emoji+' '+prop.civ.name+' propose un pacte de non-agression à '
+        +o.civ.emoji+' '+o.civ.name+' — en attente de sa réponse…','dim');
+      _emitRemote('accord_request', o,
+        {title:'🕊️ Proposition de pacte de non-agression',
+         from:prop.civ.id, fromName:prop.civ.emoji+' '+prop.civ.name,
+         texte:prop.civ.emoji+' '+prop.civ.name+' te propose un PACTE DE NON-AGRESSION de 4 tours : '
+               +'tension remise à zéro entre vous, fin de la guerre s\'il y en a une, et +1<i class=ri-morale></i> pour chacun. '
+               +'C\'est lui qui paie les 6<i class=ri-materials></i>.',
+         options:[{id:'yes',name:'🕊️ Accepter le pacte'},{id:'no',name:'❌ Refuser'}]},
+        'stPacteReponse', null);
       continue;
     }
-    G.player.res.materials-=needM;
-    if(war)_evEndWarWith(ai.civ.id,4);
-    G._nonAgg=G._nonAgg||{};G._nonAgg[ai.civ.id]=G.turn+4;
-    G._peaceCooldown=G._peaceCooldown||{};G._peaceCooldown[ai.civ.id]=Math.max(G._peaceCooldown[ai.civ.id]||0,G.turn+4);
-    setTens('player',ai.civ.id,0);setTens(ai.civ.id,'player',0);
-    G.player.res.morale=Math.min(getResCapFor(G.player).morale,(G.player.res.morale||0)+1);made++;
-    addLog('🕊️ Pacte de non-agression avec '+ai.civ.emoji+' '+ai.civ.name+' (4 tours).','gold');
+    const _avis=accordAcceptable(o,prop);
+    if(!_avis.ok){
+      addLog('🕊️ '+o.civ.emoji+' '+o.civ.name+' REFUSE le pacte de non-agression de '+prop.civ.emoji+' '+prop.civ.name+' — '+_avis.raison+'.','red');
+      continue;
+    }
+    prop.res.materials-=needM;
+    if(war){const _i=_warIndexBetween(prop.civ.id,o.civ.id);if(_i>=0)G.wars.splice(_i,1);halveTensions(prop.civ.id,o.civ.id);if(typeof syncWarState==='function')syncWarState();}
+    /* ⚠️ MÉMO — `G._nonAgg` est indexé par la SEULE nation visée, pas par le couple : un pacte
+       signé par un joueur protège donc cette nation vis-à-vis de tout le monde. C'est la même
+       maladie de perspective, mais changer la forme de cette donnée touche à tous ses lecteurs —
+       à traiter à part, pas au milieu de la simultanéité. */
+    G._nonAgg=G._nonAgg||{};G._nonAgg[o.civ.id]=G.turn+4;
+    setTens(prop.civ.id,o.civ.id,0);setTens(o.civ.id,prop.civ.id,0);
+    prop.res.morale=Math.min(getResCapFor(prop).morale,(prop.res.morale||0)+1);made++;
+    addLog('🕊️ Pacte de non-agression : '+prop.civ.emoji+' '+prop.civ.name+' ↔ '+o.civ.emoji+' '+o.civ.name+' (4 tours).','gold');
   }
   _evCloseOverlay();
   /* Le journal est PARTAGÉ : « aucun pacte conclu » sans nom laissait croire que PERSONNE n'avait
      rien signé, alors que deux lignes plus haut deux pactes venaient d'être annoncés par un autre
      joueur (log de Marc, partie CC36). On nomme la nation. */
-  if(made===0)addLog('🕊️ '+G.player.civ.emoji+' '+G.player.civ.name+' — sommet diplomatique : aucun pacte signé (tension −5 tout de même).','dim');
-  _appelerSuite(done);
+  if(made===0)addLog('🕊️ '+prop.civ.emoji+' '+prop.civ.name+' — sommet diplomatique : aucun pacte signé (tension −5 tout de même).','dim');
+  if(_simul)_accordsVerifierFin(); else _appelerSuite(done);
 }
+
 /* ============================================================ STATE ============================================================ */
 let G={};let mode=null;let routeFrom=null;let selectedCiv=null;let selectedAiCiv=null;let selectedAiCivs=[];let gameDifficulty='easy';let undoStack=[];let _warSliderMode='attack';
 /* `_warModalCb`, `_peaceCb`, `_evModalCb`, `_warCombatCb`, `_pendingDiscovery`, `_forcedWarCb` ont
@@ -1020,6 +1125,109 @@ function mesGuerres(civId){
    les IA, pour les rares endroits qui veulent vraiment « une IA » (l'ancien nom, l'ancien sens). */
 function ownerNation(nodeId){ return allPlayers().find(n=>n&&n.colonies&&n.colonies.some(c=>c.nodeId===nodeId))||null; }
 function getNodeOwnerAI(nodeId){const o=ownerNation(nodeId);return (o&&o._isAI!==false)?o:null;}
+
+/* ══════════ COHABITATION SUR UN NŒUD (Exploration Extra-Solaire) ══════════
+   `Exploration Extra-Solaire` est le SEUL moyen d'avoir deux nations sur le même nœud. Tout le
+   reste du moteur a été écrit en supposant « un nœud = un propriétaire », et cela se voyait :
+
+     · un cohabitant qui attaquait son propre nœud ne déclenchait RIEN — `getNodeOwnerAI` tombait
+       sur l'attaquant lui-même, la fonction sortait en silence, sans message ni AC dépensé ;
+     · une tierce nation attaquait le PREMIER occupant de la liste interne, pas le vrai maître des
+       lieux, et l'autre restait sur place après la « capture » ;
+     · le chemin de l'IA n'avait aucun garde-fou : une IA cohabitante qui gagnait se retrouvait avec
+       DEUX colonies sur le même nœud, comptées deux fois en points de victoire.
+
+   RÈGLES DÉCIDÉES PAR MARC (2026-08-14) :
+     1. un cohabitant PEUT chasser l'autre. Le vainqueur reste seul : sa colonie prend le niveau de
+        la colonie conquise (−1, comme toute capture), perd l'interdiction d'améliorer et l'accord
+        commercial forcé disparaît — il n'a plus d'objet, il n'y a plus personne avec qui cohabiter ;
+     2. face à une TIERCE nation, les occupants défendent ENSEMBLE. On attaque un lieu, pas une
+        nation. Si l'assaillant l'emporte, il les expulse tous les deux et prend le nœud.
+   ═══════════════════════════════════════════════════════════════════════ */
+/* ══════════ QUI A SIGNÉ QUOI ══════════
+   ⚠️ `G.commercialAccords` n'est qu'une liste de NŒUDS : elle ne dit pas qui a signé avec qui.
+   Le calcul des revenus faisait donc `gains += G.commercialAccords.length` pour CHAQUE nation —
+   autrement dit, chaque accord de la partie enrichissait TOUT LE MONDE, y compris les nations qui
+   n'avaient rien signé. Mesuré le 2026-08-14 : deux accords entre Terriens et Martiens rapportaient
+   +2🪨 +2🙂/tour au Jupitérien, resté à l'écart. Vestige du solo, où le seul signataire possible
+   était le joueur.
+   On tient donc un registre des DEUX signataires par nœud. La liste de nœuds reste inchangée : ses
+   vingt autres lecteurs (carte, routes, colonisation, révocation…) n'ont pas à savoir tout cela. */
+function _accordEnregistrer(nodeId,a,b){
+  if(!nodeId)return;
+  if(!G.commercialAccords.includes(nodeId))G.commercialAccords.push(nodeId);
+  G.accordsParties=G.accordsParties||{};
+  G.accordsParties[nodeId]=[a&&a.civ?a.civ.id:a, b&&b.civ?b.civ.id:b].filter(Boolean);
+}
+function _accordSignataires(nodeId){ return (G.accordsParties&&G.accordsParties[nodeId])||null; }
+/* Les accords auxquels CETTE nation est partie. Un accord sans signataires connus (partie
+   enregistrée avant ce changement) est attribué au propriétaire du nœud, faute de mieux. */
+function accordsDe(nat){
+  if(!nat)return [];
+  return (G.commercialAccords||[]).filter(function(nid){
+    const s=_accordSignataires(nid);
+    if(s)return s.includes(nat.civ.id);
+    const o=ownerNation(nid); return !!(o&&o.civ.id===nat.civ.id);
+  });
+}
+function occupantsDuNoeud(nodeId){
+  return allPlayers().filter(n=>n&&n.colonies&&n.colonies.some(c=>c.nodeId===nodeId));
+}
+function estNoeudPartage(nodeId){ return occupantsDuNoeud(nodeId).length>1; }
+/* Tous ceux qui défendent ce nœud contre `attaquant` — un seul en temps normal, deux en cohabitation. */
+function defenseursDuNoeud(nodeId, attaquant){
+  return occupantsDuNoeud(nodeId).filter(n=>n!==attaquant);
+}
+/* Le défenseur PRINCIPAL : celui contre qui la guerre se déclare. On prend le plus développé sur ce
+   nœud — pas le premier venu de l'ordre interne, qui n'a aucun sens de jeu. */
+function defenseurPrincipal(nodeId, attaquant){
+  const d=defenseursDuNoeud(nodeId, attaquant);
+  if(!d.length) return null;
+  const niv=n=>Math.max.apply(null,n.colonies.filter(c=>c.nodeId===nodeId).map(c=>c.level||1));
+  return d.slice().sort((a,b)=>niv(b)-niv(a))[0];
+}
+/* LA CAPTURE, ÉCRITE UNE SEULE FOIS. Le joueur et l'IA avaient chacun leur copie ; l'une avait un
+   garde-fou contre la double colonie, l'autre non. Deux copies d'un même calcul, c'est une de trop
+   (voir docs/ARCHITECTURE_AVENIR.md). Rend le niveau obtenu.
+   `vainqueur` prend le nœud ; TOUS les autres occupants en sont expulsés. */
+function capturerNoeud(vainqueur, nodeId){
+  if(!vainqueur||!nodeId) return 0;
+  const nom=(NODES[nodeId]&&NODES[nodeId].name)||nodeId;
+  let meilleur=0, expulses=0;
+  for(const perdant of occupantsDuNoeud(nodeId)){
+    if(perdant===vainqueur) continue;
+    const col=perdant.colonies.filter(c=>c.nodeId===nodeId);
+    for(const c of col) meilleur=Math.max(meilleur, c.level||1);
+    perdant.colonies=perdant.colonies.filter(c=>c.nodeId!==nodeId);
+    if(typeof updateConnections==='function')updateConnections(perdant);
+    perdant.res.morale=Math.max(0,(perdant.res.morale||0)-1);
+    expulses++;
+    if(expulses>1) addLog('🏴 '+perdant.civ.emoji+' '+perdant.civ.name+' est AUSSI chassé de '+nom
+      +' — les cohabitants tombent ensemble.','red');
+  }
+  const nouveau=Math.max(1, meilleur-1);   // toute capture endommage la colonie d'un niveau
+  const sienne=vainqueur.colonies.find(c=>c.nodeId===nodeId);
+  const conn=(typeof checkConnected==='function')?checkConnected(nodeId,vainqueur):true;
+  if(sienne){
+    /* ⚠️ LE VAINQUEUR COHABITANT ÉTAIT PUNI. Le chemin du joueur refusait d'ajouter une colonie
+       s'il en avait déjà une ici : il détruisait donc une colonie de Nv.3 et restait bloqué à Nv.1,
+       avec l'interdiction d'améliorer — alors qu'il n'y a plus personne avec qui cohabiter.
+       Le chemin de l'IA, lui, en ajoutait une SECONDE sur le même nœud. On garde la meilleure des
+       deux valeurs et on lève le bridage. */
+    sienne.level=Math.max(sienne.level||1, nouveau);
+    delete sienne.noUpgrade;
+    sienne.connected=conn;
+  }else{
+    vainqueur.colonies.push({nodeId:nodeId, level:nouveau, connected:conn, _conquest:3});
+  }
+  if(typeof updateConnections==='function')updateConnections(vainqueur);
+  /* L'accord commercial FORCÉ n'a plus d'objet : il n'existait que pour la cohabitation. */
+  if(!estNoeudPartage(nodeId) && G.commercialAccords.includes(nodeId)){
+    G.commercialAccords=G.commercialAccords.filter(n=>n!==nodeId);
+    addLog('📜 '+nom+' : l\'accord forcé tombe avec la cohabitation.','dim');
+  }
+  return nouveau;
+}
 /* Une nation accepte-t-elle un accord commercial ? Règle unique, humains comme IA — c'est ce qui
    permet de DEMANDER à une IA au lieu de décider à sa place, et de lui laisser refuser.
    Elle refuse si : guerre en cours, tension trop forte, ou si le proposant est déjà loin devant
@@ -1266,7 +1474,7 @@ function initGame(civId,aiCivIds){
     log:[],turnActions:[],aiActions:[],_raidsThisTurn:[],_journal:[],
     wars:[],warRisk:0,warState:null,warTurnsLeft:0,warWins:{player:0,ai:0},_warDeclaredBy:'other',_aiWarTarget:null,_aiWarStance:'hold',
     warWith:null,tensions:{},
-    commercialAccords:[],mapPanel:0,wormholeUsed:false,_pendingEvModal:null,
+    commercialAccords:[],accordsParties:{},mapPanel:0,wormholeUsed:false,_pendingEvModal:null,
     playerInvest:null,aiInvest:null,investApplied:false,
     playerInvest2:null,aiInvest2:null,invest2Applied:false,
     empathesFounder:null,
@@ -2042,28 +2250,56 @@ function espInventaire(espion){
   }
   return par;
 }
-/* La liste proposée : d'abord les CATÉGORIES entières (le gros coup), puis les technologies UNE
-   PAR UNE (le coup discret), puis « attendre ». Chaque entrée porte un `id` — le serveur vérifie
-   que la réponse vient bien de la liste, et cela n'était pas possible sans identifiant. */
+/* LA LISTE PROPOSÉE — RANGÉE PAR NATION, PAS PAR TYPE DE COUP.
+   ⚠️ ELLE ÉTAIT TRIÉE À L'ENVERS DE LA FAÇON DONT ON DÉCIDE. Le premier jet listait TOUTES les
+   catégories entières de TOUTES les nations, puis TOUTES les technologies une par une de toutes les
+   nations. Marc, après la partie 0C10 : « J'ai pas vu s'afficher des catégories de tech pour les
+   regrouper. Il faudrait regrouper par nation de manière plus claire. » Il avait raison : on
+   choisit d'abord QUI on espionne, ensuite QUOI — pas l'inverse. Une même nation se retrouvait
+   citée en haut et en bas de la liste, et rien ne disait combien elle avait de technologies.
+
+   On range donc par NATION : d'abord celle qui a le plus à prendre, et pour chacune ses catégories
+   entières puis ses technologies isolées. Chaque option porte `groupe` (le titre de section) et
+   `groupeId` (la nation), ce qui permet à l'affichage — solo comme serveur — d'insérer un
+   intertitre au lieu d'une liste plate.
+
+   Chaque entrée porte un `id` : le serveur vérifie que la réponse vient bien de la liste, ce qui
+   n'était pas possible sans identifiant. */
 function _espOptions(espion){
   const inv=espInventaire(espion), opts=[];
   const tens=n=>' — tension +'+espTensionPour(n)+' chez la victime';
-  for(const e of inv.filter(x=>x.cartes.length>=2).sort((a,b)=>b.cartes.length-a.cartes.length)){
-    opts.push({ id:'lot:'+e.nation.civ.id+':'+e.branch, kind:'lot',
-      nation:e.nation.civ.id, branch:e.branch, ids:e.cartes.map(c=>c.id),
-      name:'📦 '+e.nation.civ.emoji+' '+e.nation.civ.name+' · '+(BRANCH_NAMES[e.branch]||e.branch)
-           +' — LA CATÉGORIE ENTIÈRE ('+e.cartes.length+')',
-      desc:e.cartes.map(c=>c.emoji+' '+c.name).join(', ')+tens(e.cartes.length) });
-  }
+
+  // Regrouper l'inventaire par nation, la plus fournie en premier.
+  const parNation=new Map();
   for(const e of inv){
-    for(const c of e.cartes){
-      opts.push({ id:'une:'+e.nation.civ.id+':'+c.id, kind:'une',
-        nation:e.nation.civ.id, branch:e.branch, ids:[c.id],
-        name:c.emoji+' '+c.name,
-        desc:e.nation.civ.emoji+' '+e.nation.civ.name+' · '+(BRANCH_NAMES[e.branch]||e.branch)+tens(1) });
+    const k=e.nation.civ.id;
+    if(!parNation.has(k)) parNation.set(k,{nation:e.nation, entrees:[], total:0});
+    const g=parNation.get(k); g.entrees.push(e); g.total+=e.cartes.length;
+  }
+  const nations=[...parNation.values()].sort((a,b)=>b.total-a.total);
+
+  for(const g of nations){
+    const titre=g.nation.civ.emoji+' '+g.nation.civ.name+' — '+g.total+' technologie'+(g.total>1?'s':'')+' à prendre';
+    const marque=o=>{ o.groupe=titre; o.groupeId=g.nation.civ.id; return o; };
+    // 1) les catégories entières de CETTE nation (le gros coup), les plus grosses d'abord
+    for(const e of g.entrees.filter(x=>x.cartes.length>=2).sort((a,b)=>b.cartes.length-a.cartes.length)){
+      opts.push(marque({ id:'lot:'+e.nation.civ.id+':'+e.branch, kind:'lot',
+        nation:e.nation.civ.id, branch:e.branch, ids:e.cartes.map(c=>c.id),
+        name:'📦 '+(BRANCH_NAMES[e.branch]||e.branch)+' — LA CATÉGORIE ENTIÈRE ('+e.cartes.length+')',
+        desc:e.cartes.map(c=>c.emoji+' '+c.name).join(', ')+tens(e.cartes.length) }));
+    }
+    // 2) puis ses technologies une par une, catégorie par catégorie
+    for(const e of g.entrees){
+      for(const c of e.cartes){
+        opts.push(marque({ id:'une:'+e.nation.civ.id+':'+c.id, kind:'une',
+          nation:e.nation.civ.id, branch:e.branch, ids:[c.id],
+          name:c.emoji+' '+c.name,
+          desc:(BRANCH_NAMES[e.branch]||e.branch)+tens(1) }));
+      }
     }
   }
   if(opts.length) opts.push({ id:'attendre', kind:'attendre', ids:[],
+    groupe:'⏳ Ou ne rien faire ce tour-ci', groupeId:'_attendre',
     name:'⏳ Attendre un tour',
     desc:'Ne rien piller maintenant. La fenêtre reviendra à la fin du tour prochain — les autres '
         +'auront peut-être développé davantage.' });
@@ -2180,11 +2416,18 @@ function showEspionageChoiceModal(){
   if(!opts.length){ addLog('🕵️ Espionnage : aucune technologie à voler pour l\'instant.','dim'); return; }
   document.getElementById('espionage-modal-sub').textContent=
     'Vole une technologie, ou une catégorie entière chez une même nation. La tension monte CHEZ ELLE.';
-  document.getElementById('espionage-branch-opts').innerHTML=opts.map(o=>
-    `<div class="inv-opt" onclick="applyEspionageChoice('${o.id}')">
+  /* Un intertitre à chaque changement de nation : c'est ce qui manquait à Marc pour « regrouper
+     par nation de manière plus claire ». La liste reste plate techniquement — on n'insère qu'un
+     titre quand `groupe` change. */
+  let _grp=null;
+  document.getElementById('espionage-branch-opts').innerHTML=opts.map(o=>{
+    let tete='';
+    if(o.groupe&&o.groupe!==_grp){ _grp=o.groupe; tete=`<div class="esp-groupe">${o.groupe}</div>`; }
+    return tete+`<div class="inv-opt" onclick="applyEspionageChoice('${o.id}')">
       <div class="inv-opt-name">${o.name}</div>
       <div class="inv-opt-benefit">${o.desc}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   document.getElementById('espionage-modal').classList.remove('hidden');
 }
 function applyEspionageChoice(optId){
@@ -2859,6 +3102,8 @@ fluxDeclarer('stAgendaLocalRecu', stAgendaLocalRecu);   // draft d'agenda en par
 fluxDeclarer('_agendaStep', _agendaStep);
 fluxDeclarer('runStrategyDraft', typeof runStrategyDraft==='function'?runStrategyDraft:stRien);
 fluxDeclarer('stAccordsSuivant', stAccordsSuivant);
+fluxDeclarer('_accordsVerifierFin', _accordsVerifierFin);
+fluxDeclarer('_accordsTerminer', _accordsTerminer);
 fluxDeclarer('stInvestDemander', stInvestDemander);
 fluxDeclarer('stInvestRecu', stInvestRecu);
 /* ESPIONNAGE — trois états nommés, comme tout le reste : une question posée en fin de tour 3, 4
@@ -2887,6 +3132,7 @@ fluxDeclarer('applyDysonClose', typeof applyDysonClose==='function'?applyDysonCl
 fluxDeclarer('stAccordCommChoisi', stAccordCommChoisi);
 fluxDeclarer('stAccordReponse', stAccordReponse);
 fluxDeclarer('stAccordDirectReponse', stAccordDirectReponse);
+fluxDeclarer('stPacteReponse', stPacteReponse);   // pacte de non-agression proposé à un JOUEUR
 fluxDeclarer('stDiploChoisi', stDiploChoisi);
 fluxDeclarer('routeCaptureChoice', typeof routeCaptureChoice==='function'?routeCaptureChoice:stRien);
 fluxDeclarer('adChoixDeCombat', adChoixDeCombat);
@@ -3485,21 +3731,126 @@ function _runInteractiveEventAllHumans(ev, done){
   const d=fluxDonnees();
   d.evenementCourant=ev?ev.id:d.evenementCourant;
   d.apresEvenement=(typeof done==='string'&&done)?done:d.apresEvenement;
-  d.fileAccords=allPlayers().filter(p=>!p._isAI).map(p=>p.civ.id);
+  /* TOUTES les nations, IA comprises — voir `iaChoisitAccord`. Avant : `filter(p=>!p._isAI)`. */
+  d.fileAccords=allPlayers().map(p=>p.civ.id);
   d.nationAvantAccords=G.player&&G.player.civ?G.player.civ.id:null;
   stAccordsSuivant();
 }
+/* LE SOMMET S'OUVRE POUR TOUT LE MONDE EN MÊME TEMPS.
+   ⚠️ IL SE JOUAIT L'UN APRÈS L'AUTRE, et c'était le reproche de Marc : « c'est le joueur actif qui
+   voit la possibilité tout seul, or il faut que ce soit simultané ». Cette fonction faisait
+   `file.shift()`, basculait `G.player` sur ce joueur (`_evSwap`) et n'ouvrait la fenêtre du suivant
+   qu'une fois le premier servi. Trois conséquences : les autres attendaient sans rien voir, la
+   perspective globale changeait à chaque étape, et celui qui jouait en premier signait avant que
+   les autres aient pu se manifester.
+   Désormais, en ligne, chaque humain reçoit SA fenêtre au même instant, avec SA liste de
+   partenaires et SA fiche de renseignement. Le tour ne repart que lorsque tout le monde a répondu
+   ET que toutes les propositions en vol ont reçu leur réponse.
+   Le mode SOLO garde le chemin d'origine : un seul humain, la question est la même. */
+/* CE QU'UNE IA CHOISIT AU SOMMET — elle propose, elle ne fait plus que subir.
+   ⚠️ ELLE N'Y PARTICIPAIT PAS DU TOUT. `fileAccords` ne contenait que les humains : au sommet
+   commercial, une IA encaissait les +2🪨 collectifs et rien d'autre. Elle ne proposait jamais
+   d'accord à personne, et ne pouvait donc jamais sortir d'un isolement diplomatique.
+   Marc, 2026-08-14 : « qu'elles puissent elles aussi participer c'est mieux […] dans la
+   perspective d'éliminer le joueur dominant qui contrôle tout et voit tout et pas les autres. »
+   Elle vise la nation avec qui la tension est la PLUS FORTE parmi celles qui accepteraient : c'est
+   là que l'accord rapporte le plus (tension −3 des deux côtés), et c'est ce qu'un joueur ferait. */
+function iaChoisitAccord(ia){
+  const cands=_evCommCandidats(ia).filter(function(o){
+    return accordAcceptable(o,ia).ok && accordAcceptable(ia,o).ok;   // les DEUX doivent y trouver leur compte
+  });
+  if(!cands.length) return null;
+  return cands.slice().sort(function(a,b){
+    return (getTens(ia.civ.id,b.civ.id)+getTens(b.civ.id,ia.civ.id))
+         - (getTens(ia.civ.id,a.civ.id)+getTens(a.civ.id,ia.civ.id));
+  })[0];
+}
+/* Ce qu'une IA signe au sommet diplomatique : les pactes qu'elle peut payer, avec qui accepterait. */
+function iaChoisitPactes(ia){
+  let budget=(ia.res.materials||0);
+  const out=[];
+  const cibles=allPlayers().filter(function(o){return o!==ia;}).sort(function(a,b){
+    return (getTens(b.civ.id,ia.civ.id)) - (getTens(a.civ.id,ia.civ.id));   // d'abord les plus remontés contre elle
+  });
+  for(const o of cibles){
+    if(budget<6) break;
+    if(!accordAcceptable(o,ia).ok) continue;
+    if(getTens(ia.civ.id,o.civ.id)<4 && !_warBetween(ia.civ.id,o.civ.id)) continue; // pas de pacte inutile
+    out.push(o.civ.id); budget-=6;
+  }
+  return out;
+}
 function stAccordsSuivant(){
   const d=fluxDonnees(), file=d.fileAccords||[];
-  if(!file.length){
-    if(d.nationAvantAccords)_evSwap(d.nationAvantAccords);
-    d.fileAccords=null; d.nationAvantAccords=null;
-    stApresEvenement();
+  if(!_decisionActive()){
+    /* SOLO. ⚠️ La file contient maintenant les IA aussi (elles participent au sommet) : sans ce
+       filtre, on ouvrirait la fenêtre du JOUEUR pour chaque nation IA à tour de rôle. Elles
+       décident sur place, par le même chemin nommé que les humains. */
+    while(file.length){
+      const suiv=allPlayers().find(p=>p.civ.id===file[0]);
+      if(!suiv){ file.shift(); continue; }
+      if(!suiv._isAI) break;
+      file.shift(); d.fileAccords=file;
+      const ev0=_evCourant();
+      if(ev0&&ev0.id==='diplo') stDiploChoisi({selected:iaChoisitPactes(suiv)}, suiv.civ.id);
+      else { const cible=iaChoisitAccord(suiv); stAccordCommChoisi({aiId:cible?cible.civ.id:null}, suiv.civ.id); }
+    }
+    d.fileAccords=file;
+    if(!file.length){ _accordsTerminer(); return; }
+    const civId=file.shift(); d.fileAccords=file;
+    _evSwap(civId);
+    showEventChoiceModal(_evCourant(), 'stAccordsSuivant');
     return;
   }
-  const civId=file.shift(); d.fileAccords=file;
-  _evSwap(civId);
-  showEventChoiceModal(_evCourant(), 'stAccordsSuivant');
+  if(!file.length){ _accordsVerifierFin(); return; }
+  d.accordsRestants=file.slice(); d.fileAccords=[]; d.accordsPaires=d.accordsPaires||[];
+  const ev=_evCourant();
+  const local=(G.player&&G.player.civ)?G.player.civ.id:null;
+  for(const civId of d.accordsRestants.slice()){
+    const nat=allPlayers().find(p=>p.civ.id===civId);
+    if(!nat){ _accordsMarquerRepondu(civId); continue; }
+    /* Une IA n'a pas de fenêtre : elle décide tout de suite, mais elle passe par EXACTEMENT le même
+       chemin qu'un joueur (`stAccordCommChoisi` / `stDiploChoisi`). Deux chemins pour une même
+       décision, c'est ce qui a produit toutes les divergences de cette semaine. */
+    if(nat._isAI){
+      if(ev&&ev.id==='diplo') stDiploChoisi({selected:iaChoisitPactes(nat)}, nat.civ.id);
+      else { const cible=iaChoisitAccord(nat); stAccordCommChoisi({aiId:cible?cible.civ.id:null}, nat.civ.id); }
+      continue;
+    }
+    const versLui=(nat.civ.id===local)?_emitDecision:_emitRemote;
+    if(ev&&ev.id==='diplo'){
+      versLui('event_diplo', nat,
+        {mat:(nat.res.materials||0), energy:(nat.res.energy||0),
+         rows:allPlayers().filter(o=>o!==nat).map(function(o){
+           return {id:o.civ.id,name:o.civ.name,emoji:o.civ.emoji,war:!!(_warBetween(nat.civ.id,o.civ.id)),info:_evAiInfo(o,nat)};})},
+        'stDiploChoisi', null);
+    }else{
+      versLui('event_comm', nat,
+        {cands:_evCommCandidats(nat).map(function(o){
+           return {id:o.civ.id,name:o.civ.name,emoji:o.civ.emoji,war:!!(_warBetween(nat.civ.id,o.civ.id)),info:_evAiInfo(o,nat)};})},
+        'stAccordCommChoisi', null);
+    }
+  }
+  _accordsVerifierFin();   // cas limite : aucune nation valide
+}
+/* Le sommet est fini quand plus personne ne doit répondre ET qu'aucune proposition n'est en vol. */
+function _accordsVerifierFin(){
+  const d=fluxDonnees();
+  if(!Array.isArray(d.accordsRestants))return;
+  if((d.accordsRestants||[]).length)return;
+  if((d.accordsPaires||[]).length)return;   // quelqu'un attend encore la réponse de son partenaire
+  _accordsTerminer();
+}
+function _accordsMarquerRepondu(civId){
+  const r=fluxDonnees().accordsRestants;
+  if(!Array.isArray(r)||!civId)return;
+  const i=r.indexOf(civId); if(i>=0)r.splice(i,1);
+}
+function _accordsTerminer(){
+  const d=fluxDonnees();
+  if(d.nationAvantAccords)_evSwap(d.nationAvantAccords);
+  d.fileAccords=null; d.nationAvantAccords=null; d.accordsRestants=null; d.accordsPaires=null;
+  stApresEvenement();
 }
 function refillGeneralRiver(){
   // Militaires : TOUTES visibles (grisées si non acquérables) ; 1× par carte par tour (suivi via _milBoughtThisTurn).
@@ -3833,19 +4184,20 @@ function revenusBruts(p, opts){
   const _o=opts||{}, _j=_o.journal||function(){}, _d=_o.detail||null;
   const _det=(label,o)=>{ if(_d) _d.push({label:label,o:o}); };
   const gains={};
-  // Colonies connectées via réseau étranger (accord commercial) — malus
-  if(p===G.player){
-    for(const col of p.colonies){
-      if(!col.foreignConnected)continue;
-      const node=NODES[col.nodeId];
-      if(node.decorative)continue;
-      for(const[r,a]of Object.entries(node.res)){gains[r]=(gains[r]||0)+a;}
-      // Malus connexion étrangère : −1<i class=ri-morale></i> −1<i class=ri-materials></i> (min 0<i class=ri-materials></i>)
-      gains.morale=(gains.morale||0)-1;
-      const matGain=gains.materials||0;
-      gains.materials=Math.max(0,matGain-1);
-        _j('🔗 '+node.name+' (connexion étrangère) — revenus avec malus −1<i class=ri-morale></i> −1<i class=ri-materials></i>','dim');
-    }
+  /* TRANSIT PAR LE RÉSEAU D'UN PARTENAIRE. Une colonie non reliée à ton propre réseau rapporte
+     quand même si UNE DE TES ROUTES la relie à un nœud sous accord commercial — c'est le droit de
+     transit décrit dans les règles.
+     ⚠️ DEUX CORRECTIONS ICI. (1) `if(p===G.player)` : seule la nation ACTIVE en profitait, les
+     autres n'étaient jamais payées. (2) Le malus −1🙂 −1🪨 est SUPPRIMÉ à la demande de Marc
+     (2026-08-14 : « Il faut supprimer ce malus. Je n'en veux plus. »). Il reste que ces colonies
+     ne touchent pas le bonus de niveau : les ressources brutes du nœud, rien de plus. */
+  for(const col of p.colonies){
+    if(!col.foreignConnected)continue;
+    const node=NODES[col.nodeId];
+    if(node.decorative)continue;
+    for(const[r,a]of Object.entries(node.res)){gains[r]=(gains[r]||0)+a;}
+    _det('🔗 '+node.name+' (transit par un partenaire)',Object.assign({},node.res));
+    _j('🔗 '+node.name+' — reliée par le réseau d\'un partenaire (ressources brutes, sans bonus de niveau)','dim');
   }
   for(const col of p.colonies){
     if(!col.connected)continue;
@@ -3870,18 +4222,26 @@ function revenusBruts(p, opts){
       _det('🏙️ '+((NODES[col.nodeId]&&NODES[col.nodeId].name)||col.nodeId)+' (Nv.'+(col.level||1)+')',_o); }
   }
   // Accord commercial actif : +1<i class=ri-materials></i> +1<i class=ri-morale></i> par accord (les deux nations)
-  if(G.commercialAccords.length>0){
-    gains.materials=(gains.materials||0)+G.commercialAccords.length;
-    gains.morale=(gains.morale||0)+G.commercialAccords.length;
-    _det('🤝 Accords commerciaux ×'+G.commercialAccords.length,{materials:G.commercialAccords.length,morale:G.commercialAccords.length});
-    if(p===G.player)  _j('🤝 Accord commercial : +'+G.commercialAccords.length+'<i class=ri-materials></i> +'+G.commercialAccords.length+'<i class=ri-morale></i>','dim');
-  }
+  /* ⚠️ SEULS LES SIGNATAIRES SONT PAYÉS. C'était `G.commercialAccords.length` pour tout le monde :
+     une nation qui n'avait signé aucun accord touchait quand même +1🪨 +1🙂 par accord de la
+     partie. Voir `accordsDe`. */
+  {const _mes=accordsDe(p).length;
+   if(_mes>0){
+    gains.materials=(gains.materials||0)+_mes;
+    gains.morale=(gains.morale||0)+_mes;
+    _det('🤝 Accords commerciaux ×'+_mes,{materials:_mes,morale:_mes});
+    _j('🤝 Accord commercial : +'+_mes+'<i class=ri-materials></i> +'+_mes+'<i class=ri-morale></i>','dim');
+   }}
   if(p.civ.id==='ceinturiens'){gains.energy=(gains.energy||0)+1;_det('☠️ Réserves de la Ceinture',{energy:1});} // réserves de la ceinture
-  /* JUPITÉRIENS (règle de Marc, 2026-08-07) : +1⚡/tour dès le premier tour, quel que soit le
-     nombre de colonies. Remplace l'ancien « +1⚡ par colonie jovienne », qui récompensait
-     l'expansion deux fois — une fois par les ressources du nœud, une fois par le pouvoir — et
-     rendait la nation d'autant plus forte qu'elle était déjà en avance. */
-  if(p.civ.id==='jupiteriens'){gains.energy=(gains.energy||0)+1;_det('🟠 Réacteurs joviens',{energy:1});}  // réacteurs joviens
+  /* JUPITÉRIENS — LE +1⚡ NATIONAL EST SUPPRIMÉ (Marc, 2026-08-14).
+     ⚠️ TROIS AVANTAGES SE CUMULAIENT SUR LA MÊME RESSOURCE. Io est le nœud le plus riche en
+     énergie du jeu (3⚡ ; le suivant est Titan à 2⚡, tout le reste est à 0 ou 1) — et c'est une
+     CAPITALE : gratuite au tour 1, toujours connectée, exemptée d'entretien. Par-dessus venait ce
+     +1⚡/tour, de la même ressource. Et la Forge Orbitale monte une lune jovienne pour 0 AC, en
+     contournant la vraie monnaie rare du jeu.
+     Mesuré le 2026-08-14 : 4⚡/tour au tour 1 contre 1⚡ pour les trois autres, et 17⚡ cumulés à la
+     fin du tour 3 contre 5, 7 et 9. Le pouvoir national faisait double emploi avec la capitale :
+     c'est lui qu'on retire, la richesse d'Io suffit à caractériser la nation. */
   {const _o={};for(const[r,a]of Object.entries(p.rpt)){gains[r]=(gains[r]||0)+a;if(a)_o[r]=a;}if(Object.keys(_o).length)_det('🔬 Bonus techs/cartes',_o);}
   // Bonus investissement Niv.1 (actif si turnsLeft > 0 ou non défini)
   if(p.investBonus&&(p.investBonus.turnsLeft===undefined||p.investBonus.turnsLeft>0)){
@@ -4148,7 +4508,7 @@ function applyCard(card,p){
 function _extraSolarColonize(p,nid){
   if(!nid||p.colonies.find(c=>c.nodeId===nid))return;
   const occupied=allPlayers().some(pl=>pl!==p&&pl.colonies.find(c=>c.nodeId===nid));
-  if(occupied&&!G.commercialAccords.includes(nid))G.commercialAccords.push(nid);
+  if(occupied){const _occ=allPlayers().find(function(pl){return pl!==p&&pl.colonies.some(function(c){return c.nodeId===nid;});});_accordEnregistrer(nid,p,_occ);}
   const connected=(typeof checkConnected==='function')?checkConnected(nid,p):false;
   p.colonies.push({nodeId:nid,level:1,connected,noUpgrade:!!occupied});
   updateConnections(p);
@@ -4580,10 +4940,17 @@ function showAccordInfo(nodeId){
   btn.onclick=function(){document.getElementById('accord-modal').classList.add('hidden');proposeAccord(nodeId);};
   document.getElementById('accord-modal').classList.remove('hidden');
 }
-function proposeAccord(nodeId){
-  if(G.phase!=='actions')return;const node=NODES[nodeId];const p=G.player;
-  if(p.acLeft<1){addLog('⚠️ Accord : besoin 1 AC.','red');return;}
-  if((p.res.materials||0)<2){addLog('⚠️ Accord : besoin 2<i class=ri-materials></i> (donnés à l\'autre nation).','red');return;}
+/* `proposant` : la nation qui propose. ⚠️ IL ÉTAIT ÉCRIT EN DUR (`G.player`), et c'est pour cela
+   qu'une IA ne pouvait PAS proposer d'accord de sa propre initiative — le seul chemin existant
+   passait par le clic du joueur sur une colonie. Une IA subissait la diplomatie sans jamais
+   pouvoir l'engager. Marc : « c'est le dernier morceau du principe l'IA est une nation comme une
+   autre ». Le paramètre est optionnel : sans lui, le comportement du joueur est identique. */
+function proposeAccord(nodeId,proposant){
+  if(G.phase!=='actions')return;const node=NODES[nodeId];const p=proposant||G.player;
+  const _humain=(p===G.player&&!p._isAI);
+  const _dire=(m,c)=>{ if(_humain)addLog(m,c); };
+  if(p.acLeft<1){_dire('⚠️ Accord : besoin 1 AC.','red');return;}
+  if((p.res.materials||0)<2){_dire('⚠️ Accord : besoin 2<i class=ri-materials></i> (donnés à l\'autre nation).','red');return;}
   /* ⚠️ UN ACCORD SE PROPOSE, IL NE S'IMPOSE PAS — ET CELA VAUT POUR TOUTES LES NATIONS.
      Avant : le propriétaire était cherché parmi `G.ais` seulement. Sur la colonie d'un autre
      HUMAIN, il n'y avait donc AUCUN propriétaire : aucune vérification, aucune demande, et
@@ -4612,26 +4979,34 @@ function proposeAccord(nodeId){
     }
     const avis=accordAcceptable(proprio,p);
     if(!avis.ok){
-      addLog('⚠️ '+proprio.civ.emoji+' '+proprio.civ.name+' refuse l\'accord — '+avis.raison+'.','red');
+      _dire('⚠️ '+proprio.civ.emoji+' '+proprio.civ.name+' refuse l\'accord — '+avis.raison+'.','red');
+      if(!_humain)addLog('🤝 '+proprio.civ.emoji+' '+proprio.civ.name+' refuse l\'accord de '
+        +p.civ.emoji+' '+p.civ.name+' — '+avis.raison+'.','dim');
       return;
     }
   }
   /* `accordAi` (qui ne pouvait être qu'une IA) est devenu `proprio` : la SUITE de cette fonction
      s'en servait pour verser les 2🪨 et baisser la tension. Avec un propriétaire humain, elle ne
      versait donc rien et ne calmait rien — la moitié invisible du même défaut. */
-  undoStack=[];p.acLeft-=1;p.res.materials-=2;p.spentThisTurn+=3;
+  if(_humain)undoStack=[];   // l'annulation n'a de sens que pour le joueur local
+  p.acLeft-=1;p.res.materials-=2;p.spentThisTurn=(p.spentThisTurn||0)+3;
   if(proprio)proprio.res.materials=(proprio.res.materials||0)+2; // le matériau est DONNÉ à l'autre nation
-  G.commercialAccords.push(nodeId);
+  _accordEnregistrer(nodeId,p,proprio);
   let tensionMsg='';
   if(proprio){
-    const pPrev=getTens('player',proprio.civ.id), aPrev=getTens(proprio.civ.id,'player');
-    setTens('player',proprio.civ.id,Math.max(0,pPrev-3));
-    setTens(proprio.civ.id,'player',Math.max(0,aPrev-3)); // −3 des DEUX côtés
+    /* ⚠️ LA TENSION ÉTAIT CALMÉE ENTRE « player » ET LE PROPRIÉTAIRE — donc entre la nation ACTIVE
+       et lui, quel que soit le vrai proposant. Avec une IA qui propose, c'est la tension de
+       quelqu'un d'autre qui baissait. On nomme les deux nations. */
+    const pPrev=getTens(p.civ.id,proprio.civ.id), aPrev=getTens(proprio.civ.id,p.civ.id);
+    setTens(p.civ.id,proprio.civ.id,Math.max(0,pPrev-3));
+    setTens(proprio.civ.id,p.civ.id,Math.max(0,aPrev-3)); // −3 des DEUX côtés
     tensionMsg=' — Tension −3 des deux côtés vs '+proprio.civ.name;
   }
-  addLog('🤝 Accord Commercial sur '+node.name+' — 2<i class=ri-materials></i> donnés à '+(proprio?proprio.civ.name:'l\'autre nation')+tensionMsg,'gold');
-  addAction('🤝','Accord '+node.name,1,{materials:2},'2 matériaux donnés'+tensionMsg);
-  closePopup();render();
+  addLog((_humain?'🤝 Accord Commercial sur ':'🤝 '+p.civ.emoji+' '+p.civ.name+' conclut un accord sur ')+node.name
+    +' — 2<i class=ri-materials></i> donnés à '+(proprio?proprio.civ.name:'l\'autre nation')+tensionMsg,'gold');
+  if(_humain){ addAction('🤝','Accord '+node.name,1,{materials:2},'2 matériaux donnés'+tensionMsg); closePopup();render(); }
+  else G.aiActions.push({emoji:'🤝',name:'Accord '+node.name,desc:'avec '+(proprio?proprio.civ.name:'?')});
+  return true;
 }
 function breakAccordAndAttack(nodeId){
   if(G.phase!=='actions')return;const node=NODES[nodeId];const p=G.player;
@@ -4654,8 +5029,13 @@ function breakAccordAndAttack(nodeId){
 }
 function attackColony(nodeId){
   if(G.phase!=='actions')return;const node=NODES[nodeId];const p=G.player;
-  const _atkAI=getNodeOwnerAI(nodeId);
-  if(!_atkAI){addLog('⚠️ Cette colonie n’appartient à aucune nation.','red');return;}
+  /* ⚠️ ON NE DEMANDE PLUS « À QUI EST CE NŒUD » MAIS « QUI LE DÉFEND CONTRE MOI ».
+     `getNodeOwnerAI` rendait UNE nation — sur un nœud partagé elle pouvait rendre l'attaquant
+     lui-même, et l'assaut sortait alors en silence : pas de message, pas d'AC dépensé, rien.
+     Un clic mort, impossible à comprendre en jouant. */
+  const _atkAI=defenseurPrincipal(nodeId,p);
+  if(!_atkAI){addLog('⚠️ Aucune autre nation à assaillir sur ce nœud.','red');return;}
+  if(estNoeudPartage(nodeId))addLog('⚔️ '+(node?node.name:nodeId)+' est partagé — l\'assaut rompt la cohabitation.','red');
   /* Capitale assaillable : voir la note dans breakAccordAndAttack(). Sa défense de 10 jetons
      (garrisonOf) suffit à la rendre difficile ; l'interdire n'a plus lieu d'être. */
   const tc=p.civ.id==='ceinturiens'?1:2;
@@ -4669,7 +5049,8 @@ function attackColony(nodeId){
 }
 // ── ASSAUT DE COLONIE : combat résolu IMMÉDIATEMENT (1 manche), capture si victoire. (Le modèle « guerre en 2 tours » est supprimé.) ──
 function playerAssaultColony(nodeId,enemyAI){
-  enemyAI=enemyAI||getNodeOwnerAI(nodeId);if(!enemyAI)return;
+  enemyAI=enemyAI||defenseurPrincipal(nodeId,G.player);
+  if(!enemyAI){addLog('⚠️ Assaut impossible : aucune nation adverse sur '+((NODES[nodeId]&&NODES[nodeId].name)||nodeId)+'.','red');return;}
   G.player._attacksThisTurn=(G.player._attacksThisTurn||0)+1; G._warCancelRefund={ac:1,atk:1};
   let war=_warBetween(_moiId(),enemyAI.civ.id);
   if(!war){G._warFocusColony=nodeId;declareWar('Assaut sur '+(NODES[nodeId]?.name||nodeId)+' !','player',enemyAI.civ.id);war=_warBetween(_moiId(),enemyAI.civ.id);}
@@ -4775,10 +5156,13 @@ function resolveAiAssault(ai,targetId,commit){
   if(aPow>pDef){
     war.winsBy[ai.civ.id]=(war.winsBy[ai.civ.id]||0)+1;
     if(_cruDef)p.cruiserCooldown=getCooldownTurn(p); // croiseur en récupération (2 tours, 1 avec tech) suite à la défense perdue
-    const pcol=p.colonies.find(c=>c.nodeId===targetId);const newLvl=pcol?Math.max(1,pcol.level-1):1;
-    p.colonies=p.colonies.filter(c=>c.nodeId!==targetId);updateConnections(p);
-    const conn=(typeof checkConnected==='function')?checkConnected(targetId,ai):true;
-    ai.colonies.push({nodeId:targetId,level:newLvl,connected:conn});updateConnections(ai);
+    /* ⚠️ TROISIÈME COPIE DE LA CAPTURE, ET LA DERNIÈRE SANS GARDE-FOU. `ai.colonies.push(...)` était
+       inconditionnel : quand l'IA cohabitait déjà sur ce nœud (seul l'Extra-Solaire le permet), elle
+       s'y retrouvait avec DEUX colonies. `selftest.js` l'a attrapé — « invariant : double colonie
+       eris » — une partie sur six, et seulement depuis qu'Éris rapporte 1⚡ et attire les IA.
+       J'avais fusionné les deux autres copies le matin même et manqué celle-ci : c'est exactement
+       ce que le mémo sur les copies multiples annonçait. Une seule capture pour tout le monde. */
+    const newLvl=capturerNoeud(ai,targetId);
     ai._warRecapture=null;war.aiRecaptureTarget=null;
     p.res.morale=Math.max(0,(p.res.morale||0)-1);
     addLog('🏴 '+ai.civ.emoji+' '+ai.civ.name+' REPREND '+(node?node.name:targetId)+' ! ('+aPow+'⚔️ vs '+pDef+'🛡️, Nv.'+newLvl+') — tu perds la colonie, −1<i class=ri-morale></i>','red');
@@ -4958,15 +5342,19 @@ function updateConnections(p){
     col.connected=vis.has(col.nodeId);
     // Connexion étrangère : colonie non connectée à son propre réseau,
     // mais reliée par une route à une colonie IA avec qui un accord commercial est actif
+    /* ⚠️ LE TRANSIT NE VALAIT QUE POUR LA NATION ACTIVE, ET QU'AVEC UNE IA. `p===G.player` privait
+       les autres nations de la règle, et `G.ais.some(...)` faisait qu'un accord de transit avec un
+       autre JOUEUR ne comptait jamais, pour personne. */
     col.foreignConnected=false;
-    if(!col.connected&&p===G.player){
+    if(!col.connected){
       for(const r of p.routes){
         const other=r.from===col.nodeId?r.to:r.to===col.nodeId?r.from:null;
         if(!other)continue;
-        const hasAccordAI=G.ais.some(ai=>
-          ai.colonies.some(ac=>ac.nodeId===other)&&G.commercialAccords.includes(other)
-        );
-        if(hasAccordAI){col.foreignConnected=true;break;}
+        if(!G.commercialAccords.includes(other))continue;
+        const partenaire=allPlayers().some(function(o){
+          return o!==p && o.colonies.some(function(ac){return ac.nodeId===other;});
+        });
+        if(partenaire){col.foreignConnected=true;break;}
       }
     }
   }
@@ -5019,19 +5407,25 @@ function updateTension(){
     else if(getTens(ai.civ.id,'player')>0)addTens(ai.civ.id,'player',-1); // paix : −1/tour
     // Effets tension joueur → cette IA (guerre forcée uniquement ici)
     const pt=tensEff('player',ai.civ.id); // tension effective (−6 envers les autres nations si une guerre tourne déjà)
-    const _cool=((G._peaceCooldown&&G._peaceCooldown[ai.civ.id])||0)>G.turn; // trêve après une guerre récente avec cette nation
+    /* ⚠️ LA TRÊVE DE 3 TOURS EST SUPPRIMÉE (Marc, 2026-08-14 : « y a une trêve de trois tours pour
+       les IA dans les règles ? Je savais pas, supprime ça »).
+       Elle n'était nulle part dans les règles écrites, et surtout elle ne liait QUE les IA : elle
+       était consultée ici et pour les manifestations, jamais quand le joueur déclarait la guerre
+       lui-même. On pouvait donc déclarer, conquérir, acheter la paix, et recommencer au tour
+       suivant — cinq colonies prises ainsi dans la partie 0C10 — pendant que les IA, elles,
+       devaient attendre. Une règle qui ne s'applique qu'à un camp n'est pas une règle. */
     const _warWithThis=!!(_warBetween(_moiId(),ai.civ.id)); // déjà en guerre avec CETTE nation → pas de guerre populaire en plus
-    if(pt>=10&&!_warWithThis&&!_cool){triggerGuereeForcee('player',ai);return;}
+    if(pt>=10&&!_warWithThis){triggerGuereeForcee('player',ai);return;}
     // Effets tension IA → joueur
     const at=tensEff(ai.civ.id,'player');
-    if(at>=10&&!_warWithThis&&!_cool){triggerGuereeForcee('ai',ai);return;}
+    if(at>=10&&!_warWithThis){triggerGuereeForcee('ai',ai);return;}
   }
   // Compat aliases
   G.playerTension=G.ais.reduce((mx,ai)=>Math.max(mx,getTens('player',ai.civ.id)),0);
   if(G.ais[0])G.aiTension=getTens(G.ais[0].civ.id,'player');
   // Effet tension : −1<i class=ri-morale></i> par nation avec tension ≥6 (cumulatif)
   // Manifestations : −1<i class=ri-morale></i> par nation à tension ≥6 — MAIS on exclut celles avec qui on est déjà EN GUERRE (pas de double peine).
-  const highTensAis=G.ais.filter(ai=>tensEff('player',ai.civ.id)>=6&&!(_warBetween(_moiId(),ai.civ.id))&&!(G._peaceCooldown&&G.turn<(G._peaceCooldown[ai.civ.id]||0))); // pas de manifestations avec qui on est en guerre NI en paix/trêve récente
+  const highTensAis=G.ais.filter(ai=>tensEff('player',ai.civ.id)>=6&&!(_warBetween(_moiId(),ai.civ.id))); // pas de manifestations avec qui on est en guerre (la trêve, elle, est supprimée)
   G.player._manifLoss=highTensAis.length; // mémorisé pour l'affichage du revenu cœur en net
   if(highTensAis.length>0){
     G.player.res.morale=Math.max(0,(G.player.res.morale||0)-highTensAis.length);
@@ -5134,7 +5528,7 @@ function forcedWarDemandPeace(){
     G.player.res.materials=Math.min(cap.materials,(G.player.res.materials||0)+tM);
     G.player.res.energy=Math.min(cap.energy,(G.player.res.energy||0)+tE);
     const _i=_warIndexBetween(_moiId(),ai.civ.id);if(_i>=0)G.wars.splice(_i,1);
-    halveTensions('player',ai.civ.id);G._peaceCooldown=G._peaceCooldown||{};G._peaceCooldown[ai.civ.id]=G.turn+3;syncWarState();
+    halveTensions('player',ai.civ.id);syncWarState();
     addLog('🕊️ '+ai.civ.emoji+' '+ai.civ.name+' cède à la pression et achète la paix : tribut +'+tM+' matériaux +'+tE+' énergie.','gold');
   }else if(ai){
     addLog('⚔️ '+ai.civ.emoji+' '+ai.civ.name+' refuse de payer — la guerre continue (pas de combat ce tour).','red');
@@ -5146,7 +5540,7 @@ function forcedWarDemandPeace(){
 function forcedWarNoTarget(){
   document.getElementById('forced-war-modal').classList.add('hidden');
   const fwId=G.warWith;
-  if(fwId){const _i=_warIndexBetween(_moiId(),fwId);if(_i>=0)G.wars.splice(_i,1);halveTensions('player',fwId);G._peaceCooldown=G._peaceCooldown||{};G._peaceCooldown[fwId]=G.turn+3;syncWarState();}
+  if(fwId){const _i=_warIndexBetween(_moiId(),fwId);if(_i>=0)G.wars.splice(_i,1);halveTensions('player',fwId);syncWarState();}
   G.playerTension=0;G.aiTension=0;
   addLog('⚔️ Guerre populaire : aucune cible ennemie accessible — la pression retombe, pas d\'attaque.','dim');
   if(!_guerrePopSuiteJouer())render();
@@ -5187,7 +5581,8 @@ function declareWar(reason,declaredBy='other',aiId=null,agresseurCiv=null){
   const warEnName=G.ais.find(a=>a.civ.id===tgtId)?.civ.name||tgtId;
   // Annule les accords commerciaux AVEC CETTE nation (sur toutes ses colonies) — un raid ne les annule pas.
   const _revoked=G.commercialAccords.filter(nid=>{const o=getNodeOwnerAI(nid);return o&&o.civ.id===tgtId;});
-  if(_revoked.length){G.commercialAccords=G.commercialAccords.filter(nid=>!_revoked.includes(nid));addLog('📜 Accords commerciaux avec '+warEnName+' révoqués ('+_revoked.length+') !','red');}
+  if(_revoked.length){G.commercialAccords=G.commercialAccords.filter(nid=>!_revoked.includes(nid));
+    if(G.accordsParties)for(const _n of _revoked)delete G.accordsParties[_n];addLog('📜 Accords commerciaux avec '+warEnName+' révoqués ('+_revoked.length+') !','red');}
   // Colonie Extra-Solaire co-localisée sur un nœud de la nation en guerre → elle saute.
   const _warAI=G.ais.find(a=>a.civ.id===tgtId);
   if(_warAI){
@@ -5297,7 +5692,25 @@ function resolveWarCombat(playerCommitted){
   // capturée pour 1 jeton → nation à 0 colonie et partie bloquée).
   const _homeDef=(_warAttackColonyTarget&&warEnemy&&_warAttackColonyTarget===warEnemy.civ.home)?10:0;
   if(_homeDef)addLog('🏛️ Capitale '+(NODES[_warAttackColonyTarget]?.name||'')+' : défense automatique de 10 jetons.','dim');
-  const aPow=aiEngaged+aEmpathBonus+(_aiCru?(warEnemy.cruiserPower||5):0)+garrisonOf(warEnemy,_warAttackColonyTarget); // garnison auto : 1 colonie / 10 base
+  /* RENFORT DES COHABITANTS (règle Marc, 2026-08-14) : « les deux défendent ensemble ». On attaque
+     un LIEU, pas une nation. Si un nœud extra-solaire est partagé, l'occupant qui n'est pas la cible
+     officielle de la guerre prête quand même main-forte : ses jetons engageables et ses bonus de
+     cartes s'ajoutent à la défense. En contrepartie, s'il perd, il est expulsé lui aussi
+     (`capturerNoeud`). */
+  let _renfort=0;
+  if(_warAttackColonyTarget){
+    for(const _co of defenseursDuNoeud(_warAttackColonyTarget,G.player)){
+      if(_co===warEnemy)continue;
+      const _j=Math.max(0,Math.min(_co.forceTokens||0,_co.res.materials||0,_co.res.energy||0));
+      const _b=(typeof bonusCombatCartes==='function')?bonusCombatCartes(_co):0;
+      if(_j+_b<=0)continue;
+      _renfort+=_j+_b;
+      if(typeof applyCombatEngage==='function')applyCombatEngage(_co,_j,false); // il se bat vraiment : ses jetons partent
+      addLog('🤝 '+_co.civ.emoji+' '+_co.civ.name+' défend '+((NODES[_warAttackColonyTarget]&&NODES[_warAttackColonyTarget].name)||_warAttackColonyTarget)
+        +' aux côtés de '+warEnemy.civ.emoji+' '+warEnemy.civ.name+' (+'+(_j+_b)+'⚔️) — cohabitants.','gold');
+    }
+  }
+  const aPow=aiEngaged+aEmpathBonus+(_aiCru?(warEnemy.cruiserPower||5):0)+garrisonOf(warEnemy,_warAttackColonyTarget)+_renfort; // garnison auto : 1 colonie / 10 base
   G._aiWarCommitted=undefined;
   // Coût + récupération SYMÉTRIQUES (attaque ET défense) : 1<i class=ri-materials></i> +1<i class=ri-energy></i> par jeton engagé, jetons immobilisés (récupération / moitié perdue si défaite).
   const targetAvantNettoyage=_warAttackColonyTarget;   // mémorisée : elle est effacée plus bas, or le journal en a besoin
@@ -5346,14 +5759,14 @@ function resolveWarCombat(playerCommitted){
       const tc=warEnemy.colonies.find(c=>c.nodeId===targetId);
       if(tc){
         // CAPTURE (memo #10/#15) : la colonie change de propriétaire sur victoire
-        warEnemy.colonies=warEnemy.colonies.filter(c=>c.nodeId!==targetId);updateConnections(warEnemy);
         warEnemy.forceTokens=Math.max(0,(warEnemy.forceTokens||0)-1); // le jeton de GARNISON de la colonie perdue est DÉTRUIT (il a défendu et péri)
         addLog('💥 Jeton de garnison de '+NODES[targetId].name+' détruit dans la défense.','dim');
-        warEnemy.res.morale=Math.max(0,(warEnemy.res.morale||0)-1); // abandon forcé : −1<i class=ri-morale></i> de plus (total −2)
-        const newLvl=Math.max(1,tc.level-1); // colonie endommagée par l'assaut
-        const connP=(typeof checkConnected==='function')?checkConnected(targetId,G.player):true;
-        if(!G.player.colonies.some(c=>c.nodeId===targetId))G.player.colonies.push({nodeId:targetId,level:newLvl,connected:connP,_conquest:3});
-        updateConnections(G.player);
+        /* ⚠️ LE MORAL DE L'ABANDON FORCÉ EST MAINTENANT DANS `capturerNoeud`, qui l'applique à CHAQUE
+           nation expulsée — cohabitants compris. Le laisser ici aussi le comptait deux fois : le
+           perdant tombait de −3 au lieu de −2, et `test_guerre_complete.js` l'a vu tout de suite. */
+        /* La capture est écrite UNE SEULE FOIS (`capturerNoeud`) : elle expulse tous les occupants,
+           lève le bridage d'une colonie partagée et fait tomber l'accord forcé. */
+        const newLvl=capturerNoeud(G.player,targetId);
         txt='🏴 Victoire ! Tu CAPTURES '+NODES[targetId].name+' (Nv.'+newLvl+') — elle est à toi ! (+2 VP, population hostile −2<i class=ri-morale></i>)';
         addLog('🏴 '+NODES[targetId].name+' capturée sur '+warEnemy.civ.emoji+' '+warEnemy.civ.name+' ! (Nv.'+newLvl+', −2<i class=ri-morale></i> ennemi)','gold');
       }else{txt='Victoire ! (+2 VP, IA −2 jetons, −1<i class=ri-morale></i>)';addLog('⚔️ Combat : victoire ('+pPow+' vs '+aPow+') +2 VP','gold');}
@@ -5398,7 +5811,6 @@ function endWar(aiId){
   const idx=_warIndexBetween(_moiId(),ewAiId);
   if(idx<0){syncWarState();return null;}
   const war=G.wars.splice(idx,1)[0];
-  G._peaceCooldown=G._peaceCooldown||{};if(ewAiId)G._peaceCooldown[ewAiId]=G.turn+3; // trêve : pas de nouvelle guerre populaire avec cette nation pendant ~2 tours
   const warEnemyEW=G.ais.find(a=>a.civ.id===ewAiId)||G.ais[0];
   let txt,cls;
   if(war.wins.player>war.wins.ai){
@@ -5530,7 +5942,14 @@ function _doAITurnInterne(aiPlayer,oneShot){
       const _cr=pirateCommerce(ai);ai.abilityUsed=true;
       if(_cr.length)G.aiActions.push({emoji:'💫',name:'Commerce avec les pirates',desc:'+'+_cr.map(rEmoji).join('')});
     }else if(ai.civ.id==='terriens'){ // Diplomatie Verte : +3 pts Gouv pour 3🪨 (garde 2🪨 de réserve pour bâtir)
-      if((ai.res.materials||0)>=5){ai.res.materials-=3;addGovPts(ai,3);ai.abilityUsed=true;
+      /* ⚠️ ELLE PAYAIT ENCORE APRÈS LE NIVEAU MAXIMAL. Le gouvernement plafonne à 15 points (niveau 4,
+         4 AC de base) : au-delà, un point de plus ne donne RIEN — ni action, ni score, et l'agenda
+         « Gouvernance Éclairée » demande seulement le niveau 4. L'IA terrienne continuait pourtant à
+         verser 3🪨 par tour, indéfiniment : 27🪨 brûlés dans la partie 0C10, ce qui explique qu'elle
+         n'ait presque rien bâti et fini dernière avec 7 VP de colonies.
+         Le garde-fou existait déjà ailleurs pour la Réforme Institutionnelle (`gov_pts<15`) — il
+         manquait seulement ici. */
+      if((ai.res.materials||0)>=5&&(ai.gov_pts||0)<15){ai.res.materials-=3;addGovPts(ai,3);ai.abilityUsed=true;
         G.aiActions.push({emoji:'💫',name:'Diplomatie Verte',desc:'+3 pts Gouvernement'});}
     }else if(ai.civ.id==='martiens'){ // Surtension : +1 AC pour 2⚡ (si l'AC supplémentaire est finançable et hors fin de partie)
       if((ai.res.energy||0)>=3&&(ai.res.materials||0)>=2&&G.turn<=7){ai.res.energy-=2;ai.acLeft+=1;ai.acMax=(ai.acMax||ai.acLeft)+1;ai.abilityUsed=true;
@@ -5702,6 +6121,36 @@ function _doAITurnInterne(aiPlayer,oneShot){
     return true;
   }
 
+  /* PROPOSER UN ACCORD COMMERCIAL — de sa propre initiative, pendant son tour.
+     ⚠️ AUCUNE IA NE L'AVAIT JAMAIS FAIT. Le seul chemin vers `proposeAccord` était le clic du
+     joueur sur une colonie : une IA pouvait accepter ou refuser, jamais engager. Elle subissait la
+     diplomatie. C'est le dernier morceau du principe posé par Marc — « l'IA est une nation comme
+     une autre ».
+     Elle vise une colonie de la nation avec qui la tension est la plus forte parmi celles qui
+     accepteraient : c'est là que l'accord rapporte le plus (−3 de tension des deux côtés, +1🪨
+     +1🙂/tour, et fin d'une guerre s'il y en a une). */
+  function tryAccord(){
+    if(ai.acLeft<1||(ai.res.materials||0)<2)return false;
+    if(typeof accordAcceptable!=='function')return false;
+    const partenaires=allPlayers().filter(function(o){
+      if(o===ai)return false;
+      if(!o.colonies||!o.colonies.length)return false;
+      if(!accordAcceptable(o,ai).ok)return false;        // il refuserait
+      if(!accordAcceptable(ai,o).ok)return false;        // elle-même n'y a pas intérêt
+      return o.colonies.some(function(c){return !G.commercialAccords.includes(c.nodeId);});
+    }).sort(function(x,y){
+      return (getTens(ai.civ.id,y.civ.id)+getTens(y.civ.id,ai.civ.id))
+           - (getTens(ai.civ.id,x.civ.id)+getTens(x.civ.id,ai.civ.id));
+    });
+    if(!partenaires.length)return false;
+    const cible=partenaires[0];
+    /* On évite sa capitale : un accord sur la colonie mère est le plus mal vu, et c'est aussi ce
+       qu'un joueur choisirait en dernier. */
+    const col=cible.colonies.filter(function(c){return !G.commercialAccords.includes(c.nodeId);})
+                            .sort(function(a,b){return (a.nodeId===cible.civ.home?1:0)-(b.nodeId===cible.civ.home?1:0);})[0];
+    if(!col)return false;
+    return proposeAccord(col.nodeId, ai)===true;
+  }
   function tryRaid(){
     const raidTok=isPirate?1:2;const raidEn=0;
     if(ai.acLeft<1||ai.forceTokens<raidTok)return false;
@@ -5724,7 +6173,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
          ligne de coût. Le coût était bien payé ; rien ne le prouvait.
          On l'écrit, et on applique aussi la tension : subir une tentative de pillage fâche, qu'elle
          ait réussi ou non — elle était jusqu'ici sans conséquence diplomatique. */
-      addLog('🛡️ IA Défensive : raid de '+ai.civ.emoji+' '+ai.civ.name+' bloqué — il perd quand même 1 AC et '+raidTok+' jeton(s) (récupération).','gold');
+      addLog('🛡️ IA Défensive de '+_e.civ.emoji+' '+_e.civ.name+' : raid de '+ai.civ.emoji+' '+ai.civ.name+' bloqué — il perd quand même 1 AC et '+raidTok+' jeton(s) (récupération).','gold');
       G.warRisk=Math.min(10,(G.warRisk||0)+1);
       addTens(_e.civ.id,ai.civ.id,1);
       G.aiActions.push({emoji:'🛡️',name:'Raid bloqué',desc:'−1 AC −'+raidTok+' jeton(s), aucun butin'});
@@ -5737,7 +6186,13 @@ function _doAITurnInterne(aiPlayer,oneShot){
     G._raidsThisTurn.push({civ:ai.civ,stolen:[...stolen]});
     if(!_e._raidsThisTurn)_e._raidsThisTurn=[]; // journal propre à la victime (bilan multijoueur)
     _e._raidsThisTurn.push({civ:ai.civ,stolen:[...stolen]});
-    addLog('🤖 Raid '+ai.civ.emoji+' '+ai.civ.name+' ! Tu perds '+stolen.join('')+' (risque guerre +2, tension +2)','red');
+    /* ⚠️ « TU PERDS » ÉTAIT ÉCRIT EN DUR. La cible d'un raid est la nation la plus PROCHE
+       géographiquement (`_aiResolveTarget`), pas forcément le lecteur du journal. Quand une IA en
+       pillait une autre, le journal annonçait donc à Marc que c'était LUI qui perdait les
+       ressources — au point de fausser la lecture d'une partie entière (14 raids dans le log 0C10,
+       dont on ne pouvait pas savoir combien le visaient réellement). On nomme la victime. */
+    const _vic=(_e===G.player&&!G.player._isAI)?'Tu perds':(_e.civ.emoji+' '+_e.civ.name+' perd');
+    addLog('🤖 Raid de '+ai.civ.emoji+' '+ai.civ.name+' ! '+_vic+' '+(stolen.join('')||'rien — coffres vides')+' (risque guerre +2, tension +2)','red');
     G.aiActions.push({emoji:'⚔️',name:'Raid',desc:'Vole : '+(stolen.join('')||'rien')});
     notifyNationHit(_e,ai.civ.name+' te pille',(stolen.length?'Ils volent '+_riToText(stolen.join(' '))+'.':'Raid sans butin.')+' Risque de guerre +2, tension +2.');
     return true;
@@ -5938,18 +6393,29 @@ function _doAITurnInterne(aiPlayer,oneShot){
     const aEmpath=bonusCombatCartes(ai);
     const dEmpath=bonusCombatCartes(best);
     const dCommit=Math.max(0,Math.min(best.forceTokens||0,best.res.materials||0,best.res.energy||0));
-    const aPow=commit+aEmpath,dPow=dCommit+dEmpath+1/*garnison de base*/;
+    let _renfortIA=0;
+    for(const _co of defenseursDuNoeud(bestCol.nodeId,ai)){
+      if(_co===best)continue;
+      const _j=Math.max(0,Math.min(_co.forceTokens||0,_co.res.materials||0,_co.res.energy||0));
+      const _b=(typeof bonusCombatCartes==='function')?bonusCombatCartes(_co):0;
+      if(_j+_b<=0)continue;
+      _renfortIA+=_j+_b;
+      if(typeof applyCombatEngage==='function')applyCombatEngage(_co,_j,false);
+      addLog('🤝 '+_co.civ.emoji+' '+_co.civ.name+' défend '+((NODES[bestCol.nodeId]&&NODES[bestCol.nodeId].name)||bestCol.nodeId)
+        +' aux côtés de '+best.civ.emoji+' '+best.civ.name+' (+'+(_j+_b)+'⚔️) — cohabitants.','gold');
+    }
+    const aPow=commit+aEmpath,dPow=dCommit+dEmpath+1/*garnison de base*/+_renfortIA;
     ai.acLeft=Math.max(0,ai.acLeft-1);ai.spentThisTurn+=1+commit;ai._attacksThisTurn=(ai._attacksThisTurn||0)+1;
     const win=aPow>dPow;
     applyCombatEngage(ai,commit,win);if(dCommit>0)applyCombatEngage(best,dCommit,!win);
     addTens(ai.civ.id,best.civ.id,1);addTens(best.civ.id,ai.civ.id,3);
     const node=NODES[bestCol.nodeId];
     if(win){
-      const newLvl=Math.max(1,bestCol.level-1);
-      best.colonies=best.colonies.filter(c=>c.nodeId!==bestCol.nodeId);updateConnections(best);
-      const conn=(typeof checkConnected==='function')?checkConnected(bestCol.nodeId,ai):true;
-      ai.colonies.push({nodeId:bestCol.nodeId,level:newLvl,connected:conn});updateConnections(ai);
-      best.res.morale=Math.max(0,(best.res.morale||0)-1);
+      /* ⚠️ CE CHEMIN N'AVAIT AUCUN GARDE-FOU. `ai.colonies.push(...)` était inconditionnel : une IA
+         qui cohabitait déjà sur ce nœud s'y retrouvait avec DEUX colonies, comptées deux fois en
+         points de victoire. Mesuré, pas supposé (`mesure_cohabitation.js`). Une seule capture pour
+         tout le monde, désormais. */
+      const newLvl=capturerNoeud(ai,bestCol.nodeId);
       addLog('🏴 '+ai.civ.emoji+' '+ai.civ.name+' capture '+(node?node.name:bestCol.nodeId)+' sur '+best.civ.emoji+' '+best.civ.name+' ('+aPow+'⚔️ vs '+dPow+'🛡️, Nv.'+newLvl+')','red');
       G.aiActions.push({emoji:'🏴',name:'Capture '+(node?node.name:bestCol.nodeId),desc:'sur '+best.civ.name+' — '+aPow+'⚔️ vs '+dPow+'🛡️'});
     }else{
@@ -6069,6 +6535,20 @@ function _doAITurnInterne(aiPlayer,oneShot){
     if(!(atWar||G.warRisk>=6||(ai.forceTokens||0)<2||isMartien))return 0;
     return (ai.forceTokens||0)<2?9:(atWar?8:5);
   }
+  function _accordUtil(){
+    if(ai.acLeft<1||(ai.res.materials||0)<2)return 0;
+    const tens=Math.max.apply(null,[0].concat(allPlayers().filter(function(o){return o!==ai;})
+      .map(function(o){return getTens(o.civ.id,ai.civ.id);})));
+    /* ⚠️ LE FREIN NE FREINAIT PAS. Je comptais les accords posés SUR MES colonies — or une IA qui
+       propose signe sur la colonie de l'AUTRE : son compteur restait à zéro et elle proposait sans
+       fin. Mesuré : 83 accords sur 8 parties, moral moyen +60 %. On compte les accords dont elle
+       est SIGNATAIRE (`accordsDe`), et on plafonne : au-delà de trois, un accord de plus n'est plus
+       une priorité de tour. */
+    const mesAccords=(typeof accordsDe==='function')?accordsDe(ai).length:0;
+    if(mesAccords>=3)return 0;
+    if(tens<3&&mesAccords>0)return 0;                    // tranquille et déjà lié : rien d'urgent
+    return Math.min(11, 3+tens*1.4-mesAccords*3);
+  }
   function _routeUtil(){
     const hasDisc=ai.colonies.some(c=>!c.connected&&c.nodeId!==ai.civ.home);
     return (hasDisc&&(ai.res.materials||0)>=1)?18:0; // connecter est vital → prioritaire sur coloniser davantage
@@ -6090,6 +6570,10 @@ function _doAITurnInterne(aiPlayer,oneShot){
     U.raid    = _raidUtil();
     U.raidAI  = _raidAIUtil();
     U.assaultAI=_assaultAIUtil();
+    /* L'ACCORD VAUT D'AUTANT PLUS QUE LA TENSION EST HAUTE. Une nation isolée et détestée a plus
+       besoin d'un partenaire qu'une nation tranquille — c'est exactement le raisonnement d'un
+       joueur, et c'est ce qui empêche les IA de rester spectatrices de la diplomatie. */
+    U.accord  = _accordUtil();
     return U;
   }
   const execMap={
@@ -6097,7 +6581,8 @@ function _doAITurnInterne(aiPlayer,oneShot){
     colonize:tryColonize, upgrade:tryUpgrade, route:tryRoute,
     tech:()=>tryTech(_econBranches()),
     civic:tryCivic, military:tryMilitary,
-    raid:tryRaid, raidAI:tryRaidAI, assaultAI:tryAssaultAI
+    raid:tryRaid, raidAI:tryRaidAI, assaultAI:tryAssaultAI,
+    accord:tryAccord
   };
   // RÉSERVE DE GUERRE (comportement d'un joueur humain) : quand elle est EN GUERRE, l'IA ne dépense plus
   // jusqu'à zéro — elle garde de quoi PAYER sa défense (1🪨 +1⚡ par jeton engagé). Avant, elle finissait
@@ -6486,11 +6971,22 @@ function playingCivs(){return [G.player,...G.ais].map(p=>p.civ.name);}
 const MAP_SECTORS={
  interne:{title:'Secteur 1 · Interne',color:'#7ed09a',belt:1,
    place:{mercure:[68,128],venus:[110,232],terre:[180,355],lune:[146,372],mars:[188,488],phobos:[150,452],deimos:[258,392],ceres:[332,250]},
-   nexus:[{fromNode:'ceres',toNode:'io',to:'jupiter',next:'Io',xy:[372,345]},{fromNode:'ceres',toNode:'vesta',to:'jupiter',next:'Vesta',xy:[392,196]}],
+   /* ⚠️ UNE LIAISON INTER-SECTEURS N'EST PAS DESSINÉE PAR `conn` SEUL. La carte tactique ne trace
+      que les arêtes INTRA-secteur ; tout ce qui sort du cadre passe par un `nexus`, qui porte le
+      point de sortie et le bouton « + » de construction. Les liaisons Lune↔Io, Lune↔Vesta et
+      Phobos↔Vesta (Marc, 2026-08-14 : « ça va désenclaver ») franchissent la frontière Interne ↔
+      Jupiter : il leur faut donc une entrée de CHAQUE côté. */
+   nexus:[{fromNode:'ceres',toNode:'io',to:'jupiter',next:'Io',xy:[372,345]},{fromNode:'ceres',toNode:'vesta',to:'jupiter',next:'Vesta',xy:[392,196]},
+          {fromNode:'lune',toNode:'vesta',to:'jupiter',next:'Vesta',xy:[350,110]},
+          {fromNode:'lune',toNode:'io',to:'jupiter',next:'Io',xy:[372,432]},
+          {fromNode:'phobos',toNode:'vesta',to:'jupiter',next:'Vesta',xy:[380,530]}],
    band:{a:[300,118],b:[372,366],w:74,n:60,warm:true,name:'Ceinture intérieure',lab:[348,108]}},
  jupiter:{title:'Secteur 2 · Jupiter',color:'#ffb255',belt:1,
    place:{vesta:[52,158],jorbital1:[105,392],io:[160,350],europe:[240,378],ganymede:[208,238],callisto:[348,300]},
-   nexus:[{fromNode:'io',toNode:'ceres',to:'interne',next:'Cérès',xy:[28,248]},{fromNode:'vesta',toNode:'ceres',to:'interne',next:'Cérès',xy:[24,96]},{fromNode:'callisto',toNode:'titan',to:'saturne',next:'Titan',xy:[372,392]}],
+   nexus:[{fromNode:'io',toNode:'ceres',to:'interne',next:'Cérès',xy:[28,248]},{fromNode:'vesta',toNode:'ceres',to:'interne',next:'Cérès',xy:[24,96]},{fromNode:'callisto',toNode:'titan',to:'saturne',next:'Titan',xy:[372,392]},
+          {fromNode:'vesta',toNode:'phobos',to:'interne',next:'Phobos',xy:[22,36]},
+          {fromNode:'vesta',toNode:'lune',to:'interne',next:'Lune',xy:[18,170]},
+          {fromNode:'io',toNode:'lune',to:'interne',next:'Lune',xy:[26,440]}],
    band:{a:[18,80],b:[120,248],w:52,n:44,warm:true,name:'Ceinture intérieure',lab:[132,264]}},
  saturne:{title:'Secteur 3 · Saturne',color:'#e9cf86',
    place:{saturne:[108,425,54],encelade:[210,360],titan:[262,235]},
@@ -7245,8 +7741,6 @@ function _paixAppliquer(prop,dest,o){
     dest.res[r]=(dest.res[r]||0)+q;
   }
   const i=_warIndexBetween(prop.civ.id,dest.civ.id); if(i>=0)G.wars.splice(i,1);
-  G._peaceCooldown=G._peaceCooldown||{};
-  G._peaceCooldown[dest.civ.id]=G.turn+3; G._peaceCooldown[prop.civ.id]=G.turn+3;
   halveTensions(prop.civ.id,dest.civ.id);
   syncWarState();
   const offerStr=[o.materials?o.materials+'<i class=ri-materials></i>':'',o.energy?o.energy+'<i class=ri-energy></i>':'',o.science?o.science+'<i class=ri-science></i>':''].filter(Boolean).join(' ');
@@ -7316,7 +7810,6 @@ function submitPeaceOffer(){
     if(peaceAi){peaceAi.res.materials=(peaceAi.res.materials||0)+(o.materials||0);peaceAi.res.energy=(peaceAi.res.energy||0)+(o.energy||0);peaceAi.res.science=(peaceAi.res.science||0)+(o.science||0);}
     const peaceWarWith=G.warWith;
     const _pwIdx=_warIndexBetween(_moiId(),peaceWarWith);if(_pwIdx>=0)G.wars.splice(_pwIdx,1);
-    G._peaceCooldown=G._peaceCooldown||{};if(peaceWarWith)G._peaceCooldown[peaceWarWith]=G.turn+3; // trêve après paix négociée
     if(peaceWarWith)halveTensions('player',peaceWarWith);
     G.playerTension=G.ais.reduce((mx,ai)=>Math.max(mx,getTens('player',ai.civ.id)),0);
     G.aiTension=G.ais[0]?getTens(G.ais[0].civ.id,'player'):0;

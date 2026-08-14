@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-12 · v9.48';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
+const SOLAR_BUILD_JS = '2026-08-14 · v9.55';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :
@@ -516,7 +516,16 @@ function showOptsReal(pending, modalId, contId, key, allowNone){
   const go=(ans)=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide(ans); };
   /* Les options d'espionnage sont longues (nation · catégorie · liste des technologies) : on laisse
      le texte respirer et s'aligner à gauche, sinon la liste est illisible sur mobile. */
-  cont.innerHTML=opts.map((op,i)=>'<button class="inv-opt" data-i="'+i+'" style="cursor:pointer;width:100%;text-align:left;white-space:normal"><div class="inv-opt-name">'+(op.emoji||'')+' '+(op.name||op.id||op.branch)+'</div>'+(op.desc?'<div class="inv-opt-benefit" style="white-space:normal">'+op.desc+'</div>':'')+'</button>').join('');
+  /* INTERTITRE PAR NATION. Les options d'espionnage arrivent rangées par nation et portent un
+     champ `groupe` ; on insère son titre à chaque changement. Sans cela la liste était plate et
+     une même nation apparaissait à deux endroits — le reproche exact de Marc après la partie
+     0C10 : « il faudrait regrouper par nation de manière plus claire ». */
+  let _grp=null;
+  cont.innerHTML=opts.map((op,i)=>{
+    let tete='';
+    if(op.groupe&&op.groupe!==_grp){ _grp=op.groupe; tete='<div class="esp-groupe">'+esc(op.groupe)+'</div>'; }
+    return tete+'<button class="inv-opt" data-i="'+i+'" style="cursor:pointer;width:100%;text-align:left;white-space:normal"><div class="inv-opt-name">'+(op.emoji||'')+' '+(op.name||op.id||op.branch)+'</div>'+(op.desc?'<div class="inv-opt-benefit" style="white-space:normal">'+op.desc+'</div>':'')+'</button>';
+  }).join('');
   cont.querySelectorAll('.inv-opt[data-i]').forEach(b=>{ b.onclick=()=>{ const op=opts[parseInt(b.getAttribute('data-i'))]; const ans={}; ans[key]=(op[key]!==undefined?op[key]:(op.id!==undefined?op.id:op.branch)); go(ans); }; });
   m.classList.remove('hidden');
   return true;
