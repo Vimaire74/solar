@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-14 · v9.55';
+const SOLAR_BUILD_MOTEUR = '2026-08-14 · v9.56';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -97,19 +97,32 @@ const PLANETS_DECO=[
   {name:'Jupiter',color:'#FF9800',x:960,y:330,r:30,img:'jupiter',ir:62},{name:'Saturne',color:'#FFD54F',x:1120,y:545,r:28,img:'saturne',ir:56},
   {name:'Uranus',color:'#80DEEA',x:1460,y:315,r:16,img:'uranus',ir:32},{name:'Neptune',color:'#3F51B5',x:1660,y:505,r:15,img:'neptune',ir:31},
 ];
+/* ⚠️ LES COORDONNÉES DE CETTE TABLE SONT AUSSI LA MISE EN PAGE DE LA CARTE SYSTÈME.
+   Déplacer un nœud ne change aucune règle, mais change ce que le joueur peut LIRE : les routes sont
+   des segments entre ces points, et les planètes décoratives (`PLANETS_DECO`) sont des disques que
+   ces segments peuvent traverser. Trois repositionnements le 2026-08-14, à la demande de Marc qui
+   regardait la carte en direct, chacun vérifié par le calcul de la distance segment↔disque :
+     · Phobos 552,282 → 555,260 — monté de 22 px. Sa route vers Déimos frôlait Mars à 3 px du
+       centre (rayon 29) : elle passe maintenant à 14. Celle vers la Lune traversait déjà Mars
+       avant ce changement (20 px) et y reste — c'est le prix à payer pour monter Phobos, la Lune
+       étant très en dessous à gauche.
+     · Europe 1060,352 → 1072,266 — la route depuis Vesta traversait le disque de Jupiter (17 px du
+       centre, rayon 62). Elle passe désormais à 77, soit 15 px au-dessus du bord.
+     · Callisto 1052,425 → 1052,397 — montée plus modestement : la route Ganymède→Titan passait à
+       21 px de Callisto (rayon 16), elle passe à 43. Les deux voies vers Titan se distinguent. */
 const NODES={
   // upgradeCost:'standard'=2AC / 'remote'=3AC | strategic:'full'=+1jeton/tour / 'half'=50%
   // Colonisation colonie 'remote' → −1<i class=ri-morale></i> one-time | Niv.1 → +1<i class=ri-morale></i> toutes | Niv.2 → +1<i class=ri-morale></i> si attractive, +2<i class=ri-morale></i> Callisto
   // ATTRACTIVE_COLS=['lune','europe','titan','encelade','triton']
   lune:{id:'lune',name:'Lune',emoji:'🌕',color:'#B0BEC5',type:'moon',baseVP:2,maxLv:3,r:15,upgradeCost:'standard',strategic:'half',res:{energy:1,materials:2},x:420,y:475,conn:['phobos','ceres','deimos','io','vesta'],desc:'Satellite terrestre. Vue sur la Terre — habitat confortable.'},
-  phobos:{id:'phobos',name:'Phobos',emoji:'⚫',color:'#8D6E63',type:'moon',baseVP:2,maxLv:3,r:11,upgradeCost:'standard',strategic:'half',res:{energy:1,materials:2},x:552,y:282,conn:['lune','deimos','ceres','vesta'],desc:'Lune intérieure de Mars. Proche des routes de propulsion.'},
+  phobos:{id:'phobos',name:'Phobos',emoji:'⚫',color:'#8D6E63',type:'moon',baseVP:2,maxLv:3,r:11,upgradeCost:'standard',strategic:'half',res:{energy:1,materials:2},x:555,y:260,conn:['lune','deimos','ceres','vesta'],desc:'Lune intérieure de Mars. Proche des routes de propulsion.'},
   deimos:{id:'deimos',name:'Déimos',emoji:'🟤',color:'#795548',type:'moon',baseVP:1,maxLv:3,r:12,upgradeCost:'remote',strategic:null,res:{materials:1},x:452,y:322,conn:['phobos','lune'],desc:'Petite lune aride de Mars. Conditions difficiles.'},
   ceres:{id:'ceres',name:'Cérès',emoji:'⬜',color:'#CFD8DC',type:'dwarf_planet',baseVP:3,maxLv:3,r:21,upgradeCost:'standard',strategic:'full',res:{energy:1,materials:3},x:625,y:548,conn:['lune','phobos','vesta','io','ganymede'],desc:'Hub de la ceinture d\'astéroïdes. Carrefour stratégique des routes.'},
   vesta:{id:'vesta',name:'Vesta',emoji:'🪨',color:'#78909C',type:'asteroid',baseVP:2,maxLv:3,r:17,upgradeCost:'remote',strategic:null,res:{materials:2},x:715,y:212,conn:['ceres','ganymede','phobos','io','europe','lune'],desc:'Grand astéroïde métallique. Éloigné des routes principales.'},
   io:{id:'io',name:'Io',emoji:'🟡',color:'#FFD54F',type:'moon',baseVP:3,maxLv:3,r:15,upgradeCost:'standard',strategic:'half',res:{energy:3,materials:1},x:862,y:328,conn:['ceres','europe','ganymede','vesta','lune'],desc:'Lune volcanique. Énergie géothermique intense.'},
-  europe:{id:'europe',name:'Europe',emoji:'🔵',color:'#42a5f5',type:'moon',baseVP:4,maxLv:3,r:15,upgradeCost:'remote',strategic:null,res:{energy:1,materials:1},x:1060,y:352,conn:['io','callisto','titan','vesta'],desc:'Océan sous-glaciaire. Paysage saisissant sous Jupiter. Radiation intense.'},
+  europe:{id:'europe',name:'Europe',emoji:'🔵',color:'#42a5f5',type:'moon',baseVP:4,maxLv:3,r:15,upgradeCost:'remote',strategic:null,res:{energy:1,materials:1},x:1072,y:266,conn:['io','callisto','titan','vesta'],desc:'Océan sous-glaciaire. Paysage saisissant sous Jupiter. Radiation intense.'},
   ganymede:{id:'ganymede',name:'Ganymède',emoji:'🟤',color:'#A1887F',type:'moon',baseVP:4,maxLv:3,r:18,upgradeCost:'standard',strategic:'full',res:{energy:1,materials:2},x:922,y:432,conn:['io','vesta','callisto','titan','ceres'],desc:'Plus grande lune du système. Hub jovien majeur, carrefour de routes.'},
-  callisto:{id:'callisto',name:'Callisto',emoji:'🔘',color:'#607D8B',type:'moon',baseVP:3,maxLv:3,r:16,upgradeCost:'standard',strategic:'half',res:{energy:1,materials:2},x:1052,y:425,conn:['europe','ganymede','titan'],desc:'Hors de la radiation jovienne. Meilleur habitat humain du système jovien.'},
+  callisto:{id:'callisto',name:'Callisto',emoji:'🔘',color:'#607D8B',type:'moon',baseVP:3,maxLv:3,r:16,upgradeCost:'standard',strategic:'half',res:{energy:1,materials:2},x:1052,y:397,conn:['europe','ganymede','titan'],desc:'Hors de la radiation jovienne. Meilleur habitat humain du système jovien.'},
   /* ⚠️ « STATION JUPITER » N'EST PLUS QU'UN DESSIN (2026-08-07, décision de Marc).
      Elle n'est pas SUPPRIMÉE de la table des nœuds, et c'est délibéré : c'est elle qui DESSINE la
      planète Jupiter sur la carte tactique (`mapImg` la traduit en image `jupiter`, `MAP_RAD` lui
