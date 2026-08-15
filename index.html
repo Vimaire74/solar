@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-14 · v9.56';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-14 · v9.60';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -730,6 +730,9 @@ body.vue-carte #top-bar,body.vue-carte #bottom-bar{border-radius:0;}
    impossible de dézoomer pour atteindre les nœuds du bas comme Triton). */
 .map-zoom{position:absolute;right:10px;top:10px;z-index:20;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:8px;padding:5px 8px;background:rgba(8,10,28,.86);border:1px solid #2a3a6a;border-radius:10px;backdrop-filter:blur(4px);box-shadow:0 4px 14px rgba(0,0,0,.5);}
 .map-zoom .mz-lbl{font-size:.72em;color:#7a88aa;min-width:32px;text-align:center;font-weight:700;}
+/* Bouton de bascule des distances : jaune quand elles sont visibles, éteint quand elles sont masquées. */
+.map-zoom #mz-dist{color:#ffd54f;border-color:#5a4a1e;}
+.map-zoom #mz-dist.off{color:#5a6280;border-color:#2a3a6a;}
 .map-zoom button{width:26px;height:26px;border-radius:6px;background:rgba(10,12,34,.9);border:1px solid #2a3a6a;color:#9cc2ff;font-size:.95em;line-height:1;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .map-zoom button:active{background:#1a2a5a;}
 /* popup nœud -> feuille en bas, indépendant de la géométrie de la carte */
@@ -1194,7 +1197,11 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
          DÉFILE : un élément en `position:absolute` à l'intérieur défile avec le contenu, donc les
          boutons partaient hors de vue dès qu'on faisait glisser la carte. Ils sont maintenant
          ancrés au PANNEAU (qui, lui, ne défile pas) : toujours visibles, en haut à droite. -->
-    <div class="map-zoom"><button onclick="uiZoom(-1)" title="Dézoomer">−</button><span id="mz-lbl" class="mz-lbl">1×</span><button onclick="uiZoom(1)" title="Zoomer">＋</button></div>
+    <div class="map-zoom"><button onclick="uiZoom(-1)" title="Dézoomer">−</button><span id="mz-lbl" class="mz-lbl">1×</span><button onclick="uiZoom(1)" title="Zoomer">＋</button><!--
+      Bascule des distances entre capitales (les traits jaunes Terre–Mars–Jupiter–Éris). Elles
+      n'portent aucune règle : ni route, ni adjacence, seulement des durées de trajet. Placée près
+      du zoom, comme demandé, parce que c'est là qu'on règle la lisibilité de la carte. -->
+      <button id="mz-dist" onclick="toggleDistances()" title="Masquer les distances entre capitales">⤳</button></div>
   </div>
   </div>
   <div class="m-panel" id="mp-tech">

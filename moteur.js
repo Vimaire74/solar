@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-14 · v9.56';
+const SOLAR_BUILD_MOTEUR = '2026-08-14 · v9.60';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -120,7 +120,7 @@ const NODES={
   ceres:{id:'ceres',name:'Cérès',emoji:'⬜',color:'#CFD8DC',type:'dwarf_planet',baseVP:3,maxLv:3,r:21,upgradeCost:'standard',strategic:'full',res:{energy:1,materials:3},x:625,y:548,conn:['lune','phobos','vesta','io','ganymede'],desc:'Hub de la ceinture d\'astéroïdes. Carrefour stratégique des routes.'},
   vesta:{id:'vesta',name:'Vesta',emoji:'🪨',color:'#78909C',type:'asteroid',baseVP:2,maxLv:3,r:17,upgradeCost:'remote',strategic:null,res:{materials:2},x:715,y:212,conn:['ceres','ganymede','phobos','io','europe','lune'],desc:'Grand astéroïde métallique. Éloigné des routes principales.'},
   io:{id:'io',name:'Io',emoji:'🟡',color:'#FFD54F',type:'moon',baseVP:3,maxLv:3,r:15,upgradeCost:'standard',strategic:'half',res:{energy:3,materials:1},x:862,y:328,conn:['ceres','europe','ganymede','vesta','lune'],desc:'Lune volcanique. Énergie géothermique intense.'},
-  europe:{id:'europe',name:'Europe',emoji:'🔵',color:'#42a5f5',type:'moon',baseVP:4,maxLv:3,r:15,upgradeCost:'remote',strategic:null,res:{energy:1,materials:1},x:1072,y:266,conn:['io','callisto','titan','vesta'],desc:'Océan sous-glaciaire. Paysage saisissant sous Jupiter. Radiation intense.'},
+  europe:{id:'europe',name:'Europe',emoji:'🔵',color:'#42a5f5',type:'moon',baseVP:4,maxLv:3,r:15,upgradeCost:'remote',strategic:null,res:{energy:1,materials:1},x:1072,y:266,conn:['io','callisto','titan','vesta','pluto'],desc:'Océan sous-glaciaire. Paysage saisissant sous Jupiter. Radiation intense.'},
   ganymede:{id:'ganymede',name:'Ganymède',emoji:'🟤',color:'#A1887F',type:'moon',baseVP:4,maxLv:3,r:18,upgradeCost:'standard',strategic:'full',res:{energy:1,materials:2},x:922,y:432,conn:['io','vesta','callisto','titan','ceres'],desc:'Plus grande lune du système. Hub jovien majeur, carrefour de routes.'},
   callisto:{id:'callisto',name:'Callisto',emoji:'🔘',color:'#607D8B',type:'moon',baseVP:3,maxLv:3,r:16,upgradeCost:'standard',strategic:'half',res:{energy:1,materials:2},x:1052,y:397,conn:['europe','ganymede','titan'],desc:'Hors de la radiation jovienne. Meilleur habitat humain du système jovien.'},
   /* ⚠️ « STATION JUPITER » N'EST PLUS QU'UN DESSIN (2026-08-07, décision de Marc).
@@ -142,7 +142,7 @@ const NODES={
   titan:{id:'titan',name:'Titan',emoji:'🌫️',color:'#FF8F00',type:'moon',baseVP:5,maxLv:3,r:18,upgradeCost:'standard',strategic:'full',res:{energy:2,materials:1},x:1400,y:485,conn:['ganymede','callisto','encelade','triton','europe','pluto'],desc:'Hydrocarbures atmosphériques. Paysage orange unique. Hub saturnien.'},
   encelade:{id:'encelade',name:'Encelade',emoji:'❄️',color:'#E0F7FA',type:'moon',baseVP:3,maxLv:3,r:14,upgradeCost:'remote',strategic:null,res:{energy:1,materials:1},x:1325,y:580,conn:['titan','triton'],desc:'Geysers spectaculaires. Lune éloignée dans l\'ombre de Saturne.'},
   triton:{id:'triton',name:'Triton',emoji:'💜',color:'#7C4DFF',type:'moon',baseVP:4,maxLv:3,r:16,upgradeCost:'remote',strategic:'half',res:{energy:1,materials:1},x:1745,y:620,conn:['titan','pluto','eris','encelade'],desc:'Lune rétrograde de Neptune. Paysage unique — carrefour vers Kuiper.'},
-  pluto:{id:'pluto',name:'Pluton',emoji:'🩶',color:'#90A4AE',type:'dwarf_planet',baseVP:4,maxLv:3,r:15,upgradeCost:'remote',strategic:null,res:{materials:1},x:1590,y:215,conn:['triton','eris','titan'],desc:'Porte de la ceinture de Kuiper. Très éloigné, conditions extrêmes.'},
+  pluto:{id:'pluto',name:'Pluton',emoji:'🩶',color:'#90A4AE',type:'dwarf_planet',baseVP:4,maxLv:3,r:15,upgradeCost:'remote',strategic:null,res:{materials:1},x:1590,y:215,conn:['triton','eris','titan','europe'],desc:'Porte de la ceinture de Kuiper. Très éloigné, conditions extrêmes.'},
   eris:{id:'eris',name:'Éris',emoji:'⬡',color:'#B0BEC5',type:'dwarf_planet',baseVP:5,maxLv:3,r:17,upgradeCost:'remote',strategic:null,res:{materials:1,energy:1},x:1790,y:190,conn:['pluto','triton'],desc:'Aux confins du système solaire. Avant-poste visible d\'un réseau de colonies dispersées dans la Ceinture — VP élevés.'},
 };
 const TYPE_COLORS={economic:'#4CAF50',military:'#ef5350',technology:'#42a5f5',colonization:'#FF9800',government:'#AB47BC',civique:'#AB47BC',militaire:'#ef5350'};
@@ -365,14 +365,27 @@ const CIVIC_MARKET=[
   {id:'cm_propagande', name:'Propagande', emoji:'📣', type:'social',
    effect:'+1<i class=ri-morale></i> immédiat', desc:'Discours et affiches — galvanise la population.',
    resGain:{morale:1}, cost:{energy:1}},
-  {id:'cm_social', name:'Programmes Sociaux', emoji:'🌿', type:'social', repeatable:true,
-   effect:'+2<i class=ri-morale></i> +1<i class=ri-science></i> immédiat', desc:'Bien-être et éducation publique.',
+  /* ⚠️ ELLE ÉTAIT RÉPÉTABLE À L'INFINI, ET C'ÉTAIT UNE ERREUR (Marc, 2026-08-14).
+     Elle rendait TROIS ressources pour deux — dont du moral, celui qui divise les revenus par deux
+     quand il tombe à 1 et déclenche la guerre civile à 0 — alors que ses deux sœurs de moral,
+     Campagne Culturelle (2🪨 → +3🙂) et Propagande (1⚡ → +1🙂), sont limitées à une fois par
+     partie. La plus généreuse des trois était aussi la seule sans limite.
+     Elle passe à 1× la partie, comme elles : le moral se gagne par le jeu — colonies de niveau,
+     technologies, événements — et non par une carte qu'on réactive en boucle. */
+  {id:'cm_social', name:'Programmes Sociaux', emoji:'🌿', type:'social',
+   effect:'+2<i class=ri-morale></i> +1<i class=ri-science></i> immédiat (1× la partie)', desc:'Bien-être et éducation publique.',
    resGain:{morale:2,science:1}, cost:{materials:2}},
   {id:'cm_calm', name:'Calmer la Population', emoji:'🕊️', type:'social', repeatable:true,
    effect:'+1<i class=ri-morale></i> −3 tension vers une nation', desc:'Festivals de paix — apaisement populaire ciblé.',
    calmAction:true, cost:{materials:1,energy:1}},
-  {id:'cm_research', name:'Investissement dans la Recherche', emoji:'📖', type:'social', perTurn:true,
-   effect:'+2<i class=ri-science></i> immédiat (1×/tour)', desc:'Subventions aux labos et universités.',
+  /* ⚠️ ELLE ÉTAIT LA SEULE BRIDÉE À 1×/TOUR, ET RIEN NE LE JUSTIFIAIT. Ses trois sœurs du marché
+     civique font exactement la même chose — une action et des ressources contre un gain immédiat —
+     sans aucune limite : Extraction d'He3 (1🪨 1🔬 → +2⚡), Capture d'astéroïdes (1⚡ 1🔬 → +2🪨),
+     Programmes Sociaux (2🪨 → +2🙂). Seule la science était rationnée.
+     Marc, 2026-08-14 : « investissement dans la recherche est bloqué à 1×/tour, ce n'est pas
+     juste. » Elle devient répétable comme les autres ; le point d'action reste le vrai frein. */
+  {id:'cm_research', name:'Investissement dans la Recherche', emoji:'📖', type:'social', repeatable:true,
+   effect:'+2<i class=ri-science></i> immédiat', desc:'Subventions aux labos et universités.',
    resGain:{science:2}, cost:{materials:2}},
   {id:'cm_univ', name:'Universités des Colonies', emoji:'🎓', type:'social',
    effect:'+1<i class=ri-science></i>/tour (permanent)', desc:'Réseau universitaire — savoir continu.',
@@ -4907,9 +4920,33 @@ function doRaidTarget(aiId,nodeId){
     addTens('player',target.civ.id,1);
     addLog('⚔️ Raid sur '+target.civ.emoji+' '+target.civ.name+' ! +'+(stolen.join('')||'rien')+(enCost>0?' (−1<i class=ri-energy></i>)':'')+' ('+tc+' jeton en CD, tension +2)','green');
     addAction('💰','Raid '+target.civ.emoji,1,{},'Volé : '+(stolen.join('')||'rien'));
-    /* Le butin s'affiche à l'écran, pas seulement au journal : c'est le seul retour immédiat sur une
-       action qu'on vient de payer en jetons. */
+    /* LE BUTIN DOIT SE VOIR AU MOMENT DU RAID, PAS SEULEMENT DANS LE JOURNAL.
+       ⚠️ `gainToast` ne suffisait qu'en SOLO. En multijoueur, cette fonction s'exécute sur le
+       SERVEUR, où `window.showGainToast` n'existe pas : le toast partait dans le vide et le joueur
+       ne voyait rien — exactement le reproche de Marc (2026-08-14 : « le gain des raids qu'on fait
+       n'est toujours pas affiché au moment du raid, c'est visible seulement dans le journal »).
+       On envoie donc une NOTICE, qui elle traverse le réseau, comme pour les réponses d'accord. */
+    const _butin=stolen.length?stolen.join(' '):'';
     gainToast(p.civ.name+' — raid sur '+target.civ.name+' : '+(stolen.length?'+'+stolen.join(' +'):'aucun butin'));
+    if(_decisionActive()){
+      _emitNotice('raid_result', p,
+        {title:'💰 Raid sur '+target.civ.emoji+' '+target.civ.name,
+         butin:_butin,
+         body:(stolen.length?('Butin : <b>+'+stolen.join(' +')+'</b>'):'<b>Aucun butin</b> — ses coffres étaient vides.')
+              +' · '+tc+' jeton(s) en récupération · tension +2 chez '+target.civ.name+'.'}, 'stRien');
+      /* La VICTIME aussi doit l'apprendre autrement que par le journal : on lui doit la même
+         courtoisie qu'aux propositions d'accord. */
+      /* ⚠️ LES ICÔNES DOIVENT ÊTRE DES MOTS POUR LA VICTIME. Son bandeau (`showLogToast`) retire
+         toutes les balises HTML avant d'afficher : `<i class=ri-materials></i>` disparaissait
+         purement et simplement, et le message devenait « Tu perds  . ». Mon propre banc l'a montré
+         avant qu'une partie ne le fasse. On convertit donc en texte AVANT l'envoi (`_riToText`).
+         Le pillard, lui, passe par un bandeau qui rend le HTML : il garde ses icônes. */
+      if(!target._isAI) _emitNotice('raid_result', target,
+        {title:'⚠️ '+p.civ.emoji+' '+p.civ.name+' te pille',
+         butin:'', perte:true,
+         body:(stolen.length?('Tu perds '+_riToText(stolen.join(' ')).trim()+'.'):'Rien à prendre — tes coffres étaient vides.')
+              +' Ta tension envers '+p.civ.name+' monte de 2.'}, 'stRien');
+    }
     render();
   }catch(e){console.error('doRaidTarget',e);}
 }
@@ -6999,14 +7036,18 @@ const MAP_SECTORS={
    nexus:[{fromNode:'io',toNode:'ceres',to:'interne',next:'Cérès',xy:[28,248]},{fromNode:'vesta',toNode:'ceres',to:'interne',next:'Cérès',xy:[24,96]},{fromNode:'callisto',toNode:'titan',to:'saturne',next:'Titan',xy:[372,392]},
           {fromNode:'vesta',toNode:'phobos',to:'interne',next:'Phobos',xy:[22,36]},
           {fromNode:'vesta',toNode:'lune',to:'interne',next:'Lune',xy:[18,170]},
-          {fromNode:'io',toNode:'lune',to:'interne',next:'Lune',xy:[26,440]}],
+          {fromNode:'io',toNode:'lune',to:'interne',next:'Lune',xy:[26,440]},
+          {fromNode:'europe',toNode:'pluto',to:'externe',next:'Pluton',xy:[368,470]}],
    band:{a:[18,80],b:[120,248],w:52,n:44,warm:true,name:'Ceinture intérieure',lab:[132,264]}},
  saturne:{title:'Secteur 3 · Saturne',color:'#e9cf86',
    place:{saturne:[108,425,54],encelade:[210,360],titan:[262,235]},
    nexus:[{fromNode:'titan',toNode:'callisto',to:'jupiter',next:'Callisto',xy:[36,175]},{fromNode:'titan',toNode:'triton',to:'externe',next:'Triton',xy:[376,330]}]},
  externe:{title:'Secteur 4 · Externe & Kuiper',color:'#9ac8f5',belt:1,
    place:{uranus:[108,165],neptune:[235,150],triton:[222,196],pluto:[135,430],eris:[305,458]},
-   nexus:[{fromNode:'triton',toNode:'titan',to:'saturne',next:'Titan',xy:[36,300]}],
+   /* Pluton↔Europe (Marc, 2026-08-14) : la Ceinture externe était la seule à n'avoir gagné aucune
+      liaison au désenclavement du centre — quatre sauts d'Io contre un pour les Terriens. */
+   nexus:[{fromNode:'triton',toNode:'titan',to:'saturne',next:'Titan',xy:[36,300]},
+          {fromNode:'pluto',toNode:'europe',to:'jupiter',next:'Europe',xy:[28,470]}],
    band:{a:[55,398],b:[362,500],w:64,n:62,warm:false,name:'Ceinture de Kuiper',lab:[210,556]}},
 };
 /* ─── ZONES CLIQUABLES DE LA CARTE GLOBALE ────────────────────────────────────
@@ -8876,22 +8917,51 @@ function drawConnections(){
     'europe|io':3,'ganymede|io':4,'callisto|europe':4,'callisto|ganymede':4,
     'europe|titan':82,'ganymede|titan':80,'callisto|titan':78,
     'encelade|titan':6,'encelade|triton':150,'titan|triton':150,'pluto|titan':130,
-    'pluto|triton':60,'eris|triton':90,'eris|pluto':45,
+    'pluto|triton':60,'eris|triton':90,'eris|pluto':45,'europe|pluto':170,
     'mars|terre':26,'jupiter|mars':70,'eris|jupiter':220};
   const _range=d=>{const lo=Math.max(1,Math.round(d*0.85)),hi=Math.round(d*1.2);return lo+'–'+hi+' j';};
   const _pill=(x,y,txt,gold)=>{const w=Math.max(34,txt.length*5.4);return `<g><rect x="${(x-w/2).toFixed(1)}" y="${y-8}" width="${w.toFixed(1)}" height="16" rx="8" fill="${gold?'#241f0e':'#0b1730'}" fill-opacity=".9" stroke="${gold?'#FFD54F':'#4a9eff'}" stroke-opacity=".65" stroke-width="1"/><text x="${x}" y="${y+3.5}" text-anchor="middle" font-size="8.5" font-weight="600" fill="${gold?'#ffe08a':'#a9c8ff'}">${txt}</text></g>`;};
   const _curve=(a,b)=>{const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len;const side=((mx-SUN.x)*ny-(my-SUN.y)*nx)>=0?1:-1;const off=Math.min(len*0.18,90)*side;return{cx:mx+nx*off,cy:my+ny*off};};
   // Routes POSSIBLES (graphe du jeu) : lignes bleues + durée si le trajet est long (≥50 j)
+  /* ROUTES QUI CONTOURNENT UNE PLANÈTE.
+     ⚠️ Deux tracés passaient à travers le disque de Mars — Phobos↔Déimos à 14 px de son centre
+     (rayon 29) et Lune↔Phobos à 13. Marc, 2026-08-14 : « fais des courbes pour […] éviter de
+     passer sous la planète ». La valeur est la déviation perpendiculaire du point de contrôle, en
+     pixels ; le signe choisit le côté. Chaque valeur a été retenue en MESURANT la distance de la
+     courbe échantillonnée au disque, pas à l'œil :
+        Phobos↔Déimos  +70 → Mars à 47 px (au lieu de 14)
+        Lune↔Phobos    +70 → Mars à 35 px (au lieu de 13), et Terre reste à 64
+     Toute autre liaison reste une droite : une carte pleine de courbes se lit moins bien. */
+  const COURBE_ROUTE={'deimos|phobos':70,'lune|phobos':70};
+  const _ctrl=(a,b,k)=>{const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1;return{cx:mx-dy/len*k, cy:my+dx/len*k};};
   const drawn=new Set();
   for(const[id,node]of Object.entries(NODES)){for(const adj of node.conn){const key=[id,adj].sort().join('-');if(drawn.has(key))continue;drawn.add(key);const t=NODES[adj];if(node.type==='orbital_station'||t.type==='orbital_station')continue;
-    s+=`<line x1="${node.x}" y1="${node.y}" x2="${t.x}" y2="${t.y}" stroke="#5a7fc0" stroke-width="1.5" stroke-opacity=".7" stroke-dasharray="6,4"/>`;
+    const _k=COURBE_ROUTE[[id,adj].sort().join('|')];
+    let _mid;
+    if(_k){const c=_ctrl(node,t,_k);
+      s+=`<path d="M ${node.x} ${node.y} Q ${c.cx.toFixed(1)} ${c.cy.toFixed(1)} ${t.x} ${t.y}" fill="none" stroke="#5a7fc0" stroke-width="1.5" stroke-opacity=".7" stroke-dasharray="6,4"/>`;
+      _mid={x:0.25*node.x+0.5*c.cx+0.25*t.x, y:0.25*node.y+0.5*c.cy+0.25*t.y};   // point réel de la courbe, pour la pastille
+    }else{
+      s+=`<line x1="${node.x}" y1="${node.y}" x2="${t.x}" y2="${t.y}" stroke="#5a7fc0" stroke-width="1.5" stroke-opacity=".7" stroke-dasharray="6,4"/>`;
+      _mid={x:node.x+(t.x-node.x)*0.65, y:node.y+(t.y-node.y)*0.65};
+    }
     const d=DUR[[id,adj].sort().join('|')]??_days(node,t);
-    if(d>=50){const px=node.x+(t.x-node.x)*0.65,py=node.y+(t.y-node.y)*0.65;s+=_pill(px,py,_range(d),false);}
+    if(d>=50){s+=_pill(_mid.x,_mid.y,_range(d),false);}
   }}
-  // Routes COMMERCIALES (purement visuelles) reliant les capitales : Terre → Mars → Jupiter → Éris. Durée toujours affichée.
+  /* ROUTES COMMERCIALES (purement visuelles) reliant les capitales : Terre → Mars → Jupiter → Éris.
+     ⚠️ MASQUABLES depuis le 2026-08-14 (Marc : « crée un bouton sur la carte pour afficher ou
+     cacher les distances […] sinon ça devient moins lisible »). Elles ne portent AUCUNE règle :
+     ni route constructible, ni adjacence — seulement des durées de trajet. Les cacher ne change
+     donc rien au jeu, et l'état est rangé dans `G` pour survivre à une sauvegarde. */
   const _pos=id=>NODES[id]||PLANETS_DECO.find(p=>p.name==={terre:'Terre',mars:'Mars',jupiter:'Jupiter'}[id]);
-  for(const[a,b] of [['terre','mars'],['mars','jupiter'],['jupiter','eris']]){const A=_pos(a),B=_pos(b);if(!A||!B)continue;const c=_curve(A,B);s+=`<path d="M ${A.x} ${A.y} Q ${c.cx.toFixed(1)} ${c.cy.toFixed(1)} ${B.x} ${B.y}" fill="none" stroke="#FFD54F" stroke-width="2.3" stroke-opacity=".5" stroke-dasharray="2,7" stroke-linecap="round"/>`;const px=0.25*A.x+0.5*c.cx+0.25*B.x,py=0.25*A.y+0.5*c.cy+0.25*B.y;s+=_pill(px,py,_range(DUR[[a,b].sort().join('|')]??_days(A,B)),true);}
+  if(G.mapDistances!==false)for(const[a,b] of [['terre','mars'],['mars','jupiter'],['jupiter','eris']]){const A=_pos(a),B=_pos(b);if(!A||!B)continue;const c=_curve(A,B);s+=`<path d="M ${A.x} ${A.y} Q ${c.cx.toFixed(1)} ${c.cy.toFixed(1)} ${B.x} ${B.y}" fill="none" stroke="#FFD54F" stroke-width="2.3" stroke-opacity=".5" stroke-dasharray="2,7" stroke-linecap="round"/>`;const px=0.25*A.x+0.5*c.cx+0.25*B.x,py=0.25*A.y+0.5*c.cy+0.25*B.y;s+=_pill(px,py,_range(DUR[[a,b].sort().join('|')]??_days(A,B)),true);}
   document.getElementById('connections').innerHTML=s;
+}
+/* Bascule des distances entre capitales (lignes jaunes). Rien de plus qu'un affichage. */
+function toggleDistances(){
+  G.mapDistances = (G.mapDistances===false);
+  try{ const b=document.getElementById('mz-dist'); if(b){ b.classList.toggle('off', G.mapDistances===false); b.title = (G.mapDistances===false?'Afficher':'Masquer')+' les distances entre capitales'; } }catch(e){}
+  if(typeof renderMap==='function')renderMap();
 }
 /* ============================================================ CIV SELECTION ============================================================ */
 (function(){

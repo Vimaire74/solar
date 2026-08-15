@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-14 · v9.56';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
+const SOLAR_BUILD_JS = '2026-08-14 · v9.60';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :
@@ -758,6 +758,23 @@ function showNotice(m){
     const btn=em.querySelector('.eot-btn'); if(btn){ btn.textContent='Fermer'; btn.onclick=go; }
     else { const b2=em.querySelector('button'); if(b2)b2.onclick=go; }
     em.classList.remove('hidden');
+    return;
+  }
+  /* RÉSULTAT D'UN RAID — notice personnelle, au pillard ET à la victime.
+     ⚠️ Le butin ne s'affichait qu'en solo : `gainToast` s'exécute dans le moteur, or en
+     multijoueur le moteur tourne sur le SERVEUR, où aucune fenêtre n'existe. Le joueur payait ses
+     jetons et ne voyait rien arriver ; il fallait ouvrir le journal. On rend ici la notice que le
+     serveur envoie désormais. Bandeau, pas fenêtre modale : un raid est une petite action, une
+     modale à fermer serait plus lourde que le gain. */
+  if(k==='raid_result'){
+    const t=esc(o.title||'💰 Raid');
+    const corps=o.body||'';
+    /* ⚠️ J'AI FAILLI APPELER UNE FONCTION QUI N'EXISTE PAS. Le bandeau rouge s'appelle
+       `showLogToast`, pas `showRedToast` — et il prend un TABLEAU de lignes brutes, qu'il filtre
+       et met en forme lui-même. Un `typeof === 'function'` en garde-fou aurait masqué l'erreur :
+       le pillé n'aurait simplement rien vu, et personne ne l'aurait su avant une partie réelle. */
+    if(o.perte) showLogToast([t + ' — ' + corps.replace(/<[^>]+>/g, '')]);
+    else showGainToast('<b>' + t + '</b><br>' + corps);
     return;
   }
   /* RÉPONSE À MA PROPOSITION D'ACCORD COMMERCIAL — notice PERSONNELLE au proposant.
