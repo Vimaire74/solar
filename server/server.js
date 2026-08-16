@@ -800,8 +800,46 @@ function route(g, r) {
        tour ne repart qu'au DERNIER clic. C'est le même mécanisme que l'agenda et les
        investissements ; la machine sait déjà compter les réponses. */
     if (p.kind === 'eot') {
+      /* ⚠️ CE BLOC RENVOYAIT LE BILAN À CHAQUE PASSAGE, ET REMETTAIT LE COMPTEUR À ZÉRO.
+         `route()` est rejoué après CHAQUE réponse : `pump()` rend les questions encore ouvertes, et
+         le bilan en fait partie tant que tout le monde n'a pas cliqué. Le bloc générique plus bas se
+         protège avec `g.envoyees` — celui-ci, écrit avant et terminé par un `return`, ne le faisait
+         pas. Deux conséquences, et la seconde est la pire :
+           1. chaque joueur recevait une SECONDE fois la même décision, y répondait, et le serveur
+              refusait cette réponse — « décision périmée » (mesuré : `eot #d85 RENVOYÉE DEUX FOIS`) ;
+           2. `attenteBilan.restants` était RECONSTRUIT avec tous les humains, effaçant les clics
+              déjà enregistrés. Ceux qui avaient validé étaient réinscrits dans la liste d'attente
+              alors que leur fenêtre était refermée : plus personne ne pouvait débloquer le tour.
+         C'est très probablement ce qui faisait qu'une partie reprise « n'allait pas jusqu'à son
+         terme » une fois sur deux au banc de redémarrage.
+         On n'envoie donc qu'une fois, et on ne touche au compteur que s'il s'agit d'un NOUVEAU
+         bilan. La liste `lastRoute.questions`, elle, est reconstruite à chaque fois : c'est elle que
+         lit `renvoyerLaMain` quand quelqu'un se reconnecte, et elle doit rester exacte. */
+      /* ⚠️ « TOUT OU RIEN » NE MARCHE PAS ICI — mon premier correctif a bloqué la partie.
+         J'avais posé un drapeau « déjà envoyé » qui coupait l'envoi à TOUT LE MONDE dès le second
+         passage : ceux qui n'avaient pas encore reçu leur fenêtre ne l'ont jamais eue, et la table
+         a tourné en rond sur `bilan_attente`. Le critère juste n'est pas « ai-je déjà diffusé ce
+         bilan » mais « CE joueur-ci a-t-il déjà cliqué ». On n'envoie donc qu'aux `restants`. */
       const humains = g.seats.filter(s => !s.ai && s.user).map(s => s.civId);
-      g.attenteBilan = { id: p.id, porteur: civ, restants: humains.slice() };
+      /* Ne reconstruire le compteur que pour un NOUVEAU bilan. Le reconstruire à chaque passage
+         effaçait les clics déjà enregistrés : ceux qui avaient validé étaient réinscrits dans la
+         liste d'attente alors que leur fenêtre était refermée, et plus personne ne pouvait
+         débloquer le tour. C'est très probablement ce qui faisait qu'une partie reprise « n'allait
+         pas jusqu'à son terme » une fois sur deux au banc de redémarrage. */
+      /* ⚠️ UN BILAN SOLDÉ NE DOIT PAS ÊTRE RENVOYÉ — MAIS SURTOUT PAS AU PRIX D'UN BLOCAGE.
+         Quand le dernier joueur clique, `attenteBilan` repasse à `null` ; si `route()` revient
+         ensuite sur la MÊME question, la condition ci-dessous la prend pour un bilan neuf et la
+         rediffuse à tout le monde, d'où une seconde réponse refusée comme « décision périmée ».
+         MON PREMIER RÉFLEXE — sortir immédiatement (`attendre(); return;`) — A ÉTÉ PIRE QUE LE MAL :
+         le serveur continuait d'attendre une réponse qu'il ne demandait plus à personne, et la
+         partie se figeait en « État debut, en attente de : terriens, martiens ». Un défaut cosmétique
+         échangé contre une partie morte.
+         On se contente donc de ne RIEN RENVOYER à ceux qui ont déjà cliqué (via `restants`
+         ci-dessous), et on laisse le reste du traitement suivre son cours. La tolérance au doublon,
+         plus bas, rattrape le cas où une réponse arrive quand même en double. */
+      if (!g.attenteBilan || g.attenteBilan.id !== p.id)
+        g.attenteBilan = { id: p.id, porteur: civ, restants: humains.slice() };
+      const attendus = new Set(g.attenteBilan.restants);
       /* ⚠️ MÉMORISER LE BILAN DE CHACUN, pas seulement l'envoyer.
          Ce branchement sortait AVANT de renseigner `lastRoute.questions`. Un joueur qui revenait
          pendant le bilan — après un rafraîchissement, ou après un REDÉMARRAGE du serveur, où tout
@@ -814,7 +852,10 @@ function route(g, r) {
         const corps = (p.payload && p.payload.bodies && p.payload.bodies[s.civId]) || (p.payload && p.payload.html) || '';
         const sien = { id: p.id, kind: 'eot', nation: s.civId, payload: Object.assign({}, p.payload, { html: corps }) };
         g.lastRoute.questions.push({ civId: s.civId, pending: sien });
-        if (s.ws) sendTo(s.ws, { t: 'decision', pending: sien });
+        /* Seuls ceux qu'on attend encore reçoivent la fenêtre. Celui qui a déjà cliqué ne la revoit
+           pas — c'est ce renvoi qui produisait une seconde réponse, refusée ensuite comme
+           « décision périmée » (mesuré : `eot #d85 RENVOYÉE DEUX FOIS`). */
+        if (s.ws && attendus.has(s.civId)) sendTo(s.ws, { t: 'decision', pending: sien });
       }
       broadcast(g, { t: 'bilan_attente', restants: g.attenteBilan.restants.slice() });
       attendre(g, civ);
@@ -898,6 +939,11 @@ function route(g, r) {
   }
   const diag = diagnostiquer(g);
   console.error('route ' + g.code + ' : BLOQUÉE après ' + g._idleEssais + ' tentatives — ' + diag.resume);
+  /* ⚠️ LE DIAGNOSTIC COMPLET N'ALLAIT QUE PAR MAIL. Sans SMTP — c'est-à-dire sur toute machine de
+     développement — il n'allait donc NULLE PART : il ne restait que le résumé d'une ligne, sans les
+     douze dernières transitions, qui sont précisément ce qui dit COMMENT on est arrivé là. On a
+     cherché à l'aveugle un blocage que la machine à états savait raconter. */
+  console.error(diag.texte);
   broadcast(g, { t: 'notice', kind: 'info', payload: { msg:
     '⚠️ La partie ne parvient pas à repartir toute seule. ' + diag.resume
     + ' Rafraîchis la page : le serveur revérifiera. Le problème a été signalé.' } });
@@ -1396,7 +1442,27 @@ wss.on('connection', (ws) => {
             ? g.driver.sb.fluxQuestionsEnAttente()
             : (g.driver.state()._pending ? [g.driver.state()._pending] : []);
           const p = enAttente.find(q => q && q.id === m.id);
-          if (!p) return err('décision périmée', { id: m.id });
+          if (!p) {
+            /* ⚠️ UN DOUBLON N'EST PAS UNE ERREUR. Sur un réseau, la même réponse peut arriver deux
+               fois — reconnexion, double clic, message rejoué. Répondre « décision périmée » à
+               quelqu'un qui a simplement répondu deux fois affiche une erreur rouge pour un geste
+               parfaitement normal, et fait échouer les bancs sur du bruit de protocole.
+               On distingue donc les deux cas : si CE joueur a déjà répondu à cette question, on
+               ignore en silence ; s'il répond à une question qu'il n'a jamais eue, c'est une vraie
+               anomalie et on le dit. */
+            g.repondues = g.repondues || new Map();
+            /* ⚠️ PLUSIEURS JOUEURS RÉPONDENT AU MÊME `id` — c'est le cas du bilan de fin de tour.
+               Une Map `id → civId` n'en retenait qu'un seul, le dernier écrasant le premier : la
+               tolérance au doublon ne protégeait donc qu'une personne sur deux. Il faut un ENSEMBLE
+               de répondeurs par question. */
+            const dejaVus = g.repondues.get(m.id);
+            if (dejaVus && dejaVus.has(s.civId)) break;   // déjà traité pour lui : rien à signaler
+            return err('décision périmée', { id: m.id });
+          }
+          g.repondues = g.repondues || new Map();
+          if (!g.repondues.has(m.id)) g.repondues.set(m.id, new Set());
+          g.repondues.get(m.id).add(s.civId);
+          if (g.repondues.size > 200) { const k = g.repondues.keys().next().value; g.repondues.delete(k); }
           /* BILAN MULTI-ACTIF : la même question est posée à TOUS les humains. On enregistre les
              accusés de réception un par un et on ne répond au moteur qu'au DERNIER — sinon le tour
              repartirait dès le premier clic et la fenêtre disparaîtrait chez les autres. */

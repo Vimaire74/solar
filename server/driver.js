@@ -203,6 +203,60 @@ class GameDriver {
     return true;
   }
   _isNotice(p){ return !!(p && (p.notice || ['war_result','event_result','event_announce','eot'].includes(p.kind))) && !this._isBlockingNotice(p); }
+
+  /* ═══════ UNE QUESTION POSÉE À UNE NATION QUE PERSONNE NE JOUE ═══════
+     Depuis que les guerres éclatent aussi entre deux IA, le flux de guerre change de point de vue
+     (`_focusWar`) et pose ses fenêtres à un belligérant qui peut être tenu par l'ordinateur. Aucun
+     siège humain ne les reçoit, et la table entière attend une réponse qui ne viendra jamais.
+
+     ⚠️ POURQUOI ICI ET PAS DANS LE MOTEUR. J'avais d'abord court-circuité les quatre fenêtres
+     concernées dans `moteur.js` : « si `G.player` est une IA, appeler la continuation tout de
+     suite ». Ça débloquait le multijoueur — et ça a CASSÉ LA REPRISE DE PARTIE. Mesuré : deux bancs
+     verts depuis le 6 août (`test_serialisation`, `test_reprise`) tombaient deux fois sur trois, une
+     partie restaurée ne repartant plus.
+     La raison tient au modèle : une partie n'est reprenable que parce que chaque question EXISTE
+     dans `G._flux`, avec sa suite rangée sous forme de NOM. En appelant la continuation en direct,
+     on saute cette étape — la question n'est jamais posée, donc jamais sauvegardée, et la chaîne
+     d'appels se déroule d'un bloc au lieu de rendre la main entre chaque étape. Sauvegarder au
+     milieu de cette chaîne donne un état dont plus personne ne sait quoi faire.
+     Ici, dans la boucle du pilote, la question est POSÉE normalement, puis résolue par le même
+     `resolveDecision` qu'un humain — exactement comme les notices juste au-dessus. L'état reste
+     cohérent à tout instant, et donc sérialisable. */
+  _natDe(p){
+    const n = p && p.nation;
+    const id = (n && typeof n === 'object') ? (n.civ && n.civ.id) : n;
+    return id ? this.nation(id) : null;
+  }
+  _reponseIA(p){
+    const o = (p && p.payload) || {}, k = p && p.kind, opts = o.options || [];
+    const nat = this._natDe(p), sb = this.sb;
+    /* Les décisions de fond sont calculées par le MOTEUR (`iaVeutLaPaix`, `iaChoixDeCombat`) :
+       les règles restent d'un seul côté, ce pilote ne fait que transmettre. */
+    if(k==='peace_offer'){
+      const ennemi = this.nation(this.sb.__G.warWith);
+      const veut = (typeof sb.iaVeutLaPaix==='function') ? sb.iaVeutLaPaix(nat, ennemi) : true;
+      return veut ? {accept:true, offer:{materials:0,energy:0,science:0}} : {accept:false};
+    }
+    if(k==='peace_answer'||k==='accord_request') return {id:'yes', accept:true};
+    if(k==='war_combat') return (typeof sb.iaChoixDeCombat==='function') ? sb.iaChoixDeCombat(nat) : {action:'hold'};
+    if(k==='defense') return {defTokens:Math.min(2, o.maxDef||0)};
+    if(k==='route_capture') return {capture:true};
+    if(k==='forced_war'){
+      if(o.colTarget) return {colony:o.colTarget};
+      if(Array.isArray(o.routes) && o.routes.length) return {route:0};
+      return {peace:true};
+    }
+    if(k==='raid_target') return {targetId: opts.length?opts[0].id:null};
+    if(k==='ai_dyson'||k==='human_dyson') return {war:false};
+    if(k==='dyson_build') return {force:false};
+    if(k==='event_comm'){ const c=o.cands||[]; return {aiId: c.length?c[0].id:null}; }
+    if(k==='event_diplo'){ const r=o.rows||[]; return {selected: r.length?[r[0].id]:[]}; }
+    if(!opts.length) return {};   // notice bloquante : un accusé de réception suffit
+    const cle = k==='agenda'?'agendaId':(k==='strategy'?'cardId':((k==='invest1'||k==='invest2')?'cardId':(k==='espionage'?'id':(k==='extrasolar'?'node':'value'))));
+    const a={}; const op=opts[0];
+    a[cle] = (op.id!==undefined)?op.id:(op.node!==undefined?op.node:op.branch);
+    return a;
+  }
   _gameOver(){ const G=this.sb.__G; return G.phase==='over' || G.turn>G.maxTurns; }
 
   // Acteur courant de la phase d'actions (round-robin sur G._order, en sautant ceux qui ont passé).
@@ -261,6 +315,11 @@ class GameDriver {
         // derrière la question d'un joueur bloquerait tout le reste jusqu'à ce qu'il réponde.
         const info = liste.find(p=>this._isNotice(p));
         if(info){ this.sb.resolveDecision(info.id,{}); continue; }
+        /* Question adressée à une nation tenue par l'ordinateur : on y répond ici, au même endroit
+           et de la même façon que les notices ci-dessus. La question a bien été posée dans
+           `G._flux` avant d'être résolue — c'est ce qui garde l'état sérialisable à tout instant. */
+        const pourIA = liste.find(p=>{ const n=this._natDe(p); return n && n._isAI; });
+        if(pourIA){ this.sb.resolveDecision(pourIA.id, this._reponseIA(pourIA)); continue; }
         // Notice BLOQUANTE sans destinataire (ex. résultat d'événement, nation=null) → l'adresser à un HUMAIN
         // (sinon personne ne peut cliquer « Continuer » et la partie se figerait).
         for(const p of liste){
@@ -278,7 +337,21 @@ class GameDriver {
         if(nat===null){ // tous ont passé → clôturer la manche (déclenche guerres/EOT/événement/invest/draft)
           G._serverActionPhase=false;
           this.activate(this.primaryId); // le traitement de guerre/EOT s'appuie sur l'humain principal
-          try{ this.sb.runEndOfRound(); }catch(e){ /* sécurité */ }
+          /* ⚠️ CE `catch` AVALAIT L'ERREUR EN SILENCE — commentaire d'origine : « sécurité ».
+             C'est le contraire d'une sécurité. Si la fin de tour lève une exception, elle ne se fait
+             pas : les revenus ne tombent pas, le tour suivant ne démarre jamais, `pump()` rend
+             `idle`, et le serveur finit par écrire « BLOQUÉE — État debut, en attente de … » sans
+             que personne sache POURQUOI. On a cherché ce blocage dans le protocole pendant des
+             heures alors que le moteur criait, et qu'on lui avait mis la main sur la bouche.
+             On garde le filet — une exception ici ne doit pas tuer le serveur pour toutes les
+             parties — mais elle est désormais JOURNALISÉE, avec l'état et le tour. */
+          try{ this.sb.runEndOfRound(); }
+          catch(e){
+            const G2=this.sb.__G||{};
+            console.error('⚠️ runEndOfRound a levé (tour ' + (G2.turn||'?') + ') : ' + e.message);
+            if(e.stack) console.error(e.stack.split('\n').slice(1,4).join('\n'));
+            this._eotErreur = { tour:G2.turn, message:e.message };
+          }
           continue;
         }
         if(this.isAI(nat.civ.id)){ this._stepActor(nat); continue; }

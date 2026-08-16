@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-14 · v9.60';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
+const SOLAR_BUILD_JS = '2026-08-16 · v9.64';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :
@@ -516,10 +516,47 @@ function showOptsReal(pending, modalId, contId, key, allowNone){
   const go=(ans)=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide(ans); };
   /* Les options d'espionnage sont longues (nation · catégorie · liste des technologies) : on laisse
      le texte respirer et s'aligner à gauche, sinon la liste est illisible sur mobile. */
-  /* INTERTITRE PAR NATION. Les options d'espionnage arrivent rangées par nation et portent un
-     champ `groupe` ; on insère son titre à chaque changement. Sans cela la liste était plate et
-     une même nation apparaissait à deux endroits — le reproche exact de Marc après la partie
-     0C10 : « il faudrait regrouper par nation de manière plus claire ». */
+  /* ESPIONNAGE : CASES À COCHER, une seule catégorie chez une seule nation.
+     ⚠️ La liste ne proposait que « une technologie » OU « la catégorie entière » — on ne pouvait
+     donc pas en prendre exactement deux, alors que la règle prévoit +6 / +8 / +10 de tension selon
+     qu'on en vole une, deux ou trois. Le moteur savait compter, l'écran ne savait pas demander
+     (Marc, 2026-08-15). Les autres listes d'options gardent leur affichage d'origine. */
+  if(pending.kind==='espionage' && opts.some(o=>o.categorieCle)){
+    let g=null, h='';
+    const blocs=new Map();
+    for(const o of opts){ if(o.kind!=='une'||!o.categorieCle)continue;
+      if(!blocs.has(o.categorieCle))blocs.set(o.categorieCle,{groupe:o.groupe,nom:o.categorieNom,techs:[]});
+      blocs.get(o.categorieCle).techs.push(o); }
+    for(const [cle,b] of blocs){
+      if(b.groupe&&b.groupe!==g){ g=b.groupe; h+='<div class="esp-groupe">'+esc(b.groupe)+'</div>'; }
+      h+='<div class="esp-cat" data-cle="'+esc(cle)+'"><div class="esp-cat-nom">'+esc(b.nom||'')+'</div>';
+      for(const t of b.techs)
+        h+='<label class="esp-tech"><input type="checkbox" data-cle="'+esc(cle)+'" value="'+esc(t.ids[0])+'"> <span>'+(t.name||'')+'</span></label>';
+      h+='<div class="esp-cat-pied"></div></div>';
+    }
+    const att=opts.find(o=>o.kind==='attendre');
+    if(att) h+='<button class="inv-opt" id="sc-esp-att" style="cursor:pointer;width:100%;text-align:left;white-space:normal;margin-top:10px">'
+      +'<div class="inv-opt-name">'+(att.name||'')+'</div><div class="inv-opt-benefit" style="white-space:normal">'+(att.desc||'')+'</div></button>';
+    cont.innerHTML=h;
+    const cases=[...cont.querySelectorAll('input[type=checkbox]')];
+    const maj=()=>{
+      cont.querySelectorAll('.esp-cat').forEach(div=>{
+        const c=div.getAttribute('data-cle');
+        const pris=cases.filter(x=>x.getAttribute('data-cle')===c&&x.checked);
+        const pied=div.querySelector('.esp-cat-pied');
+        if(!pied)return;
+        pied.innerHTML=pris.length?('<button class="opt esp-go">🕵️ Voler '+pris.length+' technologie'+(pris.length>1?'s':'')+'</button>'):'';
+        const b2=pied.querySelector('.esp-go');
+        if(b2)b2.onclick=()=>{ const [nation,branch]=c.split('|'); go({nation:nation,branch:branch,ids:pris.map(x=>x.value)}); };
+      });
+    };
+    // Une seule catégorie à la fois : cocher ailleurs décoche le bloc précédent.
+    cases.forEach(x=>x.onchange=()=>{ if(x.checked)cases.forEach(y=>{ if(y.getAttribute('data-cle')!==x.getAttribute('data-cle'))y.checked=false; }); maj(); });
+    const ba=document.getElementById('sc-esp-att'); if(ba)ba.onclick=()=>go({id:'attendre'});
+    maj();
+    m.classList.remove('hidden');
+    return true;
+  }
   let _grp=null;
   cont.innerHTML=opts.map((op,i)=>{
     let tete='';
@@ -1570,6 +1607,11 @@ function askLocalDecision(pending){
       // Le curseur est borné au VRAI plafond du moteur (jetons possédés ET payables). Sinon le
       // joueur engage 15 et le moteur n'en retient que ce qu'il peut payer, sans qu'il le voie.
       const maxF=(o.maxEngage!==undefined)?o.maxEngage:force;
+      /* ⚠️ LE CROISEUR SE PAIE AUSSI, ET LE CURSEUR L'IGNORAIT. Le serveur envoie maintenant DEUX
+         plafonds : sans croiseur, et avec sa réserve déduite. Cocher la case rabaisse donc le
+         maximum en direct, au lieu de laisser le joueur engager une force que le moteur rognerait
+         ensuite en silence (Marc, 2026-08-15 : « vérifie que j'avais assez de ressources »). */
+      const maxFCru=(o.maxEngageAvecCroiseur!==undefined)?o.maxEngageAvecCroiseur:maxF;
       const cru=o.cruiser||{has:false,afford:false,power:5};
       const cols=o.cols||[]; const canHold=!!o.canHold; const threat=o.aiThreat;
       const tokenPick=(title,hint,onOk)=>{ // sous-écran : choisir les jetons engagés (+ supercroiseur)
@@ -1580,11 +1622,25 @@ function askLocalDecision(pending){
              +'<span>⚓ Déployer le Supercroiseur <b>+'+(cru.power||5)+'⚔️</b>'+(cru.afford?'':' — ressources insuffisantes')+'</span></label>')
           : '';
         decisionPanel('<h2>'+title+'</h2>'+(hint?'<div class="muted" style="margin-bottom:6px">'+hint+'</div>':'')+limite
-          +'<div>Jetons engagés : <b id="sc-wcv">'+Math.min(1,maxF)+'</b> / '+maxF+'</div>'
+          +'<div>Jetons engagés : <b id="sc-wcv">'+Math.min(1,maxF)+'</b> / <b id="sc-wcmax">'+maxF+'</b></div>'
           +'<input type="range" id="sc-wc" min="0" max="'+maxF+'" value="'+Math.min(1,maxF)+'" style="width:100%">'
           +cruLigne
+          +'<div id="sc-wclim" style="color:#ffcc88;font-size:.8em;min-height:1em"></div>'
           +'<button class="opt" id="sc-wcok">✓ Engager</button><button class="opt" id="sc-wcback">↩ Retour</button>');
         const sl=document.getElementById('sc-wc'), dv=document.getElementById('sc-wcv'); if(sl)sl.oninput=()=>dv.textContent=sl.value;
+        /* La case du croiseur rabat le maximum du curseur, et l'annonce. */
+        const _cb=document.getElementById('sc-cru'), _lim=document.getElementById('sc-wclim');
+        const _maj=()=>{
+          if(!sl)return;
+          const m=(_cb&&_cb.checked)?maxFCru:maxF;
+          sl.max=m; if((parseInt(sl.value)||0)>m) sl.value=m;
+          if(dv)dv.textContent=sl.value;
+          const t=document.getElementById('sc-wcmax'); if(t)t.textContent=m;
+          if(_lim)_lim.textContent=(_cb&&_cb.checked&&maxFCru<maxF)
+            ? ('⚓ Le Supercroiseur réserve des ressources : maximum ramené à '+maxFCru+' jeton(s).') : '';
+        };
+        if(_cb)_cb.onchange=_maj;
+        _maj();
         document.getElementById('sc-wcok').onclick=()=>{
           const c=document.getElementById('sc-cru');
           onOk(parseInt(sl.value)||0, !!(c&&c.checked));
