@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-16 · v9.64';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
+const SOLAR_BUILD_JS = '2026-08-16 · v9.69';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :
@@ -434,7 +434,9 @@ function showWarResultReal(pending){
   if(t)t.textContent=o.title||'⚔️ Combat';
   if(b)b.innerHTML=o.body||'';
   if(r){ const res=o.result||null;
-    if(res&&res.txt){ r.textContent=res.txt; r.className='war-result '+(res.cls||''); r.classList.remove('hidden'); }
+    // Même correctif que dans le puits de notices : ces phrases portent les icônes de ressources
+    // sous forme de balises, `textContent` les affichait en clair (« class=ri-morale »).
+    if(res&&res.txt){ r.innerHTML=res.txt; r.className='war-result '+(res.cls||''); r.classList.remove('hidden'); }
     else r.classList.add('hidden');
   }
   const go=()=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide({}); };
@@ -772,7 +774,12 @@ function showNotice(m){
       if(t)t.textContent=o.title||'⚔️ Combat';
       if(b)b.innerHTML=o.body||'';
       if(r){ const res=o.result||null;
-        if(res&&res.txt){ r.textContent=res.txt; r.className='war-result '+(res.cls||''); r.classList.remove('hidden'); }
+        /* ⚠️ `textContent` AFFICHAIT LE HTML EN CLAIR. Le moteur écrit ces phrases avec les icônes
+           de ressources sous forme de balises — « Égalité — −1<i class=ri-morale></i> pour les
+           deux » — et `textContent` les rend littéralement : le joueur lisait « class=ri-morale »
+           au milieu du texte. La version solo, elle, utilise `innerHTML` deux lignes plus loin dans
+           moteur.js : les deux chemins affichaient donc la même phrase différemment. */
+        if(res&&res.txt){ r.innerHTML=res.txt; r.className='war-result '+(res.cls||''); r.classList.remove('hidden'); }
         else r.classList.add('hidden'); }
       const btn=wm.querySelector('.war-btn'); if(btn)btn.onclick=()=>wm.classList.add('hidden');
       wm.classList.remove('hidden');

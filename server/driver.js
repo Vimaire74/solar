@@ -186,6 +186,11 @@ class GameDriver {
     const G = this.sb.__G;
     this.roster = [G.player, ...G.ais];
     for(const s of seats){ const n=this.roster.find(p=>p.civ.id===s.civId); if(n)n._isAI=!!s.isAI; }
+    /* Les tempéraments sont attribués une première fois à la création de la partie, quand le moteur
+       ne sait pas encore quels sièges sont humains. Maintenant qu'ils le sont, on rappelle :
+       la fonction ignore les nations déjà pourvues et sert donc uniquement à en donner un à celles
+       qui viennent de passer sous contrôle de l'ordinateur. */
+    try{ if(typeof this.sb.attribuerProfilsIA==='function') this.sb.attribuerProfilsIA(); }catch(e){}
     this.primaryId = civIds.find(id=>{ const n=this.roster.find(p=>p.civ.id===id); return n && !n._isAI; }) || civIds[0];
     this._aptr = 0; this._aorderRef = null;
     this.sb.showAgendaSelModal(); // sièges fixés → on lance le draft d'agenda (chaque humain choisit)

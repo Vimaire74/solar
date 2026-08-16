@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-16 · v9.64';
+const SOLAR_BUILD_MOTEUR = '2026-08-16 · v9.69';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -566,9 +566,30 @@ function _evAiInfo(ai,obs){var _o=obs||G.player;var pf=perceivedForce(_o,ai);var
 /* Les nations avec qui NAT peut encore signer — humaines comprises.
    ⚠️ L'ancienne liste partait de `G.ais` : deux joueurs humains ne pouvaient donc JAMAIS se
    proposer d'accord pendant un sommet, l'un n'apparaissait simplement pas dans la liste de l'autre. */
+/* Existe-t-il DÉJÀ un accord commercial entre ces deux nations ? Le registre des signataires est la
+   source ; le propriétaire du nœud ne sert que de repli pour les parties enregistrées avant lui. */
+function accordEntre(a,b){
+  if(!a||!b||a===b)return null;
+  const ida=a.civ.id, idb=b.civ.id;
+  return (G.commercialAccords||[]).find(function(nid){
+    const s=(typeof _accordSignataires==='function')?_accordSignataires(nid):null;
+    if(s)return s.includes(ida)&&s.includes(idb);
+    const o=(typeof ownerNation==='function')?ownerNation(nid):null;
+    return !!(o&&(o.civ.id===ida||o.civ.id===idb));
+  })||null;
+}
+/* ⚠️ CE FILTRE SE TROMPAIT DEUX FOIS, ET DANS LES DEUX SENS.
+   Il écartait toute nation ayant un accord sur UNE DE SES COLONIES — peu importe avec qui. Une
+   nation liée aux Terriens devenait donc introuvable pour les Martiens, alors qu'ils n'avaient
+   rien signé ensemble.
+   Et il laissait passer une nation avec qui on avait DÉJÀ un accord, dès lors que cet accord était
+   posé sur une colonie à NOUS : c'est le cas vu en partie — un accord conclu au sommet, puis la
+   même nation revenant en proposer un second par une colonie.
+   La bonne question n'est pas « cette nation a-t-elle un accord ? » mais « avons-nous DÉJÀ un
+   accord ELLE ET MOI ? ». */
 function _evCommCandidats(nat){
   return allPlayers().filter(function(o){
-    return o!==nat && !o.colonies.some(function(c){return G.commercialAccords.includes(c.nodeId);});
+    return o!==nat && !accordEntre(nat,o);
   });
 }
 /* `onDone` est un NOM de suite (bloc @flux) : il se sauvegarde, une fonction non. */
@@ -1274,6 +1295,10 @@ function defenseurPrincipal(nodeId, attaquant){
    (voir docs/ARCHITECTURE_AVENIR.md). Rend le niveau obtenu.
    `vainqueur` prend le nœud ; TOUS les autres occupants en sont expulsés. */
 function capturerNoeud(vainqueur, nodeId){
+  /* Perdre une colonie fait basculer les expulsés en état de siège : ils riposteront. */
+  if(typeof marquerAgressee==='function')
+    for(const _v of (typeof occupantsDuNoeud==='function'?occupantsDuNoeud(nodeId):[]))
+      if(_v!==vainqueur) marquerAgressee(_v);
   if(!vainqueur||!nodeId) return 0;
   const nom=(NODES[nodeId]&&NODES[nodeId].name)||nodeId;
   let meilleur=0, expulses=0;
@@ -1579,6 +1604,10 @@ function initGame(civId,aiCivIds){
      du flux existant — elle observe, elle ne commande pas encore. La migration se fait
      flux par flux ; l'objectif mesurable est `test_serialisation.js` au vert. */
   fluxInit();
+  /* Les tempéraments sont tirés ICI, une fois la table constituée. En mode serveur, les sièges
+     humain/IA sont fixés juste après par le pilote : `attribuerProfilsIA` est donc rappelée à ce
+     moment-là, et elle ne touche pas aux nations qui ont déjà un profil. */
+  attribuerProfilsIA();
   drawStars();drawConnections();
   addLog('🚀 Partie ! '+CIVS[civId].name+' vs '+G.ais.map(a=>a.civ.name).join(', '),'gold');
   addLog('⭐ Bonus national : '+(CIVS[civId].techBonus?TECH_BRANCHES[CIVS[civId].techBonus].emoji+' '+TECH_BRANCHES[CIVS[civId].techBonus].label+' −1<i class=ri-science></i>':'Aucun'));
@@ -4500,7 +4529,16 @@ function doRevenues(){
     const caps=getResCapFor(p);
     /* LE CALCUL EST DANS `revenusBruts` — c'est CE code-ci qui y a été déplacé, sans modification.
        `doRevenues` garde ce qui est de son ressort : plafonds, moral, jetons, conquête, journal. */
-    const gains=revenusBruts(p,{journal:(m,c)=>addLog(m,c)});
+    /* ⚠️ LE JOURNAL LOCAL RECEVAIT LES REVENUS DES QUATRE NATIONS.
+       Cette boucle passe sur TOUTES les nations, et fournissait le journal à chacune : l'écran
+       affichait donc « 🤝 Accord commercial : +3🪨 +3🙂 » quatre fois de suite, sans dire de qui il
+       s'agissait. C'est du bruit, et c'est surtout une FUITE : le nombre d'accords et de bonus
+       d'une rivale est une information qu'on n'a pas à lire.
+       La règle du jeu est de journaliser pour la nation assise devant cet écran. C'est bien à
+       l'APPELANT d'en décider — `revenusBruts` calcule et ne sait pas qui regarde ; c'est pour ça
+       que la condition est ici et non dans le calcul. */
+    const _pourMoi = (p===G.player);
+    const gains=revenusBruts(p, _pourMoi?{journal:(m,c)=>addLog(m,c)}:{});
     if(p._halfResources){
       p._halfResources=false;
       for(const r of Object.keys(gains))gains[r]=Math.floor((gains[r]||0)/2);
@@ -5282,9 +5320,18 @@ function breakAccordAndAttack(nodeId){
   if(Math.min(p.res.materials||0,p.res.energy||0)<1){addLog('⚠️ Attaque : il faut du <i class=ri-materials></i> et de l\'<i class=ri-energy></i> pour engager des jetons.','red');return;}
   // LIMITE DE 2 ATTAQUES/TOUR SUPPRIMÉE (demande de Marc) : le nombre d'assauts n'est plus plafonné —
   // il reste limité naturellement par les AC, les jetons Force et le coût en ressources de chaque combat.
-  // Rupture d'accord = attaque SURPRISE : on rompt l'accord PUIS on assaille immédiatement (capture si victoire).
-  G.commercialAccords=G.commercialAccords.filter(n=>n!==nodeId);
-  addLog('📜 Accord sur '+node.name+' rompu — attaque surprise !','red');
+  /* ⚠️ LA RUPTURE N'ÉTAIT FAITE QU'À MOITIÉ, ET L'ACCORD REVENAIT.
+     Cette ligne retirait le nœud de `G.commercialAccords` mais laissait son entrée dans
+     `G.accordsParties`, le registre des signataires. Deux conséquences vues en partie :
+       · `accordsDe()` lit le registre — l'accord continuait donc de payer son revenu ;
+       · et surtout, `declarerGuerre` (appelé juste après par l'assaut) révoque les accords en
+         partant de `G.commercialAccords` : le nœud n'y étant plus, il n'avait plus rien à révoquer
+         et l'entrée orpheline survivait. D'où « le jeu ne l'enregistre pas et ne le redit pas à
+         l'attaque suivante ».
+     On ne rompt donc plus à la main : l'assaut déclare la guerre, et `declarerGuerre` révoque
+     PROPREMENT tous les accords entre les deux nations — liste ET registre. Une seule copie de la
+     règle de rupture, celle qui la connaît en entier. */
+  addLog('📜 Attaque surprise sur '+node.name+' — l\'accord est rompu par la guerre qui suit.','red');
   p.acLeft-=1;p.spentThisTurn+=1;closePopup();
   playerAssaultColony(nodeId,_brkAI); // résout le combat + capture immédiate (déclare la guerre)
 }
@@ -5959,6 +6006,9 @@ function declarerGuerre(agresseur, cible, raison, declaredBy){
     reason:raison, declaredBy:declaredBy||'other', agresseurCiv:A, live:true, aiRecaptureTarget:null});
   w.focusColony=G._warFocusColony||null; G._warFocusColony=null;
   G.wars.push(w);
+  /* Une nation à qui l'on déclare la guerre change de tempérament : elle riposte et s'arme avant
+     tout, quel que soit son profil de temps de paix (voir `PROFILS_IA.assiegee`). */
+  if(typeof marquerAgressee==='function'){ marquerAgressee(cible); marquerAgressee(agresseur); }
   if(typeof syncWarState==='function')syncWarState();
   // La tension reste au MAXIMUM des deux côtés pendant toute la guerre (endWar la halve à la fin).
   setTens(A,B,10); setTens(B,A,10);
@@ -6301,7 +6351,11 @@ function chooseInvestmentForAI(ai,level){
       case 'inv_agr': s+=morale<=4?4:1; break;
       case 'inv_exp': s+=G.turn<=2?4:1; break;
       case 'inv_esp': s+=1.5; break;
-      case 'inv2_war': s+=atWar?5:((ai.civ.id==='martiens'||ai.civ.id==='terriens')?2:1); break;
+      /* Le conquérant prend Stratégie Guerrière : ses jetons reviennent en un tour au lieu de deux,
+         ce qui double la cadence de ses assauts. C'est l'investissement qui sert le plus sa
+         doctrine — demandé explicitement par Marc. */
+      case 'inv2_war': s+=(typeof profilActifDe==='function'&&profilActifDe(ai)===PROFILS_IA.guerrier)?8:
+                          (atWar?5:((ai.civ.id==='martiens'||ai.civ.id==='terriens')?2:1)); break;
       case 'inv2_comfort': s+=morale<=4?4:1; break;
       case 'inv2_colonies': s+=belowMax*1.5; break;
       case 'inv2_union': s+=sci>=1?3:1; break;
@@ -6341,6 +6395,127 @@ function aiBuyMilitary(ai,card){
   addLog('🤖 '+ai.civ.name+' achète '+card.emoji+' '+card.name,'dim');
   G.aiActions.push({emoji:card.emoji,name:'Achète '+card.name,desc:card.effect});
 }
+/* ══════════════════ PROFILS DE JEU DES NATIONS DIRIGÉES PAR L'ORDINATEUR ══════════════════
+   Demande de Marc, 2026-08-16 : « faire un profil de jeu par IA — une qui évite la guerre et vise
+   le développement des colonies et les tech, une autre qui raid plus et qui vise la guerre, une
+   autre qui cherche à accomplir les événements et son agenda en priorité. »
+
+   POURQUOI ÇA CHANGE LE JEU. Toutes les IA partageaient le même cerveau : à situation égale, elles
+   voulaient la même chose au même moment. Une partie à quatre ressemblait donc à trois exemplaires
+   du même adversaire, et le joueur n'avait qu'une seule manière de faire à apprendre.
+
+   COMMENT. Le profil ne remplace pas le calcul d'utilité — il le PONDÈRE. Une bâtisseuse acculée
+   se défendra toujours ; elle le fera simplement plus tard et moins volontiers qu'une guerrière.
+   C'est ce qui évite les caricatures : personne ne devient incapable d'une action.
+
+   ⚠️ UNE NATION AGRESSÉE CHANGE DE TEMPÉRAMENT. Le profil décrit une préférence en temps de paix.
+   Dès qu'on lui déclare la guerre, qu'on la pille ou qu'on lui prend une colonie, elle bascule en
+   `assiegee` pour quelques tours : militaire, technologies de guerre et ripostes passent devant,
+   quel que soit son tempérament d'origine. C'est exactement ce que Marc a vu faire aux Martiens,
+   qui ont pris les technologies l'empêchant d'attaquer.
+   Le profil est une CHAÎNE rangée sur la nation : il se sauvegarde et survit à une reprise. */
+const PROFILS_IA = {
+  batisseur: {
+    nom:'Bâtisseur', emoji:'🏗️',
+    desc:'développe ses colonies et ses technologies, ne pille jamais',
+    /* Demande de Marc : aucun raid, jamais. Quand il lui manque une ressource, il la RÉCOLTE
+       (He3, astéroïdes, recherche — voir `tryCivic`) au lieu d'aller la prendre chez le voisin.
+       D'où le `civic` haut : c'est par là qu'il se refait. */
+    mult:{ colonize:1.5, upgrade:1.6, tech:1.5, route:1.3, civic:1.7,
+           raid:0, raidAI:0, assaultAI:0.3, military:0.6, accord:1.4 }
+  },
+  guerrier: {
+    nom:'Conquérant', emoji:'⚔️',
+    desc:'pille, arme sa flotte et cherche l\'affrontement',
+    /* ═══ DOCTRINE DU CONQUÉRANT (dictée par Marc, 2026-08-16) ═══
+       « Un conquérant qui ne raide pas et qui vise les technologies militaires en premier. Comme ça
+       il économise ses jetons. »
+       Le raid tombe donc à presque rien : il coûte 2 jetons pour deux ressources, et ces jetons
+       sont exactement ce dont il a besoin pour prendre une colonie — qui, elle, rapporte des VP,
+       un revenu et un territoire. Il thésaurise pour frapper.
+       Le reste de sa doctrine ne tient pas dans des multiplicateurs : l'ordre de ses recherches est
+       dans `_econBranches`, sa façon de choisir sa cible dans `_assaultAIUtil`, et son
+       investissement dans `chooseInvestmentForAI`. */
+    /* ⚠️ RAID À ZÉRO, PAS « TRÈS BAS ». Avec un simple coefficient (0,15), il pillait encore 2,4 fois
+       par partie : une utilité réduite reste positive, et quand tout le reste est hors de portée —
+       plus de savoir, plus de matériaux — le raid redevenait le seul choix classé. Un conquérant qui
+       ne raide pas, c'est zéro. Ses jetons servent aux assauts, qui rapportent une colonie. */
+    mult:{ colonize:1.0, upgrade:1.4, tech:1.35, route:1.0, civic:0.85,
+           raid:0, raidAI:0, assaultAI:2.6, military:1.1, accord:0.5 }
+  },
+  opportuniste: {
+    nom:'Opportuniste', emoji:'🎯',
+    desc:'court les événements et son agenda secret',
+    mult:{ colonize:1.2, upgrade:1.1, tech:1.3, route:1.2, civic:1.5,
+           raid:0.7, raidAI:0.7, assaultAI:0.7, military:0.9, accord:1.6 }
+  },
+  /* Non attribuable au départ : c'est l'état de crise, adopté par n'importe quelle nation. */
+  assiegee: {
+    nom:'Assiégée', emoji:'🛡️',
+    desc:'riposte et se protège avant tout',
+    mult:{ colonize:0.5, upgrade:0.7, tech:1.1, route:0.7, civic:0.8,
+           raid:1.4, raidAI:1.4, assaultAI:2.0, military:2.2, accord:1.2 }
+  }
+};
+const PROFILS_ATTRIBUABLES = ['batisseur','guerrier','opportuniste'];
+const PROFIL_ASSIEGEE_TOURS = 3;   // durée de la bascule après la dernière agression subie
+
+/* Attribue un tempérament à chaque nation dirigée par l'ordinateur.
+   À trois IA ou plus, les trois profils sortent tous — le joueur affronte donc les trois manières
+   de jouer. En dessous, on tire sans remise : deux IA auront deux tempéraments différents, une IA
+   seule en aura un au hasard. */
+function attribuerProfilsIA(){
+  /* ⚠️ L'ORDRE DE PARCOURS DOIT ÊTRE CANONIQUE, PAS CELUI D'ACTIVATION.
+     `allPlayers()` rend les nations dans l'ordre « active d'abord, puis les autres » — qui change
+     selon qui joue. Les tempéraments étaient donc distribués différemment selon la nation active,
+     et deux parties par ailleurs identiques divergeaient : `test_equivalence.js` l'a vu tout de
+     suite (« le résultat dépend de qui est la nation active »).
+     On trie par identifiant : le tirage reste aléatoire, mais pour un même tirage la même nation
+     reçoit toujours le même tempérament. */
+  /* ⚠️ ON EN DONNE UN À TOUTES LES NATIONS, MÊME CELLE DU JOUEUR.
+     Le filtre « seulement les IA » paraissait évident, et il rendait le jeu dépendant de QUI est la
+     nation active : la nation du joueur n'avait pas de tempérament, donc si l'ordinateur venait à
+     la jouer — partie tout-IA, joueur remplacé après une absence, banc d'essai — elle se comportait
+     autrement que les autres. `test_equivalence.js` l'a vu immédiatement.
+     Un tempérament posé sur une nation humaine ne coûte rien : il n'est lu que par `doAITurn`. */
+  const ias=(typeof allPlayers==='function'?allPlayers():[G.player].concat(G.ais||[]))
+    .filter(Boolean)
+    .slice().sort((a,b)=>String(a.civ.id).localeCompare(String(b.civ.id)));
+  /* ⚠️ LE TIRAGE NE DOIT ÊTRE FAIT QU'UNE FOIS, ET PAS À CHAQUE APPEL.
+     Cette fonction est rappelée après coup par le pilote (quand les sièges humain/IA sont connus).
+     Mélanger à chaque appel consommait du hasard en quantité variable selon le nombre de nations
+     déjà pourvues : deux parties par ailleurs identiques se mettaient alors à diverger, et
+     `test_equivalence.js` — qui vérifie qu'une partie ne dépend pas de QUI est la nation active —
+     est passé au rouge. Contre-épreuve faite : en retirant l'attribution, il redevenait vert.
+     On tire donc UN décalage, une seule fois par partie, rangé dans `G` ; l'ordre des nations étant
+     canonique (tri par identifiant), l'attribution devient entièrement reproductible. */
+  if(G._profilDecalage===undefined||G._profilDecalage===null)
+    G._profilDecalage=Math.floor(Math.random()*PROFILS_ATTRIBUABLES.length);
+  const sac=PROFILS_ATTRIBUABLES.slice();
+  let k=0;
+  for(const n of ias){
+    if(!n){k++;continue;}
+    if(n._profil){k++;continue;}   // on avance quand même : la place dans l'ordre reste la sienne
+    n._profil=sac[(k+G._profilDecalage)%sac.length]; k++;
+    /* On ne l'ANNONCE que pour les nations réellement tenues par l'ordinateur : inutile de dire au
+       joueur qu'il a un tempérament dont il ne verra jamais l'effet. */
+    if(n._isAI!==false){
+      try{ addLog('🧠 '+n.civ.emoji+' '+n.civ.name+' — tempérament : '+PROFILS_IA[n._profil].emoji+' '+PROFILS_IA[n._profil].nom
+        +' ('+PROFILS_IA[n._profil].desc+')','dim'); }catch(e){}
+    }
+  }
+}
+/* Marque une nation comme agressée : elle basculera en `assiegee` pour quelques tours. Appelée
+   quand elle subit un raid, une déclaration de guerre ou la perte d'une colonie. */
+function marquerAgressee(nat){ if(nat&&nat._isAI!==false) nat._agresseeTour=G.turn; }
+/* Le profil EFFECTIF : celui de crise s'il y a eu une agression récente, sinon le tempérament. */
+function profilActifDe(nat){
+  if(!nat)return null;
+  const dep=nat._agresseeTour;
+  if(dep!==undefined&&dep!==null&&(G.turn-dep)<PROFIL_ASSIEGEE_TOURS) return PROFILS_IA.assiegee;
+  return PROFILS_IA[nat._profil]||null;
+}
+function nomProfilDe(nat){ const p=profilActifDe(nat); return p?(p.emoji+' '+p.nom):'—'; }
 function doAITurn(aiPlayer,oneShot){
   /* Tout ce que cette fonction journalise appartient à CETTE IA. Sans ce marquage, ses lignes
      étaient attribuées à `G.player` — c'est-à-dire à l'humain que le serveur avait activé, ce qui
@@ -6521,17 +6696,54 @@ function _doAITurnInterne(aiPlayer,oneShot){
     const otherAiOwned=pOwned;
     if(!ai.recentLosses)ai.recentLosses=new Map();
     for(const[nid,until]of ai.recentLosses)if(G.turn>=until)ai.recentLosses.delete(nid);
-    // Trouver le meilleur nœud adjacent selon le score (pas juste le premier)
+    /* ⚠️ UNE COLONIE EN TRAVERS DU CHEMIN ENFERMAIT L'IA POUR TOUTE LA PARTIE.
+       Elle ne regardait que les nœuds DIRECTEMENT voisins de ses colonies. Que Cérès ou Vesta soit
+       prise par quelqu'un d'autre, et elle n'avait plus rien à coloniser — alors qu'il restait de
+       la place juste derrière. Mesuré avant correction : dans 7,9 % des tours, une nation n'avait
+       AUCUN voisin libre mais un ou plusieurs nœuds libres à deux pas (`mesure_expansion_ia.js`).
+       Elle voit maintenant plus loin. Un nœud éloigné vaut moins qu'un nœud collé — il faudra
+       construire des routes pour le relier — d'où la pénalité par distance ; mais il vaut mieux
+       qu'une nation immobile. Le réflexe « reconnecter une colonie isolée avant tout », déjà en
+       place dans `chooseAndAct`, se charge ensuite de la rattacher au réseau. */
+    const PORTEE_COLONISATION=2;   // un saut de plus que le voisinage immédiat, pas davantage
     let bestAdj=null,bestScore=-99,bestFrom=null;
-    for(const col of ai.colonies){
-      for(const adj of(NODES[col.nodeId]?.conn||[])){
+    {
+      /* Parcours en largeur depuis toutes ses colonies : `dist` donne le nombre de sauts. */
+      /* ⚠️ NE VISER LOIN QUE PAR UN CHEMIN RÉELLEMENT PRATICABLE.
+         Premier jet : portée 3, tous chemins confondus. Résultat mesuré — les routes tombent de 2,9
+         à 1,5 par nation et les VP de 30 à 20. La raison : une route ne se construit qu'entre deux
+         nœuds dont l'un est à soi (`tryRoute`), et le nœud intermédiaire appartenait justement à la
+         nation qui bloquait. L'IA colonisait donc des mondes qu'elle ne pourrait JAMAIS relier —
+         colonies isolées, sans revenu et à demi-valeur en VP. Coloniser loin sans pouvoir rattacher
+         est pire que ne pas coloniser.
+         On ne traverse donc que ce par quoi une route pourra passer : ses propres nœuds, les nœuds
+         libres, et ceux sous accord commercial — le TRANSIT prévu par les règles. */
+      const _traversable=id=>{
+        if(owned.has(id))return true;
+        if(G.commercialAccords&&G.commercialAccords.includes(id))return true;   // transit autorisé
+        return !pOwned.has(id);                                                 // libre
+      };
+      const dist=new Map(), file=[];
+      for(const col of ai.colonies){ dist.set(col.nodeId,0); file.push(col.nodeId); }
+      for(let i=0;i<file.length;i++){
+        const id=file[i], d=dist.get(id);
+        if(d>=PORTEE_COLONISATION)continue;
+        if(d>0&&!_traversable(id))continue;      // cul-de-sac : on ne passera pas par là
+        for(const v of (NODES[id]?.conn||[])){
+          if(dist.has(v))continue;
+          dist.set(v,d+1); file.push(v);
+        }
+      }
+      for(const [adj,d] of dist){
+        if(d===0)continue;                                   // c'est déjà une des siennes
         if(owned.has(adj)||ai.recentLosses.has(adj))continue;
-        if(NODES[adj]?.decorative||NODES[adj]?.noColonize)continue; // Anneau jovien / Station Jupiter — non colonisable
+        if(NODES[adj]?.decorative||NODES[adj]?.noColonize)continue; // Anneau jovien / Station Jupiter
         if(pOwned.has(adj)&&!G.commercialAccords.includes(adj))continue;
-        if(otherAiOwned.has(adj))continue; // nœud déjà colonisé par une autre IA (pas de double occupation)
-        // extra-solaire ouvert à tous (plus de verrou tech)
-        const sc=nodeScore(adj);
-        if(sc>bestScore){bestScore=sc;bestAdj=adj;bestFrom=col.nodeId;}
+        if(otherAiOwned.has(adj))continue;                   // pas de double occupation
+        /* Chaque saut supplémentaire coûte une route à construire : on décote en conséquence,
+           sans interdire. Le voisin direct reste préféré à qualité égale. */
+        const sc=nodeScore(adj)-(d-1)*2.5;
+        if(sc>bestScore){bestScore=sc;bestAdj=adj;bestFrom=null;}
       }
     }
     if(!bestAdj)return false;
@@ -6600,11 +6812,34 @@ function _doAITurnInterne(aiPlayer,oneShot){
     return proposeAccord(col.nodeId, ai)===true;
   }
   function tryRaid(){
+    /* ⚠️ LE TEMPÉRAMENT DOIT ÊTRE RESPECTÉ MÊME HORS DU CALCUL D'UTILITÉ.
+       Mettre `U.raid` et `U.raidAI` à zéro suffit tant que l'action passe par `chooseAndAct` — mais
+       ces deux fonctions sont aussi atteignables par d'autres chemins (séquence de guerre, reprise
+       de colonie). Un bâtisseur affichait donc encore des pillages résiduels. « Aucun raid » se
+       vérifie ici, à l'entrée, là où aucun chemin ne peut la contourner. */
+    if(ai._profil==='batisseur'||ai._profil==='guerrier')return false;
     const raidTok=isPirate?1:2;const raidEn=0;
     if(ai.acLeft<1||ai.forceTokens<raidTok)return false;
     if((ai._attacksThisTurn||0)>=1)return false; // max 1 action agressive/tour
     if(raidEn>0&&(ai.res.energy||0)<raidEn)return false;
-    const _e=aiEnnemi(ai);
+    /* ⚠️ L'IA SE RUINAIT CONTRE UN MUR, TOUR APRÈS TOUR.
+       L'immunité de la cible (IA Défensive) n'était constatée qu'APRÈS le paiement : 1 AC et 2
+       jetons partaient, le raid ne rapportait rien, et l'IA recommençait au tour suivant. Vu dans
+       la partie C06D : Terriens et Martiens ont gaspillé leur action à chaque tour du 6 au 10
+       contre une nation immunisée — deux adversaires neutralisés sans que le joueur lève le petit
+       doigt. Ça explique une bonne part d'une victoire à 158 VP contre 33, 43 et 46.
+       Une IA regarde donc AVANT de payer, et se rabat sur une nation pillable s'il en existe une.
+       Le joueur humain, lui, garde le droit de tenter un raid perdu d'avance : c'est son choix,
+       et le journal le lui dit. */
+    let _e=aiEnnemi(ai);
+    const _pillable=n=>n&&n!==ai&&!hasSpec(n,'ia_immune')&&((n.res.energy||0)+(n.res.materials||0))>0;
+    if(!_pillable(_e)){
+      const _autres=(typeof allPlayers==='function'?allPlayers():[G.player].concat(G.ais||[]))
+        .filter(_pillable)
+        .sort((a,b)=>((b.res.energy||0)+(b.res.materials||0))-((a.res.energy||0)+(a.res.materials||0)));
+      if(!_autres.length)return false;      // personne à piller : l'IA fera autre chose de son AC
+      _e=_autres[0];
+    }
     if(!isPirate&&(ai.res.morale||0)<=2)return false; // self-intérêt : moral bas → l'IA se soigne au lieu de piller
     if(_e.res.energy+_e.res.materials<=0)return false;
     ai.acLeft--;ai.forceTokens-=raidTok;ai.forceCooldown.push({count:raidTok,returnTurn:getCooldownTurn(ai)});
@@ -6621,6 +6856,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
          ligne de coût. Le coût était bien payé ; rien ne le prouvait.
          On l'écrit, et on applique aussi la tension : subir une tentative de pillage fâche, qu'elle
          ait réussi ou non — elle était jusqu'ici sans conséquence diplomatique. */
+      if(typeof marquerAgressee==='function')marquerAgressee(_e);   // même bloqué, un pillage se retient
       addLog('🛡️ IA Défensive de '+_e.civ.emoji+' '+_e.civ.name+' : raid de '+ai.civ.emoji+' '+ai.civ.name+' bloqué — il perd quand même 1 AC et '+raidTok+' jeton(s) (récupération).','gold');
       G.warRisk=Math.min(10,(G.warRisk||0)+1);
       addTens(_e.civ.id,ai.civ.id,1);
@@ -6746,10 +6982,16 @@ function _doAITurnInterne(aiPlayer,oneShot){
     // 1) Adopter la forme de gouvernement qui améliore le plus (points + AC) si abordable
     let bestForm=null,bestVal=0;
     const curVal=(ai.govFormPts||0)+(ai.govFormAC||0)*6;
+    /* ⚠️ AU PLAFOND, LES POINTS DE GOUVERNEMENT NE VALENT PLUS RIEN. Le niveau 4 s'atteint à 15
+       points et c'est le maximum du jeu : au-delà, cinq points de plus n'apportent aucune AC. L'IA
+       adoptait pourtant encore le Sénat Solaire pour 3🪨 — de l'argent brûlé, tour après tour.
+       Seul le bonus d'AC (Tyrannie) garde de la valeur là-haut. */
+    const _auPlafond=(ai.gov_pts||0)>=15;
     for(const f of CIVIC_MARKET){
       if(f.type!=='government'||f.id===ai.govForm||!f.govForm)continue;
       const cost=f.cost||{};if(!Object.entries(cost).every(([r,a])=>(ai.res[r]||0)>=a))continue;
-      const val=(f.govForm.formPts||0)+(f.govForm.acBonus||0)*6-curVal;
+      const _pts=_auPlafond?0:(f.govForm.formPts||0);
+      const val=_pts+(f.govForm.acBonus||0)*6-curVal;
       if(val>bestVal){bestVal=val;bestForm=f;}
     }
     if(bestForm){aiBuyCivic(ai,bestForm);return true;}
@@ -6767,12 +7009,34 @@ function _doAITurnInterne(aiPlayer,oneShot){
         const cost=c.cost||{};if(Object.entries(cost).every(([r,a])=>(ai.res[r]||0)>=a)){aiBuyCivic(ai,c);return true;}
       }
     }
-    // 3) Matériaux bas → carte sociale de matériaux (ex. Forages Planétaires) — aide surtout les Jupitériens
-    if((ai.res.materials||0)<=3){
-      for(const c of CIVIC_MARKET){
-        if(c.type!=='social'||c.calmAction||!(c.resGain&&c.resGain.materials))continue;
-        if(!c.repeatable&&ai._civicTaken.has(c.id))continue;
-        const cost=c.cost||{};if(Object.entries(cost).every(([r,a])=>(ai.res[r]||0)>=a)){aiBuyCivic(ai,c);return true;}
+    /* ═══ RÉCOLTER CE QUI MANQUE, PLUTÔT QUE D'ALLER LE PRENDRE CHEZ LES AUTRES ═══
+       Demande de Marc, 2026-08-16 : « le bâtisseur préfère toujours récolter du He3, du minerai ou
+       de la science pour arriver à faire ce qui est nécessaire. »
+       Cette fonction ne savait produire QUE des matériaux (et du moral). Une nation à court
+       d'énergie ou de savoir n'avait donc aucune façon de s'en procurer par le travail — il ne lui
+       restait que le raid. Les trois cartes existent pourtant depuis toujours :
+         ⚛️ Extraction d'He3        +2⚡   pour 1🪨 1🔬
+         ☄️ Capture d'astéroïdes    +2🪨   pour 1⚡ 1🔬
+         📖 Investissement Recherche +2🔬   pour 2🪨
+       On récolte la ressource la plus basse d'abord — c'est elle qui bloque. */
+    {
+      const _manque=[
+        {r:'materials', v:(ai.res.materials||0)},
+        {r:'energy',    v:(ai.res.energy||0)},
+        {r:'science',   v:(ai.res.science||0)},
+      ].filter(x=>x.v<=3).sort((x,y)=>x.v-y.v);
+      for(const m of _manque){
+        for(const c of CIVIC_MARKET){
+          if(c.type!=='social'||c.calmAction)continue;
+          if(!(c.resGain&&c.resGain[m.r]))continue;
+          if(!c.repeatable&&ai._civicTaken.has(c.id))continue;
+          const cost=c.cost||{};
+          if(!Object.entries(cost).every(([r,a])=>(ai.res[r]||0)>=a))continue;
+          /* Ne pas s'appauvrir davantage : on refuse une récolte qui coûte la ressource qu'on
+             cherche justement à reconstituer. */
+          if((cost[m.r]||0)>0)continue;
+          aiBuyCivic(ai,c);return true;
+        }
       }
     }
     return false;
@@ -6799,6 +7063,12 @@ function _doAITurnInterne(aiPlayer,oneShot){
   }
   // ── IA CONTRE IA : raid (vol de ressources) sur une nation IA rivale proche ──
   function tryRaidAI(){
+    /* ⚠️ LE TEMPÉRAMENT DOIT ÊTRE RESPECTÉ MÊME HORS DU CALCUL D'UTILITÉ.
+       Mettre `U.raid` et `U.raidAI` à zéro suffit tant que l'action passe par `chooseAndAct` — mais
+       ces deux fonctions sont aussi atteignables par d'autres chemins (séquence de guerre, reprise
+       de colonie). Un bâtisseur affichait donc encore des pillages résiduels. « Aucun raid » se
+       vérifie ici, à l'entrée, là où aucun chemin ne peut la contourner. */
+    if(ai._profil==='batisseur'||ai._profil==='guerrier')return false;
     if(ai.acLeft<1)return false;
     if((ai._attacksThisTurn||0)>=1)return false; // max 2 actions agressives / manche / nation
     const raidTok=isPirate?1:2;
@@ -6844,7 +7114,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
     const affordTok=Math.min(ai.res.materials||0,ai.res.energy||0);
     const commit=Math.min(ai.forceTokens||0,affordTok,6);   // même plafond que dans `_assaultAIUtil`
     if(commit<1)return false;
-    let best=null,bestCol=null,bestDef=99;
+    let best=null,bestCol=null,bestDef=99,bestSansDefense=false;
     for(const r of allPlayers()){
       if(r===ai)continue;
       /* ⚠️ LA LIMITE « SEULEMENT LE JOUEUR ACTIF » EST LEVÉE (Marc, 2026-08-15). Elle n'existait que
@@ -6854,10 +7124,29 @@ function _doAITurnInterne(aiPlayer,oneShot){
       if(r._isAI===false && _warBetween(ai.civ.id,r.civ.id))continue;   // déjà en guerre : la reprise s'en charge
       for(const oc of r.colonies){
         if(oc.nodeId===r.civ.home||!oc.connected||NODES[oc.nodeId]?.decorative)continue;
-        if(!ai.colonies.some(c=>(NODES[c.nodeId]?.conn||[]).includes(oc.nodeId)))continue; // doit être adjacent
+        /* ⚠️ L'IA S'INTERDISAIT CE QUE LE JOUEUR A LE DROIT DE FAIRE.
+           Elle n'assaillait qu'une colonie VOISINE d'une des siennes. Cette contrainte n'existe
+           nulle part dans les règles, et `attackColony` ne l'impose pas au joueur : il frappe où il
+           veut. L'IA se privait donc de presque toutes ses cibles — mesuré 0,1 à 0,3 guerre par
+           partie — et son tempérament conquérant ne servait à rien faute d'adversaire à portée.
+           Règle unique pour tout le monde (décidé par Marc, 2026-08-16). */
         const def=perceivedForce(ai,r).val;const tens=getTens(ai.civ.id,r.civ.id);
-        if(commit<=def&&tens<6)continue; // n'attaque que si plus fort, ou tension haute
-        if(def<bestDef){bestDef=def;best=r;bestCol=oc;}
+        /* ═══ MÊME DOCTRINE QU'À L'ÉVALUATION — sinon l'action serait jugée bonne puis refusée.
+           Une nation à court d'énergie OU de matériaux ne peut engager aucun jeton en défense
+           (1🪨 + 1⚡ par jeton) : sa colonie n'a que sa garnison. Le conquérant qui possède le
+           Réseau Orbital voit ces stocks et frappe là, en priorité absolue et à petit prix. */
+        const _pf=(typeof profilActifDe==='function')?profilActifDe(ai):null;
+        const _mordant=!!(_pf&&(_pf===PROFILS_IA.guerrier||_pf===PROFILS_IA.assiegee));
+        const _sansDefense=(_pf===PROFILS_IA.guerrier&&hasSpec(ai,'intel_2')
+                            &&Math.min(r.res.energy||0,r.res.materials||0)<=0);
+        if(!_sansDefense){
+          if(_mordant){ if(commit<def&&tens<4)continue; }
+          else if(commit<=def&&tens<6)continue;   // n'attaque que si plus fort, ou tension haute
+        }
+        /* Une cible à sec passe avant tout le reste : on lui donne une priorité artificiellement
+           basse pour qu'elle gagne le classement, quel que soit son nombre de jetons affiché. */
+        const _rang=_sansDefense?-1:def;
+        if(_rang<bestDef){bestDef=_rang;best=r;bestCol=oc;bestSansDefense=_sansDefense;}
       }
     }
     if(!best)return false;
@@ -6888,10 +7177,23 @@ function _doAITurnInterne(aiPlayer,oneShot){
       addLog('🤝 '+_co.civ.emoji+' '+_co.civ.name+' défend '+((NODES[bestCol.nodeId]&&NODES[bestCol.nodeId].name)||bestCol.nodeId)
         +' aux côtés de '+best.civ.emoji+' '+best.civ.name+' (+'+(_j+_b)+'⚔️) — cohabitants.','gold');
     }
-    const aPow=commit+aEmpath,dPow=dCommit+dEmpath+1/*garnison de base*/+_renfortIA;
-    ai.acLeft=Math.max(0,ai.acLeft-1);ai.spentThisTurn+=1+commit;ai._attacksThisTurn=(ai._attacksThisTurn||0)+1;
+    /* ═══ CONTRE UNE NATION À SEC, ON N'ENGAGE QUE CE QU'IL FAUT ═══
+       Doctrine de Marc : « elle attaque une colonie avec deux jetons ». Face à un défenseur qui ne
+       peut rien engager, il n'y a que la garnison (1) et les éventuels cohabitants : inutile d'y
+       jeter six jetons, ils partiraient en récupération pour rien. Ce qui reste sert à la cible
+       suivante — c'est tout l'intérêt d'économiser ses jetons plutôt que de raider. */
+    let _engage=commit;
+    if(bestSansDefense){
+      const _requis=dCommit+dEmpath+1+_renfortIA-aEmpath+1;   // juste de quoi passer devant
+      _engage=Math.max(2,Math.min(commit,Math.max(2,_requis)));
+      if(_engage<commit)
+        addLog('🎯 '+ai.civ.emoji+' '+ai.civ.name+' frappe '+((NODES[bestCol.nodeId]&&NODES[bestCol.nodeId].name)||bestCol.nodeId)
+          +' — '+best.civ.name+' est à court de ressources et ne peut pas défendre ('+_engage+' jeton(s) suffisent).','gold');
+    }
+    const aPow=_engage+aEmpath,dPow=dCommit+dEmpath+1/*garnison de base*/+_renfortIA;
+    ai.acLeft=Math.max(0,ai.acLeft-1);ai.spentThisTurn+=1+_engage;ai._attacksThisTurn=(ai._attacksThisTurn||0)+1;
     const win=aPow>dPow;
-    applyCombatEngage(ai,commit,win);if(dCommit>0)applyCombatEngage(best,dCommit,!win);
+    applyCombatEngage(ai,_engage,win);if(dCommit>0)applyCombatEngage(best,dCommit,!win);
     addTens(ai.civ.id,best.civ.id,1);addTens(best.civ.id,ai.civ.id,3);
     const node=NODES[bestCol.nodeId];
     if(win){
@@ -6931,15 +7233,31 @@ function _doAITurnInterne(aiPlayer,oneShot){
   // Plus de listes de priorités fixes ni de tactiques tirées au sort : à chaque action,
   // l'IA estime la VALEUR ATTENDUE de chaque type d'action et joue la meilleure. Les raids
   // sont désormais une option de faible valeur, choisie seulement s'il ne reste rien de mieux à bâtir.
+  /* ⚠️ DEUX ENDROITS POSAIENT LA MÊME QUESTION, ET UN SEUL A ÉTÉ CORRIGÉ D'ABORD.
+     Cette fonction calcule l'UTILITÉ de coloniser ; `tryColonize` EXÉCUTE. J'ai commencé par
+     élargir la portée dans l'exécution — sans effet mesurable, parce que l'utilité, elle, ne voyait
+     toujours que les voisins directs : elle valait 0, l'action n'était donc jamais tentée et le
+     code élargi jamais atteint. Les deux doivent regarder aussi loin l'un que l'autre. */
   function _bestColonizeScore(){
     const owned=new Set(ai.colonies.map(c=>c.nodeId));
     const otherOwned=new Set();for(const p of allPlayers())if(p!==ai)for(const c of p.colonies)otherOwned.add(c.nodeId);
+    const PORTEE=2;
+    const trav=id=>owned.has(id)||(G.commercialAccords&&G.commercialAccords.includes(id))||!otherOwned.has(id);
+    const dist=new Map(), file=[];
+    for(const col of ai.colonies){ dist.set(col.nodeId,0); file.push(col.nodeId); }
+    for(let i=0;i<file.length;i++){
+      const id=file[i], d=dist.get(id);
+      if(d>=PORTEE)continue;
+      if(d>0&&!trav(id))continue;   // même règle de traversée qu'à l'exécution
+      for(const v of (NODES[id]?.conn||[])){ if(dist.has(v))continue; dist.set(v,d+1); file.push(v); }
+    }
     let best=-1;
-    for(const col of ai.colonies)for(const adj of(NODES[col.nodeId]?.conn||[])){
+    for(const [adj,d] of dist){
+      if(d===0)continue;
       if(owned.has(adj)||otherOwned.has(adj)||NODES[adj]?.decorative||NODES[adj]?.noColonize)continue;
       if(ai.recentLosses&&ai.recentLosses.has(adj))continue;
-      // extra-solaire ouvert à tous (plus de verrou tech)
-      const s=nodeScore(adj);if(s>best)best=s;
+      const s=nodeScore(adj)-(d-1)*2.5;   // même décote par saut que dans `tryColonize`
+      if(s>best)best=s;
     }
     return best;
   }
@@ -6973,6 +7291,20 @@ function _doAITurnInterne(aiPlayer,oneShot){
       (ai.civ.id==='ceinturiens') ? ['sciences_exp','navigation'] :
       (isMartien)                 ? ['navigation','expansion','mines_energie'] :
                                     ['expansion','sciences_exp','navigation'];
+    /* ═══ LE CONQUÉRANT CHERCHE D'ABORD À VOIR, PUIS À FRAPPER À BAS COÛT ═══
+       Doctrine de Marc : « si je suis bloqué dans mon développement et que j'ai le moins de
+       colonies, je prends Réseau Orbital en premier pour savoir qui je peux attaquer, puis IA
+       Défensive si possible, et aussi IA de Navigation. »
+       Le Réseau Orbital est ce qui lui donne les stocks EXACTS des rivales : sans lui, il ne peut
+       pas savoir qu'une nation est tombée à zéro énergie, donc pas choisir le moment. IA Défensive
+       est dans la même branche (rang 3) et protège ses routes ; la Navigation divise son coût de
+       guerre par deux. Les branches d'énergie suivent — il lui faut de quoi payer ses assauts —
+       et le reste est dédaigné sans être abandonné. */
+    const _pf=(typeof profilActifDe==='function')?profilActifDe(ai):null;
+    if(_pf===PROFILS_IA.guerrier){
+      const _guerrier=['ia_renseignement','navigation','mines_energie'];
+      return _guerrier.concat(_normal.filter(b=>_guerrier.indexOf(b)<0));
+    }
     let _menacee=false;
     try{ _menacee=!!(aiEnnemi(ai) || (typeof _warOf==='function' && _warOf(ai.civ.id)) || (ai._warAggressor)); }catch(e){}
     if(!_menacee) return _normal;
@@ -7024,7 +7356,35 @@ function _doAITurnInterne(aiPlayer,oneShot){
     for(const r of allPlayers()){
       if(r===ai)continue;
       if(r._isAI===false && _warBetween(ai.civ.id,r.civ.id))continue;   // même condition qu'à l'exécution
-      for(const oc of r.colonies){if(oc.nodeId===r.civ.home||!oc.connected||NODES[oc.nodeId]?.decorative)continue;if(!ai.colonies.some(c=>(NODES[c.nodeId]?.conn||[]).includes(oc.nodeId)))continue;const def=perceivedForce(ai,r).val;const tens=getTens(ai.civ.id,r.civ.id);if(commit>def||tens>=6)return _valeurAssaut(commit,def,tens);}}
+      for(const oc of r.colonies){if(oc.nodeId===r.civ.home||!oc.connected||NODES[oc.nodeId]?.decorative)continue;/* même règle qu'à l'exécution : plus de contrainte d'adjacence */const def=perceivedForce(ai,r).val;const tens=getTens(ai.civ.id,r.civ.id);
+        /* ⚠️ UNE NATION BELLIQUEUSE N'ATTEND PAS D'ÊTRE SÛRE DE GAGNER. La condition « je dois avoir
+           STRICTEMENT plus de jetons que sa force perçue » convient à une nation prudente ; appliquée
+           à toutes, elle rendait l'assaut presque introuvable — mesuré : 0,1 guerre par partie.
+           Un profil conquérant, ou une nation qu'on vient d'agresser, se contente de la parité et
+           d'une tension moindre. Les autres gardent l'exigence d'origine. */
+        const _pf=(typeof profilActifDe==='function')?profilActifDe(ai):null;
+        const _mordant=!!(_pf&&(_pf===PROFILS_IA.guerrier||_pf===PROFILS_IA.assiegee));
+        const _seuilTens=_mordant?4:6;
+        /* ═══ FRAPPER QUI NE PEUT PLUS SE DÉFENDRE ═══
+           Doctrine de Marc : « qu'elle attaque avec peu de jetons les nations qui n'ont plus
+           d'énergie ou de minerai, plutôt en fin de tour. Dès qu'une nation est à zéro énergie — ce
+           qu'elle ne peut savoir qu'avec le Réseau Orbital — elle attaque une colonie avec deux
+           jetons. »
+           C'est exactement le raisonnement d'un joueur : engager des jetons en défense coûte
+           1🪨 + 1⚡ chacun. Une nation à sec ne peut RIEN engager — sa colonie n'est protégée que
+           par sa garnison, et deux jetons suffisent à la prendre.
+           ⚠️ ET ELLE NE PEUT LE SAVOIR QU'AVEC LE RENSEIGNEMENT. Sans Réseau Orbital, les stocks
+           d'une rivale lui sont cachés (§14.7 des règles) : lire `r.res` sans cette technologie
+           serait de la triche, et retirerait tout intérêt à la brancher en premier. */
+        if(_pf===PROFILS_IA.guerrier&&hasSpec(ai,'intel_2')){
+          const _sec=Math.min(r.res.energy||0,r.res.materials||0)<=0;
+          if(_sec){
+            /* Peu de jetons suffisent : on garde le reste pour la cible suivante. */
+            const _petit=Math.min(commit,Math.max(2,def+1));
+            return Math.max(_valeurAssaut(_petit,0,tens), 24);
+          }
+        }
+        if((_mordant?commit>=def:commit>def)||tens>=_seuilTens)return _valeurAssaut(commit,def,tens);}}
     return 0;
   }
   function _civicUtil(){
@@ -7033,6 +7393,18 @@ function _doAITurnInterne(aiPlayer,oneShot){
     const _reform=(typeof CIVIC_MARKET!=='undefined'?CIVIC_MARKET:[]).find(c=>c.id==='cm_reform');
     if(_reform&&!(ai._civicTaken&&ai._civicTaken.has('cm_reform'))&&(ai.gov_pts||0)<15){const rc=_reform.cost||{};if(Object.entries(rc).every(([r,a])=>(ai.res[r]||0)>=a))v=Math.max(v,10);}
     if((ai.res.morale||0)<=3)v=Math.max(v,7);
+    /* La récolte vaut d'autant plus que la ressource manquante est basse : à 0 elle bloque tout,
+       à 3 elle commence seulement à gêner. Sans cette ligne, `tryCivic` savait récolter mais
+       n'était jamais choisi — le calcul d'utilité ne connaissait que les formes de gouvernement. */
+    {
+      const _bas=Math.min(ai.res.materials||0,ai.res.energy||0,ai.res.science||0);
+      if(_bas<=3){
+        const _rec=(typeof CIVIC_MARKET!=='undefined'?CIVIC_MARKET:[]).some(c=>
+          c.type==='social'&&!c.calmAction&&c.resGain&&(c.repeatable||!(ai._civicTaken&&ai._civicTaken.has(c.id)))
+          &&Object.entries(c.cost||{}).every(([r,a])=>(ai.res[r]||0)>=a));
+        if(_rec)v=Math.max(v,10+(3-_bas)*3);
+      }
+    }
     return v;
   }
   function _militaryUtil(){
@@ -7081,6 +7453,30 @@ function _doAITurnInterne(aiPlayer,oneShot){
     U.accord  = _accordUtil();
     return U;
   }
+  /* ═══════ LE PROFIL DE L'IA PONDÈRE SES ENVIES ═══════
+     Les utilités ci-dessus disent ce qu'une action RAPPORTE. Le profil dit ce que cette nation-là
+     AIME faire. On multiplie, on ne remplace pas : une IA bâtisseuse acculée peut toujours se
+     battre, elle le fera simplement plus tard et moins volontiers qu'une guerrière.
+     Voir `PROFILS_IA` pour les trois tempéraments et `profilActifDe()` pour la bascule d'une nation
+     agressée. */
+  function _appliquerProfil(U){
+    const prof=(typeof profilActifDe==='function')?profilActifDe(ai):null;
+    if(!prof||!prof.mult)return U;
+    for(const k of Object.keys(U)) if(prof.mult[k]!==undefined) U[k]=U[k]*prof.mult[k];
+    /* ⚠️ « AUCUN RAID » VEUT DIRE AUCUN, MÊME EN ÉTAT DE SIÈGE. L'état `assiegee` remonte le raid à
+       1,4 pour permettre une riposte — un bâtisseur agressé se remettait donc à piller, et le
+       compteur ne descendait jamais tout à fait à zéro. Son tempérament de fond prime : il se
+       défend et il construit, il ne pille pas. Le conquérant, lui, garde ce zéro par doctrine. */
+    const _base=ai._profil;
+    if(_base==='batisseur'||_base==='guerrier'){ U.raid=0; U.raidAI=0; }
+    /* BESOIN DE RESSOURCES → ON PRODUIT, ON NE PILLE PAS (demande de Marc, 2026-08-16).
+       Une IA à court cherchait à se refaire par le raid, ce qui coûte 1 AC et 2 jetons pour deux
+       ressources au mieux. Les actions Économie & Société donnent autant pour moins cher et sans
+       s'attirer d'ennemis. Quand la caisse est basse, elles passent devant. */
+    const _pauvre=Math.min(ai.res.materials||0, ai.res.energy||0)<=2;
+    if(_pauvre){ U.civic=(U.civic||0)+9; U.raid=(U.raid||0)*0.3; U.raidAI=(U.raidAI||0)*0.3; }
+    return U;
+  }
   const execMap={
     heal:()=>tryMoraleTech()||tryMoraleUpgrade(),
     colonize:tryColonize, upgrade:tryUpgrade, route:tryRoute,
@@ -7105,7 +7501,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
     if(ai.colonies.some(c=>!c.connected&&c.nodeId!==ai.civ.home)&&tryRoute())return true;
     // En guerre et trésorerie basse → on THÉSAURISE (on ne dépense pas ce qui servira à se défendre).
     if(_belowReserve())return false;
-    const U=actionUtilities();
+    const U=_appliquerProfil(actionUtilities());
     const ranked=Object.keys(U).filter(k=>U[k]>0).sort((a,b)=>U[b]-U[a]);
     for(const k of ranked){ if(execMap[k]&&execMap[k]()) return true; }
     return false;
