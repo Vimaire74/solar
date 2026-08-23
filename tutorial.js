@@ -492,7 +492,12 @@ const SPECIAL=[
   tx:"Voici la 1ʳᵉ situation de guerre : la <b>Guerre Populaire Forcée</b>. Quand ta <b>tension atteint 10</b> avec une nation, ta population <b>t'oblige</b> à l'attaquer (une route ou une colonie), ou à payer pour l'apaiser. Tu ne peux pas simplement l'ignorer."},
 
  {lab:'Guerre en riposte', glow:'war-modal', pos:'top', onShow:demoWarDeclared, inhibit:['#war-modal button'],
-  tx:"2ᵉ situation : une <b>IA te déclare la guerre</b> (souvent après une provocation). <b>C'est elle l'agresseur</b> : elle frappe et tu te <b>défends</b> d'abord ; tu pourras <b>riposter à ton tour</b>. Cette fenêtre t'annonce l'attaque."},
+  tx:"2ᵉ situation : une <b>IA te déclare la guerre</b> (souvent après une provocation). <b>C'est elle l'agresseur</b> : au <b>premier tour de guerre, elle seule frappe</b> et tu te défends. Dès le <b>tour suivant</b>, chacun mène son assaut et subit celui de l'autre : <b>deux combats</b> par fin de tour. Comme chaque jeton engagé se paie, il faut <b>répartir jetons et ressources</b> entre l'attaque et la défense."},
+
+ // ── L'initiative : ajoutée le 2026-08-23 avec la règle des deux combats (§14.3 des règles) ──
+ {lab:'Qui frappe en premier ? 🎖️',
+  tx:"Quand il y a deux combats, l'ordre décide de tout — et le jeu désigne une nation pour le <b>choisir</b>. C'est l'<b>initiative</b>. Elle revient, dans cet ordre : à qui possède l'<b>🌀 Hyperpropulsion</b> ; sinon à celui qui a <b>le moins attaqué</b> l'autre pendant le tour (on ne frappe pas dans la journée pour imposer encore le tempo du soir) ; sinon au plus <b>avancé technologiquement</b>, puis au mieux <b>armé</b>, puis au mieux <b>approvisionné</b>. Le journal te dit à chaque fois qui l'a et pourquoi.<br><br><b>Défendre en premier</b>, c'est savoir ce qu'il te reste avant de choisir ton assaut. <b>Attaquer en premier</b>, c'est frapper avec tous tes jetons pendant que tu les as encore.",
+  hint:'Compris, puis Suivant'},
 
  {lab:'Attaque de colonie (immédiate)', glow:'war-modal', pos:'top', onShow:demoAssault, inhibit:['#war-modal button'],
   tx:"3ᵉ situation : <b>toi</b> tu lances un <b>assaut</b> sur une colonie ennemie. Le combat est résolu <b>immédiatement</b> (une seule manche), en comparant les puissances. Si tu gagnes, tu <b>captures la colonie</b> sur-le-champ."},
@@ -503,7 +508,7 @@ const SPECIAL=[
 
  // ── La fenêtre de combat (2 étapes : le choix, puis le coût) ──
  {lab:'La fenêtre de combat ⚔️', glow:'war-combat-modal', pos:'top', onShow:demoCombat, inhibit:['#war-combat-modal button'],
-  tx:"Voici la <b>fenêtre de combat</b>. Tu choisis d'abord une <b>cible</b> (colonie ou route ennemie), puis un <b>curseur</b> te laisse fixer <b>combien de jetons Force engager</b>. La <b>force de l'ennemi</b> ne t'est montrée qu'en <b>estimation (± 3)</b> — exacte seulement si tu as du <b>renseignement</b> (espionnage / tech d'intel)."},
+  tx:"Voici la <b>fenêtre de combat</b>. Tu choisis d'abord une <b>cible</b> (colonie ou route ennemie), puis un <b>curseur</b> te laisse fixer <b>combien de jetons Force engager</b>. Si tu possèdes le <b>⚓ Supercroiseur</b>, une case te propose de le <b>déployer</b> : +5⚔️, mais il se paie, et le curseur se rabaisse pour t'en réserver le prix.<br><br>Tu peux toujours <b>te retirer</b> : le bouton <b>🚪 Renoncer à l'assaut</b> (ou <b>🕊️ Tenir position</b> si tu subis) conserve tes jetons — la guerre continue, tu ne frappes simplement pas ce tour-ci. La <b>force de l'ennemi</b> ne t'est montrée qu'en <b>estimation (± 3)</b> — exacte seulement si tu as du <b>renseignement</b> (espionnage / tech d'intel)."},
 
  {lab:'Attaquer une route 🛤️', glow:'war-combat-modal', pos:'top', onShow:demoCombat, inhibit:['#war-combat-modal button'],
   tx:"Attaquer une <b>route</b> est bien plus facile qu'une colonie (un seul assaut suffit — l'ennemi ne peut pas défendre une route). La fenêtre montre <b>toutes</b> ses routes : <b>🔓 non protégée → 1 jeton</b> (aucun coût) ; <b>🛡️ protégée → 2 jetons</b> (tu <b>détruis son jeton défenseur</b>, et <b>1 seul des tiens</b> part en récupération). Ensuite tu choisis : <b>la récupérer</b> (elle devient tienne — top pour prolonger ton réseau vers une colonie lointaine) ou <b>la détruire</b>. Dans les deux cas, l'adversaire <b>perd son revenu</b> et doit la reconstruire."},

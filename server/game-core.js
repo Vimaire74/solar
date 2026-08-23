@@ -75,6 +75,12 @@ const FONCTIONS_MOTEUR_REQUISES = [
   'initGame', 'startTurn', 'endTurn', 'runEndOfRound', 'doMaintenance', 'doRevenues', 'advancePirates',
   'doColonize', 'doEstablishRoute', 'doUpgrade', 'buyTech', 'useAbility', 'doRaid', 'doRaidTarget',
   'resolveWarCombat', 'declareWar', 'showWarModal', 'getNodeOwnerAI', 'doAITurn',
+  /* ⚠️ AJOUTÉES LE 2026-08-23 avec la réparation des conquêtes. `ACTIONS.attack` délègue désormais
+     à `playerAssaultColony` et désigne le défenseur avec `defenseurPrincipal` — les deux seules
+     fonctions qui traitent les humains, les IA et la cohabitation de la même façon. Les déclarer
+     ici, c'est garantir qu'un renommage futur soit signalé au démarrage plutôt que de faire
+     retomber l'assaut en silence, comme `getNodeOwnerAI` l'a fait pendant des semaines. */
+  'defenseurPrincipal', 'playerAssaultColony', 'stAssautJoueurChoisi', '_warBetween', 'defenseIA',
   'setDecisionSink', 'resolveDecision', 'refreshWarViews', 'scSetG', 'scDeserialize', 'rehydrateState',
   'showAgendaSelModal', 'confirmRouteToken', 'dismissDiscovery', 'cruiserAvailable', 'cruiserAfford',
   'routeManageDeploy', 'routeManageRecall', '_forgeUpgrade',
@@ -173,18 +179,35 @@ const ACTIONS = {
     // engagés vs défense affichée, PAS l'ancien confirmAttack (coût de trajet). Ainsi l'affichage ne ment plus.
     const G = sb.__G, p = G.player, node = a.node;
     if (!node) { _postAction(sb); return; }
-    const owner = (typeof sb.getNodeOwnerAI === 'function') ? sb.getNodeOwnerAI(node)
-                : (G.ais || []).find(x => x.colonies.some(c => c.nodeId === node));
-    if (!owner) { _postAction(sb); return; }
-    // Guerre avec le propriétaire (déclarée si besoin) + cible de capture.
-    let war = (G.wars || []).find(w => w.a === owner.civ.id || w.b === owner.civ.id);
-    if (!war && typeof sb.declareWar === 'function') {
-      try { sb.declareWar('Assaut sur ' + node + ' !', 'player', owner.civ.id); } catch (e) {}
-      war = (G.wars || []).find(w => w.a === owner.civ.id || w.b === owner.civ.id);
+    /* ═══════ ATTAQUER UN JOUEUR HUMAIN N'A JAMAIS PU FONCTIONNER ═══════
+       ⚠️ DEUX DÉFAUTS ICI, ET LE MÊME MAL : ce bloc était une SECONDE implémentation de l'assaut,
+       écrite quand seules les IA pouvaient être attaquées. Marc et Laurent, partie 140A du 23/08 :
+       « on peut pas attaquer quelqu'un en direct, ça ne fait rien ».
+
+       1. `getNodeOwnerAI` ne rend un propriétaire QUE s'il est tenu par l'ordinateur
+          (`o._isAI !== false`). Contre une colonie humaine elle rend `null`, et la ligne suivante
+          sortait EN SILENCE : pas d'AC, pas de ressources, pas de message, pas de guerre. Le
+          défenseur n'était évidemment jamais prévenu.
+       2. La guerre était cherchée par `w.a === owner || w.b === owner` — N'IMPORTE QUELLE guerre
+          impliquant le propriétaire, pas la MIENNE. Au tour 10 il existait déjà une guerre
+          Jupitériens ↔ Ceinturiens : l'assaut de Marc contre le Jupitérien a repris CETTE guerre-là,
+          posé `G.warWith` dessus, et n'a jamais déclaré la sienne.
+
+       ON DÉLÈGUE DONC AU MOTEUR. `playerAssaultColony` sait déjà tout faire correctement, et pour
+       tout le monde : `defenseurPrincipal` désigne le vrai défenseur (humain, IA, ou les DEUX en
+       cohabitation extra-solaire), `declarerGuerre(attaquant, cible, …)` ne connaît que deux nations
+       nommées, et la cible est rangée dans `G._flux.donnees` — donc sérialisable. Le serveur ne
+       recalcule plus rien : il appelle. */
+    const owner = (typeof sb.defenseurPrincipal === 'function') ? sb.defenseurPrincipal(node, p) : null;
+    if (!owner || owner === p) {
+      try { sb.addLog('⚠️ Assaut impossible sur ' + node + ' : aucune nation adverse n\'y défend.', 'red'); } catch (e) {}
+      _postAction(sb); return;
     }
-    G.warWith = owner.civ.id;
-    if (war) { war.live = true; war.justDeclared = false; war.turnsLeft = 99; }
-    vm.runInContext('_warAttackColonyTarget=' + JSON.stringify(node), sb);
+    /* La fin de `playerAssaultColony` ouvre la modale SOLO. Les éléments du bac à sable l'absorbent
+       sans broncher, mais tout l'état utile est posé AVANT ces lignes : un échec éventuel de la
+       partie affichage ne peut donc pas laisser l'assaut à moitié fait. */
+    try { sb.playerAssaultColony(node, owner, p); } catch (e) {}
+    const war = (typeof sb._warBetween === 'function') ? sb._warBetween(p.civ.id, owner.civ.id) : null;
     /* ══ QUI DÉCIDE DE LA DÉFENSE ? ══════════════════════════════════════════════════════════
        ⚠️ CORRIGÉ LE 2026-08-07 — c'était LE défaut le plus grave du multijoueur.
        Ce bloc calculait `G._aiWarCommitted = min(jetons, matériaux, énergie)` et appelait
@@ -213,7 +236,9 @@ const ACTIONS = {
         : Math.max(0, Math.min(owner.forceTokens || 0, owner.res.materials || 0, owner.res.energy || 0));
     }
     if (p && (p.acLeft || 0) > 0) p.acLeft -= 1; // l'assaut coûte 1 AC
-    p._attacksThisTurn = (p._attacksThisTurn || 0) + 1;
+    /* `_attacksThisTurn` n'est PLUS incrémenté ici : `playerAssaultColony` le fait déjà. Le compter
+       deux fois faisait croire au moteur que le joueur avait attaqué deux fois — ce qui pèse
+       maintenant sur la rétrocession d'initiative (qui a frappé le plus ce tour). */
     const tokens = Math.max(1, parseInt(a.tokens) || 1);
     // Supercroiseur : le drapeau est posé par la modale SOLO ; sur le chemin serveur il doit venir
     // de l'action, sinon il est silencieusement ignoré (le joueur le déploie et rien ne se passe).

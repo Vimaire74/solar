@@ -1,12 +1,17 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-23 · v9.74';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
+const SOLAR_BUILD_JS = '2026-08-23 · v9.76';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :
    on corrige souvent le jeu sans toucher au protocole. */
-const SC_PROTO = 1;
+/* 2 (2026-08-23) — la réponse d'ESPIONNAGE a changé de forme le 17/08 : elle porte désormais
+   `{id}` ou `{nation,branch,ids}`, plus `{branch}` seul. Un client resté en cache continuait
+   d'envoyer l'ancienne forme, que le serveur ne peut PAS appliquer : Marc a perdu son espionnage
+   deux parties de suite sans qu'aucun message ne le prévienne. Le numéro n'avait pas été
+   incrémenté — c'est précisément à cela qu'il sert. */
+const SC_PROTO = 2;
 // Exposé sur window pour que l'écran d'ACCUEIL (index.html, #lv-build) puisse comparer les deux
 // builds et signaler un upload partiel. Un `const` seul n'est pas visible depuis l'autre fichier.
 try{ window.SOLAR_BUILD_JS = SOLAR_BUILD_JS; }catch(e){}
@@ -111,6 +116,16 @@ function handle(m){
       try{ window._scPseudo = window._scPseudo || {}; (m.game.seats||[]).forEach(s=>{ if(s.civId && s.user) window._scPseudo[s.civId]=s.user; }); }catch(e){}
       if (!STATE.myCiv){ const s = m.game.seats.find(x=>x.user===STATE.user); if(s) STATE.myCiv = s.civId; }
       STATE.isHost = (m.game.host === STATE.user);
+      /* ═══ UNE NOUVELLE PARTIE NE DOIT RIEN HÉRITER DE LA PRÉCÉDENTE ═══
+         ⚠️ `scGetG()` garde en mémoire l'état de la DERNIÈRE partie affichée. Les fenêtres qui
+         arrivent avant le premier `state` du serveur — l'agenda secret est la toute première —
+         s'y alimentent : Laurent a choisi son agenda en lisant les ressources et les revenus de sa
+         partie précédente, celle qui avait planté (Marc, 23/08 : « les chiffres de son ancienne
+         partie sont revenus dans le choix d'agenda »). Rien n'était corrompu côté serveur : c'est
+         l'écran qui affichait un état périmé.
+         On marque donc l'état comme NON REÇU dès que le code de partie change ; `onDecision` met
+         les fenêtres en file jusqu'au premier `state`. */
+      if(STATE._codePartie !== m.game.code){ STATE._codePartie = m.game.code; STATE._etatRecu = false; }
       try{ localStorage.setItem('sc_ws_game', m.game.code); }catch(e){}
       if (m.game.status === 'lobby') renderWait();
       else if (m.game.status === 'playing' && !STATE.started){ STATE.started = true; installIntercepts(); concederVisible(true); hideOverlay(); revealGameUI(); reqState(true); send({t:'resync'}); }
@@ -149,6 +164,14 @@ function handle(m){
       bandeauATonTour(false);   // une question remplace le tour d'action
       hideAbsence();   // la partie repart : plus personne n'est en attente de l'absent
       if(m.pending&&m.pending.kind!=='eot')hideBilanAttente();
+      /* ⚠️ LE PLATEAU RESTAIT EN ARRIÈRE D'UNE ÉTAPE. Aucune demande d'état n'accompagnait une
+         question : entre la résolution des investissements (début de tour) et la réponse à la carte
+         Stratégie, l'écran montrait encore l'état d'AVANT. Marc et Laurent, tour 7 de la partie
+         140A : « on pensait que les colonies de Laurent n'avaient pas été augmentées niveau 3 et on
+         s'inquiétait pour rien » — Colonies Avancées venait de s'appliquer, invisible.
+         On redemande donc l'état à chaque question : le plateau se met à jour derrière la fenêtre,
+         et ce qu'on lit correspond à ce qui vient de se produire. */
+      reqState(true);
       onDecision(m.pending);
       break;
     case 'your_action':
@@ -283,6 +306,14 @@ function applyState(state){
     if (typeof refreshWarViews === 'function') refreshWarViews();
     renderBoard();
     refreshJournal(g);   // le log arrive dans l'état serveur ; render() ne le redessine pas → on le fait ici
+    /* L'état de CETTE partie est arrivé : les fenêtres mises de côté peuvent enfin s'afficher sur
+       des chiffres qui sont les bons. */
+    if(STATE._etatRecu === false){
+      STATE._etatRecu = true;
+      if(STATE._queue && STATE._queue.length && !STATE._answering){
+        const nx = STATE._queue.shift(); setTimeout(()=>onDecision(nx), 40);
+      }
+    }
     // restaurer l'onglet actif s'il a été réinitialisé par le rendu
     try{
       if(activeTab && typeof uiTab==='function'){
@@ -310,12 +341,19 @@ function onDecision(pending){
      arrivant pendant qu'une autre attendait une réponse — c'est ainsi qu'une victoire au combat
      obtenue juste après la Sphère de Dyson ne s'affichait pas du tout (bug signalé le 2026-08-01).
      On les met en file : chaque fenêtre est montrée à son tour, aucune n'est perdue. */
-  if (STATE._answering){
+  /* ⚠️ UNE MÊME QUESTION POUVAIT S'AFFICHER DEUX FOIS. La file écarte les doublons entre eux, mais
+     jamais un doublon de la question DÉJÀ à l'écran — or `resync` (à la connexion, après un
+     rafraîchissement) redistribue les questions en attente. Marc, partie 140A : « les événements du
+     prochain tour ont été présentés deux fois à Laurent, au tour 1 et au tour 5 » — précisément les
+     moments où l'on se (re)connecte. On retient donc l'identifiant en cours de traitement. */
+  if (STATE._enCours && STATE._enCours === pending.id) return;
+  if (STATE._answering || STATE._etatRecu === false){
     STATE._queue = STATE._queue || [];
     if(!STATE._queue.some(q=>q.id===pending.id)) STATE._queue.push(pending);
     return;
   }
   STATE._answering = true;
+  STATE._enCours = pending.id;
   STATE._myTurn=false; turnBar(false);
   hideWaitBlock();
   reqState();
@@ -324,6 +362,7 @@ function onDecision(pending){
     bandeauATonTour(false);   // idem : répondre, c'est avoir joué
     send({t:'answer', id:pending.id, ans:ans});
     STATE._answering = false;
+    STATE._enCours = null;
     showWaitBlock();
     status('En attente des autres joueurs…');
     // Fenêtre suivante de la file, s'il y en a une (voir la note en tête de onDecision).
@@ -1294,18 +1333,65 @@ function hideWaitBlock(){ const b=document.getElementById('sc-waitblock'); if(b)
 function absenceBanner(m){
   hideAbsence();
   if(!m || !m.civId || m.civId===STATE.myCiv) return;
-  const b=el('<div id="sc-absence" style="position:fixed;left:50%;transform:translateX(-50%);bottom:64px;z-index:8200;'
+  /* ═══ CE BANDEAU RECOUVRAIT LE PLATEAU, ET ON NE POUVAIT RIEN Y FAIRE ═══
+     Marc, partie 140A : « le message qui demande si on veut remplacer un joueur est bloquant, il
+     cache ce qui est dessous ; rendre la fenêtre déplaçable et ajouter la possibilité de la réduire
+     à un filet serait bien. » Il est donc DÉPLAÇABLE (souris et doigt) et RÉDUCTIBLE à une simple
+     pastille. Sa position et son état replié sont mémorisés : on ne le repousse pas à chaque fois
+     qu'il réapparaît.
+     ⚠️ Il ne bloque rien au sens technique — aucun calque, aucun `pointer-events` — mais il occupait
+     le bas de l'écran, là où sont les boutons. Le déplacer suffit ; le réduire vaut mieux. */
+  let pos=null, replie=false;
+  try{ pos=JSON.parse(localStorage.getItem('sc_abs_pos')||'null'); replie=localStorage.getItem('sc_abs_replie')==='1'; }catch(e){}
+  const b=el('<div id="sc-absence" style="position:fixed;z-index:8200;'
     +'max-width:min(94vw,560px);background:rgba(24,30,44,.97);border:1px solid #45557a;border-radius:12px;'
-    +'padding:10px 14px;color:#dbe6ff;font:600 .82em system-ui;box-shadow:0 8px 28px rgba(0,0,0,.5);text-align:center">'
-    +'<div id="sc-absence-msg" style="margin-bottom:'+(m.votable?'8px':'0')+'"></div>'
-    +(m.votable
-      ? '<button id="sc-absence-vote" style="background:linear-gradient(135deg,#a2542f,#7a3c20);color:#fff;border:0;'
-        +'border-radius:9px;padding:7px 13px;font:700 .95em system-ui;cursor:pointer">🤖 Proposer de le remplacer par une IA</button>'
-        +'<div id="sc-absence-vote-etat" style="margin-top:6px;color:#9fb4d8;font-weight:500"></div>'
-      : '')
+    +'padding:8px 12px;color:#dbe6ff;font:600 .82em system-ui;box-shadow:0 8px 28px rgba(0,0,0,.5);text-align:center">'
+    +'<div id="sc-abs-tete" style="display:flex;align-items:center;gap:8px;cursor:move;user-select:none;touch-action:none">'
+      +'<span id="sc-abs-poignee" style="flex:1;text-align:left;color:#9fb4d8;font-size:.9em">⠿ Joueur absent</span>'
+      +'<button id="sc-abs-reduire" title="Réduire" style="background:#1a2444;color:#9fb4d8;border:1px solid #45557a;'
+        +'border-radius:7px;min-width:26px;height:22px;cursor:pointer;font-weight:800;line-height:1">–</button>'
+    +'</div>'
+    +'<div id="sc-abs-corps">'
+      +'<div id="sc-absence-msg" style="margin:6px 0 '+(m.votable?'8px':'0')+'"></div>'
+      +(m.votable
+        ? '<button id="sc-absence-vote" style="background:linear-gradient(135deg,#a2542f,#7a3c20);color:#fff;border:0;'
+          +'border-radius:9px;padding:7px 13px;font:700 .95em system-ui;cursor:pointer">🤖 Proposer de le remplacer par une IA</button>'
+          +'<div id="sc-absence-vote-etat" style="margin-top:6px;color:#9fb4d8;font-weight:500"></div>'
+        : '')
+    +'</div>'
     +'</div>');
   b.querySelector('#sc-absence-msg').textContent = m.msg || '';
   document.body.appendChild(b);
+  /* Position : celle qu'on avait laissée, sinon en bas au centre comme avant. */
+  if(pos && typeof pos.x==='number'){ b.style.left=pos.x+'px'; b.style.top=pos.y+'px'; b.style.transform='none'; }
+  else { b.style.left='50%'; b.style.bottom='64px'; b.style.transform='translateX(-50%)'; }
+  const corps=b.querySelector('#sc-abs-corps'), btR=b.querySelector('#sc-abs-reduire');
+  const appliquerRepli=()=>{ corps.style.display=replie?'none':''; btR.textContent=replie?'+':'–';
+    btR.title=replie?'Déplier':'Réduire'; b.style.padding=replie?'4px 8px':'8px 12px'; };
+  appliquerRepli();
+  btR.onclick=(ev)=>{ ev.stopPropagation(); replie=!replie; appliquerRepli();
+    try{ localStorage.setItem('sc_abs_replie', replie?'1':'0'); }catch(e){} };
+  /* Déplacement — souris ET tactile, via les événements Pointer : une seule implémentation. */
+  const tete=b.querySelector('#sc-abs-tete');
+  let dx=0, dy=0, bouge=false;
+  tete.addEventListener('pointerdown', (ev)=>{
+    if(ev.target===btR) return;
+    const r=b.getBoundingClientRect();
+    b.style.left=r.left+'px'; b.style.top=r.top+'px'; b.style.bottom='auto'; b.style.transform='none';
+    dx=ev.clientX-r.left; dy=ev.clientY-r.top; bouge=true;
+    try{ tete.setPointerCapture(ev.pointerId); }catch(e){}
+  });
+  tete.addEventListener('pointermove', (ev)=>{
+    if(!bouge) return;
+    const x=Math.max(0,Math.min(window.innerWidth-40, ev.clientX-dx));
+    const y=Math.max(0,Math.min(window.innerHeight-30, ev.clientY-dy));
+    b.style.left=x+'px'; b.style.top=y+'px';
+  });
+  const fin=()=>{ if(!bouge)return; bouge=false;
+    const r=b.getBoundingClientRect();
+    try{ localStorage.setItem('sc_abs_pos', JSON.stringify({x:Math.round(r.left),y:Math.round(r.top)})); }catch(e){} };
+  tete.addEventListener('pointerup', fin);
+  tete.addEventListener('pointercancel', fin);
   const bt=document.getElementById('sc-absence-vote');
   if(bt) bt.onclick=()=>{ bt.disabled=true; bt.textContent='✓ Ton vote est enregistré'; bt.style.opacity=.65; send({t:'vote_ia'}); };
 }

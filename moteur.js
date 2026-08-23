@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-23 · v9.74';
+const SOLAR_BUILD_MOTEUR = '2026-08-23 · v9.76';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -161,7 +161,13 @@ const CARDS_POOL=[
    cost:{science:6,materials:4,energy:4},vp:5},
   // ── NAVIGATION & MOTEURS ─────────────────────────────────────────────────────
   {id:'prop1',branch:'navigation',tier:1,type:'technology',name:'Propulsion Ionique',emoji:'⚗️',
-   effect:'Routes −1<i class=ri-materials></i>',spec:'route_disc',
+   /* ⚠️ MARC DEMANDAIT « préciser que le rabais vaut pour la construction ET l'entretien ».
+      Vérifié dans le moteur : `route_disc` met le coût de CONSTRUCTION à 0🪨 (une route coûte
+      1🪨 sans lui). L'entretien d'une route, lui, se paie en ÉNERGIE — il n'existe aucun entretien
+      en matériaux à réduire. La technologie qui supprime l'entretien est l'Hyperpropulsion.
+      On écrit donc ce que la carte fait VRAIMENT, et on dit où va l'autre moitié de la question :
+      un texte qui promet un rabais inexistant est pire qu'un texte trop court. */
+   effect:'Construction de route : <b>0</b><i class=ri-materials></i> au lieu de 1. (L\'entretien d\'une route se paie en <i class=ri-energy></i> — voir Hyperpropulsion pour le supprimer.)',spec:'route_disc',
    cost:{science:2,energy:1},vp:1},
   {id:'nav2',branch:'navigation',tier:2,type:'technology',name:'IA de Navigation',emoji:'🧠',
    effect:'+2 jetons Force. Coût de guerre ÷2 (division exacte : si le nombre de jetons engagés est impair, la demi-part est prélevée sur l\'<i class=ri-energy></i> — ex. 5 jetons = 2<i class=ri-materials></i> et 3<i class=ri-energy></i>).',spec:'nav2_war',forceBonus:2,
@@ -234,7 +240,10 @@ const CARDS_POOL=[
   {id:'mil1',branch:null,tier:1,type:'militaire',name:'Drones de Combat',emoji:'🛩️',ac:1,reqCard:'drones1',
    effect:'+1 jeton Force, perdu au tour suivant. (Requiert Drones Surveillance.)',forceTemp:1,forceLoseNext:1,cost:{energy:1,materials:1},vp:1,repeatable:true},
   {id:'mil2',branch:null,tier:1,type:'militaire',name:'Flottes de Chasseurs',emoji:'🛸',ac:2,reqCard:'robo2',
-   effect:'+4 jetons Force ; 1/2 perdue au T. suivant. (requis: Robotisation Avancée.)',forceTemp:4,forceLoseNext:2,cost:{energy:3,materials:3,science:1},vp:2,repeatable:true},
+   /* Marc, 23/08 : « Flottes de chasseur devrait être limité à une prise par partie mais accessible
+      à tous les joueurs aussi. » Non répétable, donc — mais par JOUEUR, pas par partie (voir le
+      bandeau du blocage global dans `buyTech`). */
+   effect:'+4 jetons Force ; 1/2 perdue au T. suivant. Une seule fois par partie. (requis: Robotisation Avancée.)',forceTemp:4,forceLoseNext:2,cost:{energy:3,materials:3,science:1},vp:2,repeatable:false},
   {id:'mil3',branch:null,tier:2,type:'militaire',name:'Supercroiseur',emoji:'⚔️',ac:3,
    effect:'+5 puissance EN GUERRE (permanent ; inutile contre raids et pirates).',warForce:5,cost:{energy:3,materials:4,science:1},vp:5,repeatable:false},
 ];
@@ -426,7 +435,32 @@ const EVENTS=[
   {id:'ruee',type:'competition',name:'Ruée Minière',emoji:'⛏️',preview:'La nation avec le plus de colonies gagne +6 VP. Si égalité en première place : les deux, si plus d\'égalités personne.',
    resolve(G){const h=_evTop(function(p){return p.colonies.length;});return 'Ruée Minière — '+_evAwardVP(h,6);}},
   {id:'storm',type:'menace',name:'Tempêtes Solaires',emoji:'🌩️',preview:'Sans IA Défensive, chaque nation perd 1 jeton Force, 1 route et 2<i class=ri-materials></i>.',
-   resolve(G){let n=0;const pProt=hasSpec(G.player,'storm_immune');for(const p of allPlayers()){if(hasSpec(p,'storm_immune'))continue;p.forceTokens=Math.max(0,(p.forceTokens||0)-1);if(p.routes&&p.routes.length){p.routes.pop();updateConnections(p);}p.res.materials=Math.max(0,(p.res.materials||0)-2);n++;}return (pProt?'Tu as réussi à te protéger. ':'')+'Tempêtes Solaires — '+n+' nation(s) touchée(s) : −1 jeton, −1 route, −2<i class=ri-materials></i>.';}},
+   /* ⚠️ « 2 NATIONS TOUCHÉES » NE DIT NI QUI, NI QUOI. Marc, partie 140A : « on ne sait pas qui est
+      touché au moment où c'est notifié. On devrait aussi rappeler là ce qui est perdu par chacun
+      avec le nom de la route perdue. » Le détail existait — il était simplement jeté.
+      On nomme donc chaque nation, sa route détruite, et on dit qui s'en est tiré. */
+   resolve(G){
+     const touches=[], proteges=[];
+     for(const p of allPlayers()){
+       if(hasSpec(p,'storm_immune')){ proteges.push(p.civ.emoji+' '+p.civ.name); continue; }
+       const _j=Math.min(1,p.forceTokens||0);
+       p.forceTokens=Math.max(0,(p.forceTokens||0)-1);
+       let _rte=null;
+       if(p.routes&&p.routes.length){
+         const r=p.routes.pop();
+         _rte=((NODES[r.from]&&NODES[r.from].name)||r.from)+'→'+((NODES[r.to]&&NODES[r.to].name)||r.to);
+         updateConnections(p);
+       }
+       const _mat=Math.min(2,p.res.materials||0);
+       p.res.materials=Math.max(0,(p.res.materials||0)-2);
+       const perte=[]; if(_j)perte.push('−'+_j+' jeton'); if(_rte)perte.push('route '+_rte+' détruite'); if(_mat)perte.push('−'+_mat+'<i class=ri-materials></i>');
+       touches.push(p.civ.emoji+' '+p.civ.name+' : '+(perte.join(', ')||'rien à perdre'));
+       addLog('🌩️ '+p.civ.emoji+' '+p.civ.name+' — tempête : '+(perte.join(', ')||'rien à perdre')+'.','red');
+     }
+     return 'Tempêtes Solaires — '+touches.length+' nation(s) touchée(s).<br>'
+       +touches.map(t=>'• '+t).join('<br>')
+       +(proteges.length?('<br><span style="color:#9ad89a">🛡️ Épargnées (IA Défensive) : '+proteges.join(', ')+'</span>'):'');
+   }},
   {id:'pirates',type:'menace',name:'Prolifération des pirates',emoji:'☠️',preview:'Les pirates frappent les routes de la nation la plus riche en <i class=ri-materials></i> : les routes sans jeton NI technologie de protection sont détruites ; celles avec un jeton ont 50% de chance d\'être perdues, mais 2 au maximum.',
    resolve(G){const h=_evTop(function(p){return p.res.materials||0;});if(h.length!==1)return 'Prolifération des pirates — aucune cible claire.';const tgt=h[0];let unp=0,prot=0,tech=0;const keep=[];for(const r of tgt.routes){if((r.tokens||0)>0){/* jeton posé : 50% chacune, MAX 2 perdues */ if(prot<2&&Math.random()<0.5){tgt.forceCooldown.push({count:r.tokens,returnTurn:getCooldownTurn(tgt)});prot++;}else keep.push(r);}else if(routeProtegee(tgt,r)){keep.push(r);tech++;/* protégée par une TECHNOLOGIE : elle n'a pas besoin de jeton */}else unp++;/* ni jeton ni technologie : détruite */}tgt.routes=keep;updateConnections(tgt);if(tech)addLog('🛡️ '+tech+' route(s) de '+_evName(tgt)+' épargnée(s) — protégées par une technologie, sans jeton nécessaire.','gold');if((unp+prot)===0)return 'Prolifération des pirates — '+_evName(tgt)+' est la nation la plus riche en <i class=ri-materials></i> et devient la cible des pirates, mais AUCUNE route n\'est perdue.';
     return 'Prolifération des pirates — '+_evName(tgt)+' est visé (nation la plus riche en <i class=ri-materials></i>) et perd '+(unp+prot)+' route(s) : '+unp+' sans jeton détruite(s)'+(prot?', '+prot+' protégée(s) pillée(s) (max 2 — jetons en récupération)':'')+'.';}},
@@ -1463,11 +1497,21 @@ function isTechAvailable(card,p){
   }
   return true;
 }
+/* ═══════ CE QUI EST EXCLUSIF À UNE SEULE NATION DANS TOUTE LA PARTIE ═══════
+   Une seule famille l'est : les technologies de BRANCHE de rang 3. La première nation qui en prend
+   une la ferme aux autres — c'est la règle qui fait de l'arbre technologique une course.
+
+   ⚠️ LE COMMENTAIRE D'ORIGINE DISAIT « Militaires = répétables », ET C'ÉTAIT VRAI QUAND IL A ÉTÉ
+   ÉCRIT. Le Supercroiseur est ensuite passé en `repeatable:false` : il tombait alors dans le
+   `return !card.branch || card.tier>=3` — vrai, puisqu'il n'a pas de branche — et devenait exclusif
+   à toute la partie. Marc, partie 140A du 23/08 : « Supercroiseur est limité à un joueur, ça ne
+   devrait pas être le cas. » Le premier acheteur le rendait introuvable pour la table entière, avec
+   le message « déjà prise par une autre faction ».
+   Le militaire se limite par la POSSESSION, jamais globalement : chacun peut l'acheter une fois
+   (contrôle dans le chemin d'achat), personne n'en prive les autres. */
 function isTechExclusive(card){
-  // Militaires = répétables. Civiques = chacun peut acheter 1×, non-exclusives globalement.
-  // T3 de branche = exclusives (1 seul acheteur par partie).
   if(card.repeatable) return false;
-  if(card.type==='civique') return false;
+  if(card.type==='civique'||card.type==='militaire') return false;
   return !card.branch||card.tier>=3;
 }
 function getEffCost(card,p){
@@ -2612,6 +2656,12 @@ function stEspionnageRecu(ans, civId){
          On dit désormais POURQUOI, sinon on ne peut pas distinguer « j'ai cliqué Attendre » d'une
          sélection refusée — c'est ce qui a rendu ce défaut si long à cerner. */
       const _volontaire=!!(ans&&(ans.id==='attendre'||choisi==='attendre'));
+      /* ⚠️ ON DIT CE QU'ON A REÇU. « Sélection invalide » sans le contenu de la réponse a coûté deux
+         diagnostics à l'aveugle (Marc, parties du 16 et du 23/08). Les CLÉS suffisent à trancher :
+         `{branch}` seul = client d'avant le 17/08 resté en cache — il n'envoie pas d'identifiant
+         d'option, et aucune réponse de cette forme ne peut être appliquée. */
+      if(!_volontaire) addLog('🕵️ ⚙️ Réponse reçue : {'+Object.keys(ans||{}).join(', ')+'}'
+        +((ans&&ans.branch&&!ans.ids&&!ans.id)?' — forme ANCIENNE (client en cache) : demande au joueur de recharger la page.':''),'dim');
       addLog('🕵️ '+nat.civ.emoji+' '+nat.civ.name+' — espionnage '
         +(_volontaire?'reporté volontairement':'NON APPLIQUÉ : sélection invalide ou vide')
         +(G.turn<ESP_TOUR_DERNIER?' — la fenêtre reviendra à la fin du tour prochain.'
@@ -4544,6 +4594,13 @@ function revenueBreakdownHTML(p){
   let h='<div style="font-weight:700;color:#cdd8ff;margin-bottom:5px">📊 Revenu par tour</div>';
   h+='<div style="color:#7fe0a0;margin-bottom:2px;font-weight:600">Sources</div>';
   h+=inc.length?inc.map(l=>'<div>'+l+'</div>').join(''):'<div style="color:#7a88a8">Aucune colonie connectée.</div>';
+  /* ═══ L'ORDRE DE LECTURE SUIT L'ORDRE DU CALCUL ═══
+     Marc, partie 140A : « il vaut mieux indiquer le revenu brut en bas des colonies, puis en dessous
+     les bonus malus d'entretien, et enfin le revenu net calculé. Pour le moment l'ordre est bizarre. »
+     Il avait raison : le total BRUT était affiché APRÈS l'entretien, si bien qu'on lisait des
+     déductions avant de savoir de quoi elles se déduisaient. On sous-total donc juste sous les
+     sources, puis on retranche, puis on conclut. */
+  h+='<div style="border-top:1px solid #2a3a5a;margin-top:5px;padding-top:4px;color:#9fb0d0">Total brut (avant entretien) : '+fmt(g)+'</div>';
   if(mal.length){h+='<div style="color:#ff9a8a;margin:6px 0 2px;font-weight:600">Entretien / malus</div>';h+=mal.map(l=>'<div style="color:#ffb3a3">'+l+'</div>').join('');}
   /* Total : on affiche le BRUT (somme des sources) puis le vrai NET, entretien déduit.
      Le net vient de _netIncome() — la même fonction que la barre du haut et le menu Empire,
@@ -4553,8 +4610,7 @@ function revenueBreakdownHTML(p){
      présente dans le brut OU dans le net (sinon une déduction qui ramène à 0 disparaît). */
   const fmtNet=(o,ref)=>['materials','energy','science','morale'].filter(r=>o[r]||ref[r])
     .map(r=>'<span style="color:'+((o[r]||0)<0?'#ff6b6b':(o[r]||0)>0?'#7fe0a0':'#8898b8')+'">'+((o[r]||0)>0?'+':'')+(o[r]||0)+E[r]+'</span>').join(' ')||'—';
-  h+='<div style="border-top:1px solid #2a3a5a;margin-top:6px;padding-top:4px;color:#9fb0d0">Total brut (avant entretien) : '+fmt(g)+'</div>';
-  h+='<div style="font-weight:700;color:#dfe8ff">Revenu net (entretien déduit) : '+fmtNet(_netTip,g)+'</div>';
+  h+='<div style="border-top:1px solid #2a3a5a;margin-top:6px;padding-top:4px;font-weight:700;color:#dfe8ff">= Revenu net (entretien déduit) : '+fmtNet(_netTip,g)+'</div>';
   return h;
 }
 // Revenu NET estimé du prochain end-of-turn, PAR ressource (revenus BRUTS − entretien colonies/routes/gouv,
@@ -4848,7 +4904,13 @@ function buyGeneral(cardId){
            ||(G.generalRiver||[]).find(c=>c&&c.id===cardId);
   if(!card)return;
   if(card.reqCard&&!G.player.cards.some(c=>c.id===card.reqCard)){const _rn=CARDS_POOL.find(c=>c.id===card.reqCard)?.name||card.reqCard;addLog('⚠️ '+card.name+' nécessite la tech « '+_rn+' ».','red');return;}
-  if(card.type==='militaire'){if(!G.player._milBoughtThisTurn)G.player._milBoughtThisTurn=new Set();if(G.player._milBoughtThisTurn.has(card.id)){addLog('⚠️ '+card.name+' déjà acheté ce tour (1×/tour).','red');return;}}
+  if(card.type==='militaire'){
+    if(!G.player._milBoughtThisTurn)G.player._milBoughtThisTurn=new Set();
+    if(G.player._milBoughtThisTurn.has(card.id)){addLog('⚠️ '+card.name+' déjà acheté ce tour (1×/tour).','red');return;}
+    /* ⚠️ « UNE SEULE FOIS » VEUT DIRE PAR JOUEUR, PAS PAR PARTIE. C'est la possession qui compte,
+       et elle se lit dans les cartes de CETTE nation — pas dans un registre commun. */
+    if(!card.repeatable&&G.player.cards.some(c=>c.id===card.id)){addLog('⚠️ '+card.name+' — tu la possèdes déjà (une seule par partie).','red');return;}
+  }
   const acCost=card.ac||1;
   if(G.player.acLeft<acCost){addLog('⚠️ Pas assez d\'AC (besoin '+acCost+').','red');return;}
   const cost=getEffCost(card,G.player);
@@ -4857,13 +4919,26 @@ function buyGeneral(cardId){
   G.player.acLeft-=acCost;G.player.spentThisTurn+=acCost+Object.values(cost).reduce((s,v)=>s+v,0);
   for(const[r,a]of Object.entries(cost))G.player.res[r]-=a;
   // Pour les militaires répétables, on clone la carte pour ne pas bloquer les futurs achats
-  const cardCopy=card.repeatable?{...card,_uid:Date.now()}:card;
+  /* ⚠️ ON CLONE TOUJOURS. Les cartes non répétables poussaient l'objet du CATALOGUE dans la main du
+     joueur : tant qu'une seule nation pouvait la prendre, cela ne se voyait pas. Depuis que le
+     Supercroiseur est accessible à tous, deux nations partageraient la même instance — toute
+     mutation de l'une se lirait chez l'autre, et la sauvegarde la dupliquerait en deux objets
+     distincts au rechargement. Un clone par acquéreur, sans exception. */
+  const cardCopy={...card,_uid:(card.repeatable?Date.now():card.id+':'+G.player.civ.id)};
   G.player.cards.push(cardCopy);applyCard(cardCopy,G.player);
   if(card.type==='militaire'){if(!G.player._milBoughtThisTurn)G.player._milBoughtThisTurn=new Set();G.player._milBoughtThisTurn.add(card.id);} // 1× par carte par tour
   // Militaires : répétables → rien dans techTaken
   // Civiques : chacun peut acheter 1×, pas de blocage global → rien dans techTaken
   // Branche T3 exclusive : techTaken global
-  if(!card.repeatable&&card.type!=='civique') G.techTaken.add(cardId);
+  /* ═══ `G.techTaken` EST UN REGISTRE GLOBAL — IL NE DOIT CONCERNER QUE LES BRANCHES ═══
+     ⚠️ Il existe pour l'exclusivité des technologies de rang 3 : la première nation qui prend une T3
+     de branche la ferme aux autres. Les cartes MILITAIRES y tombaient aussi, du seul fait qu'elles
+     sont `repeatable:false` — si bien que le premier joueur à acheter le Supercroiseur le rendait
+     introuvable pour toute la table. Marc, partie 140A : « Supercroiseur est limité à un joueur, ça
+     ne devrait pas être le cas. »
+     Le militaire se limite désormais par la POSSESSION (voir le contrôle plus haut) : chacun peut
+     l'acheter une fois, personne ne prive les autres. */
+  if(!card.repeatable&&card.type!=='civique'&&card.type!=='militaire') G.techTaken.add(cardId);
   addLog('✅ '+card.emoji+' '+card.name+' ('+acCost+' AC)','green');
   addAction(card.emoji,card.name,acCost,cost,card.effect);
   scArmConfirm(card.emoji+' '+card.name,_scCardGains(card));
@@ -5911,7 +5986,16 @@ function updateConnections(p){
 }
 /* ============================================================ TENSION POPULAIRE ============================================================ */
 function updateTension(){
-  if(G.warState)return; // pas de montée de tension pendant la guerre
+  /* ═══════ LA TENSION SE FIGEAIT DÈS QU'UNE GUERRE EXISTAIT QUELQUE PART ═══════
+     ⚠️ `if(G.warState) return;` — une seule ligne, et tout le système s'arrêtait. `G.warState` est
+     un drapeau LOCAL : « la nation que je regarde est en guerre ». À quatre nations, dès qu'un
+     conflit s'ouvrait n'importe où, plus AUCUN couple ne voyait sa tension bouger — ni les griefs,
+     ni l'érosion, ni les manifestations, ni la guerre populaire. Marc, partie 140A : « les tensions
+     ne semblent pas vraiment interpolées correctement, y en a jamais ». Sa partie a connu des
+     guerres dès le tour 4 : le calcul dormait depuis ce moment-là.
+     L'intention était juste — deux nations DÉJÀ en guerre n'ont pas à accumuler de la rancune, la
+     guerre s'en charge — mais cela se décide COUPLE PAR COUPLE. C'est ce que font les gardes
+     `_warBetween(...)` ci-dessous, qui existaient déjà pour le déclenchement. */
   const pColNodes=new Set(G.player.colonies.map(c=>c.nodeId));
   const pConnectedCount=G.player.colonies.filter(c=>c.connected).length;
   const pT3=G.player.cards.filter(c=>c.tier===3).length;
@@ -5953,6 +6037,7 @@ function updateTension(){
   for(const x of _toutes)for(const y of _toutes){
     if(x===y)continue;
     if(x===G.player||y===G.player)continue;      // les couples du joueur ouvrent une fenêtre : traités plus bas
+    if(_warBetween(x.civ.id,y.civ.id))continue;  // déjà en guerre ensemble : la guerre tient la tension à 10
     const a=_tensionVers(x,y);
     if(a>0)addTens(x.civ.id,y.civ.id,a);
     else if(getTens(x.civ.id,y.civ.id)>0)addTens(x.civ.id,y.civ.id,-1);   // paix : −1/tour
@@ -5965,6 +6050,7 @@ function updateTension(){
     }
   }
   for(const ai of G.ais){
+    if(_warBetween(_moiId(),ai.civ.id))continue;   // même règle que ci-dessus, couple par couple
     let addP=_tensionVers(G.player,ai), addA=_tensionVers(ai,G.player);
     // Appliquer
     if(addP>0){addTens('player',ai.civ.id,addP);addLog('😡 Ta tension vs '+ai.civ.name+' +'+addP+' → '+getTens('player',ai.civ.id)+'/10','dim');}
@@ -7952,11 +8038,22 @@ function calcVP(p){
   for(const r of['energy','materials','science','morale']){const v=p.rpt[r]||0;rptVP+=v>10?5:v>5?2:0;}
   let agendasVP=p.agenda&&typeof p.agenda.score==='function'?p.agenda.score(p):0;
   const evtVP=p.tempVP||0;
-  let extraVP=0;
-  if(hasSpec(p,'extrasolar')&&p.cards.filter(c=>c.type==='technology').length>=5)extraVP+=8;
-  if(hasSpec(p,'colony_vp'))extraVP+=p.colonies.filter(c=>c.connected).length;
+  /* ═══ « BONUS DIVERS » NE VEUT RIEN DIRE POUR CELUI QUI LE LIT ═══
+     Marc, partie 140A : « dans le décompte des points de fin de partie, c'est pas clair pourquoi »
+     et « les bonus spéciaux en particulier c'est pas clair, faut expliquer pourquoi ». Le calcul
+     savait exactement d'où venait chaque point ; il n'en gardait que la somme. On conserve donc le
+     DÉTAIL au fil du calcul — c'est gratuit, et cela évite de reconstituer après coup un
+     raisonnement qu'on vient de faire. */
+  let extraVP=0; const extraDetail=[];
+  if(hasSpec(p,'extrasolar')&&p.cards.filter(c=>c.type==='technology').length>=5){
+    extraVP+=8; extraDetail.push('🚀 Exploration Extra-Solaire : +8 (au moins 5 technologies)'); }
+  if(hasSpec(p,'colony_vp')){
+    const _n=p.colonies.filter(c=>c.connected).length;
+    extraVP+=_n; extraDetail.push('✨ Éveil Collectif : +1 par colonie connectée (×'+_n+')'); }
+  if(p.bonusVP){ extraDetail.push('🗺️ Découvertes : +'+p.bonusVP); }   // déjà compté dans evtVP/tempVP selon le chemin
   const forceVP=0; // supprimé v6
-  return{colVP,routeVP,cardsVP,techBonusVP,rptVP,forceVP,agendasVP,evtVP,extraVP,total:colVP+routeVP+cardsVP+techBonusVP+rptVP+agendasVP+evtVP+extraVP};
+  return{colVP,routeVP,cardsVP,techBonusVP,rptVP,forceVP,agendasVP,evtVP,extraVP,extraDetail,
+    total:colVP+routeVP+cardsVP+techBonusVP+rptVP+agendasVP+evtVP+extraVP};
 }
 // ── Log de partie : construction + copier / email / télécharger (en jeu ET à la fin) ──
 // Rapport lisible : chaque action de chaque nation avec coûts + gain, groupée par tour,
@@ -8100,15 +8197,31 @@ function doEndGame(){
     const win=pVP.total>=aVP.total;
     document.getElementById('end-title').textContent=win?'🏆 Victoire !':'💀 Défaite';
     document.getElementById('end-result').textContent=win?'Tu domines le système solaire ! '+pVP.total+' VP contre '+aVP.total+'.':"Un adversaire s'impose : "+aVP.total+' VP contre '+pVP.total+'.';
+    /* ═══ CHAQUE LIGNE DIT SA RÈGLE ═══
+       Marc, partie 140A : « dans le décompte des points de fin de partie, c'est pas clair pourquoi.
+       Il faut ajouter les mêmes textes que dans le fichier de règle pour qu'on comprenne pourquoi on
+       gagne ou pas les VP. » Les libellés sont donc repris MOT POUR MOT du §17 des règles — deux
+       formulations différentes pour un même calcul, c'est déjà une contradiction en germe.
+       Et les « bonus spéciaux » énumèrent leur provenance, qui était la seule ligne réellement
+       indéchiffrable. */
+    const _reg=(t)=>`<div style="font-size:.78em;color:#8898b8;margin:-2px 0 4px 2px">${t}</div>`;
     const mkBox=(lbl,vp,w,em)=>`<div class="vp-box ${w?'winner':''}"><h3>${em} ${lbl}</h3>
-      <div class="vp-line"><span>Colonies (+1/connectée)</span><span>${vp.colVP}</span></div>
-      <div class="vp-line"><span>Routes (1VP/route)</span><span>+${vp.routeVP}</span></div>
+      <div class="vp-line"><span>Colonies</span><span>${vp.colVP}</span></div>
+      ${_reg('VP du nœud × niveau, ×1 si connectée, ×0,5 si isolée (+1 par colonie connectée)')}
+      <div class="vp-line"><span>Routes</span><span>+${vp.routeVP}</span></div>
+      ${_reg('+1 VP par route établie')}
       <div class="vp-line"><span>Cartes</span><span>+${vp.cardsVP}</span></div>
-      <div class="vp-line"><span>Bonus Tech (×0.5/tech)</span><span>+${vp.techBonusVP}</span></div>
-      <div class="vp-line"><span>Bonus Revenus/tour</span><span>+${vp.rptVP}</span></div>
-      <div class="vp-line"><span>Agendas</span><span>+${vp.agendasVP}</span></div>
+      ${_reg('VP inscrit sur la carte : 1 au T1, 3 au T2, 5 au T3')}
+      <div class="vp-line"><span>Bonus technologique</span><span>+${vp.techBonusVP}</span></div>
+      ${_reg('+0,5 VP par technologie, arrondi à l\'inférieur')}
+      <div class="vp-line"><span>Bonus revenus/tour</span><span>+${vp.rptVP}</span></div>
+      ${_reg('Par ressource : +2 VP au-delà de 5 de revenu, +5 VP au-delà de 10')}
+      <div class="vp-line"><span>Agenda</span><span>+${vp.agendasVP}</span></div>
+      ${_reg(vp.agendasVP?'Condition de ton agenda secret remplie':'Condition de ton agenda secret NON remplie')}
       <div class="vp-line"><span>Événements</span><span>+${vp.evtVP}</span></div>
+      ${_reg('VP gagnés au fil des événements et des victoires de guerre')}
       <div class="vp-line"><span>Bonus spéciaux</span><span>+${vp.extraVP}</span></div>
+      ${_reg((vp.extraDetail&&vp.extraDetail.length)?vp.extraDetail.join('<br>'):'aucun')}
       <div class="vp-total">${vp.total} VP</div></div>`;
     document.getElementById('vp-wrap').innerHTML=mkBox(G.player.civ.name,pVP,win,G.player.civ.emoji)+aiVPs.map(x=>mkBox(x.ai.civ.name,x.vp,!win&&x.vp.total===aVP.total,x.ai.civ.emoji)).join('');
     document.getElementById('end-scr').classList.remove('hidden');
@@ -8226,7 +8339,15 @@ function renderSystemMap(){
   ng.innerHTML='';/* soleil dessiné retiré : fourni par l'image de fond (lueur à gauche) */
   for(const[id,node]of Object.entries(NODES)){
     if(node.type==='orbital_station')continue; // stations orbitales (dont Station Jupiter) non dessinées
-    const pCol=G.player.colonies.find(c=>c.nodeId===id);const anyACol=G.ais.map(ai=>({col:ai.colonies.find(c=>c.nodeId===id),ai})).find(x=>x.col);const aCol=anyACol?anyACol.col:null;const aColAI=anyACol?anyACol.ai:G.ais[0];
+    /* ⚠️ MÊME DÉFAUT QUE DANS LA FENÊTRE DE NŒUD : `.find()` prend le PREMIER occupant de la table
+       interne, dont l'ordre dépend du siège qu'on occupe. Sur un nœud partagé (Exploration
+       Extra-Solaire), chacun voyait donc l'anneau d'une nation différente — Marc voyait Éris en
+       couleur jovienne alors qu'elle est à Laurent. On dessine un anneau PAR occupant : deux
+       cercles concentriques disent ce qu'aucune couleur unique ne peut dire. */
+    const pCol=G.player.colonies.find(c=>c.nodeId===id);
+    const _occ=G.ais.map(ai=>({col:ai.colonies.find(c=>c.nodeId===id),ai})).filter(x=>x.col)
+      .sort((x,y)=>(y.col.level||1)-(x.col.level||1));   // le plus établi d'abord
+    const anyACol=_occ[0]||null;const aCol=anyACol?anyACol.col:null;const aColAI=anyACol?anyACol.ai:G.ais[0];
     const nr=node.r||6;
     const isOrbital=node.type==='orbital_station';
     const ir=Math.min(Math.max(nr,6),26); // lunes plus petites, proportionnelles à node.r
@@ -8239,7 +8360,7 @@ function renderSystemMap(){
     }
     let rings='';
     if(pCol)rings+=`<circle cx="${node.x}" cy="${node.y}" r="${br+3+pCol.level*3}" fill="none" stroke="${G.player.civ.color}" stroke-width="${pCol.level+1}" stroke-opacity="${pCol.connected?.85:.3}"/>`;
-    if(aCol)rings+=`<circle cx="${node.x}" cy="${node.y}" r="${br+1+aCol.level*2}" fill="none" stroke="${aColAI.civ.color}" stroke-width="${aCol.level}" stroke-opacity="${aCol.connected?.65:.2}"/>`;
+    _occ.forEach((o,i)=>{ rings+=`<circle cx="${node.x}" cy="${node.y}" r="${br+1+o.col.level*2+i*2}" fill="none" stroke="${o.ai.civ.color}" stroke-width="${o.col.level}" stroke-opacity="${o.col.connected?.65:.2}"${i?' stroke-dasharray="3,3"':''}/>`; });
     // Image pour lunes/naines ; petite station pour Station Jupiter (la grosse Jupiter est un décor) ; losange pour les anneaux joviens.
     const body=node.decorative
       ?`<polygon points="${node.x},${node.y-nr*1.5} ${node.x+nr*1.5},${node.y} ${node.x},${node.y+nr*1.5} ${node.x-nr*1.5},${node.y}" fill="${node.color}" fill-opacity=".25" stroke="${node.color}" stroke-width="1.2" stroke-dasharray="3,2"/>`
@@ -8815,12 +8936,30 @@ function showNodePopup(nodeId){
   if(G.phase!=='actions')return;
   const node=NODES[nodeId];
   if(node.decorative||node.noColonize){return;} // Anneau jovien / Station Jupiter — non colonisable
-  const pCol=G.player.colonies.find(c=>c.nodeId===nodeId);const aColInfo=G.ais.map(ai=>({ai,col:ai.colonies.find(c=>c.nodeId===nodeId)})).find(x=>x.col);const aCol=aColInfo?aColInfo.col:null;const aColAI=aColInfo?aColInfo.ai:null;
+  /* ═══════ DEUX OCCUPANTS, ET CHACUN N'EN VOYAIT QU'UN ═══════
+     ⚠️ `G.ais.map(…).find(x=>x.col)` prend le PREMIER occupant trouvé dans la table interne. Sur un
+     nœud partagé — le seul cas possible, l'Exploration Extra-Solaire — ce premier occupant dépend de
+     l'ordre des nations, donc du siège de celui qui regarde. Marc et Laurent, partie 140A : sur
+     Éris, Marc voyait « colonie des Jupitériens Nv.1 » et Laurent, à qui Éris appartient, voyait sa
+     propre Nv.3. Deux écrans, deux vérités, aucune mention du fait qu'ils étaient DEUX.
+     Pire : le bouton d'attaque visait cet occupant arbitraire — d'où Laurent capable de « raider sa
+     propre colonie ». La règle l'autorise (un cohabitant peut chasser l'autre), mais l'écran ne
+     disait pas qui il visait.
+     On liste donc TOUS les occupants, et la cible des boutons est celle que le moteur retiendra :
+     `defenseurPrincipal`, la même fonction qui résout l'assaut. */
+  const pCol=G.player.colonies.find(c=>c.nodeId===nodeId);
+  const _occupants=allPlayers().filter(n=>n!==G.player&&n.colonies.some(c=>c.nodeId===nodeId))
+    .map(n=>({nat:n, col:n.colonies.find(c=>c.nodeId===nodeId)}));
+  const _defPrinc=(typeof defenseurPrincipal==='function')?defenseurPrincipal(nodeId,G.player):null;
+  const aColInfo=(_defPrinc&&_defPrinc!==G.player)
+    ? {ai:_defPrinc, col:_defPrinc.colonies.find(c=>c.nodeId===nodeId)}
+    : (_occupants[0]?{ai:_occupants[0].nat, col:_occupants[0].col}:null);
+  const aCol=aColInfo?aColInfo.col:null;const aColAI=aColInfo?aColInfo.ai:null;
   document.getElementById('npop-title').textContent=node.emoji+' '+node.name;
   const resStr=Object.entries(node.res).map(([r,a])=>'+'+a+rEmoji(r)).join(' ');
   /* LE défaut signalé par Marc : c'est MON accord qui compte, pas celui du voisin d'en face. */
   const accord=accordAvecMoi(nodeId,G.player);
-  document.getElementById('npop-info').innerHTML=`VP: ${node.baseVP} | ${resStr}<br>Type: ${({moon:'Lune',dwarf_planet:'Planète naine',asteroid:'Astéroïde',orbital_station:'Station orbitale',planet:'Planète',gas_giant:'Géante gazeuse'})[node.type]||node.type}${pCol?`<br>✅ <b style="color:${G.player.civ.color}">${G.player.civ.emoji} ${G.player.civ.name} (toi)</b> — Nv.${pCol.level}${pCol.connected?' ✓':' ✗ déconnectée'}`:''}${aCol&&aColAI?`<br>🏴 Colonie de <b style="color:${aColAI.civ.color}">${aColAI.civ.emoji} ${aColAI.civ.name}</b> — Nv.${aCol.level}${accord?' 🤝 accord':''}`:''}${!pCol&&!aCol?'<br><span style="color:#7a8aa0">Inoccupé</span>':''}${getPiratePos(G.turn)===nodeId?'<br><span style="color:#ff8888">⚠️ Pirates ici !</span>':''}`;
+  document.getElementById('npop-info').innerHTML=`VP: ${node.baseVP} | ${resStr}<br>Type: ${({moon:'Lune',dwarf_planet:'Planète naine',asteroid:'Astéroïde',orbital_station:'Station orbitale',planet:'Planète',gas_giant:'Géante gazeuse'})[node.type]||node.type}${pCol?`<br>✅ <b style="color:${G.player.civ.color}">${G.player.civ.emoji} ${G.player.civ.name} (toi)</b> — Nv.${pCol.level}${pCol.connected?' ✓':' ✗ déconnectée'}`:''}${_occupants.map(o=>`<br>🏴 Colonie de <b style="color:${o.nat.civ.color}">${o.nat.civ.emoji} ${o.nat.civ.name}</b> — Nv.${o.col.level}${(o.nat===aColAI&&accord)?' 🤝 accord':''}${(_occupants.length>1&&o.nat===aColAI)?' <span style="color:#ffcc88">← cible de tes actions</span>':''}`).join('')}${(_occupants.length>1||(pCol&&_occupants.length))?'<br><span style="color:#ffcc88;font-size:.9em">⚠️ Nœud PARTAGÉ — les occupants se défendent ensemble contre un tiers ; entre eux, l\'un peut chasser l\'autre.</span>':''}${!pCol&&!aCol?'<br><span style="color:#7a8aa0">Inoccupé</span>':''}${getPiratePos(G.turn)===nodeId?'<br><span style="color:#ff8888">⚠️ Pirates ici !</span>':''}`;
   const acts=document.getElementById('npop-acts');acts.innerHTML='';
   if(!pCol){
     const{ac,mat,en}=colonizeCost(G.player);

@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-07 · v8.1';</script>
+<script>window.SOLAR_BUILD_HTML='2026-08-23 · v9.76';</script>
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -45,6 +45,27 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
 .diff-btn.active{border-color:#ffd700;color:#ffd700;background:#1a1a08}
 .diff-btn:hover:not(.active){border-color:#4a9eff;color:#aabbff}
 .btn-go:disabled{opacity:.35;cursor:not-allowed}
+/* ⚠️ LE BADGE NE DOIT NI RECOUVRIR NI POUSSER.
+   Dans le flux, il a fait GRANDIR la barre du haut (Marc : « tu as agrandi le menu du haut pour
+   placer ton bouton »). Il est donc sorti du flux — `position:absolute` dans `#top-bar`, calé en bas
+   à droite, sous le bouton Capacité : la hauteur de la barre redevient exactement ce qu'elle était.
+   Et pour qu'il ne recouvre rien, la deuxième ligne se réserve la place à droite (`padding-right`)
+   uniquement quand le badge est allumé. Ni superposition, ni décalage. */
+#a-toi-badge{display:none;position:absolute;right:9px;bottom:5px;z-index:2;
+  background:linear-gradient(135deg,#1f7a3a,#146030);color:#eafff0;border:1px solid #35a35c;
+  border-radius:6px;padding:2px 7px;font:800 .55em/1.1 system-ui;letter-spacing:.08em;
+  white-space:nowrap;pointer-events:none;}
+#a-toi-badge.on{display:block;}
+/* Le bouton se place à GAUCHE du badge, dans la même bande, hors du flux : la barre du haut ne
+   change donc pas de hauteur, et la deuxième ligne réserve déjà la place à droite. */
+#passer-btn{display:none;position:absolute;right:62px;bottom:5px;z-index:2;
+  background:linear-gradient(135deg,#7a3f1f,#5a2d14);color:#ffe0cc;border:1px solid #b5673a;
+  border-radius:6px;padding:2px 8px;font:800 .55em/1.1 system-ui;letter-spacing:.08em;
+  white-space:nowrap;cursor:pointer;}
+#passer-btn:active{transform:scale(.96);}
+#passer-btn.on{display:block;}
+#top-bar.a-toi .mtb-line2{padding-right:118px;}   /* place réservée pour le badge ET le bouton */
+
 #top-bar{display:flex;align-items:center;gap:10px;padding:6px 14px;background:#0a0a22;border-bottom:1px solid #1a1a3a;flex-shrink:0;min-height:38px}
 .gtitle{font-weight:700;font-size:.95em;color:#4a9eff;letter-spacing:2px}
 #turn-disp{color:#ffd700;font-weight:700;font-size:.85em;min-width:70px}
@@ -124,7 +145,7 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
 #tech-handle:hover::before{background:#4a9eff}
 #tech-hdr{display:flex;align-items:center;gap:8px;padding:3px 10px;border-bottom:1px solid #1a1a3a;flex-shrink:0}
 #tech-hdr span{font-size:.7em;text-transform:uppercase;color:#7880a0;letter-spacing:1px}
-#tech-body{flex:1;overflow-y:auto;padding:4px 6px;display:flex;flex-direction:column;gap:3px}
+#tech-body{flex:1;overflow-y:auto;padding:4px 6px max(calc(var(--botband,84px) + env(safe-area-inset-bottom,0px) + 32px), 170px);display:flex;flex-direction:column;gap:3px}   /* la réserve est ICI : c'est ce bloc qui défile */
 .tb-row{display:flex;align-items:center;gap:4px}
 .tb-label{width:100px;flex-shrink:0;font-size:.65em;font-weight:700;display:flex;align-items:center;gap:4px;padding:2px 4px;border-radius:4px}
 .tb-bonus-star{font-size:.75em;color:#ffd700}
@@ -136,10 +157,26 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
    par une opacité très basse, ce qui rendait le texte illisible sur un écran peu lumineux. On garde
    la distinction visuelle (carte éteinte, non cliquable) mais avec une opacité bien plus haute et un
    texte éclairci : on doit pouvoir LIRE une techno avant de pouvoir l'acheter. */
-.tcard.tlocked{opacity:.62;cursor:default;background:#15153a}
+/* ═══ TROIS NIVEAUX DE LUMIÈRE, ET TROIS SEULEMENT (validé par Marc le 2026-08-08) ═══
+     achetable 1,00 · à toi 0,86 · tout le reste 0,72
+   Il y avait auparavant trois valeurs incohérentes pour des situations qui disent toutes la même
+   chose au joueur — « pas maintenant » : verrouillée 0,62, trop chère 0,85, prise 0,62. Un seul
+   niveau désormais. Les écarts sont volontairement faibles : ce qui distingue vraiment les états,
+   c'est la bordure bleue, le « À toi » vert et le rouleau — la lumière ne fait que du renfort.
+   L'opacité porte sur la CARTE ENTIÈRE, donc l'illustration suit automatiquement. */
+.tcard.tlocked,.tcard.ttaken,.tcard.tcantbuy{opacity:.72;background:#15153a}
+.tcard.tlocked,.tcard.ttaken{cursor:default}
+.tcard.tc-mine{opacity:.86}
+.tcard.tavail,.tcard.tbonus{opacity:1}
 .tcard.tlocked .tc-name,.tcard.tlocked .tc-effect{color:#b6c4e2}
 .tcard.tavail{border-color:#3a5a8a}
-.tcard.tcantbuy{border-color:#7a5520;opacity:.85}
+/* ⚠️ C'ÉTAIT LA LIGNE QUI ANNULAIT L'ATTÉNUATION.
+   Elle repose `opacity:.85` six lignes APRÈS le réglage à 0,72 — et en CSS, à spécificité égale,
+   la dernière écrite gagne. Les cartes trop chères restaient donc à 0,85, quasi indiscernables des
+   cartes achetables : c'est exactement ce que Marc voyait, et il avait raison de soupçonner une
+   seconde ligne. On ne garde que la bordure ambrée, qui est un vrai signal, sans re-toucher à la
+   lumière déjà fixée plus haut. */
+.tcard.tcantbuy{border-color:#7a5520}
 .tcard.tbonus{border-color:#ffd700;box-shadow:0 0 5px rgba(255,215,0,.2)}
 .tc-header{display:flex;align-items:center;justify-content:space-between;padding:3px 5px;background:#07071a;font-size:.62em;line-height:1.3;min-height:20px}
 .tc-name{font-weight:700;color:#c8d8f8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
@@ -174,17 +211,41 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
    idée, et ce n'était pas celle-là.)
    Le triangle est fait de deux moitiés : la partie « manquante » de la carte (fond du panneau) et le
    dos du papier replié, plus clair — c'est ce qui donne l'impression de relief. */
+/* ═══ CARTE INACCESSIBLE : LE BORD DROIT S'ENROULE ═══════════════════════════
+   Avant : un coin replié de 15 px, qu'on ne voyait pas. Marc voulait le BORD DROIT ENTIER enroulé,
+   comme un rouleau de parchemin qu'on n'a pas encore le droit de dérouler — visible d'un coup d'œil
+   dans une rivière de dix cartes. Uniquement pour un PRÉREQUIS MANQUANT : les technologies acquises
+   ou prises par une autre nation ont déjà leurs marques (✓ et ⛔). */
 .tcard.tc-corne{position:relative;overflow:hidden}
-.tcard.tc-corne::before{content:'';position:absolute;top:0;right:0;width:0;height:0;
-  border-left:15px solid transparent;border-top:15px solid #0b0b18;z-index:3;pointer-events:none}
-.tcard.tc-corne::after{content:'';position:absolute;top:0;right:0;width:0;height:0;
-  border-right:15px solid transparent;border-bottom:15px solid #46567e;z-index:4;pointer-events:none;
-  filter:drop-shadow(-1px 1px 1px rgba(0,0,0,.55))}
-/* Le nom reste lisible : on lui laisse la place du coin replié. */
-.tcard.tc-corne .tc-name{padding-right:15px}
-/* En mode compact la carte fait 22 px de haut : une corne de 15 px la mangerait. On la réduit. */
-.tcard.tc-corne.tc-compact::before{border-left-width:9px;border-top-width:9px}
-.tcard.tc-corne.tc-compact::after{border-right-width:9px;border-bottom-width:9px}
+.tcard.tc-corne::before{content:'';position:absolute;top:0;right:26px;bottom:0;width:10px;z-index:3;
+  pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,0),rgba(0,0,0,.45))}
+.tcard.tc-corne::after{content:'';position:absolute;top:0;right:0;bottom:0;width:26px;z-index:4;
+  pointer-events:none;border-left:1px solid #3a4a78;
+  background:linear-gradient(90deg,#0d1326 0%,#1b2440 20%,#2e3c62 48%,#1b2440 76%,#0a0f1e 100%)}
+.tcard.tc-corne .tc-header,.tcard.tc-corne .tc-body,.tcard.tc-corne .tc-art{padding-right:32px}
+/* ⚠️ PAS DE SECONDE ATTÉNUATION — ELLES SE MULTIPLIENT.
+   J'avais posé `opacity:.42` sur le texte, valeur choisie sur une maquette où la carte était à
+   pleine luminosité. Mais dans le jeu, une carte à prérequis manquant porte DÉJÀ `.tlocked`, qui
+   applique `opacity:.62` à toute la carte. Les deux se multiplient : 0,62 × 0,42 = 0,26. Le texte
+   tombait à un contraste de 1,84:1 sur le fond, contre 4,61:1 pour une carte verrouillée ordinaire
+   — en dessous de tout seuil de lisibilité, et c'est ce que Marc a vu.
+   Le rouleau EST le signal ; l'atténuation existe déjà. On ne rajoute rien. */
+.tcard.tc-corne .tc-cost{opacity:1}
+/* Cartes compactes : rouleau plus fin, elles sont deux fois moins hautes. */
+.tcard.tc-corne.tc-compact::before{right:16px;width:7px}
+.tcard.tc-corne.tc-compact::after{width:16px}
+.tcard.tc-corne.tc-compact .tc-header{padding-right:20px}
+/* Le même rouleau sur les cartes Éco&Soc et Militaires : technologie requise absente, ou action
+   déjà utilisée. Jamais sur les cartes répétables — voir `_gcBloque` dans moteur.js. */
+.gcard.gc-corne{position:relative;overflow:hidden}
+.gcard.gc-corne::before{content:'';position:absolute;top:0;right:26px;bottom:0;width:10px;z-index:3;
+  pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,0),rgba(0,0,0,.45))}
+.gcard.gc-corne::after{content:'';position:absolute;top:0;right:0;bottom:0;width:26px;z-index:4;
+  pointer-events:none;border-left:1px solid #3a4a78;
+  background:linear-gradient(90deg,#0d1326 0%,#1b2440 20%,#2e3c62 48%,#1b2440 76%,#0a0f1e 100%)}
+.gcard.gc-corne .gc-header,.gcard.gc-corne .gc-body,.gcard.gc-corne .gc-art{padding-right:32px}
+.gcard.gc-corne.gc-compact::before{right:16px;width:7px}
+.gcard.gc-corne.gc-compact::after{width:16px}
 .tcard.tc-compact{display:flex;align-items:center;padding:0;height:22px}
 .tcard.tc-compact .tc-header{flex:1;background:transparent;min-height:unset;height:100%;padding:2px 5px}
 .tcard.tc-compact .tc-art,.tcard.tc-compact .tc-body{display:none}
@@ -193,7 +254,11 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
 .gen-label{width:100px;flex-shrink:0;font-size:.65em;color:#5a6a8a;display:flex;align-items:center;padding:2px 4px}
 .gcard{flex:1;min-width:0;background:#0d0d22;border:1px solid #2a2a5a;border-radius:5px;cursor:pointer;transition:all .15s;overflow:hidden}
 .gcard:hover:not(.no-buy){border-color:#4a9eff}
-.gcard.no-buy{opacity:.68;cursor:default} /* était .4 : illisible sur écran peu lumineux */
+.gcard.no-buy{opacity:.72}   /* même niveau que les cartes tech inaccessibles */
+/* ⚠️ Seules les cartes ENROULÉES perdent le curseur : une carte qu'on ne peut pas encore PAYER
+   reste cliquable — on veut pouvoir lire son détail pour décider si on économise pour elle. */
+.gcard.gc-corne{cursor:default}
+.gcard.gc-mine{opacity:.86}   /* « à toi » : légèrement en retrait, comme dans la rivière tech */
 .gc-header{display:flex;align-items:center;justify-content:space-between;padding:3px 5px;background:#07071a;font-size:.62em;min-height:20px}
 .gc-art{position:relative;height:42px;display:flex;align-items:center;justify-content:center;font-size:18px}
 .gc-body{padding:2px 5px 4px;font-size:.59em;line-height:1.3}
@@ -359,11 +424,28 @@ body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-seri
 .inv-ai-pick{background:#1a1a0a;border:1px solid #5a4a0a;border-radius:8px;padding:7px 12px;margin-bottom:14px;font-size:.8em;color:#cc9944;text-align:left}
 .inv-opts{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-bottom:10px;max-height:46vh;overflow-y:auto}
 .inv-opt{width:112px;padding:8px 7px;background:#0f0f2a;border:2px solid #2a3a5a;border-radius:9px;cursor:pointer;text-align:center;transition:all .2s;position:relative}
+/* Investissement qu'on n'a pas les moyens de payer : même atténuation que les cartes verrouillées
+   de la rivière (.72), pour que « inaccessible » ait UNE seule apparence dans tout le jeu. */
+.inv-opt.inv-nope{opacity:.72;cursor:not-allowed;border-color:#4a2a2a;background:#15102a}
+.inv-opt.inv-nope:hover{border-color:#4a2a2a}
 .inv-opt:hover:not(.inv-taken){border-color:#ffd700;background:#1a1a08;transform:translateY(-2px)}
 .inv-opt.inv-taken{opacity:.35;cursor:default;border-color:#3a3a3a}
 .inv-opt-emoji{font-size:1.7em;margin-bottom:5px}
 .inv-opt-name{font-size:.75em;font-weight:700;color:#c8d8f8;margin-bottom:3px}
 .inv-opt-benefit{font-size:.62em;color:#66cc66;line-height:1.3;margin-bottom:3px}
+/* Intertitre de la liste d'espionnage : une ligne par nation espionnée. Sans lui, la liste était
+   plate et une même nation revenait à deux endroits (retour de Marc, partie 0C10). */
+.esp-groupe{font-size:.68em;font-weight:700;color:#ffd479;letter-spacing:.03em;text-transform:uppercase;
+  margin:10px 0 5px;padding:4px 6px;border-left:3px solid #ffd479;background:rgba(255,212,121,.07);border-radius:0 4px 4px 0}
+.esp-groupe:first-child{margin-top:0}
+/* Bloc de catégorie espionnable : les cases à cocher d'une même filière chez une même nation. */
+.esp-cat{border:1px solid #2a3a6a;border-radius:8px;padding:7px 9px;margin:6px 0;background:rgba(12,16,38,.5)}
+.esp-cat-nom{font-size:.68em;font-weight:700;color:#9fb4d6;margin-bottom:4px}
+.esp-tech{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:.72em;color:#dbe6ff;cursor:pointer}
+.esp-tech input{width:auto;margin:0;flex:none}
+.esp-cat-pied:empty{display:none}
+.esp-cat-pied{margin-top:6px}
+.esp-cat-pied .esp-go{width:100%;font-size:.7em;padding:6px 8px}
 .inv-opt-cost{font-size:.6em;color:#ff8866;line-height:1.3}
 /* Route token modal */
 #route-token-modal{position:fixed;inset:0;background:rgba(4,4,18,.82);backdrop-filter:blur(5px);z-index:395;display:flex;align-items:center;justify-content:center}
@@ -492,7 +574,7 @@ body.modal-lock #btn-ability,body.modal-lock #btn-undo,body.modal-lock #btn-col,
 /* ======================  SURCHARGE MOBILE / SMALL SCREEN  ============= */
 /* ===================================================================== */
 html{background:#020208;height:100%;}
-body{max-width:480px;margin:0 auto;height:100dvh;height:100vh;position:relative;overflow:hidden;font-size:14px;box-shadow:0 0 50px #000;display:flex;flex-direction:column;padding:10px 0 calc(10px + env(safe-area-inset-bottom,0));}
+body{max-width:var(--appw,480px);margin:0 auto;height:100dvh;height:100vh;position:relative;overflow:hidden;font-size:14px;box-shadow:0 0 50px #000;display:flex;flex-direction:column;padding:10px 0 calc(10px + env(safe-area-inset-bottom,0));}
 #top-bar{border-radius:12px 12px 0 0;}
 #bottom-bar{border-radius:0 0 12px 12px;overflow:hidden;}
 /* revenu inline dans la barre de ressources */
@@ -534,17 +616,118 @@ body{max-width:480px;margin:0 auto;height:100dvh;height:100vh;position:relative;
 #m-content{flex:1;min-height:0;overflow:hidden;position:relative;}
 /* padding-bottom : sans lui, le DERNIER bloc d'un panneau (ex. la 2e nation dans Empire, le bas de
    Diplomatie) restait masqué sous la barre du bas et le défilement ne descendait pas plus loin. */
-.m-panel{position:absolute;inset:0;overflow-y:auto;display:none;padding-bottom:96px;-webkit-overflow-scrolling:touch;}
+/* ⚠️ LA RÉSERVE DU BAS DOIT SUIVRE LA VRAIE HAUTEUR DE LA BARRE.
+   Elle valait 96 px en dur. Or la barre du bas mesure ~84 px et s'ajoute à la zone réservée de
+   l'iPhone (`env(safe-area-inset-bottom)`, jusqu'à 34 px) : la réserve manquait donc d'une
+   vingtaine de pixels sur mobile, et la dernière carte tech, la dernière ligne du journal, le bas
+   d'Empire et de Diplo restaient sous la barre, inatteignables au défilement.
+   Elle se calcule maintenant sur la hauteur MESURÉE de la barre (`--botband`, posée par
+   `uiSyncBands()`), plus la zone de sécurité, plus 28 px d'air pour qu'on voie bien que c'est fini. */
+/* ⚠️ LA RÉSERVE VA SUR LE CONTENU QUI DÉFILE, PAS SUR LE CADRE.
+   Marc : « tu as mis un espace dans la zone centrale qui réduit la hauteur de la rivière ». Il a
+   raison, et c'était mon erreur d'analyse : j'avais posé un `padding-bottom` sur le panneau, qui est
+   un conteneur en FLEX pour l'onglet Tech. Sur un conteneur flex, le padding RETIRE de la hauteur
+   disponible aux enfants — la rivière perdait donc 110 px, et l'espace gagné en bas ne servait à
+   rien. Ce n'est pas un problème de place, c'est un problème de DÉFILEMENT : il faut que le contenu
+   puisse défiler un peu plus loin, pas que le cadre rétrécisse. La réserve appartient donc à la
+   LISTE qui défile, pas au panneau qui la contient. */
+.m-panel{position:absolute;inset:0;overflow-y:auto;display:none;-webkit-overflow-scrolling:touch;}
+/* Fin de contenu : de quoi faire défiler au-delà de la barre du bas, sur tous les onglets qui
+   défilent d'un bloc (Empire, Diplo, Journal). Mesurée, pas devinée : hauteur réelle de la barre
+   plus la zone de sécurité de l'iPhone. */
+/* ⚠️ UNE RÉSERVE QUI NE PEUT PAS ÊTRE TROP COURTE.
+   Le calcul dépend de `--botband`, mesuré en JavaScript. Si la mesure arrive tard, échoue, ou si le
+   navigateur mobile ajoute sa propre barre par-dessus (ce que montrent les captures de Marc), la
+   réserve est insuffisante et le bas reste inatteignable. `max()` garantit un plancher de 170 px :
+   au pire on peut défiler un peu plus loin que nécessaire, ce qui ne coûte RIEN — c'est de l'espace
+   vide en fin de liste. Se tromper par excès est ici sans conséquence, par défaut ça coupe le texte. */
+#mp-empire,#mp-diplo,#mp-journal{padding-bottom:max(calc(var(--botband,84px) + env(safe-area-inset-bottom,0px) + 32px), 170px);}
 .m-panel.active{display:block;}
+
+/* ═══ LA CARTE PREND TOUTE LA PLACE DISPONIBLE ═══════════════════════════════
+   Le jeu est dessiné dans une colonne de 480 px centrée — la forme d'un téléphone.
+   C'est juste pour les menus et les cartes tech, mais sur un ordinateur la CARTE se
+   retrouvait coincée dans cette colonne, avec du noir de chaque côté et un ruban
+   minuscule au milieu (capture de Marc, 2026-08-07) : on jouait sur un timbre-poste
+   au milieu d'un écran vide.
+   La carte sort donc de la colonne et occupe toute la largeur de la fenêtre, sans
+   toucher au reste de la mise en page. `calc(50% - 50vw)` est la marge négative qui
+   ramène le bord gauche du bloc au bord gauche de l'écran, quelle que soit la
+   largeur de la colonne — donc valable sur téléphone, tablette et ordinateur. */
+/* La carte prend toute la largeur de la fenêtre ; les menus et les cartes tech gardent la colonne
+   étroite, où leur mise en page a été pensée. Élargir le CADRE seul ne servait à rien : `body` porte
+   `overflow:hidden` et coupait tout ce qui dépassait de la colonne. */
+body.vue-carte{--appw:100vw;}
+body.vue-carte #top-bar,body.vue-carte #bottom-bar{border-radius:0;}
+#mp-map.active{position:relative;}   /* repère pour les boutons de zoom, ancrés au panneau */
+/* ⚠️ NE PAS METTRE `#map-wrap` EN `grid` (ni en `flex`).
+   J'avais essayé, pour centrer la carte après un dézoom. Mais la carte se dimensionne avec
+   `height:100%` du cadre : dans une grille, la hauteur de la piste dépend du contenu, et le
+   contenu dépend de la hauteur de la piste. Le calcul tourne en rond et la carte devenait
+   DÉMESURÉMENT HAUTE (signalé par Marc). On reste donc en flux normal, et on centre à la marge —
+   `margin:0 auto` ne s'applique que quand la carte est plus étroite que son cadre, ce qui est
+   exactement le cas après un dézoom. */
 
 /* ---------- Onglet Carte ---------- */
 #mp-map{display:none;}
 #mp-map.active{display:flex;flex-direction:column;}
 #center{display:contents;}
 #map-wrap{flex:1;min-height:0;overflow:auto;position:relative;background:#070718;}
-#solar-svg{display:block;width:100%;height:auto;aspect-ratio:400/600;min-height:0;margin:0 auto;transition:none;}
+/* ⚠️ LA CONTRAINTE ÉTAIT ICI, ET NULLE PART AILLEURS.
+   Le dessin était dimensionné sur UN SEUL axe, l'autre étant déduit par `aspect-ratio` :
+     · vue globale  : `width:100%` + `aspect-ratio:400/600` (portrait) → élargir la colonne
+       multipliait la HAUTEUR par 1,5 ; d'où la carte devenue démesurément haute ;
+     · vue système  : `height:100%` + `aspect-ratio:2020/490` → la largeur valait quatre fois la
+       hauteur, impossible de voir le système entier.
+   ⚠️ ET MA PREMIÈRE CORRECTION N'A MARCHÉ QUE SUR UNE DES DEUX VUES.
+   J'ai donné `height:100%` au dessin — mais une hauteur en POURCENTAGE n'a de sens que si le cadre
+   a une hauteur définie. Selon le chemin de mise en page, le navigateur la traite alors comme
+   `auto` : la hauteur repart de la largeur via le ratio du `viewBox`, et la carte globale (portrait
+   400×600) redevenait une fois et demie plus haute que large. D'où « elle reste trop grande », et
+   un dézoom sans effet puisqu'il n'agissait plus sur rien.
+   Le dessin est donc maintenant en `position:absolute` dans le cadre : ses dimensions se calculent
+   sur le bloc conteneur, sans passer par la résolution des pourcentages. Il n'y a plus de cas où
+   ça peut retomber en `auto`.
+
+   Or le `<svg>` porte déjà
+   `preserveAspectRatio="xMidYMid meet"` : si on lui donne les DEUX dimensions, il met le dessin à
+   l'échelle pour qu'il tienne entièrement, centré, sans rien déformer. C'est le navigateur qui fait
+   le travail, et il le fait bien. À 1× tout est visible ; au-delà, le cadre défile.
+   Rien d'autre ne dépend de la taille de la carte : les nœuds sont placés en coordonnées du
+   `viewBox`, pas en pixels. Agrandir ne casse donc rien — c'était le sens de ta question. */
+/* ⚠️ RETOUR À LA RÈGLE D'ORIGINE — 2026-08-07.
+   J'ai tenté quatre variantes pour que la carte occupe tout l'écran : `aspect-ratio` sur les deux
+   axes, hauteur en pourcentage, `position:absolute`, puis un calcul en pixels en JavaScript. Aucune
+   n'a marché, et les deux dernières ont cassé l'affichage — carte globale zoomée à l'extrême, carte
+   tactique entièrement noire (captures de Marc). Je ne vois pas le rendu : je corrigeais à l'aveugle
+   une chose que je ne pouvais pas observer, et chaque essai coûtait un aller-retour.
+   On remet donc EXACTEMENT ce qui fonctionnait. L'élargissement de la carte reste à faire, mais il
+   demande de pouvoir vérifier le résultat, pas de deviner. */
+/* ═══ MESURE RÉELLE (console de Marc, v9.1, vue tactique) ═══════════════════
+     cadre 1211 × 1816 px · viewBox « 0 175 2020 490 » (ratio 4,1:1)
+   Le CADRE faisait 1816 px de haut alors que la fenêtre en fait ~900 : il n'a jamais été borné par
+   l'écran. Le dessin, mis à l'échelle pour tenir (0,6×), mesurait 1211 × 294 px et se retrouvait
+   CENTRÉ VERTICALEMENT dans ces 1816 px — donc dessiné vers y≈760, largement sous le bas de la
+   fenêtre. D'où l'écran noir : la carte était là, en dessous.
+   C'est aussi pourquoi `height:100%` était capricieux : la hauteur du parent dépendait de son
+   contenu, donc d'elle-même. On la FIXE maintenant à la place réellement visible, entre les deux
+   barres, dont les hauteurs sont déjà mesurées par `uiSyncBands()`. */
+/* ⚠️ LA HAUTEUR DISPONIBLE EST MESURÉE, PAS CALCULÉE.
+   Ma formule `100dvh − barre du haut − barre du bas` OUBLIAIT deux choses : le `padding` de 10 px
+   du corps de page, et `env(safe-area-inset-bottom)` — la zone réservée à la barre d'accueil des
+   iPhone, jusqu'à 34 px. Le cadre aurait donc débordé d'une cinquantaine de pixels sur mobile, et
+   le bas de la carte se serait fait couper : exactement le défaut d'affichage à ne pas introduire.
+   Plutôt que d'allonger la formule — il y aurait toujours un terme oublié —, `uiMapFit()` MESURE
+   l'espace réellement libre entre le haut du cadre et le sommet de la barre du bas. Une mesure
+   n'oublie rien, sur aucun appareil.
+   Le `max-height` ci-dessous n'est qu'un garde-fou pour le tout premier rendu, avant la mesure. */
+#mp-map.active #map-wrap{max-height:calc(100dvh - var(--topband,56px) - var(--botband,84px) - 20px - env(safe-area-inset-bottom,0px));}
+/* Les deux dimensions sont données au dessin ; `preserveAspectRatio="xMidYMid meet"` (déjà sur la
+   balise <svg>) le met à l'échelle pour qu'il tienne ENTIER, centré, sans déformation. À 1× tout
+   est visible ; au-delà, la boîte dépasse et le cadre défile. */
+#solar-svg{display:block;width:100%;height:100%;min-height:0;margin:0 auto;transition:none;}   /* repli : la taille exacte est posée par uiMapFit() */
 /* 2e carte (système entier index, scrollable) : SVG large 980x320 */
-#map-wrap.mapzoom #solar-svg{aspect-ratio:2020/490;height:calc(100% * var(--mz,1));width:auto;margin:0;}
+/* (plus de règle spéciale `.mapzoom` : les deux vues suivent la même, ci-dessus.) */
 #map-back{display:none;position:absolute;top:8px;left:8px;z-index:6;padding:6px 13px;border-radius:16px;background:#13203f;border:1px solid #33509a;color:#bcd0ff;font-weight:700;font-size:.82em;cursor:pointer;}
 #map-wrap.mapzoom #map-back{display:block;}
 #map-wrap.mapzoom .panel-nav{display:none!important;}
@@ -553,8 +736,11 @@ body{max-width:480px;margin:0 auto;height:100dvh;height:100vh;position:relative;
 /* Barre de zoom horizontale, discrète, sous la carte (~5 % ; la carte garde ~95 %) */
 /* Zoom carte : FLOTTANT au-dessus de la carte (avant : en flux sous la carte → invisible sur mobile,
    impossible de dézoomer pour atteindre les nœuds du bas comme Triton). */
-.map-zoom{position:fixed;right:10px;bottom:calc(var(--botband,84px) + 10px);z-index:200;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:8px;padding:5px 8px;background:rgba(8,10,28,.86);border:1px solid #2a3a6a;border-radius:10px;backdrop-filter:blur(4px);box-shadow:0 4px 14px rgba(0,0,0,.5);}
+.map-zoom{position:absolute;right:10px;top:10px;z-index:20;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:8px;padding:5px 8px;background:rgba(8,10,28,.86);border:1px solid #2a3a6a;border-radius:10px;backdrop-filter:blur(4px);box-shadow:0 4px 14px rgba(0,0,0,.5);}
 .map-zoom .mz-lbl{font-size:.72em;color:#7a88aa;min-width:32px;text-align:center;font-weight:700;}
+/* Bouton de bascule des distances : jaune quand elles sont visibles, éteint quand elles sont masquées. */
+.map-zoom #mz-dist{color:#ffd54f;border-color:#5a4a1e;}
+.map-zoom #mz-dist.off{color:#5a6280;border-color:#2a3a6a;}
 .map-zoom button{width:26px;height:26px;border-radius:6px;background:rgba(10,12,34,.9);border:1px solid #2a3a6a;color:#9cc2ff;font-size:.95em;line-height:1;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .map-zoom button:active{background:#1a2a5a;}
 /* popup nœud -> feuille en bas, indépendant de la géométrie de la carte */
@@ -563,13 +749,16 @@ body{max-width:480px;margin:0 auto;height:100dvh;height:100vh;position:relative;
 .npop-btn{padding:11px 12px;font-size:.95em;}
 
 /* ---------- Onglet Techs ---------- */
-#mp-tech{padding:0;}
+/* ⚠️ CETTE LIGNE ANNULAIT LA RÉSERVE DU BAS. `padding:0` écrase le `padding-bottom` de `.m-panel`
+   — c'est pour cela que les cartes tech étaient les plus visiblement coupées des cinq onglets.
+   On ne remet donc à zéro que les côtés, et on garde la réserve en bas. */
+#mp-tech{padding:0;}   /* colonne flex : tout padding ici RÉTRÉCIT la rivière. La réserve est sur #tech-body, qui défile. */
 #mp-tech.active{display:flex;flex-direction:column;}
 #tech-area{height:auto!important;max-height:none!important;min-height:0!important;flex:1;border-top:none;}
 #tech-handle{display:none;}
 #tech-hdr{padding:7px 10px;}
 #tech-hdr span:first-child{font-size:.82em;}
-#tech-body{gap:8px;padding:8px;}
+#tech-body{gap:8px;padding:8px 8px max(calc(var(--botband,84px) + env(safe-area-inset-bottom,0px) + 32px), 170px);}   /* idem sur mobile : la réserve suit le bloc qui défile */
 /* rangées de branches -> empilées, lisibles */
 .tb-row{flex-direction:column;align-items:stretch;gap:5px;background:#0b0b22;border:1px solid #1a1a3a;border-radius:10px;padding:8px;}
 .tb-label{width:auto!important;font-size:.82em!important;padding:3px 6px;border-radius:6px;}
@@ -590,7 +779,13 @@ body{max-width:480px;margin:0 auto;height:100dvh;height:100vh;position:relative;
 /* carte possédée par le joueur -> mise en valeur (vert) */
 .tcard.tc-mine,.gcard.gc-mine{border-color:#3fbf6a!important;background:linear-gradient(180deg,#0c2418,#0a1a12)!important;box-shadow:0 0 0 1px #3fbf6a55,0 0 10px rgba(63,191,106,.18)!important;opacity:1!important;}
 .tcard.tc-mine .tc-name{color:#9fe8b8;}
-.tcard.tc-mine .tc-art:not(.tc-illus),.gcard.gc-mine .gc-art{background:#0f3320!important;}
+/* ⚠️ LE FOND VERT « À TOI » NE DOIT PAS RECOUVRIR UNE ILLUSTRATION.
+   Le côté tech avait bien `:not(.tc-illus)` ; le côté Éco&Soc, non — il peignait du vert par-dessus
+   l'image de TOUTES les cartes possédées. Le défaut existait depuis toujours mais restait invisible :
+   la zone d'art faisait 50 px. En la passant à 150 px pour montrer les illustrations, il est devenu
+   un grand rectangle vert (capture de Marc : « Sénat Solaire », forme de gouvernement en cours).
+   La classe `gc-illus` n'existait pas quand cette règle a été écrite ; elle existe maintenant. */
+.tcard.tc-mine .tc-art:not(.tc-illus),.gcard.gc-mine .gc-art:not(.gc-illus){background:#0f3320!important;}
 
 /* ---------- Modale détail tech = plein écran ---------- */
 #tech-detail-modal{align-items:flex-end;}
@@ -610,7 +805,7 @@ body{max-width:480px;margin:0 auto;height:100dvh;height:100vh;position:relative;
 .rbox .rv{font-size:1.1em;}
 
 /* ---------- Onglet Diplo (ex left-panel war/events) ---------- */
-#mp-diplo{background:#0a0a22;padding:2px;}
+#mp-diplo{background:#0a0a22;padding:2px 2px max(calc(var(--botband,84px) + env(safe-area-inset-bottom,0px) + 32px), 170px);}   /* idem : `padding:2px` écrasait la réserve du bas */
 #left-panel{width:auto!important;border-right:none;overflow:visible;}
 /* Diplomatie : 2 mini-barres par nation */
 .dip-help{font-size:.62em;color:#6a7a98;margin:2px 2px 8px;line-height:1.4;}
@@ -710,7 +905,12 @@ body{font-size:16px;}
 .tcard .tc-name{font-size:1.55em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;}
 .tcard .tc-header{font-size:.78em;}
 /* Carte tech illustrée : l'illustration remplit la zone d'art (plus haute) */
-.tc-art.tc-illus{height:150px!important;width:100%;background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;font-size:0;}
+/* ═══ MÊME HAUTEUR D'ILLUSTRATION DANS LES TROIS RIVIÈRES (Marc, 2026-08-08) ═══
+   La rivière Tech montrait ses illustrations sur 150 px ; Éco&Soc et Militaire se contentaient de
+   50 px, hérités de l'époque où il n'y avait qu'une seule rivière et où ces cartes n'étaient qu'une
+   liste. Maintenant qu'il y en a trois, autant montrer les images dans les trois. */
+.tc-art.tc-illus,.gc-art.gc-illus{height:150px!important;width:100%;background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;font-size:0;}
+.gcard{display:flex;flex-direction:column;}   /* la carte suit la hauteur de son illustration */
 
 /* 2c) Cartes CIVIQUES & MILITAIRES : même traitement que les techs (titres gros, pleine largeur, 1 ligne) */
 .gcard .gc-name{font-size:1.5em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;}
@@ -857,9 +1057,17 @@ function lvEye(){
 function lvShowBuild(){
   try{
     const el=document.getElementById('lv-build'); if(!el)return;
-    const h=window.SOLAR_BUILD_HTML||null, j=window.SOLAR_BUILD_JS||null;
-    if(h&&j&&h!==j) el.innerHTML='<span style="color:#ff8a8a">Versions incohérentes — jeu : '+h+' · en ligne : '+j+'</span>';
-    else el.textContent='Version '+(h||'inconnue');
+    /* LES TROIS FICHIERS SONT COMPARÉS, pas deux. `moteur.js` — qui contient toutes les règles —
+       n'avait aucun marqueur : on pouvait donc tourner avec un moteur vieux de plusieurs versions
+       sans qu'aucun écran ne le dise. C'est ce qui a rendu indécidable le compte des cartes
+       Stratégie. Si l'un des trois diffère, on nomme LEQUEL. */
+    const h=window.SOLAR_BUILD_HTML||null, j=window.SOLAR_BUILD_JS||null, m=window.SOLAR_BUILD_MOTEUR||null;
+    const parts=[['page',h],['en ligne',j],['moteur',m]].filter(x=>x[1]);
+    const distinctes=[...new Set(parts.map(x=>x[1]))];
+    if(distinctes.length>1)
+      el.innerHTML='<span style="color:#ff8a8a">Versions incohérentes — '
+        +parts.map(x=>x[0]+' : '+x[1]).join(' · ')+' — recharge (Cmd+Maj+R) ou renvoie les fichiers manquants</span>';
+    else el.textContent='Version '+(h||m||'inconnue');
   }catch(e){}
 }
 // Auto-connexion au chargement si « se souvenir de moi » était coché et la session serveur est encore valide.
@@ -916,6 +1124,14 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
   <div class="mtb-line2">
     <div class="top-res" id="top-res"></div>
     <div id="top-income"></div>
+    <!-- « À TOI » : DANS la barre du haut, à droite, sous le bouton Capacité (demande de Marc).
+         Posé ici et pas en flottant : un élément flottant se superpose forcément à quelque chose. -->
+    <span id="a-toi-badge">À TOI</span>
+    <!-- Passer son tour d'action. Demande de Marc (2026-08-08) : « parfois on ne peut plus rien
+         jouer » — plus d'AC, plus de ressources, plus de case atteignable. Le bouton « Fin de Tour »
+         du jeu existait mais il faut le chercher ; ici il est juste à côté du badge, là où l'œil est
+         déjà quand c'est à toi. Il n'apparaît QUE pendant ton tour d'action. -->
+    <button id="passer-btn" type="button">PASSER</button>
   </div>
 </div>
 <div id="game-wrap" style="display:none">
@@ -942,9 +1158,11 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
       <a href="regles.html" target="_blank" rel="noopener" style="display:inline-block;background:linear-gradient(135deg,#d09a2e,#a8761a);color:#fff;text-decoration:none;font-weight:800;font-size:.92em;padding:8px 15px;border-radius:9px;border:2px solid #ffd98a;box-shadow:0 2px 10px rgba(0,0,0,.45)">📖 Règles du jeu</a>
     </div>
     <div class="log-tools" style="display:flex;gap:6px;padding:7px;flex-wrap:wrap;border-bottom:1px solid #1a1a3a;background:#080820;position:sticky;top:0;z-index:2">
+      <!-- « Envoyer par email » et « .txt » RETIRÉS (Marc, 2026-08-09) : inutiles, « Copier le log » suffit. -->
       <button class="abtn" style="flex:1;min-width:90px" onclick="copyLogText()">📋 Copier le log</button>
-      <button class="abtn" style="flex:1;min-width:90px" onclick="emailLog()">📧 Envoyer par email</button>
-      <button class="abtn" style="flex:1;min-width:80px" onclick="downloadLog()">💾 .txt</button>
+      <!-- CONCÉDER : n'apparaît qu'EN LIGNE (online.js le démasque). En solo il n'y a personne à qui
+           concéder, et le bouton « Recommencer à zéro » ci-dessus fait déjà l'affaire. -->
+      <button class="abtn" id="conceder-btn" type="button" style="flex:1;min-width:90px;display:none;background:linear-gradient(135deg,#7a1f1f,#4a1010);border-color:#c85050;color:#ffd0d0;font-weight:800" onclick="scConcede()">🏳️ Concéder la victoire</button>
     </div>
     <div id="log-legend" class="log-legend"></div><div id="log-content" class="open"></div>
   </div>
@@ -961,7 +1179,10 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
           <filter id="glow2"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         </defs>
         <rect width="400" height="600" fill="url(#bg-grad)"/>
-        <image id="map-bg-img" href="assets/map/global.png" xlink:href="assets/map/global.png" x="0" y="0" width="400" height="600" preserveAspectRatio="xMidYMid slice"/>
+        <!-- Carte globale : `global2.webp` (2048 × 3072, rapport 2:3 exact, 677 Ko). Le WebP pèse trois
+           fois moins que le PNG d'origine (7,3 Mo) pour un rendu identique ; `global2.jpg` sert de repli
+           aux très vieux navigateurs. ⚠️ Changer ce dessin oblige à recalculer MAP_HOTSPOTS (moteur.js). -->
+        <image id="map-bg-img" href="assets/map/global2.webp" xlink:href="assets/map/global2.webp" x="0" y="0" width="400" height="600" preserveAspectRatio="xMidYMid slice"/>
         <g id="stars"></g>
         <g id="connections"></g>
         <g id="routes-ai"></g>
@@ -979,7 +1200,16 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
         <div class="npop-acts" id="npop-acts"></div>
       </div>
     </div>
-    <div class="map-zoom"><button onclick="uiZoom(-1)" title="Zoom −">−</button><span id="mz-lbl" class="mz-lbl">2×</span><button onclick="uiZoom(1)" title="Zoom +">＋</button></div>
+    <!-- ⚠️ LES BOUTONS DE ZOOM NE DOIVENT PAS ÊTRE DANS `#map-wrap`.
+         Je les y avais mis pour les poser « sur la carte ». Mais `#map-wrap` est le cadre qui
+         DÉFILE : un élément en `position:absolute` à l'intérieur défile avec le contenu, donc les
+         boutons partaient hors de vue dès qu'on faisait glisser la carte. Ils sont maintenant
+         ancrés au PANNEAU (qui, lui, ne défile pas) : toujours visibles, en haut à droite. -->
+    <div class="map-zoom"><button onclick="uiZoom(-1)" title="Dézoomer">−</button><span id="mz-lbl" class="mz-lbl">1×</span><button onclick="uiZoom(1)" title="Zoomer">＋</button><!--
+      Bascule des distances entre capitales (les traits jaunes Terre–Mars–Jupiter–Éris). Elles
+      n'portent aucune règle : ni route, ni adjacence, seulement des durées de trajet. Placée près
+      du zoom, comme demandé, parce que c'est là qu'on règle la lisibilité de la carte. -->
+      <button id="mz-dist" onclick="toggleDistances()" title="Masquer les distances entre capitales">⤳</button></div>
   </div>
   </div>
   <div class="m-panel" id="mp-tech">
@@ -1352,6 +1582,11 @@ function uiTab(name){
   try{
     document.querySelectorAll('.mtab').forEach(b=>b.classList.toggle('active',b.getAttribute('data-tab')===name));
     document.querySelectorAll('.m-panel').forEach(p=>p.classList.toggle('active',p.id==='mp-'+name));
+    // La CARTE mérite tout l'écran ; les menus et les cartes tech restent dans la colonne étroite,
+    // où leur mise en page a été pensée. C'est le seul moyen d'élargir sans tout déformer.
+    document.body.classList.toggle('vue-carte', name==='map');
+    try{ uiSyncBands(); }catch(e){}
+    if(name==='map') setTimeout(function(){ try{ uiMapFit(); }catch(e){} },0);
     if(G&&G.player){
       if(name==='tech')renderTechTree();
       else if(name==='map')renderMap();
@@ -1368,18 +1603,38 @@ getTechAreaMode=function(){return 'full';};
 
 /* --- Zoom carte : 1× = carte remplit la HAUTEUR dispo (scroll horizontal), jusqu'à 4× --- */
 var uiMZ=1;
+/* Borne le cadre de la carte à l'espace VRAIMENT libre, puis met le dessin à cette taille.
+   Deux mesures, aucune formule : `getBoundingClientRect()` rend des pixels à l'écran, marges et
+   zones de sécurité déjà déduites. Rendue tolérante : si une mesure est absurde (page pas encore
+   disposée), on ne touche à rien plutôt que de poser une valeur fausse. */
+function uiMapFit(){
+  try{
+    var wrap=document.getElementById('map-wrap'), svg=document.getElementById('solar-svg');
+    if(!wrap||!svg) return;
+    var bas=document.getElementById('bottom-bar');
+    var haut=wrap.getBoundingClientRect().top;
+    var plancher=(bas&&bas.offsetHeight)?bas.getBoundingClientRect().top:window.innerHeight;
+    var dispo=Math.floor(plancher-haut);
+    if(dispo>80){ wrap.style.maxHeight=dispo+'px'; wrap.style.height=dispo+'px'; }
+    var w=wrap.clientWidth||0, h=wrap.clientHeight||0;
+    if(w>40&&h>40){ svg.style.width=Math.round(w*uiMZ)+'px'; svg.style.height=Math.round(h*uiMZ)+'px'; }
+  }catch(e){}
+}
 function uiApplyMZ(){
   var wrap=document.getElementById('map-wrap');
   if(wrap)wrap.style.setProperty('--mz',uiMZ);
+  uiMapFit();
   var lbl=document.getElementById('panel-label');
   if(lbl)lbl.textContent='Zoom '+uiMZ.toFixed(1).replace(/\.0$/,'')+'×';
   var l2=document.getElementById('mz-lbl');
   if(l2)l2.textContent=uiMZ.toFixed(1).replace(/\.0$/,'')+'×';
 }
 function uiZoom(d){
+  /* Échelle d'origine : 1× = la carte remplit la hauteur du cadre, jusqu'à 4×. */
   uiMZ=Math.max(1,Math.min(4,Math.round((uiMZ+d*0.5)*10)/10));
   uiApplyMZ();
 }
+
 
 /* Mesure la HAUTEUR des barres (ancrées en position:fixed) → le contenu central
    est calé entre les deux (padding de #game-wrap) et les modales s'y inscrivent.
@@ -1428,6 +1683,8 @@ if(window.visualViewport){
   window.visualViewport.addEventListener('scroll',syncFixedBars);
 }
 setAppHeight();
+try{ window.addEventListener('resize',function(){ try{ uiMapFit(); }catch(e){} }); 
+      if(window.visualViewport)window.visualViewport.addEventListener('resize',function(){ try{ uiMapFit(); }catch(e){} }); }catch(e){}
 /* La carte affiche TOUJOURS le système entier (viewBox complet) + les "+" de route par-dessus tout */
 /* Vue carte : affiche toujours le système entier (viewBox complet) + zoom,
    puis dessine les "+" de création de route PAR-DESSUS tout (dans nodes-g). */

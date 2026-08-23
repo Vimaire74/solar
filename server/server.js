@@ -12,7 +12,10 @@
    `PROTO_MIN` = le plus ancien client encore accepté. Élargir la fenêtre plutôt que de casser :
    sur mobile, les joueurs mettent des semaines à mettre à jour. À incrémenter dès qu'un message
    change de forme (nouveau champ obligatoire, sens modifié, message retiré). */
-const PROTO_MIN = 1, PROTO_MAX = 1;
+/* PROTO 2 (2026-08-23) : forme de la réponse d'espionnage. On REFUSE les clients 1 au lieu de les
+   laisser jouer avec une fenêtre qui ne validera jamais — un refus explicite vaut mieux qu'une
+   fonctionnalité qui échoue en silence pendant toute la partie. */
+const PROTO_MIN = 2, PROTO_MAX = 2;
 const SERVER_BUILD = '2026-08-07 · v8.1';
 const http = require('http');
 const crypto = require('crypto');
@@ -190,14 +193,20 @@ function corpsRapport(entry) {
     const s = entry.scores[i], d = s.detail || {};
     L.push('');
     L.push((i + 1) + '. ' + s.name + (s.user ? ' (' + s.user + ')' : ' (IA)') + ' — TOTAL ' + s.vp + ' VP');
-    L.push('     Colonies ............... ' + (d.colVP || 0));
-    L.push('     Routes ................. ' + (d.routeVP || 0));
-    L.push('     Cartes ................. ' + (d.cardsVP || 0));
-    L.push('     Bonus technologiques ... ' + (d.techBonusVP || 0));
-    L.push('     Revenus par tour ....... ' + (d.rptVP || 0));
-    L.push('     Agenda' + (s.agenda ? ' (' + s.agenda + ')' : '') + ' ......... ' + (d.agendasVP || 0));
-    L.push('     Événements ............. ' + (d.evtVP || 0));
+    /* ⚠️ UN DÉCOMPTE SANS SA RÈGLE N'EXPLIQUE RIEN. Marc, partie 140A : « c'est pas clair pourquoi.
+       Il faut ajouter les mêmes textes que dans le fichier de règle. » Les libellés viennent donc du
+       §17 des règles, mot pour mot — et « Bonus divers » énumère enfin sa provenance. */
+    L.push('     Colonies ............... ' + (d.colVP || 0) + '   [VP du nœud × niveau, ×1 si connectée, ×0,5 si isolée]');
+    L.push('     Routes ................. ' + (d.routeVP || 0) + '   [+1 VP par route établie]');
+    L.push('     Cartes ................. ' + (d.cardsVP || 0) + '   [VP inscrit sur la carte : 1 au T1, 3 au T2, 5 au T3]');
+    L.push('     Bonus technologiques ... ' + (d.techBonusVP || 0) + '   [+0,5 VP par technologie, arrondi à l\'inférieur]');
+    L.push('     Revenus par tour ....... ' + (d.rptVP || 0) + '   [par ressource : +2 au-delà de 5, +5 au-delà de 10]');
+    L.push('     Agenda' + (s.agenda ? ' (' + s.agenda + ')' : '') + ' ......... ' + (d.agendasVP || 0)
+      + '   [' + ((d.agendasVP || 0) > 0 ? 'condition remplie' : 'condition NON remplie') + ']');
+    L.push('     Événements ............. ' + (d.evtVP || 0) + '   [VP des événements et des victoires de guerre]');
     L.push('     Bonus divers ........... ' + (d.extraVP || 0));
+    for (const ligne of (d.extraDetail || [])) L.push('        · ' + String(ligne).replace(/<[^>]+>/g, ''));
+    if (!(d.extraDetail || []).length && !(d.extraVP || 0)) L.push('        · aucun');
   }
   L.push('');
   L.push('═══════════ RAPPORT DE BUG ═══════════');
@@ -521,7 +530,12 @@ function clearTimer(g) { if (g.timer) { clearTimeout(g.timer); g.timer = null; }
    il ne fait qu'afficher un bouton chez les autres. 90 s laisse largement le temps de
    recharger une page ; ce n'est pas une horloge de partie (celles-ci viennent avec les
    types de partie temps réel / tour par tour). */
-const ECHEANCE_MS = parseInt(process.env.ECHEANCE_MS || '90000', 10);
+/* ⚠️ PORTÉ DE 90 s À 180 s (Marc, 23/08 : « le délai de parution est trop court pour le moment,
+   double la durée »). 90 s suffisent à recharger une page, mais pas à répondre au téléphone, à
+   relire les règles ou à réfléchir devant un choix de combat : le bandeau surgissait pendant que
+   le joueur jouait encore. Il ne déclenche rien de lui-même — il n'ouvre qu'un vote — donc l'allonger
+   ne coûte que de la patience, alors que l'écourter accuse un joueur présent. */
+const ECHEANCE_MS = parseInt(process.env.ECHEANCE_MS || '180000', 10);
 
 /* Le PUITS DE NOTICES d'une partie : à qui va chaque fenêtre non bloquante.
    ⚠️ ELLES NE SONT PAS DIFFUSÉES À TOUT LE MONDE. Un `broadcast` faisait apparaître « Tu as gagné
