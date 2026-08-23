@@ -426,7 +426,7 @@ const STEPS=[
   tx:"Enfin les <b>Actions militaires</b> (onglet rouge — renforts de <b>jetons Force</b>, utiles en défense et en guerre). Je viens d'acheter <b>Investissements militaires</b> (+2 jetons). <b>Point crucial :</b> sur les 4 cartes militaires, <b>3 sont TEMPORAIRES</b> — leurs jetons disparaissent au tour suivant, il faut <b>les repayer</b> à chaque fois. Seul le <b>Supercroiseur</b> est permanent."},
 
  {lab:'Coûts : à l\'achat vs chaque tour', glow:'top-bar',
-  tx:"Dernier point clé. Tes cartes <b>ne se perdent jamais</b>. Mais surveille le coût : <b>la plupart</b> ne coûtent qu'à l'<b>achat</b> ; <b>d'autres</b> (par ex. certaines formes de gouvernement comme la Démocratie Directe) coûtent aussi <b>quelques ressources chaque tour</b> (entretien). Lis toujours la description avant d'acheter."},
+  tx:"Dernier point clé. Tes cartes <b>ne se perdent jamais</b>. Mais surveille le coût : <b>la plupart</b> ne coûtent qu'à l'<b>achat</b> ; <b>d'autres</b> (par ex. certaines formes de gouvernement comme la Démocratie Instantanée) coûtent aussi <b>quelques ressources chaque tour</b> (entretien). Lis toujours la description avant d'acheter."},
 
  {lab:'À toi de jouer les technos !', glow:'tech-tabs', onShow:boostMaxCine,
   tx:"À toi : ouvre les onglets, <b>ouvre une carte et achète</b> ce que tu veux (AC et ressources au max). Quand tu as fini, clique <b>Suivant</b>.",

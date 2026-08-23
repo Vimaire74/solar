@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-16 · v9.69';
+const SOLAR_BUILD_MOTEUR = '2026-08-23 · v9.74';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -166,8 +166,15 @@ const CARDS_POOL=[
   {id:'nav2',branch:'navigation',tier:2,type:'technology',name:'IA de Navigation',emoji:'🧠',
    effect:'+2 jetons Force. Coût de guerre ÷2 (division exacte : si le nombre de jetons engagés est impair, la demi-part est prélevée sur l\'<i class=ri-energy></i> — ex. 5 jetons = 2<i class=ri-materials></i> et 3<i class=ri-energy></i>).',spec:'nav2_war',forceBonus:2,
    cost:{science:4,energy:1},vp:3},
+  /* ⚠️ SECOND POUVOIR AJOUTÉ LE 17/08 — L'INITIATIVE DE GUERRE (demande de Marc).
+     Depuis que la fin de tour porte DEUX combats, l'ordre dans lequel ils se déroulent décide de
+     tout : frapper d'abord, c'est engager ses jetons quand on les a encore ; défendre d'abord, c'est
+     savoir ce qui reste avant de choisir son assaut. Une flotte capable de se déplacer plus vite que
+     les autres doit pouvoir imposer ce tempo — et ce choix se paie, puisqu'il faut répartir des
+     jetons et des ressources entre les deux combats. */
   {id:'hyper3',branch:'navigation',tier:3,type:'technology',name:'Hyperpropulsion',emoji:'🌀',
-   effect:'+5 Gov. Routes sans entretien. +3 jetons.',spec:'route_force_free',govPts:5,forceBonus:3,
+   effect:'+5 Gov. Routes sans entretien. +3 jetons. En guerre : tu choisis d\'attaquer ou de défendre en premier.',
+   spec:'route_force_free',spec2:'guerre_initiative',govPts:5,forceBonus:3,
    cost:{science:6,energy:2,materials:2},vp:5},
   // ── IA & RENSEIGNEMENT ───────────────────────────────────────────────────────
   {id:'drones1',branch:'ia_renseignement',tier:1,type:'technology',name:'Drones Surveillance',emoji:'🔍',
@@ -409,7 +416,7 @@ const CIVIC_MARKET=[
   {id:'gov_senat', name:'Sénat Solaire', emoji:'⚖️', type:'government',
    effect:'+5 pts Gouvernement.', desc:'Élus de toutes les colonies et de la mère — décisions coordonnées.',
    govForm:{formPts:5}, cost:{materials:3}},
-  {id:'gov_democratie', name:'Démocratie Directe', emoji:'🗳️', type:'government',
+  {id:'gov_democratie', name:'Démocratie Instantanée', emoji:'🗳️', type:'government',
    effect:'+1<i class=ri-morale></i>/tour, +10 pts Gouv. Entretien −2<i class=ri-materials></i> −2<i class=ri-energy></i>/tour.', desc:'Vote permanent sur mobile — légitimité forte, coût de communication.',
    govForm:{formPts:10,moralePerTurn:1,upkeep:{materials:2,energy:2}}, cost:{materials:3,energy:2,science:1}},
 ];
@@ -601,7 +608,10 @@ function showEventChoiceModal(ev,onDone){
 }
 function showCommEventModal(onDone){
   fluxDonnees().suiteAccord=(typeof onDone==='string'&&onDone)?onDone:null; _evCommDone=onDone;
-  const cands=G.ais.filter(function(ai){return !ai.colonies.some(function(c){return G.commercialAccords.includes(c.nodeId);});});
+  /* ⚠️ « QUI N'A PAS DÉJÀ UN ACCORD » — AVEC MOI, pas avec n'importe qui. Une nation liée à une
+     TROISIÈME disparaissait de mes candidats : le sommet me refusait un partenaire parfaitement
+     libre à mon égard. Voir le bandeau d'`accordAvecMoi`. */
+  const cands=G.ais.filter(function(ai){return !accordEntre(G.player,ai);});
   if(_decisionActive()){ // EN LIGNE : router vers le client, qui affiche la vraie modale (pas de panneau générique)
     _emitDecision('event_comm', G.player, {cands:cands.map(function(ai){return {id:ai.civ.id,name:ai.civ.name,emoji:ai.civ.emoji,war:!!(_warBetween(_moiId(),ai.civ.id)),info:_evAiInfo(ai)};})}, 'stAccordCommChoisi', null);
     return;
@@ -1264,6 +1274,39 @@ function _accordEnregistrer(nodeId,a,b){
   G.accordsParties[nodeId]=[a&&a.civ?a.civ.id:a, b&&b.civ?b.civ.id:b].filter(Boolean);
 }
 function _accordSignataires(nodeId){ return (G.accordsParties&&G.accordsParties[nodeId])||null; }
+/* ═══════ « AI-JE UN ACCORD ICI ? » — LA QUESTION QUE PERSONNE NE POSAIT ═══════
+   `G.commercialAccords` est une liste de NŒUDS : elle dit qu'un accord existe quelque part, jamais
+   avec qui. Le registre des signataires existe depuis le 14/08, mais il n'avait été branché que sur
+   le calcul des revenus — partout ailleurs on continuait de lire la liste brute.
+
+   CE QUE ÇA DONNAIT (partie FDDD de Marc, 23/08). Au tour 8, un accord Martiens ↔ Jupitériens se
+   pose sur Titan, colonie jovienne. Au tour 10, Marc ouvre Titan et lit « 🤝 Accord actif » avec le
+   bouton « Rompre l'accord & Attaquer » — pour un contrat entre deux AUTRES nations, qu'il n'a
+   jamais signé et qui ne l'engage à rien. Son commentaire : « j'ai validé aucun accord ».
+   Sept endroits posaient la question de cette façon : la fenêtre de nœud, la carte, le choix de
+   cible des IA, deux parcours de colonisation, le calcul de tension et la connexion des colonies.
+
+   ⚠️ REPLI POUR LES VIEILLES PARTIES. Une sauvegarde d'avant le registre n'a pas de signataires. Le
+   seul couple possible y était « le propriétaire du nœud » et « le joueur local » — le solo ne
+   connaissait pas d'autre accord. On accorde donc le bénéfice du doute à ces deux-là, et à personne
+   d'autre : mieux vaut un ancien accord reconnu à tort qu'une partie sauvegardée devenue illisible. */
+function accordAvecMoi(nodeId,nat){
+  if(!nodeId||!nat||!(G.commercialAccords||[]).includes(nodeId))return false;
+  const id=nat.civ?nat.civ.id:nat;
+  const s=_accordSignataires(nodeId);
+  if(s)return s.includes(id);
+  const o=(typeof ownerNation==='function')?ownerNation(nodeId):null;   // partie d'avant le registre
+  return !!(o&&o.civ.id===id)||id===_moiId();
+}
+/* L'accord de ce nœud lie-t-il PRÉCISÉMENT ces deux nations ? */
+function accordConcerne(nodeId,a,b){
+  if(!nodeId||!a||!b||!(G.commercialAccords||[]).includes(nodeId))return false;
+  const ida=a.civ?a.civ.id:a, idb=b.civ?b.civ.id:b;
+  const s=_accordSignataires(nodeId);
+  if(s)return s.includes(ida)&&s.includes(idb);
+  const o=(typeof ownerNation==='function')?ownerNation(nodeId):null;
+  return !!(o&&(o.civ.id===ida||o.civ.id===idb));
+}
 /* Les accords auxquels CETTE nation est partie. Un accord sans signataires connus (partie
    enregistrée avant ce changement) est attribué au propriétaire du nœud, faute de mieux. */
 function accordsDe(nat){
@@ -1329,10 +1372,22 @@ function capturerNoeud(vainqueur, nodeId){
     vainqueur.colonies.push({nodeId:nodeId, level:nouveau, connected:conn, _conquest:3});
   }
   if(typeof updateConnections==='function')updateConnections(vainqueur);
-  /* L'accord commercial FORCÉ n'a plus d'objet : il n'existait que pour la cohabitation. */
+  /* ⚠️ CE MESSAGE ANNONÇAIT TOUJOURS UN « ACCORD FORCÉ », ET C'ÉTAIT FAUX NEUF FOIS SUR DIX.
+     Il n'avait été écrit que pour la cohabitation extra-solaire — le seul cas où un accord est
+     effectivement imposé. Mais ce bloc tombe sur TOUT accord posé sur le nœud capturé, y compris un
+     accord librement signé entre deux autres nations. Marc, partie FDDD : « 📜 Titan : l'accord
+     forcé tombe avec la cohabitation » alors qu'il s'agissait d'un pacte Martiens ↔ Jupitériens,
+     signé au sommet commercial deux tours plus tôt.
+     Le nœud change de maître : l'accord qui y était attaché tombe, c'est juste — mais on dit
+     désormais LEQUEL et POURQUOI, au lieu d'invoquer une règle qui n'a rien à voir. */
   if(!estNoeudPartage(nodeId) && G.commercialAccords.includes(nodeId)){
+    const _sg=(typeof _accordSignataires==='function')?_accordSignataires(nodeId):null;
+    const _noms=(_sg||[]).map(function(cid){ const n=allPlayers().find(function(x){return x.civ.id===cid;}); return n?(n.civ.emoji+' '+n.civ.name):cid; });
+    const _force=(typeof estNoeudPartage==='function')&&sienne&&sienne.noUpgrade;
     G.commercialAccords=G.commercialAccords.filter(n=>n!==nodeId);
-    addLog('📜 '+nom+' : l\'accord forcé tombe avec la cohabitation.','dim');
+    if(G.accordsParties)delete G.accordsParties[nodeId];
+    addLog('📜 '+nom+' change de maître — l\'accord commercial'
+      +(_noms.length===2?(' entre '+_noms[0]+' et '+_noms[1]):(_force?' forcé':''))+' qui s\'y rattachait tombe.','dim');
   }
   return nouveau;
 }
@@ -2416,11 +2471,14 @@ function _espOptions(espion){
       }
     }
   }
-  if(opts.length) opts.push({ id:'attendre', kind:'attendre', ids:[],
+  /* ⚠️ PLUS DE « ATTENDRE » AU DERNIER TOUR. L'option promettait une fenêtre qui ne reviendrait
+     pas : au tour 5, reporter revient à jeter l'investissement, et le jeu le proposait sans le
+     dire. On ne l'offre donc qu'aussi longtemps qu'elle est tenable. */
+  if(opts.length&&G.turn<ESP_TOUR_DERNIER) opts.push({ id:'attendre', kind:'attendre', ids:[],
     groupe:'⏳ Ou ne rien faire ce tour-ci', groupeId:'_attendre',
     name:'⏳ Attendre un tour',
     desc:'Ne rien piller maintenant. La fenêtre reviendra à la fin du tour prochain — les autres '
-        +'auront peut-être développé davantage.' });
+        +'auront peut-être développé davantage. Dernière occasion au tour '+ESP_TOUR_DERNIER+'.' });
   return opts;
 }
 /* VALIDER UNE SÉLECTION À COCHER — une seule nation, une seule catégorie.
@@ -2498,10 +2556,20 @@ function espChoixIA(espion){
   espion._espFait=true;
   return true;
 }
-/* ÉTAT DE FLUX — fin de chaque tour à partir du 3e, jusqu'à ce que l'espionnage soit utilisé. */
+/* ═══════ QUAND LA FENÊTRE S'OUVRE, ET QUAND ELLE SE FERME ═══════
+   ⚠️ ELLE N'AVAIT PAS DE FIN. Le code ne posait qu'une borne BASSE (`G.turn<3`), alors que tout
+   le reste du jeu — le texte de la carte, le commentaire ci-dessus, le décompte de `investBonus` —
+   annonce un investissement de niveau 1 actif de T3 à T5. Journal de Marc du 16/08 : la fenêtre
+   d'espionnage revient aux tours 3, 4, 5, 6, 7, 8, 9 ET 10, y compris après la ligne
+   « ⌛ investissement Niv.1 expiré (T3→T5 couverts) » du tour 6. L'outil survivait à ce qui le
+   justifie, et pouvait donc voler des technologies bien après la fin de son financement.
+   Les deux bornes sont désormais écrites au même endroit, et l'expiration de l'investissement les
+   suit. */
+const ESP_TOUR_PREMIER=3, ESP_TOUR_DERNIER=5;
+/* ÉTAT DE FLUX — fin des tours 3, 4 et 5, jusqu'à ce que l'espionnage soit utilisé. */
 function stEspionnage(){
   const d=fluxDonnees();
-  if(G.turn<3){ stBilanDeTour(); return; }
+  if(G.turn<ESP_TOUR_PREMIER||G.turn>ESP_TOUR_DERNIER){ stBilanDeTour(); return; }
   const candidats=allPlayers().filter(p=>p&&p._inv1==='inv_esp'&&!p._espFait&&p._espTour!==G.turn);
   for(const p of candidats) p._espTour=G.turn;      // une seule sollicitation par tour
   for(const p of candidats.filter(p=>p._isAI)) espChoixIA(p);
@@ -2511,8 +2579,9 @@ function stEspionnage(){
   for(const p of humains){
     const opts=_espOptions(p);
     if(!opts.length){
-      addLog('🕵️ '+p.civ.emoji+' '+p.civ.name+' — aucune technologie à voler pour l\'instant ; '
-        +'la fenêtre reviendra au prochain tour.','dim');
+      addLog('🕵️ '+p.civ.emoji+' '+p.civ.name+' — aucune technologie à voler pour l\'instant'
+        +(G.turn<ESP_TOUR_DERNIER?' ; la fenêtre reviendra au prochain tour.'
+                                 :' — et c\'était la dernière fenêtre (l\'investissement couvre T3→T5).'),'dim');
       continue;
     }
     d.espRestants.push(p.civ.id);
@@ -2537,8 +2606,16 @@ function stEspionnageRecu(ans, civId){
       opt=espSelectionValide(nat, ans.nation, ans.branch, ans.ids);
     if(!opt) opt=_espOptions(nat).find(o=>o.id===choisi);
     if(!opt||opt.kind==='attendre'){
-      addLog('🕵️ '+nat.civ.emoji+' '+nat.civ.name+' — espionnage reporté : la fenêtre reviendra '
-        +'à la fin du tour prochain.','dim');
+      /* ⚠️ CE MESSAGE EST AUSSI UN SIGNAL D'ALARME. Il ne s'écrit que si une réponse est arrivée
+         sans qu'aucune option valide n'ait pu en être tirée. Dans le journal de Marc du 16/08 il
+         apparaît HUIT fois d'affilée : le choix partait bien et se faisait rejeter à chaque tour.
+         On dit désormais POURQUOI, sinon on ne peut pas distinguer « j'ai cliqué Attendre » d'une
+         sélection refusée — c'est ce qui a rendu ce défaut si long à cerner. */
+      const _volontaire=!!(ans&&(ans.id==='attendre'||choisi==='attendre'));
+      addLog('🕵️ '+nat.civ.emoji+' '+nat.civ.name+' — espionnage '
+        +(_volontaire?'reporté volontairement':'NON APPLIQUÉ : sélection invalide ou vide')
+        +(G.turn<ESP_TOUR_DERNIER?' — la fenêtre reviendra à la fin du tour prochain.'
+                                 :' — et c\'était la dernière fenêtre (T3→T5).'),'dim');
     }else{
       if(espPiller(nat,opt)>0) nat._espFait=true;
     }
@@ -3293,6 +3370,29 @@ function adChoixDeCombat(ans){
   if(act==='hold')suite('STANDOFF');
   else if(act==='defend')suite('DEFEND:'+Math.max(0,(ans.tokens|0)));
   else if(act==='attack'){ if(ans.node)_warAttackColonyTarget=ans.node; suite(Math.max(0,(ans.tokens|0))); } // ← CIBLE routée → capture
+  /* ═══════ ATTAQUER UNE ROUTE — L'ACTION MANQUAIT ENTIÈREMENT EN LIGNE ═══════
+     La fenêtre de combat envoie la liste des routes ennemies depuis toujours, `warAttackRoute` et
+     toute la mécanique de capture existent, et la question « récupérer ou détruire » sait déjà se
+     poser en réseau (`route_capture`). Il ne manquait que ceci : le verbe. Aucune branche `route`
+     ici, donc une réponse `{action:'route'}` tombait dans le `else` et valait « n'engager
+     personne ». En multijoueur, la guerre offrait donc strictement moins d'options qu'en solo, sans
+     que rien ne le signale — l'ami de Marc l'a remarqué sans oser l'affirmer (17/08).
+
+     ⚠️ ET ON VÉRIFIE AVANT D'APPELER. `warAttackRoute` sait renoncer quand les jetons manquent :
+     elle écrit un avertissement et rend la main pour qu'on rechoisisse. C'est juste en solo, où la
+     modale est restée ouverte — mais mortel en ligne, où la question vient d'être CONSOMMÉE : plus
+     personne ne pourrait répondre, et on aurait remplacé une impasse par une autre. On contrôle
+     donc ici, et à défaut on se retire proprement plutôt que de figer la table. */
+  else if(act==='route'){
+    const _idx=Math.max(0,(ans.route|0));
+    const _adv=allPlayers().find(a=>a&&a.civ.id===G.warWith)||null;
+    const _r=_adv&&_adv.routes?_adv.routes[_idx]:null;
+    const _besoin=_r?(((_r.tokens||0)>=1)?2:1):0;
+    if(!_r||(_p.forceTokens||0)<_besoin){
+      addLog('⚠️ Route inattaquable ('+(_r?('il faut '+_besoin+' jeton'+(_besoin>1?'s':'')):'cible introuvable')+') — assaut abandonné pour ce tour.','red');
+      suite('STANDOFF');
+    } else warAttackRoute(_idx);
+  }
   else suite(0);
 }
 /* Après un assaut né d'une guerre populaire forcée : on rend la main à la suite de ce flux. */
@@ -3464,16 +3564,20 @@ function guerrePaixRepondue(peaceResult){
     return;
   }
   if(war&&(war.live||G._il)){
-    // POURSUITE DE LA GUERRE. Règle (Marc) : ta fenêtre d'ASSAUT ne s'ouvre QUE si TU es l'agresseur.
-    // Si c'est l'AUTRE nation qui a déclaré la guerre, c'est ELLE qui attaque : tu n'as alors que le
-    // choix DÉFENSIF (combien de jetons engager, déployer ou non ton Supercroiseur) — ce qui permet la
-    // guerre d'usure : sur-défendre pour lui coûter ses jetons et attendre d'être en position d'attaquer.
-    /* On compare des IDENTIFIANTS, plus des étiquettes. Repli sur l'ancien test UNIQUEMENT pour
-       les parties sauvegardées avant le 2026-08-09, dont les guerres n'ont pas `agresseurCiv`. */
-    const _jeSuisAgresseur = war.agresseurCiv ? (war.agresseurCiv===_moiId())
-                                              : (war.declaredBy==='player');
-    if(!_jeSuisAgresseur){ guerreAssautIAPuisSuivante(); return; }
-    showWarCombatModal('guerreCombatLiveChoisi');
+    /* ═══════ LE DÉFENSEUR N'A JAMAIS PU RIPOSTER — C'ÉTAIT ÉCRIT ICI ═══════
+       ⚠️ CE BLOC DISAIT : « ta fenêtre d'ASSAUT ne s'ouvre QUE si TU es l'agresseur », et renvoyait
+       sinon directement à l'assaut ennemi (`guerreAssautIAPuisSuivante`). À CHAQUE tour, sans
+       exception. Le défenseur ne pouvait donc jamais attaquer — alors que la fenêtre du premier
+       tour lui promet noir sur blanc : « Tu pourras riposter à TON tour. » Le jeu faisait une
+       promesse qu'aucune ligne ne tenait, et l'agresseur, lui, avait déjà DEUX combats par tour
+       (son assaut, puis la riposte adverse). Marc, 17/08 : « à la fin du deuxième tour on devrait
+       pouvoir faire deux combats, un en défense et un en attaque. »
+
+       MAINTENANT. Le premier tour de guerre reste au seul déclarant — c'est lui qui frappe, l'autre
+       se défend (voir `guerreEtapeFraiche`). Dès le tour suivant, les DEUX camps ont leur assaut et
+       leur défense ; seul l'ORDRE change, et c'est lui qui devient l'enjeu tactique, puisqu'il faut
+       répartir jetons et ressources entre deux combats. */
+    guerreOrdreDeBataille();
     return;
   }
   showWarCombatModal('guerreCombatClassiqueChoisi');
@@ -3481,6 +3585,112 @@ function guerrePaixRepondue(peaceResult){
 /* L'ennemi frappe à son tour, puis on passe à la guerre suivante. Fonction NOMMÉE : c'est ce qui
    remplace `()=>maybeAiAssaultPlayer(warEnemy,()=>processOngoing(idx+1))` et sa double capture. */
 function guerreAssautIAPuisSuivante(){ maybeAiAssaultPlayer(guerreEnnemi(), 'guerreSuivante'); }
+
+/* ═══════════════════ L'INITIATIVE — LE DROIT DE DÉCIDER DE L'ORDRE ═══════════════════
+   Marc, 17 puis 23/08. L'initiative n'est PAS « qui frappe en premier » : c'est « qui DÉCIDE
+   lequel des deux frappe en premier ». La nuance est tout l'intérêt de la règle — celui qui la
+   détient choisit d'ouvrir le feu ou d'encaisser d'abord, selon ce que l'adversaire peut encore
+   payer. Une seule fenêtre, six critères, dans cet ordre strict :
+
+     1. HYPERPROPULSION — priorité absolue sur tout le reste. Si les DEUX la possèdent (elle se
+        copie par Télépathie ou Espionnage), les pouvoirs s'annulent et on descend d'un cran.
+     2. RÉTROCESSION — celui qui a assailli l'autre LE PLUS pendant ce tour cède l'initiative.
+        On ne frappe pas dans la journée puis on impose encore le tempo du soir.
+     3. À ÉGALITÉ D'ASSAUTS — le plus de TECHNOLOGIES de rang 2 ou 3. L'avance scientifique décide
+        du tempo : les états-majors les mieux équipés voient venir.
+     4. Puis le plus de JETONS Force.
+     5. Puis le plus de RESSOURCES ENGAGEABLES.
+     6. Puis, en tout dernier recours, l'agresseur.
+
+   ⚠️ LE DERNIER CRITÈRE N'EST PAS DÉCORATIF. Sans lui, deux nations rigoureusement identiques ne
+   départageraient jamais, la question ne serait posée à personne, et la partie s'arrêterait là.
+   Une cascade de départage doit TOUJOURS se terminer — c'est sa seule obligation absolue.
+
+   ⚠️ « LE PLUS DE RESSOURCES POUR LE COMBAT » EST INTERPRÉTÉ, ET IL FAUT LE SAVOIR. Un jeton coûte
+   1🪨 + 1⚡ : posséder 20🪨 et 0⚡ ne permet d'en engager aucun. On compare donc le NOMBRE DE JETONS
+   PAYABLES, `min(matériaux, énergie)`, et non la somme des deux stocks — qui donnerait l'initiative
+   à une nation incapable de se battre. */
+const _RANG_TECH_INITIATIVE = 2;   // « niveau 3 ou niveau 2 » (Marc, 23/08)
+function _techsDeRang(nat){
+  if(!nat||!nat.cards) return 0;
+  /* Les copies obtenues par Espionnage ou Télépathie comptent : ce sont des technologies acquises,
+     et Marc les cite lui-même comme un moyen légitime d'obtenir l'Hyperpropulsion. */
+  return nat.cards.filter(function(c){ return c && c.branch && (c.tier||0)>=_RANG_TECH_INITIATIVE; }).length;
+}
+function _assautsDuTour(war,civId){
+  if(!war||war._assautsTour!==G.turn||!war._assautsPar) return 0;
+  return war._assautsPar[civId]||0;
+}
+/* Appelé à CHAQUE assaut de la phase d'actions, quel que soit l'assaillant. */
+function noterAssautDuTour(war,civId){
+  if(!war||!civId) return;
+  if(war._assautsTour!==G.turn){ war._assautsTour=G.turn; war._assautsPar={}; }
+  war._assautsPar[civId]=(war._assautsPar[civId]||0)+1;
+}
+/* Rend { nation, raison } — la raison est journalisée : une règle à six critères doit pouvoir
+   s'expliquer au joueur qui la subit, sinon elle passe pour de l'arbitraire. */
+function _guerreDetenteurInitiative(war){
+  const moi=G.player, adv=guerreEnnemi();
+  if(!adv) return {nation:moi, raison:'aucun adversaire'};
+  const h=function(n){ return !!(n&&typeof hasSpec==='function'&&hasSpec(n,'guerre_initiative')); };
+  const hMoi=h(moi), hAdv=h(adv);
+  if(hMoi&&!hAdv) return {nation:moi, raison:'🌀 Hyperpropulsion'};
+  if(hAdv&&!hMoi) return {nation:adv, raison:'🌀 Hyperpropulsion'};
+  const aMoi=_assautsDuTour(war,moi.civ.id), aAdv=_assautsDuTour(war,adv.civ.id);
+  if(aMoi!==aAdv) return {nation:(aMoi>aAdv?adv:moi),
+    raison:'rétrocession — '+(aMoi>aAdv?moi:adv).civ.name+' a assailli '+Math.max(aMoi,aAdv)+' fois ce tour'};
+  const tMoi=_techsDeRang(moi), tAdv=_techsDeRang(adv);
+  if(tMoi!==tAdv) return {nation:(tMoi>tAdv?moi:adv),
+    raison:'avance technologique ('+Math.max(tMoi,tAdv)+' technologies de rang 2-3 contre '+Math.min(tMoi,tAdv)+')'};
+  const jMoi=moi.forceTokens||0, jAdv=adv.forceTokens||0;
+  if(jMoi!==jAdv) return {nation:(jMoi>jAdv?moi:adv), raison:'plus de jetons Force ('+Math.max(jMoi,jAdv)+')'};
+  const rMoi=Math.min(moi.res.materials||0,moi.res.energy||0), rAdv=Math.min(adv.res.materials||0,adv.res.energy||0);
+  if(rMoi!==rAdv) return {nation:(rMoi>rAdv?moi:adv), raison:'plus de ressources engageables ('+Math.max(rMoi,rAdv)+' jetons payables)'};
+  const agr=(war&&war.agresseurCiv)?war.agresseurCiv:((war&&war.declaredBy==='player')?moi.civ.id:adv.civ.id);
+  return {nation:(agr===moi.civ.id?moi:adv), raison:'égalité parfaite — l\'agresseur tranche'};
+}
+function guerreOrdreDeBataille(){
+  const war=guerreObjet(); if(!war){ guerreSuivante(); return; }
+  const d=_guerreDetenteurInitiative(war);
+  const qui=d.nation, adv=(qui===G.player)?guerreEnnemi():G.player;
+  addLog('🎖️ Initiative de fin de tour : '+qui.civ.emoji+' '+qui.civ.name+' — '+d.raison+'.','dim');
+  /* La question est POSÉE, même à une nation tenue par l'ordinateur : c'est `driver.js` qui y
+     répond. Court-circuiter ici casserait la reprise de partie — une question qui n'existe pas
+     dans `G._flux` n'est pas sauvegardée, et la chaîne ne repart pas (leçon du lot 17). */
+  _emitDecision('war_initiative', qui,
+    {enemyName:(adv?adv.civ.name:'l\'ennemi'), enemyEmoji:(adv?adv.civ.emoji:''), raison:d.raison,
+     texte:'🎖️ <b>Tu as l\'initiative</b> ('+d.raison+') : tu décides de l\'ordre des deux combats de cette fin de tour.',
+     options:[
+       {id:'attaque', emoji:'⚔️', name:'Attaquer en premier',
+        desc:'Tu frappes avec tous tes jetons disponibles, puis tu défends avec ce qu\'il te reste.'},
+       {id:'defense', emoji:'🛡️', name:'Défendre en premier',
+        desc:'Tu encaisses d\'abord — tu sauras ce qui te reste avant de choisir ton assaut.'}]},
+    'guerreOrdreChoisi', null);
+}
+/* ⚠️ LA RÉPONSE NE VIENT PAS FORCÉMENT DE MOI. `_guerreLancerOrdre` raisonne du point de vue de
+   `G.player` ; si c'est l'ADVERSAIRE qui détenait l'initiative, son « j'attaque en premier » veut
+   dire que MOI je frappe en second. Sans cette inversion, le choix de l'adversaire s'appliquerait
+   à l'envers — et le joueur verrait le contraire de ce que l'écran vient d'annoncer.
+   `resolveDecision` passe en second argument la nation qui a répondu : c'est elle qui tranche. */
+function guerreOrdreChoisi(ans,civId){
+  const v=(ans&&(ans.id||ans.value||ans.ordre))||'attaque';
+  const veutFrapperEnPremier=(v!=='defense');
+  const decideurEstMoi=(!civId)||(civId===_moiId());
+  const jePremier=decideurEstMoi?veutFrapperEnPremier:!veutFrapperEnPremier;
+  const nat=decideurEstMoi?G.player:(guerreEnnemi()||G.player);
+  addLog('🎖️ '+nat.civ.emoji+' '+nat.civ.name+' choisit d\''
+    +(veutFrapperEnPremier?'attaquer en premier.':'encaisser en premier.'),'gold');
+  _guerreLancerOrdre(jePremier);
+}
+/* Les deux enchaînements. Le second n'a besoin d'AUCUNE modification de `guerreCombatLiveChoisi` :
+   celle-ci rappelle toujours `guerreAssautIAPuisSuivante` après l'assaut, et `maybeAiAssaultPlayer`
+   sait déjà ne pas frapper deux fois dans le même tour (`war._aiAssaultedThisTurn`). L'appel
+   redondant retombe donc simplement sur `guerreSuivante`. */
+function _guerreLancerOrdre(jePremier){
+  if(jePremier){ showWarCombatModal('guerreCombatLiveChoisi'); return; }   // moi → puis riposte adverse
+  maybeAiAssaultPlayer(guerreEnnemi(), 'guerreMonAssaut');                 // eux → puis mon assaut
+}
+function guerreMonAssaut(){ showWarCombatModal('guerreCombatLiveChoisi'); }
 
 function guerreCombatLiveChoisi(committed){
   const warEnName=guerreEnnemiNom();
@@ -3686,6 +3896,11 @@ fluxDeclarer('stGuerres', stGuerres);
 fluxDeclarer('guerreEtape', guerreEtape);
 fluxDeclarer('guerreSuivante', guerreSuivante);
 fluxDeclarer('guerreAssautIAPuisSuivante', guerreAssautIAPuisSuivante);
+/* Les étapes de l'ordre de bataille sont NOMMÉES, comme tout le reste du flux : c'est ce qui
+   permet à une partie sauvegardée entre les deux combats de repartir au bon endroit. */
+fluxDeclarer('guerreOrdreDeBataille', guerreOrdreDeBataille);
+fluxDeclarer('guerreOrdreChoisi', guerreOrdreChoisi);
+fluxDeclarer('guerreMonAssaut', guerreMonAssaut);
 fluxDeclarer('guerreFraicheOuvrirCombat', guerreFraicheOuvrirCombat);
 fluxDeclarer('guerrePaixRepondue', guerrePaixRepondue);
 fluxDeclarer('guerreFraichePaixRepondue', guerreFraichePaixRepondue);
@@ -3699,7 +3914,7 @@ function startInterleaved(){
   G._il=true;
   G._order=allPlayers().slice();
   for(let i=G._order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[G._order[i],G._order[j]]=[G._order[j],G._order[i]];}
-  for(const p of allPlayers()){ p._passedRound=false; p._aiSetupDone=false; p._turnActions=[]; p._raidsThisTurn=[]; }
+  for(const p of allPlayers()){ p._passedRound=false; p._aiSetupDone=false; p._turnActions=[]; p._raidsThisTurn=[]; p._recoltesTour=0; }
   G._ilIdx=0; G._humanActive=false; G._ilLines=[]; G._ilMarkEntry=(G.log&&G.log[0])||null; G._turnMarkEntry=(G.log&&G.log[0])||null;
   /* ⚠️ LA LIGNE D'INITIATIVE ÉTAIT ÉCRITE APRÈS LE `return` DU MODE SERVEUR — donc JAMAIS en
      multijoueur (demande de Marc, 2026-08-07 : « ajouter dans journal qui est désigné par le hasard
@@ -4348,7 +4563,7 @@ function revenueBreakdownHTML(p){
 function _netIncome(p){
   /* ⚠️ CE CALCUL AVAIT SA PROPRE VERSION DES REVENUS, et il lui manquait six règles : les passifs
      Ceinturiens et Jupitériens, Industrialisation, Recherche Intensive, Confort de la Population et
-     Démocratie Directe. La barre du haut et le menu Empire annonçaient donc au joueur un revenu
+     Démocratie Instantanée. La barre du haut et le menu Empire annonçaient donc au joueur un revenu
      qu'il ne touchait pas. Il ne calcule plus rien : il lit `revenusBruts`, la version qui crédite
      vraiment. La suite — moral et entretien — lui appartient toujours. */
   const g=(!p||!p.civ)?{energy:0,materials:0,science:0,morale:0}:revenusBruts(p);
@@ -4519,7 +4734,7 @@ function revenusBruts(p, opts){
   if(hasSpec(p,'empath_tele')&&estEnGuerre(p)){
     gains.morale=(gains.morale||0)-2;_det('🧬 Télépathie (en guerre)',{morale:-2});
   }
-  if(p.govFormMorale){gains.morale=(gains.morale||0)+p.govFormMorale;_det('🗳️ Forme de gouvernement',{morale:p.govFormMorale});} // Démocratie Directe : +1<i class=ri-morale></i>/tour
+  if(p.govFormMorale){gains.morale=(gains.morale||0)+p.govFormMorale;_det('🗳️ Forme de gouvernement',{morale:p.govFormMorale});} // Démocratie Instantanée : +1<i class=ri-morale></i>/tour
   return gains;
 }
 function doRevenues(){
@@ -5378,6 +5593,14 @@ function playerAssaultColony(nodeId,enemyAI,attaquant){
   }
   if(!war)return;
   war.live=true;war.justDeclared=false;war.turnsLeft=99;war._playerFoughtTurn=G.turn;war.playerProvoked=true; // tu as attaqué → l'IA pourra riposter dès la parité (pas besoin d'être 2× dominante)
+  /* ═══ QUI A FRAPPÉ PENDANT LE TOUR PERD L'INITIATIVE DU SOIR ═══
+     Règle de Marc, 17 puis 23/08 : celui qui a assailli l'autre LE PLUS pendant ce tour lui cède
+     l'initiative de fin de tour. On compte donc les assauts, un par un et par nation — un simple
+     « untel a frappé » ne permettrait pas de départager deux camps qui se sont rendu coup pour coup.
+     ⚠️ On range l'information DANS LA GUERRE, pas dans un drapeau global : à quatre nations il y a
+     plusieurs guerres en cours, et `war._playerFoughtTurn` juste au-dessus ne dit que « la nation
+     active s'est battue » — ce qui ne veut plus rien dire quand trois conflits coexistent. */
+  if(typeof noterAssautDuTour==='function') noterAssautDuTour(war,_atk.civ.id);
   /* `G.warWith` / `warWins` / `warTurnsLeft` sont les drapeaux de l'écran LOCAL : ils disent « la
      guerre que MOI je regarde ». Les poser quand c'est quelqu'un d'autre qui attaque affichait à ce
      joueur-ci un conflit qui n'était pas le sien. La vérité vit dans `war`, pas dans ces trois-là. */
@@ -5677,7 +5900,7 @@ function updateConnections(p){
       for(const r of p.routes){
         const other=r.from===col.nodeId?r.to:r.to===col.nodeId?r.from:null;
         if(!other)continue;
-        if(!G.commercialAccords.includes(other))continue;
+        if(!accordAvecMoi(other,p))continue;   // un accord entre deux AUTRES nations ne me connecte à rien
         const partenaire=allPlayers().some(function(o){
           return o!==p && o.colonies.some(function(ac){return ac.nodeId===other;});
         });
@@ -5704,7 +5927,7 @@ function updateTension(){
     const colX=new Set(x.colonies.map(c=>c.nodeId));
     for(const r of y.routes){           // +1 par route de y qui touche une colonie de x (hors accord)
       const touche=(colX.has(r.from)||colX.has(r.to));
-      const accord=G.commercialAccords.includes(r.from)||G.commercialAccords.includes(r.to);
+      const accord=accordConcerne(r.from,x,y)||accordConcerne(r.to,x,y);   // l'accord doit lier CES deux nations
       if(touche&&!accord)add+=1;
     }
     for(const ry of y.routes){          // +1 par route partagée que y défend d'un jeton
@@ -6100,19 +6323,30 @@ function declareWar(reason,declaredBy='other',aiId=null,agresseurCiv=null,declar
    pour de bon, d'où venait la puissance affichée (garnison, supercroiseur, bonus empathes), ni quelle
    technologie modifiait le calcul. Impossible, en relisant un log, de dire si un chiffre était juste.
    Maintenant chaque combat écrit une ligne par camp, et la ligne se suffit à elle-même. */
-function _techsCombat(p){
+/* ⚠️ CETTE LIGNE A COÛTÉ DEUX COLONIES À MARC. Elle annonçait « Supercroiseur » dès que la
+   technologie était POSSÉDÉE et hors récupération — jamais elle ne regardait s'il était ARMÉ dans ce
+   combat-ci. Son journal du 16/08 affiche donc, deux fois de suite :
+
+       « puissance 2 · techs : Navigation (coût ÷2), IA Défensive, Supercroiseur »   → défaite 2 vs 3
+
+   Deux et non sept : le +5 n'était pas là. Il a engagé deux jetons contre trois en croyant en avoir
+   sept, parce que le récapitulatif nommait une force qui ne combattait pas. Un affichage qui ment
+   sur la puissance engagée est pire qu'un affichage absent : il fait prendre la mauvaise décision
+   avec confiance. Le second argument dit s'il a réellement été déployé. */
+function _techsCombat(p, croiseurArme){
   if(!p) return [];
   const t=[];
   if(hasSpec(p,'nav2_war')) t.push('Navigation (coût ÷2)');
   if(hasSpec(p,'empath_routes')) t.push('Lien Empathe (+2⚔️)');
   if(hasSpec(p,'empath_tele')) t.push('Télépathie (+2⚔️)');
   if(hasSpec(p,'ia_immune')) t.push('IA Défensive');
-  if(typeof cruiserAvailable==='function'&&cruiserAvailable(p)) t.push('Supercroiseur');
+  if(croiseurArme) t.push('Supercroiseur DÉPLOYÉ (+'+(p.cruiserPower||5)+'⚔️)');
+  else if(typeof cruiserAvailable==='function'&&cruiserAvailable(p)) t.push('Supercroiseur au port (non déployé)');
   return t;
 }
 /* Une ligne de journal par camp. `engages` = jetons mis dans la bataille ; `gagne` = ce camp l'a-t-il
    emporté (détermine si la moitié revient tout de suite ou est perdue). */
-function journalCombat(p,engages,gagne,puissance,detailPuissance){
+function journalCombat(p,engages,gagne,puissance,detailPuissance,croiseurArme){
   if(!p) return;
   const e=Math.max(0,engages|0);
   const demi=(typeof hasSpec==='function'&&hasSpec(p,'nav2_war'));
@@ -6120,7 +6354,7 @@ function journalCombat(p,engages,gagne,puissance,detailPuissance){
   const recup=e>0?Math.floor(e/2):0;
   const sort=gagne ? (e-recup)+' revenu(s) tout de suite, '+recup+' en récupération'
                    : recup+' PERDU(S) définitivement, '+(e-recup)+' en récupération';
-  const techs=_techsCombat(p);
+  const techs=_techsCombat(p,croiseurArme);
   addLog('📊 '+p.civ.emoji+' '+p.civ.name+' — '+e+' jeton(s) engagé(s) · coût −'+cM+'<i class=ri-materials></i> −'+cE+'<i class=ri-energy></i>'
     +' · puissance '+puissance+(detailPuissance?' ('+detailPuissance+')':'')
     +' · jetons : '+sort
@@ -6164,6 +6398,58 @@ function defenseIA(def, atk, nodeId){
   else              cible=2;
   if(cible<=payable) return Math.max(0,Math.min(cible,payable));
   return Math.floor(payable/2);                            // hors de portée : on fait saigner
+}
+/* ═══════ CE QUE COÛTERA VRAIMENT UN ASSAUT — L'ARITHMÉTIQUE QUE L'IA IGNORAIT ═══════
+   Marc, partie du 16/08 (4 joueurs) : « les IA gèrent très mal la guerre ». Le journal donnait le
+   chiffre exact, cinq fois de suite :
+
+       2⚔️ vs 2🛡️ · 1⚔️ vs 1🛡️ · 4⚔️ vs 4🛡️ · 2⚔️ vs 2🛡️ · 4⚔️ vs 4🛡️
+
+   Cinq assauts, cinq égalités parfaites, cinq défaites — et 13 jetons perdus. Ce n'est pas de la
+   malchance : la victoire exige `aPow > dPow` (l'égalité revient au défenseur), alors que l'IA
+   choisissait sa cible en comparant ses jetons à `perceivedForce(ai,r).val` — la force de la NATION.
+   Or la défense d'une COLONIE, telle que le combat la calcule quelques lignes plus bas, vaut :
+
+       jetons engagés + bonus de combat du défenseur + 1 (garnison) + renforts des cohabitants
+
+   Trois termes manquaient donc à l'estimation, dont la garnison qui est toujours là. L'IA visait
+   systématiquement la parité, c'est-à-dire la défaite.
+
+   ⚠️ CETTE FONCTION NE TRICHE PAS. Elle passe par `perceivedForce`, qui ne rend un chiffre exact
+   qu'avec le Réseau Orbital ; sans renseignement on majore d'un jeton plutôt que de lire `r.res`.
+   Les technologies, elles, sont publiques (c'est ce que l'espionnage donne à voir) : leur bonus de
+   combat entre légitimement dans le calcul.
+
+   Elle sert à DEUX endroits — le choix de la cible et le calcul de l'utilité. Les corriger
+   séparément est la faute déjà commise sur l'adjacence et sur la portée de colonisation : le
+   correctif appliqué au seul exécutant ne change rien, l'action n'étant jamais jugée digne d'être
+   tentée. */
+function defenseAttendue(ai, cible, nodeId){
+  if(!ai||!cible) return 99;
+  let jetons=0, exact=false;
+  try{ const pf=perceivedForce(ai,cible); jetons=pf.val||0; exact=!!pf.exact; }catch(e){ jetons=cible.forceTokens||0; }
+  if(!exact) jetons+=1;                        // sans renseignement, on suppose le pire plutôt que le mieux
+  let renfort=0;
+  try{
+    for(const co of defenseursDuNoeud(nodeId, ai)){
+      if(co===cible) continue;
+      renfort+=Math.max(0,Math.min(co.forceTokens||0, co.res.materials||0, co.res.energy||0))
+              +((typeof bonusCombatCartes==='function')?bonusCombatCartes(co):0);
+    }
+  }catch(e){}
+  const dEmpath=(typeof bonusCombatCartes==='function')?bonusCombatCartes(cible):0;
+  return jetons+dEmpath+1/*garnison*/+renfort;
+}
+/* ═══════ UN TOUR DE GUERRE SE DÉCOMPTE UNE FOIS PAR TOUR, PAS UNE FOIS PAR COMBAT ═══════
+   Depuis que la fin de tour porte DEUX combats (l'assaut de chacun), ce décompte serait appelé
+   deux fois dans la même soirée : une guerre de deux tours s'achèverait au milieu du second, et le
+   compteur « tour de guerre 1/2 » affiché au joueur mentirait. On garde donc le décompte là où il
+   est — c'est le seul endroit qui sache qu'un combat a vraiment eu lieu — mais on le rend
+   IDEMPOTENT dans le tour, en retenant le numéro de tour déjà décompté. */
+function _decompterTourDeGuerre(){
+  const w=_warBetween(_moiId(),G.warWith);
+  if(w){ if(w._tourDecompte!==G.turn){ w._tourDecompte=G.turn; w.turnsLeft--; } G.warTurnsLeft=w.turnsLeft; }
+  else G.warTurnsLeft--;
 }
 function resolveWarCombat(playerCommitted){
   const warEnemy=G.warWith?G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0]:G.ais[0];
@@ -6236,7 +6522,7 @@ function resolveWarCombat(playerCommitted){
      donc ceux qui ont réellement été prélevés, pas une prévision. */
   try{
     const _dp=[]; if(pBonus)_dp.push('+'+pBonus+' stratégie'); if(pEmpathBonus)_dp.push('+'+pEmpathBonus+' empathes'); if(_cruOn)_dp.push('+'+(G.player.cruiserPower||5)+' supercroiseur');
-    journalCombat(G.player,_atkUsed,!aWin,pPow,_dp.join(' '));
+    journalCombat(G.player,_atkUsed,!aWin,pPow,_dp.join(' '),_cruOn);
     const _dd=[]; if(aEmpathBonus)_dd.push('+'+aEmpathBonus+' empathes'); if(_aiCru)_dd.push('+'+(warEnemy.cruiserPower||5)+' supercroiseur');
     /* ⚠️ MON PROPRE DÉFAUT, VU DANS LE LOG : « puissance 18 (+10 garnison +10 capitale) » — 8+10+10
        ferait 28, pas 18. `garrisonOf` rend DÉJÀ 10 pour une capitale ; j'affichais la même garnison
@@ -6244,9 +6530,9 @@ function resolveWarCombat(playerCommitted){
        cas pour qui relit un log en cherchant une anomalie. */
     const _gar=(typeof garrisonOf==='function')?garrisonOf(warEnemy,targetAvantNettoyage):0;
     if(_gar)_dd.push('+'+_gar+(_homeDef?' garnison de capitale':' garnison'));
-    journalCombat(warEnemy,aiEngaged,!pWin,aPow,_dd.join(' '));
+    journalCombat(warEnemy,aiEngaged,!pWin,aPow,_dd.join(' '),_aiCru);
   }catch(e){}
-  const _rcw=_warBetween(_moiId(),G.warWith);if(_rcw){_rcw.turnsLeft--;G.warTurnsLeft=_rcw.turnsLeft;}else G.warTurnsLeft--;let txt,cls;
+  _decompterTourDeGuerre();let txt,cls;
   const targetId=_warAttackColonyTarget;_warAttackColonyTarget=null;
   if(pPow>aPow){
     G.warWins.player++;G.player.tempVP+=2;warEnemy.res.morale=Math.max(0,(warEnemy.res.morale||0)-1);
@@ -6663,26 +6949,80 @@ function _doAITurnInterne(aiPlayer,oneShot){
     return false;
   }
 
+  /* ═══════ RELIER UNE COLONIE QUI N'EST PAS LA PORTE À CÔTÉ ═══════
+     ⚠️ CETTE FONCTION NE SAVAIT CONSTRUIRE QU'UNE LIAISON DIRECTE : une colonie isolée n'était
+     reliée que si elle touchait DÉJÀ une colonie connectée. À deux sauts du réseau, aucune route
+     n'était jamais construite — ni ce tour-là, ni aucun autre. La colonie restait muette jusqu'à la
+     fin de la partie, sans revenu, à demi-valeur en VP, et l'entretien continuait de courir.
+     Mesuré : 34 colonies encore isolées sur 100 fondées, même après avoir rendu la route plus
+     désirable que la colonisation. Rendre une action prioritaire ne sert à rien si elle est
+     incapable de s'exécuter.
+
+     MAINTENANT on cherche un CHEMIN court (3 sauts au plus) depuis le réseau déjà relié, et on pose
+     la PREMIÈRE liaison manquante. Les tours suivants poseront les autres : c'est ainsi qu'un
+     joueur construit une ligne, tronçon par tronçon. `updateConnections` propage le long des
+     routes sans se soucier de qui possède les nœuds traversés — un relais sur un monde vide relie
+     donc parfaitement. */
   function tryRoute(){
     if(ai.acLeft<1)return false;
     const matCost=hasSpec(ai,'route_disc')?0:1;
     if((ai.res.materials||0)<matCost)return false;
     // (plus de garde énergie : connecter une colonie est vital — une route non alimentée relie quand même la colonie, seul son bonus commercial est différé)
-    for(const col of ai.colonies){
-      if(col.connected)continue;
-      for(const oc of ai.colonies){
-        if(!oc.connected)continue;
-        const on=NODES[oc.nodeId];
-        if(on&&on.conn.includes(col.nodeId)&&!ai.routes.find(r=>(r.from===oc.nodeId&&r.to===col.nodeId)||(r.from===col.nodeId&&r.to===oc.nodeId))){
-          ai.acLeft--;ai.res.materials=Math.max(0,(ai.res.materials||0)-matCost);ai.spentThisTurn+=1+matCost;
-          const tok=ai.forceTokens>0?1:0;if(tok>0)ai.forceTokens--;
-          ai.routes.push({from:oc.nodeId,to:col.nodeId,tokens:tok});updateConnections(ai);
-          addLog('🤖 '+ai.civ.name+' route → '+NODES[col.nodeId].name,'dim');
-          G.aiActions.push({emoji:'🛤️',name:'Route → '+NODES[col.nodeId].name,desc:tok?'1⚔ déployé':'non protégée'});
-          return true;
+    const _existe=(a,b)=>!!ai.routes.find(r=>(r.from===a&&r.to===b)||(r.from===b&&r.to===a));
+    const _poser=(a,b,cible)=>{
+      ai.acLeft--;ai.res.materials=Math.max(0,(ai.res.materials||0)-matCost);ai.spentThisTurn+=1+matCost;
+      const tok=ai.forceTokens>0?1:0;if(tok>0)ai.forceTokens--;
+      ai.routes.push({from:a,to:b,tokens:tok});updateConnections(ai);
+      const _nom=(NODES[cible]&&NODES[cible].name)||cible;
+      const _etape=(b!==cible)?(' (via '+((NODES[b]&&NODES[b].name)||b)+')'):'';
+      addLog('🤖 '+ai.civ.name+' route → '+_nom+_etape,'dim');
+      G.aiActions.push({emoji:'🛤️',name:'Route → '+_nom+_etape,desc:tok?'1⚔ déployé':'non protégée'});
+      return true;
+    };
+    /* Le réseau déjà relié : la base et tout ce que les routes atteignent. */
+    const relie=new Set([ai.civ.home]);
+    {const q=[ai.civ.home];
+     while(q.length){const cur=q.shift();
+       for(const r of ai.routes){const nx=r.from===cur?r.to:(r.to===cur?r.from:null);
+         if(nx&&!relie.has(nx)){relie.add(nx);q.push(nx);}}}}
+    /* Ce qu'on peut traverser : tout sauf le territoire d'autrui, sauf accord de transit. */
+    const aAutrui=new Set();
+    for(const p of allPlayers())if(p!==ai)for(const c of p.colonies)aAutrui.add(c.nodeId);
+    const passable=id=>{
+      const n=NODES[id]; if(!n||n.decorative)return false;
+      if(relie.has(id))return true;
+      return !aAutrui.has(id)||accordAvecMoi(id,ai);
+    };
+    const isolees=ai.colonies.filter(c=>!c.connected&&c.nodeId!==ai.civ.home);
+    if(!isolees.length)return false;
+    /* BFS depuis le réseau vers la colonie isolée la PLUS PROCHE — on relie d'abord le moins cher. */
+    let meilleur=null;
+    for(const col of isolees){
+      const prec=new Map(), file=[];
+      for(const id of relie){ prec.set(id,null); file.push(id); }
+      let trouve=false;
+      for(let i=0;i<file.length&&!trouve;i++){
+        const cur=file[i];
+        for(const adj of ((NODES[cur]&&NODES[cur].conn)||[])){
+          if(prec.has(adj))continue;
+          if(adj!==col.nodeId&&!passable(adj))continue;
+          prec.set(adj,cur); file.push(adj);
+          if(adj===col.nodeId){trouve=true;break;}
         }
       }
+      if(!trouve)continue;
+      /* Remonter jusqu'au premier tronçon manquant, en partant du réseau. */
+      const chemin=[]; let n=col.nodeId;
+      while(n!==null&&n!==undefined){ chemin.unshift(n); n=prec.get(n); }
+      if(chemin.length<2||chemin.length>4)continue;         // 3 sauts au plus
+      for(let k=0;k<chemin.length-1;k++){
+        if(_existe(chemin[k],chemin[k+1]))continue;
+        if(!meilleur||chemin.length<meilleur.long)
+          meilleur={a:chemin[k], b:chemin[k+1], cible:col.nodeId, long:chemin.length};
+        break;
+      }
     }
+    if(meilleur)return _poser(meilleur.a,meilleur.b,meilleur.cible);
     return false;
   }
 
@@ -6720,7 +7060,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
          libres, et ceux sous accord commercial — le TRANSIT prévu par les règles. */
       const _traversable=id=>{
         if(owned.has(id))return true;
-        if(G.commercialAccords&&G.commercialAccords.includes(id))return true;   // transit autorisé
+        if(accordAvecMoi(id,ai))return true;                                    // transit autorisé par MON accord
         return !pOwned.has(id);                                                 // libre
       };
       const dist=new Map(), file=[];
@@ -6738,7 +7078,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
         if(d===0)continue;                                   // c'est déjà une des siennes
         if(owned.has(adj)||ai.recentLosses.has(adj))continue;
         if(NODES[adj]?.decorative||NODES[adj]?.noColonize)continue; // Anneau jovien / Station Jupiter
-        if(pOwned.has(adj)&&!G.commercialAccords.includes(adj))continue;
+        if(pOwned.has(adj)&&!accordAvecMoi(adj,ai))continue;
         if(otherAiOwned.has(adj))continue;                   // pas de double occupation
         /* Chaque saut supplémentaire coûte une route à construire : on décote en conséquence,
            sans interdire. Le voisin direct reste préféré à qualité égale. */
@@ -6797,7 +7137,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
       if(!o.colonies||!o.colonies.length)return false;
       if(!accordAcceptable(o,ai).ok)return false;        // il refuserait
       if(!accordAcceptable(ai,o).ok)return false;        // elle-même n'y a pas intérêt
-      return o.colonies.some(function(c){return !G.commercialAccords.includes(c.nodeId);});
+      return o.colonies.some(function(c){return !accordAvecMoi(c.nodeId,ai);});
     }).sort(function(x,y){
       return (getTens(ai.civ.id,y.civ.id)+getTens(y.civ.id,ai.civ.id))
            - (getTens(ai.civ.id,x.civ.id)+getTens(x.civ.id,ai.civ.id));
@@ -6806,7 +7146,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
     const cible=partenaires[0];
     /* On évite sa capitale : un accord sur la colonie mère est le plus mal vu, et c'est aussi ce
        qu'un joueur choisirait en dernier. */
-    const col=cible.colonies.filter(function(c){return !G.commercialAccords.includes(c.nodeId);})
+    const col=cible.colonies.filter(function(c){return !accordAvecMoi(c.nodeId,ai);})
                             .sort(function(a,b){return (a.nodeId===cible.civ.home?1:0)-(b.nodeId===cible.civ.home?1:0);})[0];
     if(!col)return false;
     return proposeAccord(col.nodeId, ai)===true;
@@ -7020,11 +7360,12 @@ function _doAITurnInterne(aiPlayer,oneShot){
          📖 Investissement Recherche +2🔬   pour 2🪨
        On récolte la ressource la plus basse d'abord — c'est elle qui bloque. */
     {
+    if((ai._recoltesTour||0)<1){
       const _manque=[
         {r:'materials', v:(ai.res.materials||0)},
         {r:'energy',    v:(ai.res.energy||0)},
         {r:'science',   v:(ai.res.science||0)},
-      ].filter(x=>x.v<=3).sort((x,y)=>x.v-y.v);
+      ].filter(x=>x.v<=2).sort((x,y)=>x.v-y.v);
       for(const m of _manque){
         for(const c of CIVIC_MARKET){
           if(c.type!=='social'||c.calmAction)continue;
@@ -7035,9 +7376,11 @@ function _doAITurnInterne(aiPlayer,oneShot){
           /* Ne pas s'appauvrir davantage : on refuse une récolte qui coûte la ressource qu'on
              cherche justement à reconstituer. */
           if((cost[m.r]||0)>0)continue;
+          ai._recoltesTour=(ai._recoltesTour||0)+1;   // une seule récolte par tour (voir `_civicUtil`)
           aiBuyCivic(ai,c);return true;
         }
       }
+    }
     }
     return false;
   }
@@ -7130,18 +7473,31 @@ function _doAITurnInterne(aiPlayer,oneShot){
            veut. L'IA se privait donc de presque toutes ses cibles — mesuré 0,1 à 0,3 guerre par
            partie — et son tempérament conquérant ne servait à rien faute d'adversaire à portée.
            Règle unique pour tout le monde (décidé par Marc, 2026-08-16). */
-        const def=perceivedForce(ai,r).val;const tens=getTens(ai.civ.id,r.civ.id);
+        /* ⚠️ ON COMPARAIT SES JETONS À LA FORCE DE LA NATION, PAS À LA DÉFENSE DE LA COLONIE.
+           `perceivedForce(ai,r).val` ignore la garnison (+1, toujours présente), le bonus de combat
+           du défenseur et les cohabitants — les trois termes que `dPow` ajoutera au moment du combat.
+           D'où les cinq égalités du journal de Marc, toutes perdues. Voir `defenseAttendue`. */
+        const def=defenseAttendue(ai,r,oc.nodeId);const tens=getTens(ai.civ.id,r.civ.id);
         /* ═══ MÊME DOCTRINE QU'À L'ÉVALUATION — sinon l'action serait jugée bonne puis refusée.
            Une nation à court d'énergie OU de matériaux ne peut engager aucun jeton en défense
            (1🪨 + 1⚡ par jeton) : sa colonie n'a que sa garnison. Le conquérant qui possède le
            Réseau Orbital voit ces stocks et frappe là, en priorité absolue et à petit prix. */
         const _pf=(typeof profilActifDe==='function')?profilActifDe(ai):null;
-        const _mordant=!!(_pf&&(_pf===PROFILS_IA.guerrier||_pf===PROFILS_IA.assiegee));
         const _sansDefense=(_pf===PROFILS_IA.guerrier&&hasSpec(ai,'intel_2')
                             &&Math.min(r.res.energy||0,r.res.materials||0)<=0);
         if(!_sansDefense){
-          if(_mordant){ if(commit<def&&tens<4)continue; }
-          else if(commit<=def&&tens<6)continue;   // n'attaque que si plus fort, ou tension haute
+          /* ⚠️ NI LE TEMPÉRAMENT NI LA TENSION NE DISPENSENT DE L'ARITHMÉTIQUE.
+             L'ancienne condition disait : le conquérant attaque dès la PARITÉ, les autres dès qu'ils
+             sont plus forts — « ou si la tension dépasse 6 », auquel cas n'importe qui pouvait
+             attaquer n'importe qui. Or la parité est une défaite (`aPow > dPow`), et une rancune ne
+             fabrique pas de vaisseaux : cette clause lançait des assauts perdus d'avance.
+             Il faut donc passer devant, pour tout le monde. Le tempérament garde son rôle ailleurs —
+             il décide de l'ENVIE d'attaquer (multiplicateur `assaultAI`) et du choix de la cible,
+             pas de la façon dont les additions se font.
+             MESURÉ (`mesure_assauts_ia.js`, 12 parties) : en exigeant une marge de 2, 15 conquêtes ;
+             avec +1, 18 conquêtes — et zéro défaite dans les deux cas. La prudence supplémentaire
+             ne protégeait de rien, elle privait seulement l'IA de trois conquêtes. */
+          if(commit+bonusCombatCartes(ai)<=def)continue;
         }
         /* Une cible à sec passe avant tout le reste : on lui donne une priorité artificiellement
            basse pour qu'elle gagne le classement, quel que soit son nombre de jetons affiché. */
@@ -7158,6 +7514,10 @@ function _doAITurnInterne(aiPlayer,oneShot){
       /* Voie GÉNÉRALE : deux nations nommées, quelle que soit celle qui est active. */
       if(!declarerGuerre(ai,best,'Assaut sur '+_nom+' !','ai'))return false;
       ai.acLeft=Math.max(0,ai.acLeft-1); ai._attacksThisTurn=(ai._attacksThisTurn||0)+1;
+      /* La rétrocession vaut pour TOUT LE MONDE : une IA qui marche sur une colonie humaine pendant
+         sa phase d'actions cède elle aussi l'initiative du soir. Sans cette ligne, la règle n'aurait
+         puni que le joueur — ce qui n'est pas une règle, c'est un handicap. */
+      if(typeof noterAssautDuTour==='function') noterAssautDuTour(_warBetween(ai.civ.id,best.civ.id),ai.civ.id);
       addLog('⚔️ '+ai.civ.emoji+' '+ai.civ.name+' marche sur '+_nom+' — prépare ta défense.','red');
       G.aiActions.push({emoji:'⚔️',name:'Marche sur '+_nom,desc:'assaut déclaré'});
       return true;
@@ -7166,30 +7526,53 @@ function _doAITurnInterne(aiPlayer,oneShot){
     const aEmpath=bonusCombatCartes(ai);
     const dEmpath=bonusCombatCartes(best);
     const dCommit=Math.max(0,Math.min(best.forceTokens||0,best.res.materials||0,best.res.energy||0));
+    /* ⚠️ ON COMPTE D'ABORD, ON ENGAGE ENSUITE. Cette boucle appelait `applyCombatEngage` au moment
+       même où elle additionnait les renforts. Tant que l'assaut avait lieu de toute façon, cela ne
+       se voyait pas ; depuis qu'il peut être ABANDONNÉ (voir juste en dessous), des cohabitants
+       auraient payé leurs jetons pour un combat qui n'a pas eu lieu. Deux passes : le décompte,
+       puis l'engagement — et il ne peut plus y avoir de facture sans bataille. */
+    const _renforts=[];
     let _renfortIA=0;
     for(const _co of defenseursDuNoeud(bestCol.nodeId,ai)){
       if(_co===best)continue;
       const _j=Math.max(0,Math.min(_co.forceTokens||0,_co.res.materials||0,_co.res.energy||0));
       const _b=(typeof bonusCombatCartes==='function')?bonusCombatCartes(_co):0;
       if(_j+_b<=0)continue;
-      _renfortIA+=_j+_b;
-      if(typeof applyCombatEngage==='function')applyCombatEngage(_co,_j,false);
-      addLog('🤝 '+_co.civ.emoji+' '+_co.civ.name+' défend '+((NODES[bestCol.nodeId]&&NODES[bestCol.nodeId].name)||bestCol.nodeId)
-        +' aux côtés de '+best.civ.emoji+' '+best.civ.name+' (+'+(_j+_b)+'⚔️) — cohabitants.','gold');
+      _renfortIA+=_j+_b; _renforts.push({co:_co,j:_j,b:_b});
     }
     /* ═══ CONTRE UNE NATION À SEC, ON N'ENGAGE QUE CE QU'IL FAUT ═══
        Doctrine de Marc : « elle attaque une colonie avec deux jetons ». Face à un défenseur qui ne
        peut rien engager, il n'y a que la garnison (1) et les éventuels cohabitants : inutile d'y
        jeter six jetons, ils partiraient en récupération pour rien. Ce qui reste sert à la cible
        suivante — c'est tout l'intérêt d'économiser ses jetons plutôt que de raider. */
-    let _engage=commit;
-    if(bestSansDefense){
-      const _requis=dCommit+dEmpath+1+_renfortIA-aEmpath+1;   // juste de quoi passer devant
-      _engage=Math.max(2,Math.min(commit,Math.max(2,_requis)));
-      if(_engage<commit)
-        addLog('🎯 '+ai.civ.emoji+' '+ai.civ.name+' frappe '+((NODES[bestCol.nodeId]&&NODES[bestCol.nodeId].name)||bestCol.nodeId)
-          +' — '+best.civ.name+' est à court de ressources et ne peut pas défendre ('+_engage+' jeton(s) suffisent).','gold');
+    /* ═══ LE CHIFFRE QUI FAIT BASCULER LE COMBAT, POUR TOUT LE MONDE ═══
+       `_requis` = la défense réelle, moins notre propre bonus, plus un — puisque `aPow > dPow` et
+       que l'égalité revient au défenseur. Ce calcul n'existait QUE pour la cible à sec ; partout
+       ailleurs l'IA engageait `commit`, c'est-à-dire tout ce qu'elle avait, sans jamais vérifier
+       que cela suffisait. En dessous de `_requis`, l'assaut est perdu d'avance ; au-dessus, les
+       jetons en trop partent en récupération sans rien acheter. */
+    const _defReelle=dCommit+dEmpath+1/*garnison*/+_renfortIA;
+    const _requis=_defReelle-aEmpath+1;
+    let _engage=Math.max(2,Math.min(commit,Math.max(2,_requis)));
+    /* ⚠️ ON RENONCE PLUTÔT QUE D'OFFRIR SES JETONS. La défense réelle peut dépasser l'estimation
+       faite au moment du choix (le défenseur paie plus de jetons qu'on ne lui en prêtait). Avant,
+       l'IA y allait quand même : cinq assauts, cinq égalités, cinq défaites, 13 jetons perdus
+       (journal de Marc, 16/08). Renoncer ne coûte rien — ni AC, ni jeton — et l'IA gardera de quoi
+       se défendre, ce qui était l'autre moitié du problème. */
+    if(_engage+aEmpath<=_defReelle){
+      addLog('🧠 '+ai.civ.emoji+' '+ai.civ.name+' renonce à l\'assaut sur '
+        +((NODES[bestCol.nodeId]&&NODES[bestCol.nodeId].name)||bestCol.nodeId)
+        +' — défense trop forte ('+_defReelle+'🛡️ contre '+(commit+aEmpath)+'⚔️ disponibles).','dim');
+      return false;
     }
+    for(const _r of _renforts){
+      if(typeof applyCombatEngage==='function')applyCombatEngage(_r.co,_r.j,false);
+      addLog('🤝 '+_r.co.civ.emoji+' '+_r.co.civ.name+' défend '+((NODES[bestCol.nodeId]&&NODES[bestCol.nodeId].name)||bestCol.nodeId)
+        +' aux côtés de '+best.civ.emoji+' '+best.civ.name+' (+'+(_r.j+_r.b)+'⚔️) — cohabitants.','gold');
+    }
+    if(bestSansDefense&&_engage<commit)
+      addLog('🎯 '+ai.civ.emoji+' '+ai.civ.name+' frappe '+((NODES[bestCol.nodeId]&&NODES[bestCol.nodeId].name)||bestCol.nodeId)
+        +' — '+best.civ.name+' est à court de ressources et ne peut pas défendre ('+_engage+' jeton(s) suffisent).','gold');
     const aPow=_engage+aEmpath,dPow=dCommit+dEmpath+1/*garnison de base*/+_renfortIA;
     ai.acLeft=Math.max(0,ai.acLeft-1);ai.spentThisTurn+=1+_engage;ai._attacksThisTurn=(ai._attacksThisTurn||0)+1;
     const win=aPow>dPow;
@@ -7242,7 +7625,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
     const owned=new Set(ai.colonies.map(c=>c.nodeId));
     const otherOwned=new Set();for(const p of allPlayers())if(p!==ai)for(const c of p.colonies)otherOwned.add(c.nodeId);
     const PORTEE=2;
-    const trav=id=>owned.has(id)||(G.commercialAccords&&G.commercialAccords.includes(id))||!otherOwned.has(id);
+    const trav=id=>owned.has(id)||accordAvecMoi(id,ai)||!otherOwned.has(id);   // même règle qu'à l'exécution
     const dist=new Map(), file=[];
     for(const col of ai.colonies){ dist.set(col.nodeId,0); file.push(col.nodeId); }
     for(let i=0;i<file.length;i++){
@@ -7356,15 +7739,13 @@ function _doAITurnInterne(aiPlayer,oneShot){
     for(const r of allPlayers()){
       if(r===ai)continue;
       if(r._isAI===false && _warBetween(ai.civ.id,r.civ.id))continue;   // même condition qu'à l'exécution
-      for(const oc of r.colonies){if(oc.nodeId===r.civ.home||!oc.connected||NODES[oc.nodeId]?.decorative)continue;/* même règle qu'à l'exécution : plus de contrainte d'adjacence */const def=perceivedForce(ai,r).val;const tens=getTens(ai.civ.id,r.civ.id);
+      for(const oc of r.colonies){if(oc.nodeId===r.civ.home||!oc.connected||NODES[oc.nodeId]?.decorative)continue;/* même règle qu'à l'exécution : plus de contrainte d'adjacence */const def=defenseAttendue(ai,r,oc.nodeId);const tens=getTens(ai.civ.id,r.civ.id);
         /* ⚠️ UNE NATION BELLIQUEUSE N'ATTEND PAS D'ÊTRE SÛRE DE GAGNER. La condition « je dois avoir
            STRICTEMENT plus de jetons que sa force perçue » convient à une nation prudente ; appliquée
            à toutes, elle rendait l'assaut presque introuvable — mesuré : 0,1 guerre par partie.
            Un profil conquérant, ou une nation qu'on vient d'agresser, se contente de la parité et
            d'une tension moindre. Les autres gardent l'exigence d'origine. */
         const _pf=(typeof profilActifDe==='function')?profilActifDe(ai):null;
-        const _mordant=!!(_pf&&(_pf===PROFILS_IA.guerrier||_pf===PROFILS_IA.assiegee));
-        const _seuilTens=_mordant?4:6;
         /* ═══ FRAPPER QUI NE PEUT PLUS SE DÉFENDRE ═══
            Doctrine de Marc : « qu'elle attaque avec peu de jetons les nations qui n'ont plus
            d'énergie ou de minerai, plutôt en fin de tour. Dès qu'une nation est à zéro énergie — ce
@@ -7384,7 +7765,11 @@ function _doAITurnInterne(aiPlayer,oneShot){
             return Math.max(_valeurAssaut(_petit,0,tens), 24);
           }
         }
-        if((_mordant?commit>=def:commit>def)||tens>=_seuilTens)return _valeurAssaut(commit,def,tens);}}
+        /* MÊME ARITHMÉTIQUE QU'À L'EXÉCUTION — sinon l'action est jugée bonne ici puis refusée
+           là-bas, et l'IA perd son tour à vouloir une chose qu'elle s'interdira. La parité
+           (`commit>=def`) valait acceptation ici et DÉFAITE au combat ; `||tens>=_seuilTens`
+           autorisait carrément l'assaut perdu d'avance. Une seule règle : passer devant. */
+        if(commit+bonusCombatCartes(ai)>def)return _valeurAssaut(commit,def,tens);}}
     return 0;
   }
   function _civicUtil(){
@@ -7398,7 +7783,14 @@ function _doAITurnInterne(aiPlayer,oneShot){
        n'était jamais choisi — le calcul d'utilité ne connaissait que les formes de gouvernement. */
     {
       const _bas=Math.min(ai.res.materials||0,ai.res.energy||0,ai.res.science||0);
-      if(_bas<=3){
+      /* ⚠️ LA RÉCOLTE SERT À SE DÉBLOQUER, PAS À OCCUPER SES ACTIONS. Sans plafond, elle repassait
+         en tête à chaque action du tour : le Jupitérien de la partie FDDD a acheté DIX fois
+         ☄️ Capture d'astéroïdes et CINQ fois 📖 Investissement dans la Recherche, pour une seule
+         colonisation, une amélioration et zéro route en dix tours. Marc : « le jupitérien fait rien
+         plusieurs tours de suite se contentant d'accumuler des réserves ».
+         Une récolte par tour suffit à sortir d'une pénurie ; au-delà, c'est du remplissage. Et le
+         seuil descend de 3 à 2 : à 3 d'une ressource on est gêné, pas bloqué. */
+      if(_bas<=2&&(ai._recoltesTour||0)<1){
         const _rec=(typeof CIVIC_MARKET!=='undefined'?CIVIC_MARKET:[]).some(c=>
           c.type==='social'&&!c.calmAction&&c.resGain&&(c.repeatable||!(ai._civicTaken&&ai._civicTaken.has(c.id)))
           &&Object.entries(c.cost||{}).every(([r,a])=>(ai.res[r]||0)>=a));
@@ -7426,9 +7818,20 @@ function _doAITurnInterne(aiPlayer,oneShot){
     if(tens<3&&mesAccords>0)return 0;                    // tranquille et déjà lié : rien d'urgent
     return Math.min(11, 3+tens*1.4-mesAccords*3);
   }
+  /* ═══ UNE COLONIE NON CONNECTÉE NE PRODUIT RIEN ═══
+     ⚠️ CETTE VALEUR ÉTAIT PLATE, ET ELLE PERDAIT LA COURSE. 18, quel que soit le nombre de colonies
+     à l'abandon — alors que `U.colonize` monte facilement à 25-35 (score du nœud ×1,5, prime de
+     début de partie, bonus « peu de colonies », retard en VP). L'IA préférait donc TOUJOURS fonder
+     une colonie de plus plutôt que de relier celles qu'elle avait.
+     Mesuré chez Marc, partie FDDD du 23/08 : le Martien fonde Ganymède, Europe et Pluton au tour 1
+     et ne construit sa PREMIÈRE route qu'au tour 7 — trois colonies muettes pendant six tours,
+     qui coûtent leur entretien sans rien rapporter. Score final : 1 point de routes.
+     La valeur croît maintenant avec le nombre de colonies isolées : à trois, relier devient
+     l'affaire la plus rentable de la partie, et c'est exactement ce qu'un joueur ferait. */
   function _routeUtil(){
-    const hasDisc=ai.colonies.some(c=>!c.connected&&c.nodeId!==ai.civ.home);
-    return (hasDisc&&(ai.res.materials||0)>=1)?18:0; // connecter est vital → prioritaire sur coloniser davantage
+    const _iso=ai.colonies.filter(c=>!c.connected&&c.nodeId!==ai.civ.home).length;
+    if(!_iso||(ai.res.materials||0)<1)return 0;
+    return 18+_iso*8;                                   // 26 · 34 · 42…
   }
   function actionUtilities(){
     const t=G.turn,mor=ai.res.morale||0,mat=ai.res.materials||0,en=ai.res.energy||0,sci=ai.res.science||0,nCol=ai.colonies.length;
@@ -7437,6 +7840,13 @@ function _doAITurnInterne(aiPlayer,oneShot){
     U.heal    = mor<=2 ? 60 : 0;                          // survie d'abord
     const cs=_bestColonizeScore(),colAff=mat>=(isMartien?1:2)&&en>=(isMartien?0:1);
     U.colonize= (cs>=0&&colAff)?(cs*1.5+(t<=3?7:0)+Math.max(0,6-nCol)*2+behind*0.3):0;
+    /* ⚠️ ON NE FONDE PAS UNE QUATRIÈME VILLE QUAND TROIS N'ONT PAS DE ROUTE. Relever la valeur de
+       la route ne suffisait pas : les deux actions se disputent les mêmes matériaux, et la
+       colonisation gardait l'avantage grâce à ses primes cumulées. On l'amortit donc tant que des
+       colonies restent isolées — ce n'est pas une interdiction : une nation bloquée de tous côtés
+       peut encore préférer s'étendre au loin, elle le fera simplement en connaissance de cause. */
+    const _iso=ai.colonies.filter(c=>!c.connected&&c.nodeId!==ai.civ.home).length;
+    if(_iso>0) U.colonize*= (_iso>=2?0.25:0.6);
     const uv=_bestUpgradeVal(),upAff=mat>=3&&en>=1&&sci>=1;
     U.upgrade = (uv>=0&&upAff)?(uv*1.0+(t>=7?9:2)):0;
     const tv=_affordableTechVP();
@@ -7824,7 +8234,7 @@ function renderSystemMap(){
     const glowR=br+6;
     let glow='';
     if(G.phase==='actions'){
-      if(mode==='colonize'&&!pCol&&(!aCol||G.commercialAccords.includes(id)))glow=`<circle cx="${node.x}" cy="${node.y}" r="${glowR}" fill="${node.color}" fill-opacity=".12" stroke="${node.color}" stroke-width="1.5" stroke-dasharray="4,3"/>`;
+      if(mode==='colonize'&&!pCol&&(!aCol||accordAvecMoi(id,G.player)))glow=`<circle cx="${node.x}" cy="${node.y}" r="${glowR}" fill="${node.color}" fill-opacity=".12" stroke="${node.color}" stroke-width="1.5" stroke-dasharray="4,3"/>`;
       if(mode==='route'){if(!routeFrom&&pCol)glow=`<circle cx="${node.x}" cy="${node.y}" r="${glowR}" fill="#44aaff" fill-opacity=".1" stroke="#44aaff" stroke-width="1.5" stroke-dasharray="3,3"/>`;if(routeFrom&&NODES[routeFrom]?.conn.includes(id))glow=`<circle cx="${node.x}" cy="${node.y}" r="${glowR}" fill="#ffaa00" fill-opacity=".12" stroke="#ffaa00" stroke-width="1.5" stroke-dasharray="3,3"/>`;}
     }
     let rings='';
@@ -8408,7 +8818,8 @@ function showNodePopup(nodeId){
   const pCol=G.player.colonies.find(c=>c.nodeId===nodeId);const aColInfo=G.ais.map(ai=>({ai,col:ai.colonies.find(c=>c.nodeId===nodeId)})).find(x=>x.col);const aCol=aColInfo?aColInfo.col:null;const aColAI=aColInfo?aColInfo.ai:null;
   document.getElementById('npop-title').textContent=node.emoji+' '+node.name;
   const resStr=Object.entries(node.res).map(([r,a])=>'+'+a+rEmoji(r)).join(' ');
-  const accord=G.commercialAccords.includes(nodeId);
+  /* LE défaut signalé par Marc : c'est MON accord qui compte, pas celui du voisin d'en face. */
+  const accord=accordAvecMoi(nodeId,G.player);
   document.getElementById('npop-info').innerHTML=`VP: ${node.baseVP} | ${resStr}<br>Type: ${({moon:'Lune',dwarf_planet:'Planète naine',asteroid:'Astéroïde',orbital_station:'Station orbitale',planet:'Planète',gas_giant:'Géante gazeuse'})[node.type]||node.type}${pCol?`<br>✅ <b style="color:${G.player.civ.color}">${G.player.civ.emoji} ${G.player.civ.name} (toi)</b> — Nv.${pCol.level}${pCol.connected?' ✓':' ✗ déconnectée'}`:''}${aCol&&aColAI?`<br>🏴 Colonie de <b style="color:${aColAI.civ.color}">${aColAI.civ.emoji} ${aColAI.civ.name}</b> — Nv.${aCol.level}${accord?' 🤝 accord':''}`:''}${!pCol&&!aCol?'<br><span style="color:#7a8aa0">Inoccupé</span>':''}${getPiratePos(G.turn)===nodeId?'<br><span style="color:#ff8888">⚠️ Pirates ici !</span>':''}`;
   const acts=document.getElementById('npop-acts');acts.innerHTML='';
   if(!pCol){
@@ -8429,12 +8840,10 @@ function showNodePopup(nodeId){
       // Accord actif : commerce & transit autorisés, PAS de colonisation partagée. On peut rompre l'accord pour attaquer.
       const tc=G.player.civ.id==='ceinturiens'?1:2;const atkOk=G.player.acLeft>=1&&G.player.forceTokens>=tc;
       acts.innerHTML+=`<div style="font-size:.82em;color:#9ad89a;margin:4px 0">🤝 Accord actif — commerce & transit autorisés.</div>`;
-      acts.innerHTML+=`<button class="npop-btn" style="border-color:#9a1a1a;color:#ff8888" ${atkOk?'':'disabled'} onclick="breakAccordAndAttack('${nodeId}')">💥 Rompre l'accord & Attaquer<br><small>1AC -${tc}⚔ — DÉCLENCHE GUERRE</small></button>`;
-      // Même avec un accord, on peut rompre et déclarer la guerre
-      if(!G.warState){
-        const tc=G.player.civ.id==='ceinturiens'?1:2;const atkOk=G.player.acLeft>=1&&G.player.forceTokens>=tc;
-        acts.innerHTML+=`<button class="npop-btn" style="border-color:#aa4400;color:#ff9966" ${atkOk?'':'disabled'} onclick="breakAccordAndAttack('${nodeId}')">⚔️ Rompre l'accord & Attaquer<br><small>1AC -${tc}⚔ — révoque l'accord, déclenche GUERRE</small></button>`;
-      }
+      /* ⚠️ CE BOUTON ÉTAIT ÉCRIT DEUX FOIS. Le second, sous un `if(!G.warState)`, appelait exactement
+         la même fonction avec un libellé différent : hors guerre, la fenêtre affichait donc DEUX
+         boutons « Rompre l'accord & Attaquer » l'un sous l'autre. Un seul suffit, et il dit tout. */
+      acts.innerHTML+=`<button class="npop-btn" style="border-color:#9a1a1a;color:#ff8888" ${atkOk?'':'disabled'} onclick="breakAccordAndAttack('${nodeId}')">💥 Rompre l'accord & Attaquer<br><small>1AC -${tc}⚔ — révoque l'accord, DÉCLENCHE LA GUERRE</small></button>`;
     }
   }
   if(pCol&&pCol.level<node.maxLv&&!pCol.noUpgrade){
@@ -8624,7 +9033,13 @@ function showPeaceOfferModal(isJustDeclared,cb){
   if(_decisionActive()){ // mode serveur : router le choix paix/guerre vers l'humain en guerre
     _emitDecision('peace_offer', p,
       {attacker:(ai?ai.civ.id:null), attackerName:(ai?ai.civ.name:'IA'), isJustDeclared:!!isJustDeclared, declaredBy:declBy,
-       vpYou:calcVP(p).total, vpEnemy:calcVP(ai||G.ais[0]).total, stocks:{materials:p.res.materials||0,energy:p.res.energy||0,science:p.res.science||0}},
+       vpYou:calcVP(p).total, vpEnemy:calcVP(ai||G.ais[0]).total, stocks:{materials:p.res.materials||0,energy:p.res.energy||0,science:p.res.science||0},
+       /* COMBIEN DE JETONS IL POURRAIT RÉELLEMENT ENGAGER S'IL REFUSE. Deux amis de Marc, 17/08 :
+          l'un refuse la paix, choisit d'attaquer, et découvre seulement à la fenêtre suivante qu'il
+          n'a pas de quoi engager un seul jeton. Le chiffre existe déjà (`maxAffordableTokens` tient
+          compte de l'IA de Navigation, qui divise le coût par deux) : il suffisait de le DIRE avant
+          la décision, pas après. */
+       maxEngage:Math.max(0,Math.min(p.forceTokens||0,(typeof maxAffordableTokens==='function')?maxAffordableTokens(p):(p.forceTokens||0)))},
       null, 'adOffreDePaix');
     return;
   }
@@ -8885,7 +9300,20 @@ function showWarCombatModal(cb){
       {enemy:(_ai?_ai.civ.id:null), enemyName:(_ai?_ai.civ.name:'IA'), warTurnsLeft:G.warTurnsLeft, myForce:_p.forceTokens||0,
        maxEngage:_maxEng, maxEngageAvecCroiseur:_maxEngCru,
        cruiser:{has:!!_cruHas, afford:!!_cruOk, power:(_p.cruiserPower||5), cost:(typeof cruiserCost==='function')?cruiserCost(_p):null},
-       canHold:((G._warDeclaredBy||'other')!=='player'),
+       /* ═══════ ON PEUT TOUJOURS SE RETIRER — SINON LA PARTIE SE FIGE ═══════
+          ⚠️ CE DRAPEAU VALAIT `false` POUR CELUI QUI AVAIT DÉCLARÉ LA GUERRE, et c'est ce qui a
+          bloqué la partie de deux amis de Marc le 17/08. L'intention se défendait : on ne déclare
+          pas une guerre pour ensuite croiser les bras. Mais trois conditions se rencontrent :
+            · agresseur          → pas de bouton « Tenir position » ;
+            · plus de ressources → tous les boutons de colonie sont désactivés (`maxEngage < 1`) ;
+            · l'ennemi ne menace rien ce tour-ci → pas de bouton « Défendre ».
+          La fenêtre n'avait alors plus UN SEUL élément cliquable, et la table entière attendait une
+          réponse que le joueur ne pouvait pas donner. Une règle de jeu ne doit jamais pouvoir
+          produire un écran sans issue : la sanction du renoncement appartient au jeu (la guerre
+          continue, le tour de guerre est consommé), pas à l'interface.
+          Le client reçoit `estAgresseur` pour appeler la chose par son nom : « tenir position »
+          quand on subit, « renoncer à l'assaut » quand on avait attaqué. */
+       canHold:true, estAgresseur:((G._warDeclaredBy||'other')==='player'),
        cols:_cols, routes:_routes,
        aiThreat:(G._aiWarStance==='attack'&&G._aiWarTarget)?{type:G._aiWarTarget.type, name:G._aiWarTarget.name}:null},
       null, 'adChoixDeCombat');
@@ -8907,10 +9335,12 @@ function showWarCombatModal(cb){
     ?aiRoutes.map((r,i)=>{const prot=(r.tokens||0)>=1;const need=prot?2:1;const can=(p.forceTokens||0)>=need;
       return `<button onclick="warAttackRoute(${i})"${can?'':' disabled'} style="display:block;width:100%;text-align:left;margin-bottom:4px;padding:5px 8px;background:#1a1a3a;border:1px solid ${prot?'#a35a5a':'#3a3a6a'};color:#c8d8f8;border-radius:5px;cursor:${can?'pointer':'not-allowed'};opacity:${can?1:.5};font-size:.82em">${prot?'🛡️':'🔓'} ${NODES[r.from]?.name||r.from} → ${NODES[r.to]?.name||r.to} — <b>${need} jeton${need>1?'s':''}</b>${prot?' (protégée)':' (non protégée)'}</button>`;}).join('')
     :'<div style="color:#5a6a8a;font-size:.82em">Aucune route ennemie.</div>';
-  const canHold=(G._warDeclaredBy||'other')!=='player';
-  const holdBtn=canHold
-    ?'<div style="margin-top:10px;padding-top:10px;border-top:1px solid #2a3a5a"><strong style="color:#88ccff">🕊️ Tenir position</strong><br><span style="color:#7880a0;font-size:.82em">Pas ton conflit — conserve tes jetons. Si l\'ennemi attaque, tu choisis ta défense. Si les deux tiennent : aucun combat, aucune perte.</span><br><button onclick="warHoldPosition()" style="margin-top:6px;padding:6px 14px;background:#0a1a2a;border:1px solid #4488cc;color:#88bbee;border-radius:6px;cursor:pointer;font-weight:700">🕊️ Tenir position</button></div>'
-    :'';
+  /* MÊME RÈGLE QU'EN LIGNE : la sortie existe toujours (voir le bandeau de `canHold` plus haut).
+     Seul le mot change — on ne « tient pas position » quand c'est soi qui a déclaré la guerre. */
+  const _estAgresseur=(G._warDeclaredBy||'other')==='player';
+  const holdBtn=_estAgresseur
+    ?'<div style="margin-top:10px;padding-top:10px;border-top:1px solid #2a3a5a"><strong style="color:#88ccff">🚪 Renoncer à l\'assaut ce tour</strong><br><span style="color:#7880a0;font-size:.82em">Tu as déclaré cette guerre, mais rien ne t\'oblige à frapper maintenant : conserve tes jetons. <b>La guerre continue</b> et le tour de guerre est consommé.</span><br><button onclick="warHoldPosition()" style="margin-top:6px;padding:6px 14px;background:#0a1a2a;border:1px solid #4488cc;color:#88bbee;border-radius:6px;cursor:pointer;font-weight:700">🚪 Renoncer à l\'assaut</button></div>'
+    :'<div style="margin-top:10px;padding-top:10px;border-top:1px solid #2a3a5a"><strong style="color:#88ccff">🕊️ Tenir position</strong><br><span style="color:#7880a0;font-size:.82em">Pas ton conflit — conserve tes jetons. Si l\'ennemi attaque, tu choisis ta défense. Si les deux tiennent : aucun combat, aucune perte.</span><br><button onclick="warHoldPosition()" style="margin-top:6px;padding:6px 14px;background:#0a1a2a;border:1px solid #4488cc;color:#88bbee;border-radius:6px;cursor:pointer;font-weight:700">🕊️ Tenir position</button></div>';
   // Calculer une cible d'attaque IA plausible (colonie connectée ou route protégée)
   const aiTargetCols=G.player.colonies.filter(c=>c.nodeId!==G.player.civ.home&&c.connected);
   const aiTargetRoutes=G.player.routes.filter(r=>(r.tokens||0)>0);
@@ -9125,7 +9555,7 @@ function routeCaptureChoice(capture){
   // Contexte FENÊTRE DE COMBAT : poursuite du flux de guerre (identique à l'ancien warAttackRoute)
   G._aiWarCommitted=0;
   const warCombatResult={pPow:'-',aPow:'-',txt:(capture?'Route capturée : ':'Route détruite : ')+rn+'.',cls:'win'};
-  const _rarcw=_warBetween(_moiId(),G.warWith);if(_rarcw){_rarcw.turnsLeft--;G.warTurnsLeft=_rarcw.turnsLeft;}else G.warTurnsLeft--;
+  _decompterTourDeGuerre();
   const warEndResult=G.warTurnsLeft<=0?endWar(G.warWith):null;
   {const _s=_combatSuiteLire();
     if(_s){ G._routeAttackResult={warCombatResult,warEndResult}; _s('ROUTE_ATTACK'); }

@@ -31,7 +31,10 @@ function answerDecision(p) {
   if (k === 'dyson_build') return { force: false };
   if (k === 'accord_confirm') return { confirm: true };
   if (!opts.length) return {};
-  const key = k === 'agenda' ? 'agendaId' : (k === 'strategy' ? 'cardId' : (k === 'invest1' || k === 'invest2' ? 'cardId' : (k === 'espionage' ? 'branch' : (k === 'extrasolar' ? 'node' : (k === 'empath_copy' ? 'cardId' : 'value')))));
+  /* `espionage` : `id`, pas `branch` — le moteur retrouve l'option par son identifiant, et une
+     filière ne dit pas chez QUI voler. Ce robot répondait donc toujours à côté, comme le panneau
+     de repli d'`online.js` (même défaut, deux fichiers ; voir le commentaire là-bas). */
+  const key = k === 'agenda' ? 'agendaId' : (k === 'strategy' ? 'cardId' : (k === 'invest1' || k === 'invest2' ? 'cardId' : (k === 'espionage' ? 'id' : (k === 'extrasolar' ? 'node' : (k === 'empath_copy' ? 'cardId' : 'value')))));
   const op = pick(opts); const ans = {};
   ans[key] = op.id !== undefined ? op.id : (op.branch !== undefined ? op.branch : op.node);
   if (k === 'strategy_calm') ans.targetId = op.id;

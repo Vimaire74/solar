@@ -200,7 +200,16 @@ class GameDriver {
   // Notices BLOQUANTES : le joueur doit cliquer « Continuer » (fenêtre statique). Sinon le pump acquittait
   // tout de suite → les fenêtres « tu as gagné/perdu » et « résultat d'événement » passaient inaperçues.
   _isBlockingNotice(p){
-    if(!p || !['war_result','event_result','event_announce','raid_hit','eot'].includes(p.kind)) return false;
+    /* ⚠️ `accord_result` ET `raid_result` MANQUAIENT, ET LE JOUEUR NE LES VOYAIT JAMAIS.
+       Ces deux notices annoncent le RÉSULTAT d'une action que le joueur vient de faire : « ta
+       proposition d'accord a été refusée », « voici ton butin ». N'étant pas dans cette liste, elles
+       étaient traitées comme de simples informations et ACQUITTÉES par ce pilote — la réponse partait
+       d'ici, l'écran du joueur ne recevait rien. `online.js` a pourtant une fenêtre pour elles depuis
+       longtemps ; elle n'a simplement jamais eu l'occasion de s'ouvrir.
+       Marc, partie FDDD du 23/08 : « j'ai fait un accord avec le Terrien et j'ai pas vu si ils ont
+       accepté ou pas. » Le journal, lui, disait bien qu'ils avaient refusé.
+       Règle : une notice qui répond à une action du joueur est BLOQUANTE — il doit la lire. */
+    if(!p || !['war_result','event_result','event_announce','raid_hit','raid_result','accord_result','eot'].includes(p.kind)) return false;
     // ⚠️ JUGEMENT FINAL : sa fenêtre ne doit JAMAIS bloquer — sinon la partie ne se termine pas, les scores
     // ne sont pas calculés, l'archive et l'email ne partent jamais (bug vécu par Marc, partie figée au tour 10).
     try{ const ev=p.payload&&p.payload.event; if(ev&&ev.id==='final') return false; }catch(e){}
@@ -243,6 +252,14 @@ class GameDriver {
       return veut ? {accept:true, offer:{materials:0,energy:0,science:0}} : {accept:false};
     }
     if(k==='peace_answer'||k==='accord_request') return {id:'yes', accept:true};
+    /* ORDRE DES DEUX COMBATS (Hyperpropulsion). Une nation tenue par l'ordinateur frappe la première
+       si elle a de quoi le faire — engager ses jetons tant qu'elle les a encore vaut mieux que les
+       garder pour un assaut qu'une défense coûteuse lui interdira. Sans moyens, elle défend d'abord
+       et gardera le peu qui lui reste pour riposter. */
+    if(k==='war_initiative'){
+      const jetons = nat ? Math.min(nat.forceTokens||0, nat.res.materials||0, nat.res.energy||0) : 0;
+      return {id: jetons>=2 ? 'attaque' : 'defense'};
+    }
     if(k==='war_combat') return (typeof sb.iaChoixDeCombat==='function') ? sb.iaChoixDeCombat(nat) : {action:'hold'};
     if(k==='defense') return {defTokens:Math.min(2, o.maxDef||0)};
     if(k==='route_capture') return {capture:true};

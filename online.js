@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-16 · v9.69';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
+const SOLAR_BUILD_JS = '2026-08-23 · v9.74';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :
@@ -569,6 +569,28 @@ function showOptsReal(pending, modalId, contId, key, allowNone){
   m.classList.remove('hidden');
   return true;
 }
+/* ═══════ REFUSER LA PAIX SANS AVOIR DE QUOI SE BATTRE ═══════
+   Deux amis de Marc, 17/08 : l'un refuse la paix, choisit d'attaquer, et ne découvre qu'à la
+   fenêtre SUIVANTE qu'il n'a pas de quoi engager un seul jeton. À ce moment-là le choix est fait,
+   le tour de guerre est engagé, et il ne lui reste qu'à se retirer.
+
+   Le seuil est en JETONS PAYABLES, pas en ressources brutes. Marc proposait « moins de 2🪨 et
+   moins de 2⚡ » ; c'est la bonne intuition, mais le compte exact dépend de l'IA de Navigation, qui
+   divise le coût de guerre par deux : avec elle, 2🪨 2⚡ paient quatre jetons et l'avertissement
+   serait faux. `maxEngage` est ce que le moteur autorisera réellement — la seule mesure qui ne
+   puisse pas mentir. En dessous de 2, on demande confirmation ; on n'interdit rien.
+
+   Rend `true` si on peut continuer. */
+function _confirmerGuerreSansMoyens(o){
+  const n=(o&&o.maxEngage!==undefined)?o.maxEngage:null;
+  if(n===null||n>=2) return true;
+  const s=(o&&o.stocks)||{};
+  return confirm('⚠️ Tu manques de ressources pour attaquer.\n\n'
+    +'Tu ne peux engager que '+n+' jeton'+(n>1?'s':'')+' ce tour-ci'
+    +' (stocks : '+(s.materials||0)+'🪨 '+(s.energy||0)+'⚡ — il faut 1🪨 +1⚡ par jeton engagé).\n\n'
+    +'Refuser la paix maintenant, c\'est poursuivre une guerre que tu n\'as pas les moyens de mener.\n\n'
+    +'Continuer quand même ?');
+}
 // VRAIE modale de paix (#peace-modal) : offre de ressources +/− + Proposer la paix / Se battre.
 function showPeaceReal(pending){
   const o=pending.payload||{};
@@ -589,7 +611,7 @@ function showPeaceReal(pending){
   const close=()=>{ m.classList.add('hidden'); m.style.display='none'; };
   const btns=m.querySelectorAll('.atk-btns button');
   if(btns[0])btns[0].onclick=function(){ const off=(G&&G._peaceOffer)||{materials:0,energy:0,science:0}; close(); if(STATE._realDecide)STATE._realDecide({accept:true,offer:off}); };
-  if(btns[1])btns[1].onclick=function(){ close(); if(STATE._realDecide)STATE._realDecide({accept:false}); };
+  if(btns[1])btns[1].onclick=function(){ if(!_confirmerGuerreSansMoyens(o))return; close(); if(STATE._realDecide)STATE._realDecide({accept:false}); };
   m.style.display='flex'; m.classList.remove('hidden');
   return true;
 }
@@ -932,6 +954,30 @@ function hideConfirmBar(){ try{ const b=document.getElementById('sc-confirm'); i
 // doEstablishRoute, buyTech, doUpgrade, endTurn) sont INTERCEPTÉES → au lieu de s'exécuter
 // localement, elles envoient l'INTENTION au serveur (qui reste l'autorité et re-valide).
 // Hors de ton tour, elles reprennent leur comportement normal (solo intact).
+/* ═══════ LE SUPERCROISEUR TRAVERSE-T-IL LE RÉSEAU ? ═══════
+   Marc, partie du 16/08, tour 10 — trois combats, la case ⚓ cochée à chaque fois :
+
+       combat 1 : 1 jeton  → puissance 1   « techs : … Supercroiseur »   défaite 1 vs 4
+       combat 2 : 2 jetons → puissance 2   « techs : … Supercroiseur »   défaite 2 vs 3
+       combat 3 : 6 jetons → puissance 11 (+5 supercroiseur)             victoire
+
+   Les deux premiers sont des assauts de la PHASE D'ACTIONS, le troisième un combat de FIN DE TOUR.
+   Deux chemins différents, et un seul transportait le croiseur :
+     · fin de tour → question `war_combat`, dont la réponse porte `cruiser:` (voir `tokenPick`) ;
+     · phase d'actions → intention `{type:'attack', node, tokens}` … et rien d'autre.
+
+   Or le bouton « ⚓ Déployer le Supercroiseur » ne fait que basculer `G._cruiserDeployTemp`, une
+   variable de la page. En solo, `confirmWarCombat` la recopie dans `G._cruiserDeployed` juste avant
+   de résoudre. En ligne, l'interception court-circuite ce passage : l'action part au serveur, qui
+   pose `G._cruiserDeployed = !!a.cruiser` — donc `false`, faute de champ. Le joueur cochait, le
+   bouton passait au vert, et le croiseur restait à quai sans un mot.
+
+   ⚠️ ET L'AFFICHAGE ENFONÇAIT LE CLOU : le récapitulatif de combat liste « Supercroiseur » dès
+   qu'on le POSSÈDE, déployé ou non (voir `techsCombat` dans moteur.js). Marc lisait
+   « puissance 2 · techs : … Supercroiseur » et engageait deux jetons contre trois. */
+function _croiseurCoche(){
+  try{ return !!scGetG()._cruiserDeployTemp; }catch(e){ return false; }
+}
 const INTENT_MAP = {
   doColonize:       a=>({type:'colonize', node:a[0]}),
   doEstablishRoute: a=>({type:'route', from:a[0], to:a[1]}),
@@ -961,7 +1007,7 @@ const INTENT_MAP = {
     try{ tokens=parseInt((document.getElementById('atk-slider')||{}).value)||1; }catch(e){}
     try{ if(window.cancelAttack) window.cancelAttack(); }catch(e){}
     if(!node) return null; // rien à envoyer
-    return {type:'attack', node, tokens};
+    return {type:'attack', node, tokens, cruiser:_croiseurCoche()};
   },
   // CRITIQUE : l'assaut du PLATEAU passe par la modale de COMBAT DE GUERRE (confirmWarCombat), pas l'ancienne
   // modale d'attaque. Sans cette interception, la capture ne se faisait QUE sur l'écran du joueur (jamais envoyée
@@ -972,7 +1018,7 @@ const INTENT_MAP = {
     try{ const sl=document.getElementById('wcm-slider'); if(sl)tokens=parseInt(sl.value)||1; }catch(e){}
     try{ const m=document.getElementById('war-combat-modal'); if(m)m.classList.add('hidden'); }catch(e){}
     if(!node) return null; // pas de cible colonie (ex. défense/tenir) → laisser le flux normal
-    return {type:'attack', node, tokens:Math.max(1,tokens)};
+    return {type:'attack', node, tokens:Math.max(1,tokens), cruiser:_croiseurCoche()};
   }
 };
 function installIntercepts(){
@@ -1585,7 +1631,7 @@ function askLocalDecision(pending){
   return new Promise(resolve=>{
     const o=pending.payload||{}; const k=pending.kind;
     const done=(ans)=>{ closeDecision(); resolve(ans); };
-    const TITLES={raid_target:'💰 Quelle nation piller ?',accord_request:'🤝 Proposition d\'accord commercial',agenda:'Choisis ton agenda secret',strategy:'Carte Stratégie',strategy_calm:'Calmer une tension',invest1:'Investissement (Niv.1)',invest2:'Investissement (Niv.2)',espionage:'🕵️ Espionnage : quelle filière copies-tu ?',extrasolar:'Exploration extra-solaire',empath_copy:'Télépathie : carte à copier',ai_dyson:'Sphère de Dyson adverse',dyson_build:'Ta Sphère de Dyson',peace_offer:'Offre de paix',war_combat:'Combat',accord_confirm:'Accord commercial',defense:'Défense !',peace_answer:'🕊️ Proposition de paix'};
+    const TITLES={raid_target:'💰 Quelle nation piller ?',accord_request:'🤝 Proposition d\'accord commercial',agenda:'Choisis ton agenda secret',strategy:'Carte Stratégie',strategy_calm:'Calmer une tension',invest1:'Investissement (Niv.1)',invest2:'Investissement (Niv.2)',espionage:'🕵️ Espionnage : quelle filière copies-tu ?',extrasolar:'Exploration extra-solaire',empath_copy:'Télépathie : carte à copier',ai_dyson:'Sphère de Dyson adverse',dyson_build:'Ta Sphère de Dyson',peace_offer:'Offre de paix',war_combat:'Combat',accord_confirm:'Accord commercial',defense:'Défense !',peace_answer:'🕊️ Proposition de paix',war_initiative:'🌀 Hyperpropulsion : qui frappe en premier ?'};
     let body='<h2>'+(TITLES[k]||k)+'</h2>';
     if(k==='defense'){
       // CHOIX TACTIQUE DE DÉFENSE : combien de jetons engager (0 = ne pas défendre) + Supercroiseur éventuel.
@@ -1620,7 +1666,8 @@ function askLocalDecision(pending){
          ensuite en silence (Marc, 2026-08-15 : « vérifie que j'avais assez de ressources »). */
       const maxFCru=(o.maxEngageAvecCroiseur!==undefined)?o.maxEngageAvecCroiseur:maxF;
       const cru=o.cruiser||{has:false,afford:false,power:5};
-      const cols=o.cols||[]; const canHold=!!o.canHold; const threat=o.aiThreat;
+      const cols=o.cols||[]; const threat=o.aiThreat;
+      const routes=o.routes||[]; const estAgresseur=!!o.estAgresseur;
       const tokenPick=(title,hint,onOk)=>{ // sous-écran : choisir les jetons engagés (+ supercroiseur)
         const limite=(maxF<force)?('<div style="color:#ffcc88;font-size:.82em;margin-bottom:4px">⚠️ Tu possèdes '+force+' jeton(s) mais ne peux en <b>payer</b> que '+maxF+' (1🪨 +1⚡ par jeton engagé).</div>'):'';
         const cruLigne=cru.has
@@ -1663,11 +1710,32 @@ function askLocalDecision(pending){
           b+='<div style="font-weight:700;color:#ff9966;margin:4px 0 3px">⚔️ Attaquer une colonie</div>';
           b+=cols.map((c,i)=>'<button class="opt" data-col="'+i+'"'+(maxF<1?' disabled style="opacity:.45"':'')+'>'+(c.isFocus?'🎯 ':'')+(c.emoji||'')+' <b>'+c.name+'</b> Nv.'+c.level+(c.isHome?' 🏠 QG':'')+' <span class="muted">('+c.dist+' nœud'+(c.dist>1?'s':'')+')</span>'+(c.isFocus?' <span style="color:#ffcc66">— gagne = capture !</span>':'')+'</button>').join('');
         } else b+='<div class="muted">Aucune colonie ennemie à portée.</div>';
-        // Défendre / Tenir
+        /* ═══ ATTAQUER UNE ROUTE — CETTE LISTE ÉTAIT ENVOYÉE ET JAMAIS AFFICHÉE ═══
+           Le serveur remplit `payload.routes` depuis toujours ; ce panneau ne l'a jamais lue. En
+           multijoueur, la guerre offrait donc strictement moins d'options qu'en solo, en silence.
+           Une route non protégée coûte 1 jeton et rien d'autre, une route protégée en coûte 2 :
+           c'est souvent le seul coup jouable quand on n'a plus de quoi monter un assaut. */
+        if(routes.length){
+          b+='<div style="font-weight:700;color:#88bbee;margin:8px 0 3px">🛤️ Attaquer une route</div>';
+          b+=routes.map(r=>{ const peut=force>=r.cost;
+            return '<button class="opt" data-rt="'+r.i+'"'+(peut?'':' disabled style="opacity:.45"')+'>'
+              +(r.protected?'🛡️':'🔓')+' <b>'+r.name+'</b> — '+r.cost+' jeton'+(r.cost>1?'s':'')
+              +(r.protected?' <span class="muted">(protégée)</span>':' <span class="muted">(non protégée)</span>')+'</button>'; }).join('');
+        }
+        // Défendre / Se retirer
         if(threat) b+='<button class="opt" id="sc-wc-def" style="border-color:#cc6622">🛡️ Défendre (choisir jetons)</button>';
-        if(canHold) b+='<button class="opt" id="sc-wc-hold" style="border-color:#4488cc">🕊️ Tenir position (ne rien engager)</button>';
+        /* ⚠️ CE BOUTON N'EST PLUS CONDITIONNEL, ET C'EST TOUT LE CORRECTIF DU 17/08.
+           Il n'apparaissait pas pour celui qui avait déclaré la guerre. Sans ressources pour
+           attaquer et sans menace à repousser, la fenêtre n'avait plus rien de cliquable : deux
+           amis de Marc y ont perdu leur partie. Il y a désormais toujours une sortie. */
+        b+='<button class="opt" id="sc-wc-hold" style="border-color:#4488cc">'
+          +(estAgresseur?'🚪 Renoncer à l\'assaut ce tour <span class="muted">(la guerre continue)</span>'
+                        :'🕊️ Tenir position (ne rien engager)')+'</button>';
+        /* Et on DIT pourquoi tout est gris, au lieu de laisser croire à une fenêtre cassée. */
+        if(maxF<1) b+='<div style="color:#ffcc88;font-size:.82em;margin-top:6px">⚠️ Tu n\'as pas de quoi engager un seul jeton (1🪨 +1⚡ chacun) : aucune attaque n\'est possible ce tour-ci.</div>';
         decisionPanel(b);
         document.querySelectorAll('#sc-decision .opt[data-col]').forEach(btn=>{ if(btn.disabled)return; btn.onclick=()=>{ const c=cols[parseInt(btn.getAttribute('data-col'))]; tokenPick('⚔️ Attaquer '+c.name, (c.isHome?'🏛️ CAPITALE : défendue d\'office par 10 jetons, plus ce que l\'ennemi engage.':'Force ennemie inconnue (garnison + défense).'), (t,cr)=>done({action:'attack', node:c.node, tokens:t, cruiser:cr})); }; });
+        document.querySelectorAll('#sc-decision .opt[data-rt]').forEach(btn=>{ if(btn.disabled)return; btn.onclick=()=>done({action:'route', route:parseInt(btn.getAttribute('data-rt'))}); });
         const dfn=document.getElementById('sc-wc-def'); if(dfn) dfn.onclick=()=>tokenPick('🛡️ Défense', 'Jetons engagés en défense de tes colonies.', (t,cr)=>done({action:'defend', tokens:t, cruiser:cr}));
         const hld=document.getElementById('sc-wc-hold'); if(hld) hld.onclick=()=>done({action:'hold'});
       };
@@ -1680,7 +1748,8 @@ function askLocalDecision(pending){
         <button class="opt" id="sc-war">⚔️ Continuer la guerre</button>`;
       decisionPanel(body);
       document.getElementById('sc-peace').onclick=()=>done({accept:true, offer:{materials:0,energy:0,science:0}});
-      document.getElementById('sc-war').onclick=()=>done({accept:false});
+      // Même garde-fou que dans la vraie modale : le panneau de repli ne doit pas être plus permissif.
+      document.getElementById('sc-war').onclick=()=>{ if(_confirmerGuerreSansMoyens(o)) done({accept:false}); };
       return;
     }
     if(k==='ai_dyson'){ body+=`<div>${o.builderName||'Une nation'} a bâti la Sphère de Dyson.</div>
@@ -1729,7 +1798,17 @@ function askLocalDecision(pending){
     // Génériques à options (agenda, strategy, invest1/2, espionage, extrasolar, empath_copy…)
     const opts=o.options||[];
     if(!opts.length){ decisionPanel(body+'<button class="opt" id="sc-ok">Continuer</button>'); document.getElementById('sc-ok').onclick=()=>done({}); return; }
-    const key = k==='agenda'?'agendaId' : (k==='strategy'?'cardId' : (k==='invest1'||k==='invest2'?'cardId' : (k==='espionage'?'branch' : (k==='extrasolar'?'node' : (k==='empath_copy'?'cardId':'value')))));
+    /* ⚠️ `espionage` DEMANDAIT `branch`, ET AUCUNE RÉPONSE `branch` N'EST APPLICABLE.
+       Ce panneau générique est le REPLI : il sert dès que la vraie modale à cases à cocher n'a pas
+       pu s'ouvrir (fenêtre absente d'un client resté en cache, par exemple). Il renvoyait alors
+       `{branch:'expansion'}` — le nom de la filière. Or le moteur cherche une OPTION par son
+       identifiant (`une:martiens:bio1`, `lot:martiens:expansion`) : « expansion » ne correspond à
+       rien, et une filière ne dit d'ailleurs pas CHEZ QUI voler, puisque plusieurs nations peuvent
+       avoir la même. La réponse était donc rejetée à tous les coups, la fenêtre revenait au tour
+       suivant, et Marc voyait huit fois « espionnage reporté » sans jamais pouvoir choisir
+       (journal du 16/08). `driver.js` utilisait déjà `id` de son côté : les deux chemins
+       divergeaient en silence. */
+    const key = k==='agenda'?'agendaId' : (k==='strategy'?'cardId' : (k==='invest1'||k==='invest2'?'cardId' : (k==='espionage'?'id' : (k==='extrasolar'?'node' : (k==='empath_copy'?'cardId':'value')))));
     // Pour les investissements : montrer ce que les IA/adversaires ont choisi (comme la vraie modale)
     if((k==='invest1'||k==='invest2') && Array.isArray(o.ai) && o.ai.length){
       const optName=(id)=>{ const op=opts.find(x=>x.id===id); return op?((op.emoji||'')+' '+op.name):id; };
