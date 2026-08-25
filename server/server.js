@@ -196,17 +196,38 @@ function corpsRapport(entry) {
     /* ⚠️ UN DÉCOMPTE SANS SA RÈGLE N'EXPLIQUE RIEN. Marc, partie 140A : « c'est pas clair pourquoi.
        Il faut ajouter les mêmes textes que dans le fichier de règle. » Les libellés viennent donc du
        §17 des règles, mot pour mot — et « Bonus divers » énumère enfin sa provenance. */
-    L.push('     Colonies ............... ' + (d.colVP || 0) + '   [VP du nœud × niveau, ×1 si connectée, ×0,5 si isolée]');
-    L.push('     Routes ................. ' + (d.routeVP || 0) + '   [+1 VP par route établie]');
-    L.push('     Cartes ................. ' + (d.cardsVP || 0) + '   [VP inscrit sur la carte : 1 au T1, 3 au T2, 5 au T3]');
-    L.push('     Bonus technologiques ... ' + (d.techBonusVP || 0) + '   [+0,5 VP par technologie, arrondi à l\'inférieur]');
-    L.push('     Revenus par tour ....... ' + (d.rptVP || 0) + '   [par ressource : +2 au-delà de 5, +5 au-delà de 10]');
-    L.push('     Agenda' + (s.agenda ? ' (' + s.agenda + ')' : '') + ' ......... ' + (d.agendasVP || 0)
-      + '   [' + ((d.agendasVP || 0) > 0 ? 'condition remplie' : 'condition NON remplie') + ']');
-    L.push('     Événements ............. ' + (d.evtVP || 0) + '   [VP des événements et des victoires de guerre]');
-    L.push('     Bonus divers ........... ' + (d.extraVP || 0));
-    for (const ligne of (d.extraDetail || [])) L.push('        · ' + String(ligne).replace(/<[^>]+>/g, ''));
-    if (!(d.extraDetail || []).length && !(d.extraVP || 0)) L.push('        · aucun');
+    /* ⚠️ UN TOTAL QU'ON NE PEUT PAS VÉRIFIER N'EXPLIQUE RIEN. Marc, 25/08 : « il faut mettre dans le
+       calcul de points les règles qui expliquent ça et le calcul complet des points pour chaque
+       élément calculé, notamment bonus spéciaux qui n'est pas clair ». On imprime donc, sous chaque
+       poste, l'arithmétique ligne par ligne telle que `calcVP` vient de la faire. */
+    const det = d.det || {};
+    /* ⚠️ UN POSTE À ZÉRO DOIT DIRE POURQUOI IL EST À ZÉRO. C'est là que le lecteur soupçonne une
+       erreur de comptabilité : sans explication, « Revenus par tour … 0 » ressemble à un oubli. */
+    const bloc = (titre, valeur, regle, lignes, siVide) => {
+      L.push('     ' + titre + ' ' + '.'.repeat(Math.max(1, 24 - titre.length)) + ' ' + (valeur || 0) + '   [' + regle + ']');
+      const L2 = (lignes && lignes.length) ? lignes : (siVide ? [siVide] : []);
+      for (const x of L2) L.push('          · ' + String(x).replace(/<[^>]+>/g, ''));
+    };
+    bloc('Colonies', d.colVP, 'VP du nœud × niveau, ×1 si connectée, ×0,5 si isolée, +1 par colonie reliée',
+      det.colonies, 'aucune colonie');
+    bloc('Routes', d.routeVP, '+1 VP par route établie', det.routes, 'aucune route établie');
+    bloc('Cartes', d.cardsVP, 'VP inscrit sur la carte : 1 au niveau 1, 3 au niveau 2, 5 au niveau 3',
+      det.cartes, 'aucune carte porteuse de VP');
+    bloc('Bonus technologiques', d.techBonusVP, '+0,5 VP par technologie, arrondi à l\'inférieur',
+      det.tech, 'aucune carte de type « technologie » (les cartes civiques et militaires ne comptent pas ici)');
+    bloc('Revenus par tour', d.rptVP, 'par ressource : +2 au-delà de 5/tour, +5 au-delà de 10/tour',
+      det.rpt, 'aucune ressource ne dépasse 5 de revenu par tour');
+    bloc('Agenda' + (s.agenda ? ' (' + s.agenda + ')' : ''), d.agendasVP,
+      (d.agendasVP || 0) > 0 ? 'condition remplie' : 'condition NON remplie',
+      det.agenda, 'aucun agenda secret enregistré pour cette nation');
+    bloc('Événements', d.evtVP, 'événements, victoires de combat (+2 chacune), découvertes, accords',
+      det.evt, 'aucun événement, combat gagné, découverte ni accord n\'a rapporté de point');
+    /* « Bonus divers » restait opaque même à zéro : on dit maintenant CE QU'IL CONTIENDRAIT. */
+    bloc('Bonus divers', d.extraVP, 'bonus de technologies particulières (Extra-Solaire, Éveil Collectif) et découvertes',
+      (d.extraDetail || []).length ? d.extraDetail
+        : ['aucun — aucune de ces technologies n\'a été acquise, ou leur condition n\'est pas remplie']);
+    L.push('     ' + '─'.repeat(56));
+    L.push('     TOTAL .................... ' + s.vp + '   [somme des huit postes ci-dessus]');
   }
   L.push('');
   L.push('═══════════ RAPPORT DE BUG ═══════════');
@@ -240,9 +261,12 @@ function archiveGame(g) {
         civId: p.civ.id, name: p.civ.name, vp: d.total || 0,
         user: parUser[p.civ.id] || null,
         agenda: (p.agenda && p.agenda.name) || null,
+        /* ⚠️ ON ARCHIVE LE DÉTAIL, PAS SEULEMENT LES TOTAUX. Sans lui, le rapport ne peut plus rien
+           expliquer une fois la partie terminée — et c'est justement à ce moment-là qu'on le lit. */
         detail: { colVP: d.colVP || 0, routeVP: d.routeVP || 0, cardsVP: d.cardsVP || 0,
                   techBonusVP: d.techBonusVP || 0, rptVP: d.rptVP || 0, agendasVP: d.agendasVP || 0,
-                  evtVP: d.evtVP || 0, extraVP: d.extraVP || 0 }
+                  evtVP: d.evtVP || 0, extraVP: d.extraVP || 0,
+                  extraDetail: d.extraDetail || [], det: d.det || null }
       };
     }).sort((a, b) => b.vp - a.vp);
     /* MÊME FORMAT ATTRIBUÉ que /debug : l'email de fin de partie et l'archive doivent permettre le

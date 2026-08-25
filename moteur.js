@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-25 · v9.80';
+const SOLAR_BUILD_MOTEUR = '2026-08-25 · v9.82';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -469,7 +469,7 @@ const EVENTS=[
   {id:'tech',type:'competition',name:'Développement Technologique',emoji:'⚗️',preview:'La nation avec le plus de technologies de niveau 2 et 3 gagne +6 VP.',
    resolve(G){const h=_evTop(function(p){return p.cards.filter(function(c){return c.branch&&c.tier>=2;}).length;});return 'Développement Technologique — '+_evAwardVP(h,6);}},
   {id:'attract',type:'opportunite',name:'Civilisation la plus attractive',emoji:'✨',preview:'La nation avec le plus de moral gagne +2<i class=ri-materials></i> +2<i class=ri-science></i> +3 VP. Si égalité en première place : les deux, si plus d\'égalités personne.',
-   resolve(G){const h=_evTop(function(p){return p.res.morale||0;});if(h.length===0||h.length>=3)return 'Civilisation attractive — personne (trop d\'égalités).';h.forEach(function(p){const c=getResCapFor(p);p.res.materials=Math.min(c.materials,(p.res.materials||0)+2);p.res.science=Math.min(c.science,(p.res.science||0)+2);p.tempVP=(p.tempVP||0)+3;});return 'Civilisation attractive — '+h.map(_evName).join(' & ')+' → +2<i class=ri-materials></i> +2<i class=ri-science></i> +3 VP';}},
+   resolve(G){const h=_evTop(function(p){return p.res.morale||0;});if(h.length===0||h.length>=3)return 'Civilisation attractive — personne (trop d\'égalités).';h.forEach(function(p){const c=getResCapFor(p);p.res.materials=Math.min(c.materials,(p.res.materials||0)+2);p.res.science=Math.min(c.science,(p.res.science||0)+2);gagnerVP(p,3,'Événement : Civilisation attractive');});return 'Civilisation attractive — '+h.map(_evName).join(' & ')+' → +2<i class=ri-materials></i> +2<i class=ri-science></i> +3 VP';}},
   {id:'milsup',type:'competition',name:'Suprématie Militaire',emoji:'⚔️',preview:'La nation avec le plus de jetons Force (récupération inclus) gagne +6 VP.',
    resolve(G){const h=_evTop(_forceTotal);return 'Suprématie Militaire — '+_evAwardVP(h,6);}},
   {id:'comm',type:'opportunite',name:'Accords Commerciaux',emoji:'🤝',interactive:true,preview:'Occasion de conclure un accord commercial gratuit (+3 VP par nation ; met fin à une guerre).',
@@ -556,7 +556,20 @@ function techsProtegeantRoutes(p){
   return t;
 }
 function _evTop(statFn){const all=allPlayers();let mx=-Infinity;for(const p of all){const s=statFn(p);if(s>mx)mx=s;}if(mx<=0)return[];return all.filter(function(p){return statFn(p)===mx;});}
-function _evAwardVP(holders,vp){if(holders.length===0)return 'personne (aucune production).';if(holders.length>=3)return 'personne — trop d\'égalités ('+holders.length+' nations).';holders.forEach(function(p){p.tempVP=(p.tempVP||0)+vp;});return holders.map(_evName).join(' & ')+' → +'+vp+' VP';}
+/* ═══ CHAQUE POINT GAGNÉ DOIT POUVOIR DIRE D'OÙ IL VIENT ═══
+   Marc, 2026-08-25 : « j'aimerais un rapport de fin de partie plus détaillé… le calcul complet des
+   points pour chaque élément calculé, notamment les bonus spéciaux qui n'est pas clair. »
+   `tempVP` était un compteur muet : événements, victoires de guerre, découvertes et accords y
+   versaient tous leurs points sans laisser de trace, et le rapport final n'affichait qu'un total.
+   On passe donc par UNE fonction, qui incrémente ET retient le motif. Rien de coûteux : la raison
+   est connue au moment où l'on ajoute les points — il suffisait de ne pas la jeter. */
+function gagnerVP(p,n,raison){
+  if(!p||!n)return;
+  p.tempVP=(p.tempVP||0)+n;
+  if(!Array.isArray(p._vpDetail))p._vpDetail=[];
+  p._vpDetail.push({n:n, raison:String(raison||'sans motif'), tour:(typeof G!=='undefined'&&G)?G.turn:0});
+}
+function _evAwardVP(holders,vp,nom){if(holders.length===0)return 'personne (aucune production).';if(holders.length>=3)return 'personne — trop d\'égalités ('+holders.length+' nations).';holders.forEach(function(p){gagnerVP(p,vp,'Événement : '+(nom||'récompense'));});return holders.map(_evName).join(' & ')+' → +'+vp+' VP';}
 function _evCommResolve(G){for(const ai of G.ais){setTens('player',ai.civ.id,Math.max(0,getTens('player',ai.civ.id)-2));setTens(ai.civ.id,'player',Math.max(0,getTens(ai.civ.id,'player')-2));}for(const p of allPlayers()){const c=getResCapFor(p);p.res.materials=Math.min(c.materials,(p.res.materials||0)+2);}return 'Sommet commercial — tension −2 avec chaque nation, +2<i class=ri-materials></i> pour toutes.';}
 // Tension −5 partout (règle Marc). Le +1<i class=ri-morale></i> n'est PAS distribué à tout le monde :
 // il est gagné UNIQUEMENT par pacte effectivement conclu (voir _evDiploConfirm) — texte uniformisé.
@@ -668,7 +681,7 @@ function _evAccordConclude(prop,part){
   if(_w&&typeof _evEndWarWith==='function')_evEndWarWith(part.civ.id,3);
   setTens(prop.civ.id,part.civ.id,Math.max(0,getTens(prop.civ.id,part.civ.id)-3));
   setTens(part.civ.id,prop.civ.id,Math.max(0,getTens(part.civ.id,prop.civ.id)-3));
-  prop.tempVP=(prop.tempVP||0)+3;part.tempVP=(part.tempVP||0)+3;
+  gagnerVP(prop,3,'Accord commercial avec '+part.civ.name);gagnerVP(part,3,'Accord commercial avec '+prop.civ.name);
   if(typeof updateConnections==='function'){updateConnections(prop);updateConnections(part);}
   addLog('🤝 Accord commercial conclu : '+prop.civ.emoji+' '+prop.civ.name+' ↔ '+part.civ.emoji+' '+part.civ.name+' — +3 VP chacun, tension −3.','gold');
 }
@@ -6860,6 +6873,34 @@ function resolveWarCombat(playerCommitted, attaquant){
   /* L'adversaire se déduit de l'ATTAQUANT, plus de `G.ais` — une liste qui dépend elle aussi de qui
      est « actif ». On retombe sur `G.warWith` seulement si cette nation n'a pas de guerre connue. */
   const warEnemy=(function(){
+    /* ═══ AVEC DEUX GUERRES OUVERTES, ON SE BATTAIT CONTRE LA MAUVAISE NATION ═══
+       ⚠️ DÉFAUT DE LA PARTIE F8D7. `_warOf(civ)` rend LA PREMIÈRE guerre trouvée pour cette nation.
+       Marc était en guerre contre les Martiens depuis le tour 8 ET contre les Ceinturiens depuis le
+       tour 9. En assaillant Triton — colonie ceinturienne — le combat s'est résolu contre les
+       MARTIENS : le compte rendu les nomme (« 📊 🔴 Martiens … puissance 3 »), leur garnison a
+       défendu, et la colonie visée, introuvable chez eux, n'a jamais changé de main. Trois victoires
+       sur Triton (T9 puis T10), trois fois « +2 VP » et rien d'autre. De l'extérieur cela ressemble
+       à « la colonie revient à sa nation » ; en réalité on gagnait contre quelqu'un d'autre.
+
+       L'ADVERSAIRE D'UN COMBAT SE DÉDUIT DE LA CIBLE, pas de l'ordre du tableau des guerres.
+       Ordre de préférence : qui défend le nœud visé (s'il y a guerre avec lui) · la guerre désignée
+       par `G.warWith` · à défaut seulement, la première guerre trouvée. */
+    const _estEnGuerre=n=>!!(n&&n!==_atk&&typeof _warBetween==='function'&&_warBetween(_atk.civ.id,n.civ.id));
+    const _tousSaufMoi=()=>allPlayers().filter(n=>n&&n!==_atk);
+    // 1) le défenseur du nœud visé
+    try{
+      const _cible=_warAttackColonyTarget;
+      if(_cible){
+        const _def=(typeof defenseurPrincipal==='function')?defenseurPrincipal(_cible,_atk):null;
+        if(_estEnGuerre(_def)) return _def;
+        const _occ=_tousSaufMoi().find(n=>_estEnGuerre(n)&&(n.colonies||[]).some(c=>c.nodeId===_cible));
+        if(_occ) return _occ;
+      }
+    }catch(e){}
+    // 2) la guerre explicitement désignée par l'écran
+    const _dit=_tousSaufMoi().find(n=>n.civ.id===G.warWith);
+    if(_estEnGuerre(_dit)) return _dit;
+    // 3) repli historique
     let id=null;
     try{ const w=_warOf(_atk.civ.id); if(w) id=_warOther(w,_atk.civ.id); }catch(e){}
     const cible=id||G.warWith;
@@ -6947,15 +6988,26 @@ function resolveWarCombat(playerCommitted, attaquant){
   _decompterTourDeGuerre();let txt,cls;
   const targetId=_warAttackColonyTarget;_warAttackColonyTarget=null;
   if(pPow>aPow){
-    G.warWins.player++;_atk.tempVP+=2;warEnemy.res.morale=Math.max(0,(warEnemy.res.morale||0)-1);
+    G.warWins.player++;gagnerVP(_atk,2,'Combat gagné contre '+warEnemy.civ.name);warEnemy.res.morale=Math.max(0,(warEnemy.res.morale||0)-1);
     if(_aiCru)warEnemy.cruiserCooldown=getCooldownTurn(warEnemy); // croiseur IA en réparation suite à la défaite en défense
     // (jetons : coût + récupération gérés par applyCombatEngage ci-dessus, symétrique attaque/défense)
     // Appliquer les dégâts sur la colonie ciblée
     if(targetId){
-      const tc=warEnemy.colonies.find(c=>c.nodeId===targetId);
-      if(tc){
+      /* ═══ FILET DE SÉCURITÉ : LE NŒUD VISÉ PEUT N'ÊTRE À PERSONNE DE NOMMÉ ═══
+         ⚠️ CE N'EST PAS LA CAUSE DU DÉFAUT F8D7, ET IL FAUT LE DIRE. La vraie cause est trente
+         lignes plus haut : avec deux guerres ouvertes, `warEnemy` désignait la mauvaise nation
+         (voir le bandeau de `resolveWarCombat`). Une fois l'adversaire correctement déduit de la
+         CIBLE, il possède le nœud et cette recherche élargie ne sert plus.
+         On la garde pour le cas résiduel : un nœud partagé dont aucun occupant n'est en guerre avec
+         l'assaillant — `warEnemy` retombe alors sur un repli, et sans ce filet la victoire ne
+         donnerait à nouveau que des points. `capturerNoeud` sait expulser tous les occupants ;
+         c'est le seul endroit qui doive le savoir. */
+      let _proprio=warEnemy.colonies.some(c=>c.nodeId===targetId)?warEnemy:null;
+      if(!_proprio) _proprio=(typeof allPlayers==='function'?allPlayers():[G.player].concat(G.ais||[]))
+        .find(n=>n&&n!==_atk&&(n.colonies||[]).some(c=>c.nodeId===targetId))||null;
+      if(_proprio){
         // CAPTURE (memo #10/#15) : la colonie change de propriétaire sur victoire
-        warEnemy.forceTokens=Math.max(0,(warEnemy.forceTokens||0)-1); // le jeton de GARNISON de la colonie perdue est DÉTRUIT (il a défendu et péri)
+        _proprio.forceTokens=Math.max(0,(_proprio.forceTokens||0)-1); // le jeton de GARNISON de la colonie perdue est DÉTRUIT (il a défendu et péri)
         addLog('💥 Jeton de garnison de '+NODES[targetId].name+' détruit dans la défense.','dim');
         /* ⚠️ LE MORAL DE L'ABANDON FORCÉ EST MAINTENANT DANS `capturerNoeud`, qui l'applique à CHAQUE
            nation expulsée — cohabitants compris. Le laisser ici aussi le comptait deux fois : le
@@ -6964,13 +7016,13 @@ function resolveWarCombat(playerCommitted, attaquant){
            lève le bridage d'une colonie partagée et fait tomber l'accord forcé. */
         const newLvl=capturerNoeud(_atk,targetId);
         txt='🏴 Victoire ! Tu CAPTURES '+NODES[targetId].name+' (Nv.'+newLvl+') — elle est à toi ! (+2 VP, population hostile −2<i class=ri-morale></i>)';
-        addLog('🏴 '+NODES[targetId].name+' capturée sur '+warEnemy.civ.emoji+' '+warEnemy.civ.name+' ! (Nv.'+newLvl+', −2<i class=ri-morale></i> ennemi)','gold');
+        addLog('🏴 '+NODES[targetId].name+' capturée sur '+_proprio.civ.emoji+' '+_proprio.civ.name+' ! (Nv.'+newLvl+', −2<i class=ri-morale></i> ennemi)','gold');
       }else{txt='Victoire ! (+2 VP, IA −2 jetons, −1<i class=ri-morale></i>)';addLog('⚔️ Combat : victoire ('+pPow+' vs '+aPow+') +2 VP','gold');}
     }else{txt='Victoire ! (+2 VP, IA −2 jetons, −1<i class=ri-morale></i>)';addLog('⚔️ Combat : victoire ('+pPow+' vs '+aPow+') +2 VP','gold');}
     cls='win';
   }
   else if(aPow>pPow){
-    G.warWins.ai++;warEnemy.tempVP+=2;_atk.res.morale=Math.max(0,(_atk.res.morale||0)-1);
+    G.warWins.ai++;gagnerVP(warEnemy,2,'Combat gagné contre '+_atk.civ.name);_atk.res.morale=Math.max(0,(_atk.res.morale||0)-1);
     if(_cruOn){_atk.cruiserCooldown=getCooldownTurn(_atk);addLog('⚓ Supercroiseur en réparation (récupération) suite à la défaite — pas perdu.','dim');}
     txt='Défaite. (IA +2 VP — jetons engagés immobilisés, moitié perdue, −1<i class=ri-morale></i>)';cls='loss';
     addLog('⚔️ Combat : défaite ('+pPow+' vs '+aPow+')','red');
@@ -8436,7 +8488,15 @@ function _doAITurnInterne(aiPlayer,oneShot){
   ai.acLeft=0;
 }
 /* ============================================================ VP ============================================================ */
+/* ═══ LE DÉTAIL DE CHAQUE POSTE, PAS SEULEMENT SON TOTAL ═══
+   Marc, 2026-08-25 : « il faut mettre dans le calcul de points les règles qui expliquent ça, et le
+   calcul complet des points pour chaque élément calculé ».
+   Chaque poste renseigne donc une liste de lignes montrant SON ARITHMÉTIQUE — colonie par colonie,
+   carte par carte, ressource par ressource. C'est gratuit : les nombres sont déjà là au moment du
+   calcul, on cessait simplement de les écrire. Un total qu'on ne peut pas vérifier n'explique rien,
+   et c'est précisément ce qui a fait douter Marc de la comptabilité du jeu. */
 function calcVP(p){
+  const det={colonies:[],routes:[],cartes:[],tech:[],rpt:[],agenda:[],evt:[]};
   // Colonies : baseVP×niveau×connexion + 1 bonus par colonie connectée
   let colVP=0;
   for(const col of p.colonies){
@@ -8445,18 +8505,38 @@ function calcVP(p){
     // Pirates : Éris et Pluton comptent baseVP:2 au niveau 1 (le premium est gagné en développant)
     // Jupitériens : Jupiter (J-1) donne son baseVP normalement comme home
     const effectiveBVP=(p.civ.id==='ceinturiens'&&col.level===1&&['eris','pluto'].includes(col.nodeId))?2:node.baseVP;
-    colVP+=Math.round(effectiveBVP*col.level*(col.connected?1:0.5))+(col.connected?1:0);
+    const _base=Math.round(effectiveBVP*col.level*(col.connected?1:0.5));
+    const _liaison=(col.connected?1:0);
+    colVP+=_base+_liaison;
+    det.colonies.push((node.name||col.nodeId)+' Nv.'+col.level+' : '+effectiveBVP+' (nœud) × '+col.level
+      +' (niveau) × '+(col.connected?'1 (connectée)':'0,5 (isolée)')+' = '+_base
+      +(_liaison?' +1 (liaison) ':' ')+'→ '+(_base+_liaison)
+      +(effectiveBVP!==node.baseVP?'  [Ceinturiens : '+ (node.name||col.nodeId) +' vaut 2 au niveau 1]':''));
   }
   // Routes : 1 VP par route établie (incite l'IA à construire des routes)
   const routeVP=p.routes.length;
+  if(routeVP)det.routes.push(routeVP+' route(s) × 1 = '+routeVP+'   ('
+    +p.routes.map(r=>((NODES[r.from]&&NODES[r.from].name)||r.from)+'→'+((NODES[r.to]&&NODES[r.to].name)||r.to)).join(', ')+')');
   const cardsVP=p.cards.reduce((s,c)=>s+(c.vp||0),0);
+  for(const c of p.cards){ if(c&&c.vp) det.cartes.push((c.emoji||'')+' '+(c.name||c.id)+' (niveau '+(c.tier||'?')+') : +'+c.vp); }
   // Bonus Tech : +0.5 VP par carte Technologie (arrondi inférieur), valorise la spécialisation
-  const techBonusVP=Math.floor(p.cards.filter(c=>c.type==='technology').length*0.5);
+  const _nbTech=p.cards.filter(c=>c.type==='technology').length;
+  const techBonusVP=Math.floor(_nbTech*0.5);
+  if(_nbTech)det.tech.push(_nbTech+' technologie(s) × 0,5 = '+String(_nbTech*0.5).replace('.',',')+' → '+techBonusVP+' (arrondi à l\'inférieur)');
   // Bonus revenus/tour (rpt) v6 : par ressource — rpt>5→+2VP, rpt>10→+5VP
   let rptVP=0;
-  for(const r of['energy','materials','science','morale']){const v=p.rpt[r]||0;rptVP+=v>10?5:v>5?2:0;}
+  for(const r of['energy','materials','science','morale']){const v=p.rpt[r]||0;const _g=v>10?5:v>5?2:0;rptVP+=_g;
+    if(_g)det.rpt.push((typeof rEmoji==='function'?rEmoji(r):r)+' '+v+'/tour → +'+_g+(v>10?' (au-delà de 10)':' (au-delà de 5)'));}
   let agendasVP=p.agenda&&typeof p.agenda.score==='function'?p.agenda.score(p):0;
+  if(p.agenda)det.agenda.push((p.agenda.emoji||'')+' '+(p.agenda.name||'?')+' — '+(p.agenda.desc||'')
+    +' → '+(agendasVP>0?('+'+agendasVP+' (condition remplie)'):'0 (condition NON remplie)'));
   const evtVP=p.tempVP||0;
+  /* Le détail des VP d'événement est tenu au fil de la partie par `gagnerVP` : on ne fait ici que
+     le recopier. Les parties commencées avant cette version n'en ont pas — on le dit plutôt que de
+     laisser croire à une erreur. */
+  if(Array.isArray(p._vpDetail)&&p._vpDetail.length){
+    for(const e of p._vpDetail) det.evt.push('T'+(e.tour||'?')+' — '+e.raison+' : +'+e.n);
+  } else if(evtVP) det.evt.push('+'+evtVP+' au total (détail non enregistré : partie commencée avant la v9.82)');
   /* ═══ « BONUS DIVERS » NE VEUT RIEN DIRE POUR CELUI QUI LE LIT ═══
      Marc, partie 140A : « dans le décompte des points de fin de partie, c'est pas clair pourquoi »
      et « les bonus spéciaux en particulier c'est pas clair, faut expliquer pourquoi ». Le calcul
@@ -8471,7 +8551,7 @@ function calcVP(p){
     extraVP+=_n; extraDetail.push('✨ Éveil Collectif : +1 par colonie connectée (×'+_n+')'); }
   if(p.bonusVP){ extraDetail.push('🗺️ Découvertes : +'+p.bonusVP); }   // déjà compté dans evtVP/tempVP selon le chemin
   const forceVP=0; // supprimé v6
-  return{colVP,routeVP,cardsVP,techBonusVP,rptVP,forceVP,agendasVP,evtVP,extraVP,extraDetail,
+  return{colVP,routeVP,cardsVP,techBonusVP,rptVP,forceVP,agendasVP,evtVP,extraVP,extraDetail,det,
     total:colVP+routeVP+cardsVP+techBonusVP+rptVP+agendasVP+evtVP+extraVP};
 }
 // ── Log de partie : construction + copier / email / télécharger (en jeu ET à la fin) ──
@@ -8515,9 +8595,31 @@ function buildJournalReport(){
     const isP=p===G.player;
     L.push('');
     L.push('▶ '+p.civ.name+(isP?' (toi)':' (IA)')+' — TOTAL '+v.total+' VP');
-    L.push('   Colonies : '+v.colVP+' · Routes : '+v.routeVP+' · Cartes : '+v.cardsVP);
-    L.push('   Bonus tech : '+v.techBonusVP+' · Bonus revenus/tour : '+v.rptVP);
-    L.push('   Agenda'+(p.agenda&&p.agenda.name?' ('+p.agenda.name+')':'')+' : '+v.agendasVP+' · Événements : '+v.evtVP+(v.extraVP?' · Bonus spéciaux : '+v.extraVP:''));
+    /* ⚠️ SOLO ET EN LIGNE DOIVENT DIRE LA MÊME CHOSE. Ce rapport-ci se contentait de trois lignes de
+       totaux pendant que le rapport du serveur détaillait tout : deux chemins, deux vérités, et un
+       joueur qui ne comprend pas pourquoi son score change de forme selon l'écran. Même détail des
+       deux côtés, tiré du même `calcVP().det`. */
+    const _d=v.det||{};
+    const _bloc=(titre,valeur,regle,lignes,siVide)=>{
+      L.push('   '+titre+' : '+(valeur||0)+'   ['+regle+']');
+      const _L=(lignes&&lignes.length)?lignes:(siVide?[siVide]:[]);
+      for(const x of _L)L.push('      · '+String(x).replace(/<[^>]+>/g,''));
+    };
+    _bloc('Colonies',v.colVP,'VP du nœud × niveau, ×1 si connectée, ×0,5 si isolée, +1 par colonie reliée',_d.colonies,'aucune colonie');
+    _bloc('Routes',v.routeVP,'+1 VP par route établie',_d.routes,'aucune route établie');
+    _bloc('Cartes',v.cardsVP,'VP inscrit sur la carte : 1 au niveau 1, 3 au niveau 2, 5 au niveau 3',_d.cartes,'aucune carte porteuse de VP');
+    _bloc('Bonus technologiques',v.techBonusVP,'+0,5 VP par technologie, arrondi à l\'inférieur',_d.tech,
+      'aucune carte de type « technologie » (les cartes civiques et militaires ne comptent pas ici)');
+    _bloc('Revenus par tour',v.rptVP,'par ressource : +2 au-delà de 5/tour, +5 au-delà de 10/tour',_d.rpt,
+      'aucune ressource ne dépasse 5 de revenu par tour');
+    _bloc('Agenda'+(p.agenda&&p.agenda.name?' ('+p.agenda.name+')':''),v.agendasVP,
+      (v.agendasVP>0?'condition remplie':'condition NON remplie'),_d.agenda,'aucun agenda secret enregistré');
+    _bloc('Événements',v.evtVP,'événements, victoires de combat (+2 chacune), découvertes, accords',_d.evt,
+      'aucun événement, combat gagné, découverte ni accord n\'a rapporté de point');
+    _bloc('Bonus divers',v.extraVP,'bonus de technologies particulières (Extra-Solaire, Éveil Collectif) et découvertes',
+      v.extraDetail,'aucun — aucune de ces technologies n\'a été acquise, ou leur condition n\'est pas remplie');
+    L.push('   '+'─'.repeat(50));
+    L.push('   TOTAL : '+v.total+'   [somme des huit postes ci-dessus]');
   }
   return L.join('\n');
 }
@@ -8596,8 +8698,41 @@ function downloadLog(){
   }catch(e){_logToast('⚠️ Téléchargement impossible');}
 }
 function copyEndLog(){copyLogText();} // compat écran de fin
+/* ═══ UNE GUERRE QUI DURE ENCORE À LA DERNIÈRE SECONDE DOIT QUAND MÊME SE CONCLURE ═══
+   ⚠️ DÉFAUT DE LA PARTIE F8D7 (Marc : « vérifie la guerre que j'ai faite, il manque une annonce à
+   la fin »). `doEndGame` calculait les points et s'arrêtait là. Les guerres ouvertes au tour 10 —
+   celles du joueur contre les Martiens et contre les Ceinturiens — n'étaient jamais closes : aucune
+   ligne au journal, aucun vainqueur nommé, rien. On avait mené trois combats victorieux et la
+   partie se terminait comme s'il ne s'était rien passé.
+   Le décompte des combats existe déjà, nation par nation (`war.winsBy`) : il suffisait de le dire.
+   ⚠️ ON N'APPLIQUE AUCUN EFFET ICI — ni moral, ni tension. Les +2 VP par combat ont été versés au
+   moment des combats ; ajouter quoi que ce soit après le dernier tour changerait un score déjà
+   affiché à l'écran. Cette fonction RACONTE, elle ne joue pas. */
+function cloreGuerresEnCours(){
+  if(!G||!Array.isArray(G.wars)||!G.wars.length) return;
+  const nom=id=>{ const n=(typeof allPlayers==='function'?allPlayers():[G.player].concat(G.ais||[]))
+    .find(x=>x&&x.civ&&x.civ.id===id); return n?(n.civ.emoji+' '+n.civ.name):id; };
+  for(const w of G.wars.slice()){
+    const a=w.a, b=w.b, va=(w.winsBy&&w.winsBy[a])||0, vb=(w.winsBy&&w.winsBy[b])||0;
+    let verdict;
+    if(va>vb) verdict=nom(a)+' l\'emporte ('+va+' combat(s) gagné(s) contre '+vb+')';
+    else if(vb>va) verdict=nom(b)+' l\'emporte ('+vb+' combat(s) gagné(s) contre '+va+')';
+    else verdict=(va===0)?'aucun combat livré — la guerre s\'éteint sans vainqueur'
+                        :'match nul ('+va+' combat(s) partout)';
+    addLog('🏳️ Fin de partie — guerre '+nom(a)+' ↔ '+nom(b)+' : '+verdict+'.','gold');
+  }
+  G.wars=[];
+  if(typeof syncWarState==='function')syncWarState();
+}
 function doEndGame(){
-  G.phase='over';scClearSave();const pVP=calcVP(G.player);const aiVPs=G.ais.map(ai=>({ai,vp:calcVP(ai)}));const bestAiVP=aiVPs.reduce((best,x)=>x.vp.total>best.vp.total?x:best,aiVPs[0]||{ai:null,vp:{total:0}});const aVP=bestAiVP.vp;
+  G.phase='over';scClearSave();
+  /* Avant le décompte : le journal doit dire comment les guerres finissent.
+     ⚠️ Le commentaire est écrit AU-DESSUS et non en fin de ligne : la suite de cette fonction tient
+     sur une seule ligne très longue, et un `//` posé là avalerait tout le calcul des points.
+     C'est exactement ce qui vient d'arriver — `test_serialisation.js` l'a attrapé en une minute
+     avec « pVP is not defined ». */
+  cloreGuerresEnCours();
+  const pVP=calcVP(G.player);const aiVPs=G.ais.map(ai=>({ai,vp:calcVP(ai)}));const bestAiVP=aiVPs.reduce((best,x)=>x.vp.total>best.vp.total?x:best,aiVPs[0]||{ai:null,vp:{total:0}});const aVP=bestAiVP.vp;
   addLog('═══ FIN ═══','gold');addLog('Toi : '+pVP.total+' VP','gold');G.ais.forEach(ai=>addLog(ai.civ.name+' : '+calcVP(ai).total+' VP'));
   // Révélation des agendas secrets (une ligne par nation, attribuée à la nation)
   for(const p of [G.player,...G.ais]){try{if(p.agenda&&p.agenda.name){const _asc=(typeof p.agenda.score==='function')?p.agenda.score(p):0;_journalAuto(p.civ.name,'Agenda secret révélé : '+p.agenda.name,_asc+' VP');}}catch(e){}}
@@ -9493,7 +9628,7 @@ function dismissDiscovery(){
     if(disc.res)for(const[r,a]of Object.entries(disc.res)){const caps=getResCapFor(p);p.res[r]=Math.min(caps[r]||10,(p.res[r]||0)+a);}
     if(disc.rGain)for(const[r,a]of Object.entries(disc.rGain))p.rpt[r]=(p.rpt[r]||0)+a;
     if(disc.force)p.forceTokens+=disc.force;
-    if(disc.vp)p.tempVP=(p.tempVP||0)+disc.vp;
+    if(disc.vp)gagnerVP(p,disc.vp,'Découverte : '+disc.name);
     addLog('🗺️ Découverte : '+disc.name+' — '+disc.desc,'gold');
     // Colonisation terminée (découverte fermée) → popup de confirmation annulable
     const _nd=NODES[nodeId];const _cg=[];
@@ -10581,7 +10716,7 @@ function confirmAttack(){
       const connP=(typeof checkConnected==='function')?checkConnected(col.nodeId,G.player):true;
       if(!G.player.colonies.some(c=>c.nodeId===col.nodeId))G.player.colonies.push({nodeId:col.nodeId,level:newLvl,connected:connP,_conquest:3});
       updateConnections(G.player);
-      G.player.tempVP=(G.player.tempVP||0)+2;
+      gagnerVP(G.player,2,'Colonie capturée : '+node.name);
       resultMsg='🏴 Victoire ! Tu CAPTURES '+node.name+' (Nv.'+newLvl+') — elle est à toi ! (+2 VP)';resultCls='gold';
       addLog('🏴 '+node.name+' CAPTURÉE sur '+atkAi.civ.emoji+' '+atkAi.civ.name+' ! (Nv.'+newLvl+', '+effAtk+'⚔️ vs '+aiDef+'🛡️)','gold');
     }
