@@ -561,7 +561,25 @@ function renderCoachForStep(s){
     onNext=function(){ const m=$(s.requireChoice); if(m && !m.classList.contains('hidden')){ note('👉 Choisis d\'abord une option dans la fenêtre ci-dessous.'); } else { advance(); } };
   } else if(hasConfirm){
     nextText='Valider et continuer ▶';
-    onNext=function(){ try{s.confirm();}catch(e){console.error('[TUTO]',e);} if(!s.sync){ scheduleAdvance(350); } };
+    /* ═══════ « VALIDER ET CONTINUER » POUVAIT NE RIEN FAIRE DU TOUT ═══════
+       ⚠️ Une étape SYNCHRONISÉE (`sync`) ne s'avançait pas elle-même : elle comptait sur la fonction
+       du jeu (`dismissEventAnnounce`, `confirmAgendaChoice`…) pour déclencher `syncAdvance`. Or ces
+       fonctions de confirmation commencent toutes par « si la fenêtre n'est pas ouverte, je ne fais
+       rien ». Quand la fenêtre n'était pas (ou plus) là — coach en avance sur le jeu, fenêtre déjà
+       fermée à la main, retour en arrière dans le scénario — le bouton ne produisait AUCUN effet et
+       AUCUNE avancée. L'élève restait bloqué, sans rien à cliquer.
+       Marc, 24/08 : « le tutoriel bloque à l'étape 3 […] et si je reviens en arrière et j'essaie de
+       cliquer sur continuer et valider sur la fenêtre 2, ça marche plus non plus. »
+       On regarde donc si la fenêtre était ouverte AVANT la confirmation :
+         · ouverte  → la confirmation la ferme, `syncAdvance` fera avancer (ne pas doubler) ;
+         · absente  → personne ne nous fera avancer : on avance nous-mêmes.
+       Un tutoriel n'a pas le droit d'avoir une étape sans issue — c'est la même règle que pour la
+       fenêtre de combat (voir `test_impasse_guerre.js`). */
+    onNext=function(){
+      const etaitOuverte = s.sync ? fenetreOuverte(s.sync) : false;
+      try{s.confirm();}catch(e){console.error('[TUTO]',e);}
+      if(!s.sync || !etaitOuverte){ scheduleAdvance(350); }
+    };
   }
   coach((_special?'Fenêtre spéciale ':'Étape ')+(_cur+1)+'/'+curArr().length+' · '+s.lab, s.tx, { hint:s.hint, nextText:nextText, onNext:onNext });
   positionCoach(s.glow, s.pos);
@@ -570,11 +588,14 @@ function renderCoachForStep(s){
 }
 // Synchro : quand une VALIDATION du jeu se produit (bouton du jeu OU du tuto), on avance le tuto —
 // mais seulement si la fenêtre concernée est bien fermée (action réellement validée). Fini le décalage.
+/* La fenêtre du jeu associée à chaque étape « synchronisée ». Sortie de `syncAdvance` : le bouton
+   du coach en a besoin lui aussi pour savoir s'il peut compter sur la synchro (voir plus bas). */
+const FENETRE_DE={agenda:'agenda-sel-modal',strategy:'strategy-modal',event:'event-announce-modal',eot:'eot-modal',discovery:'discovery-modal',routetoken:'route-token-modal'};
+function fenetreOuverte(key){ const id=FENETRE_DE[key]; if(!id)return false; const m=$(id); return !!(m && !m.classList.contains('hidden')); }
 function syncAdvance(key){
   if(_finished||_free)return;
   const s=STEPS[_cur]; if(!s||s.sync!==key)return;
-  const openMap={agenda:'agenda-sel-modal',strategy:'strategy-modal',event:'event-announce-modal',eot:'eot-modal',discovery:'discovery-modal',routetoken:'route-token-modal'};
-  const mid=openMap[key];
+  const mid=FENETRE_DE[key];
   if(mid){ const m=$(mid); if(m && !m.classList.contains('hidden'))return; } // pas encore validé → on attend
   scheduleAdvance(220);
 }

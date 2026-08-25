@@ -173,7 +173,9 @@
 <p>Coût : 1 AC + 1🪨. Entretien 1⚡/tour, compensé par 1🪨 de revenu commercial. Une route reste connectée tant qu'elle existe ; un jeton Force posé dessus sert <strong>uniquement</strong> à la protéger des pirates.</p>
 
 <h3>6.5 Raid</h3>
-<p>Vole jusqu'à 2 ressources (⚡ ou 🪨). Tes jetons partent 2 tours en récupération (1 avec Stratégie Guerrière). La nation pillée gagne +2 de tension envers toi.</p>
+<p>Le raid <strong>pille la production d'une colonie</strong> : tu prends ce que cette colonie rapporte ce tour-ci en ⚡, 🪨 et 🔬 — jamais son ❤️ — dans la limite de ce que la nation possède réellement. Si tu ne désignes pas de colonie, c'est la plus productive qui est pillée. Tes jetons partent 2 tours en récupération (1 avec Stratégie Guerrière).</p>
+<p>La nation pillée gagne <strong>+5 de tension</strong> envers toi, et toi <strong>+1</strong> envers elle : on se méfie de qui l'on a dépouillé.</p>
+<p>🔍 <strong>IA Défensive</strong> annule entièrement le vol ; 🛰️ <strong>Drones de Surveillance</strong> le réduit de moitié. Un raid bloqué coûte quand même son AC et ses jetons au pillard, donne +1 de tension à la victime, et le pillard en est <strong>averti</strong> pour ne pas recommencer.</p>
 
 <h3>6.6 Accord commercial</h3>
 <p>Coût : 1 AC + 2🪨 <strong>donnés</strong> à l'autre nation. La tension baisse de 3 des deux côtés.</p>
@@ -303,20 +305,41 @@
 <p>Une jauge de 0 à 10 mesure le ressentiment d'une nation envers une autre. Elle est <strong>indépendante pour chaque couple de nations</strong> et s'applique à toutes, y compris entre deux nations que tu ne joues pas : deux rivales peuvent entrer en guerre sans que tu y sois pour rien.</p>
 <p>Une guerre en cours <strong>ne gèle que le couple concerné</strong> : les deux belligérants restent à 10 tant qu'ils se battent, mais toutes les autres jauges du plateau continuent de vivre normalement.</p>
 
-<h3>12.1 Ce qui fait monter la tension, par tour</h3>
+<h3>12.1 Ce qui fait monter la tension</h3>
+<p>Les griefs de <strong>voisinage</strong> sont réévalués à chaque fin de tour : tant que la situation dure, elle se repaie. Les griefs d'<strong>acte</strong> se paient au moment où ils se produisent.</p>
 <table>
-<tr><th>Cause</th><th>Points</th></tr>
-<tr><td>Une route touchant une colonie d'une autre nation, sans accord</td><td>+1 par route</td></tr>
-<tr><td>Route partagée avec un jeton de défense adverse</td><td>+1 par route</td></tr>
-<tr><td>Nation dominante — 4 colonies connectées d'avance</td><td>+3</td></tr>
-<tr><td>Nation suprême — 6 colonies connectées d'avance</td><td>+6</td></tr>
-<tr><td>Nation possédant 2 technologies de niveau 3 ou plus</td><td>+4</td></tr>
-<tr><td>Raid subi</td><td>+2 le premier, +1 les suivants</td></tr>
-<tr><td>Accord commercial conclu</td><td>−3 des deux côtés</td></tr>
-<tr><td>Aucun conflit, aucun raid</td><td>−1 par tour</td></tr>
+<tr><th>Cause</th><th>Points</th><th>Quand</th></tr>
+<tr><td>Une route de l'autre nation touchant une de tes colonies, sans accord entre vous deux</td><td>+1 par route</td><td>chaque tour</td></tr>
+<tr><td>Route partagée avec un jeton de défense adverse</td><td>+1 par route</td><td>chaque tour</td></tr>
+<tr><td>Nation dominante — 4 colonies connectées d'avance</td><td>+3</td><td>chaque tour</td></tr>
+<tr><td>Nation suprême — 6 colonies connectées d'avance</td><td>+6</td><td>chaque tour</td></tr>
+<tr><td>Nation possédant 2 technologies de niveau 3</td><td>+4</td><td>chaque tour</td></tr>
+<tr><td><strong>Blocage de chemin</strong> — elle occupe une de tes sorties alors qu'il ne t'en reste au plus qu'une seule de libre</td><td>+4</td><td>une fois, au moment où le blocage s'installe</td></tr>
+<tr><td><strong>Étouffement</strong> — tu plafonnes à 2 colonies connectées quand une autre nation en a 3 ou plus (à partir du tour 2). La colère ne vise que <strong>celle qui occupe le plus de tes sorties</strong> — une seule ennemie désignée, pas trois fronts.</td><td>+6 puis +1</td><td>+6 quand la situation s'installe, +1 chaque tour tant qu'elle dure</td></tr>
+<tr><td>Raid subi</td><td>+5 chez la victime, +1 chez le pillard</td><td>à chaque raid</td></tr>
+<tr><td>Raid bloqué par 🔍 IA Défensive</td><td>+1 chez la victime</td><td>à chaque tentative</td></tr>
+<tr><td>Espionnage détecté</td><td>+6, +8 ou +10 chez la victime selon 1, 2 ou 3 technologies volées</td><td>à la détection</td></tr>
+<tr><td>Assaut d'une colonie</td><td>+3 chez l'assailli, +1 chez l'assaillant</td><td>à chaque assaut</td></tr>
+<tr><td>Attaque de pirates sur tes routes</td><td>+1 envers les Ceinturiens</td><td>à chaque attaque</td></tr>
+<tr><td>Déclaration de guerre</td><td>les deux jauges passent à 10</td><td>immédiatement</td></tr>
 </table>
 
-<h3>12.2 Effets</h3>
+<h3>12.2 Ce qui la fait baisser</h3>
+<table>
+<tr><th>Cause</th><th>Effet</th></tr>
+<tr><td>Aucun grief ce tour-ci</td><td>−1 par tour</td></tr>
+<tr><td>Accord commercial signé ou renouvelé</td><td>−3 des deux côtés</td></tr>
+<tr><td>🕊️ Calmer la population (action civique)</td><td>−3 envers une nation</td></tr>
+<tr><td>Sommet des accords — proposition acceptée</td><td>−5 entre le proposant et chaque nation qui accepte</td></tr>
+<tr><td>Pacte de non-agression</td><td>les deux jauges à 0</td></tr>
+<tr><td>Événement Sommet commercial</td><td>−2 avec chaque nation</td></tr>
+<tr><td>Événement Sommet diplomatique</td><td>−5 partout</td></tr>
+<tr><td>Événement Diplomatie</td><td>−3 envers une nation de ton choix</td></tr>
+<tr><td>Accepter le monopole de la Sphère de Dyson</td><td>les deux jauges à 2, et la guerre à peine déclarée s'arrête</td></tr>
+<tr><td>Fin de guerre</td><td>vainqueur 0, perdant 5 — paix blanche : 4 des deux côtés</td></tr>
+</table>
+
+<h3>12.3 Effets</h3>
 <table>
 <tr><th>Tension</th><th>Effet</th></tr>
 <tr><td>6 ou plus</td><td>Manifestations : −1❤️/tour par nation concernée. Aucune pénalité envers une nation avec qui tu es déjà en guerre.</td></tr>
