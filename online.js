@@ -1,13 +1,13 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-25 · v9.78';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
+const SOLAR_BUILD_JS = '2026-08-25 · v9.80';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :
    on corrige souvent le jeu sans toucher au protocole. */
 /* 2 (2026-08-23) — la réponse d'ESPIONNAGE a changé de forme le 17/08 : elle porte désormais
-   `{id}` ou `{nation,branch,ids}`, plus `{branch}` seul. Un client resté en cache continuait
+   `{id}` ou `{ids}` (identifiants d'OPTIONS), plus `{branch}` seul. Un client resté en cache continuait
    d'envoyer l'ancienne forme, que le serveur ne peut PAS appliquer : Marc a perdu son espionnage
    deux parties de suite sans qu'aucun message ne le prévienne. Le numéro n'avait pas été
    incrémenté — c'est précisément à cela qu'il sert. */
@@ -572,7 +572,11 @@ function showOptsReal(pending, modalId, contId, key, allowNone){
       if(b.groupe&&b.groupe!==g){ g=b.groupe; h+='<div class="esp-groupe">'+esc(b.groupe)+'</div>'; }
       h+='<div class="esp-cat" data-cle="'+esc(cle)+'"><div class="esp-cat-nom">'+esc(b.nom||'')+'</div>';
       for(const t of b.techs)
-        h+='<label class="esp-tech"><input type="checkbox" data-cle="'+esc(cle)+'" value="'+esc(t.ids[0])+'"> <span>'+(t.name||'')+'</span></label>';
+        /* ⚠️ LA CASE PORTE L'IDENTIFIANT DE L'OPTION, PAS CELUI DE LA CARTE. C'est tout le
+           correctif du 25/08 : on ne renvoie que ce que le moteur a proposé, comme la Télépathie
+           renvoie son `cardId`. La nation et la catégorie s'en déduisent côté moteur — plus besoin
+           de les fabriquer ici, donc plus personne pour les perdre en route. */
+        h+='<label class="esp-tech"><input type="checkbox" data-cle="'+esc(cle)+'" value="'+esc(t.id)+'"> <span>'+(t.name||'')+'</span></label>';
       h+='<div class="esp-cat-pied"></div></div>';
     }
     const att=opts.find(o=>o.kind==='attendre');
@@ -588,7 +592,7 @@ function showOptsReal(pending, modalId, contId, key, allowNone){
         if(!pied)return;
         pied.innerHTML=pris.length?('<button class="opt esp-go">🕵️ Voler '+pris.length+' technologie'+(pris.length>1?'s':'')+'</button>'):'';
         const b2=pied.querySelector('.esp-go');
-        if(b2)b2.onclick=()=>{ const [nation,branch]=c.split('|'); go({nation:nation,branch:branch,ids:pris.map(x=>x.value)}); };
+        if(b2)b2.onclick=()=>{ go({ids:pris.map(x=>x.value)}); };
       });
     };
     // Une seule catégorie à la fois : cocher ailleurs décoche le bloc précédent.

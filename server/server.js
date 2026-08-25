@@ -764,8 +764,29 @@ function assainirReponse(g, pending, ans) {
   const out = {};
   const payload = pending.payload || {};
   const idsProposes = new Set();
+  /* ═══ TOUTES LES CLÉS FILTRÉES NE DÉSIGNENT PAS UNE OPTION ═══
+     ⚠️ DÉFAUT TROUVÉ DANS LA PARTIE DF6A (Marc, 2026-08-25). L'espionnage à cases à cocher renvoie
+     `{nation, branch, ids}` : `branch` n'est PAS l'identifiant d'une option, c'est la CATÉGORIE
+     dans laquelle on a coché. Le filtre ci-dessous exigeait pourtant que `branch` figure parmi les
+     `id` proposés — « expansion » n'y est évidemment pas — et le supprimait en silence. Le moteur
+     recevait `{nation, ids}`, sa garde `if(… && ans.branch)` échouait, et il écrivait « sélection
+     invalide ou vide ». Deux fenêtres perdues coup sur coup dans le journal de Marc, la seconde
+     étant la dernière (T3→T5) : l'investissement Espionnage était intégralement gâché.
+     La leçon : un assainisseur qui jette une clé LÉGITIME est aussi grave qu'un assainisseur qui
+     laisse passer une clé forgée. On garde donc la vérification — `branch` doit venir de la liste —
+     mais on la fait contre les BRANCHES proposées, pas contre les identifiants d'options. */
+  const branchesProposees = new Set(), contenusProposes = new Set();
   for (const liste of [payload.options, payload.cands, payload.cols, payload.routes]) {
-    if (Array.isArray(liste)) for (const o of liste) { if (o && o.id) idsProposes.add(String(o.id)); if (o && o.node) idsProposes.add(String(o.node)); }
+    if (Array.isArray(liste)) for (const o of liste) {
+      if (o && o.id) { idsProposes.add(String(o.id)); contenusProposes.add(String(o.id)); }
+      if (o && o.node) idsProposes.add(String(o.node));
+      if (o && o.branch) branchesProposees.add(String(o.branch));
+      /* Le CONTENU d'une option (les technologies d'un lot, par exemple) est lui aussi une valeur
+         proposée : l'ancienne forme de réponse d'espionnage renvoyait ces identifiants-là. On les
+         admet donc dans les listes, sans quoi une partie reprise ou un client en cache verrait sa
+         sélection vidée — le défaut qu'on vient précisément de corriger, à l'envers. */
+      if (o && Array.isArray(o.ids)) for (const x of o.ids) if (typeof x === 'string') contenusProposes.add(x);
+    }
   }
   // Plafond de jetons : ce que le moteur a lui-même annoncé comme engageable.
   const maxJetons = Math.max(0, parseInt(payload.maxEngage !== undefined ? payload.maxEngage
@@ -780,9 +801,23 @@ function assainirReponse(g, pending, ans) {
     else if (typeof v === 'string') {
       const s = v.slice(0, 64);
       // Un identifiant de choix doit provenir de la liste proposée (quand il y en a une).
-      if (idsProposes.size && /^(id|value|targetId|cardId|agendaId|node|branch|aiId|target)$/.test(k) && !idsProposes.has(s)) continue;
+      /* `branch` se vérifie contre les branches offertes ; s'il n'y en a aucune (les autres
+         décisions n'en portent pas), on retombe sur les identifiants d'options — comportement
+         d'origine, donc aucune fenêtre existante n'est affaiblie. */
+      const _ref = (k === 'branch' && branchesProposees.size) ? branchesProposees : idsProposes;
+      if (_ref.size && /^(id|value|targetId|cardId|agendaId|node|branch|aiId|target)$/.test(k) && !_ref.has(s)) continue;
       out[k] = s;
-    } else if (Array.isArray(v)) out[k] = v.slice(0, 12).filter(x => typeof x === 'string').map(x => x.slice(0, 64));
+    } else if (Array.isArray(v)) {
+      /* ⚠️ UNE LISTE DE CHOIX SE VÉRIFIE COMME UN CHOIX. Depuis le 25/08, l'espionnage renvoie
+         `{ids:[…]}` — uniquement des identifiants d'OPTIONS, ceux que le moteur vient de proposer
+         (même modèle que la Télépathie et son `cardId`). On applique donc à chaque élément la
+         vérification qui s'appliquait déjà aux choix uniques : venir de la liste. Sans cela, un
+         client bricolé pourrait voler une technologie qu'on ne lui a jamais offerte.
+         Quand aucune liste n'est proposée, on laisse passer — comportement d'origine. */
+      const liste = v.slice(0, 12).filter(x => typeof x === 'string').map(x => x.slice(0, 64));
+      out[k] = (k === 'ids' && contenusProposes.size) ? liste.filter(x => contenusProposes.has(x)) : liste;
+      if (Array.isArray(out[k]) && !out[k].length && liste.length) delete out[k];
+    }
     else if (v && typeof v === 'object') { // une seule profondeur (ex. offre de paix {materials,energy,science})
       if (k === 'tokens' || k === 'defTokens') continue; // un nombre de jetons n'est JAMAIS un objet
       const sub = {};

@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-25 · v9.78';
+const SOLAR_BUILD_MOTEUR = '2026-08-25 · v9.80';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -2559,6 +2559,38 @@ function espSelectionValide(espion, nationId, branch, ids){
     name:noms.join(', '),
     desc:(BRANCH_NAMES[branch]||branch)+' — tension +'+espTensionPour(retenus.length)+' chez la victime' };
 }
+/* ═══ LA RÉPONSE NE PORTE PLUS QUE DES IDENTIFIANTS D'OPTIONS (Marc, 2026-08-25) ═══
+   « Pour l'espionnage mon problème c'est que ça me donne jamais la tech espionnée… On a vu que pour
+   la Télépathie ça marchait, donc applique la même chose puisque ça marche. »
+
+   Il a raison, et la comparaison est éclairante. La Télépathie renvoie UN identifiant tiré de la
+   liste qu'on vient d'afficher (`cardId`), et rien d'autre : impossible de se tromper, impossible
+   qu'un maillon l'égare. L'espionnage, lui, renvoyait un TRIPLET reconstruit à la main côté écran —
+   `{nation, branch, ids}` — dont deux champs ne figuraient dans aucune liste proposée. Chaque
+   maillon devait donc les comprendre : le client pour les fabriquer, l'assainisseur du serveur pour
+   les laisser passer, le moteur pour les revalider. Trois occasions de diverger, et elles ont
+   divergé trois fois (16/08, 23/08, 25/08 — la dernière : l'assainisseur jetait `branch`).
+
+   Désormais l'écran renvoie `{ids:['une:martiens:bio1', …]}` : uniquement des identifiants
+   D'OPTIONS, ceux-là mêmes que le moteur a proposés. La nation et la catégorie s'en DÉDUISENT, donc
+   plus personne n'a besoin de les transmettre. La règle « une seule catégorie chez une seule
+   nation » se vérifie ici, une fois, au seul endroit qui connaisse la vérité. */
+function espSelectionDepuisOptions(espion, ids){
+  if(!espion||!Array.isArray(ids)||!ids.length) return null;
+  const opts=_espOptions(espion);
+  const choisies=[...new Set(ids)].map(id=>opts.find(o=>o&&o.id===id)).filter(o=>o&&o.ids&&o.ids.length);
+  if(!choisies.length) return null;
+  const nation=choisies[0].nation, branch=choisies[0].branch;
+  if(!nation||!branch) return null;
+  /* Une seule catégorie chez une seule nation : on écarte tout ce qui déborde plutôt que de
+     refuser l'ensemble — un clic parasite ne doit pas coûter la fenêtre au joueur. */
+  const cartes=[];
+  for(const o of choisies){
+    if(o.nation!==nation||o.branch!==branch) continue;
+    for(const cid of o.ids) if(!cartes.includes(cid)) cartes.push(cid);
+  }
+  return espSelectionValide(espion, nation, branch, cartes);
+}
 /* Copie effective. Rend le nombre de cartes prises. */
 function espPiller(espion, opt){
   if(!opt||!opt.ids||!opt.ids.length) return 0;
@@ -2662,8 +2694,13 @@ function stEspionnageRecu(ans, civId){
     /* SÉLECTION À COCHER : plusieurs technologies d'une même catégorie chez une même nation.
        Elle est validée contre l'inventaire réel avant d'être appliquée (voir `espSelectionValide`). */
     let opt=null;
-    if(ans && Array.isArray(ans.ids) && ans.ids.length && ans.nation && ans.branch)
+    /* 1) FORME COURANTE — des identifiants d'options, comme la Télépathie. */
+    if(ans && Array.isArray(ans.ids) && ans.ids.length) opt=espSelectionDepuisOptions(nat, ans.ids);
+    /* 2) Forme précédente `{nation, branch, ids-de-cartes}` : tolérée pour un client resté en
+       cache, et pour les parties reprises d'une sauvegarde antérieure. */
+    if(!opt && ans && Array.isArray(ans.ids) && ans.ids.length && ans.nation && ans.branch)
       opt=espSelectionValide(nat, ans.nation, ans.branch, ans.ids);
+    /* 3) Choix unique par identifiant d'option (panneau de repli, pilote, bot). */
     if(!opt) opt=_espOptions(nat).find(o=>o.id===choisi);
     if(!opt||opt.kind==='attendre'){
       /* ⚠️ CE MESSAGE EST AUSSI UN SIGNAL D'ALARME. Il ne s'écrit que si une réponse est arrivée
@@ -5892,9 +5929,17 @@ function _warHumanFoe(war,ai){
   const otherId=(war.a===ai.civ.id)?war.b:war.a;
   return allPlayers().find(p=>p.civ.id===otherId)||null;
 }
-function _aiPickPlayerTarget(ai,defender){
+function _aiPickPlayerTarget(ai,defender,prefNode){
   const p=defender||G.player;
   const cols=p.colonies.filter(c=>c.nodeId!==p.civ.home&&c.connected);
+  /* ⚠️ ON FRAPPE LA COLONIE QU'ON A ÉVALUÉE. Quand l'assaut vient de la phase d'actions,
+     `tryAssaultAI` a choisi une cible APRÈS avoir calculé sa défense. Recalculer ici « la plus
+     proche » ferait porter le coup sur une autre colonie que celle dont on avait mesuré la garde :
+     l'IA se retrouverait à attaquer une place forte en croyant frapper un point faible. */
+  if(prefNode){
+    const _pref=p.colonies.find(c=>c.nodeId===prefNode);
+    if(_pref) return {type:'colony',obj:_pref,name:(NODES[prefNode]&&NODES[prefNode].name)||prefNode};
+  }
   let bestCol=null,bestD=99;
   for(const c of cols)for(const ac of ai.colonies){const d=getNodeDistance(c.nodeId,ac.nodeId);if(d<bestD){bestD=d;bestCol=c;}}
   if(bestCol)return{type:'colony',obj:bestCol,name:NODES[bestCol.nodeId]?.name||bestCol.nodeId};
@@ -5915,8 +5960,10 @@ function _aiPickPlayerTarget(ai,defender){
    figeait en silence au premier tour, sans exception ni message. Un paramètre qui change de nature
    se vérifie sur TOUS ses usages, pas sur celui qu'on a sous les yeux. */
 function _assautSuite(suite){ if(typeof suite==='string'&&suite) fluxAppeler(suite); }
-function maybeAiAssaultPlayer(ai,done,defender){
-  const war=ai&&_warOf(ai.civ.id);
+function maybeAiAssaultPlayer(ai,done,defender,prefNode){
+  /* `_warOf` rend « la guerre de cette nation vue d'ici » ; quand l'assaillie est nommée, c'est LEUR
+     guerre qui compte, pas la première trouvée. */
+  const war=(ai&&defender&&typeof _warBetween==='function'&&_warBetween(ai.civ.id,defender.civ.id))||(ai&&_warOf(ai.civ.id));
   if(!war){_assautSuite(done);return;}
   // ATTAQUANT HUMAIN (multijoueur) : il n'attaque PAS automatiquement en fin de tour — il assaille lui-même
   // pendant SON tour d'action (combat visible + choix des jetons). Sinon la guerre paraîtrait « occultée ».
@@ -5924,7 +5971,7 @@ function maybeAiAssaultPlayer(ai,done,defender){
   defender=defender||_warHumanFoe(war,ai)||G.player;
   if(war._aiAssaultedThisTurn){_assautSuite(done);return;} // l'IA a déjà attaqué pendant son tour → pas de double assaut
   const afford=Math.min(ai.res.materials||0,ai.res.energy||0);
-  const target=_aiPickPlayerTarget(ai,defender);
+  const target=_aiPickPlayerTarget(ai,defender,prefNode);
   if(!target||(ai.forceTokens||0)<1||afford<1||(ai.res.morale||0)<1){
     addLog('🛡️ '+ai.civ.emoji+' '+ai.civ.name+' maintient la guerre mais n\'a pas les moyens d\'attaquer ce tour.','dim');
     const _na={emoji:'🛡️',name:'En guerre — n\'a pas attaqué ce tour',desc:'moyens insuffisants'};
@@ -6731,11 +6778,44 @@ function defenseIA(def, atk, nodeId){
    séparément est la faute déjà commise sur l'adjacence et sur la portée de colonisation : le
    correctif appliqué au seul exécutant ne change rien, l'action n'étant jamais jugée digne d'être
    tentée. */
+/* ═══ L'ESTIMATION DOIT SE CALCULER COMME LE COMBAT, SINON ELLE INTERDIT DES VICTOIRES ═══
+   ⚠️ DÉFAUT MESURÉ (partie DF6A, Marc 2026-08-25 : « au lieu de conquérir une colonie le système
+   les bloque… du coup je ne vois pas de fenêtre de combat pour me défendre, et entre IA pareil »).
+
+   Cette fonction comptait TOUS les jetons du défenseur. Le combat, lui, n'en retient que ce qu'il
+   peut PAYER : `dCommit = min(jetons, matériaux, énergie)`, un jeton coûtant 1🪨 + 1⚡. Une nation
+   avec huit jetons et zéro énergie défend donc avec sa seule garnison — mais elle était estimée à
+   neuf. Le `+1` d'incertitude aggravait encore l'écart.
+
+   MESURÉ sur 8 parties tout-ordinateur, avant correction :
+     · 54 cibles évaluées, 40 défenses SURESTIMÉES, écart moyen +3,4 ;
+     · 26 assauts refusés que l'IA aurait GAGNÉS — contre 21 autorisés.
+   Autrement dit : plus d'une conquête possible sur deux était interdite par une addition fausse.
+   D'où ce que Marc voit à l'écran — les IA renoncent, aucune fenêtre de défense ne s'ouvre jamais,
+   et lui n'a rien à défendre.
+
+   ⚠️ ON NE DESSERRE PAS LA RÈGLE, ON CORRIGE LE CALCUL. « Ne pas lancer un assaut perdu d'avance »
+   reste vrai et reste appliqué : c'est l'estimation de la défense qui devient exacte. La prudence
+   sans arithmétique juste n'est pas de la prudence, c'est de la paralysie. */
 function defenseAttendue(ai, cible, nodeId){
   if(!ai||!cible) return 99;
   let jetons=0, exact=false;
   try{ const pf=perceivedForce(ai,cible); jetons=pf.val||0; exact=!!pf.exact; }catch(e){ jetons=cible.forceTokens||0; }
-  if(!exact) jetons+=1;                        // sans renseignement, on suppose le pire plutôt que le mieux
+  if(!exact) jetons+=1;                        // sans renseignement, on prévoit un jeton de plus
+  /* ⚠️ LE PLAFOND DE PAYABILITÉ NE S'APPLIQUE QU'AVEC LE RENSEIGNEMENT — ET C'EST UNE RÈGLE, PAS
+     UNE PRUDENCE. Un jeton coûte 1🪨 + 1⚡ : `min(matériaux, énergie)` borne ce que le défenseur
+     peut réellement aligner, exactement comme le calcule le combat (`dCommit`). Mais les STOCKS
+     d'une rivale sont cachés (§14.7 des règles) : les lire sans Réseau Orbital serait de la triche,
+     et retirerait tout intérêt à cette technologie. `_assaultAIUtil` pose déjà cette limite noir sur
+     blanc pour la doctrine « frapper qui ne peut plus se défendre » ; la même limite vaut ici.
+
+     ⚠️ PREMIÈRE VERSION DE CE CORRECTIF : PLAFOND INCONDITIONNEL. Elle réparait bien la paralysie
+     — 21 assauts autorisés sur 54 évaluations, contre 78 sur 96 après — mais en donnant à TOUTES
+     les IA une vision parfaite des coffres adverses. `test_equivalence.js` l'a attrapée en montrant
+     une partie dont l'issue changeait selon la nation active, et la relecture a montré pourquoi :
+     l'IA jouait avec une information qu'aucune règle ne lui accorde. Une correction qui fait
+     tricher n'est pas une correction. */
+  if(exact) jetons=Math.max(0,Math.min(jetons, Math.min(cible.res&&cible.res.materials||0, cible.res&&cible.res.energy||0)));
   let renfort=0;
   try{
     for(const co of defenseursDuNoeud(nodeId, ai)){
@@ -7840,8 +7920,18 @@ function _doAITurnInterne(aiPlayer,oneShot){
     const commit=Math.min(ai.forceTokens||0,affordTok,6);   // même plafond que dans `_assaultAIUtil`
     if(commit<1)return false;
     let best=null,bestCol=null,bestDef=99,bestSansDefense=false;
-    for(const r of allPlayers()){
-      if(r===ai)continue;
+    /* ⚠️ L'ORDRE D'EXAMEN DES CIBLES NE DOIT RIEN DEVOIR À « QUI EST LA NATION ACTIVE ».
+       `allPlayers()` rend `[G.player, ...G.ais]` : son ordre change donc selon la nation affichée.
+       À égalité de défense — et les égalités sont fréquentes, la garnison valant 1 pour tout le
+       monde — c'est la PREMIÈRE cible rencontrée qui l'emporte (`_rang < bestDef`, strict). La
+       victime dépendait ainsi de la perspective : `test_equivalence.js` a montré une nation qui
+       perdait Cérès ou la gardait selon qui était « actif », avec la même carte et le même hasard.
+       C'est la maladie de fond décrite dans `ARCHITECTURE_AVENIR.md`, dans un endroit où elle ne se
+       voyait pas tant que les assauts étaient rares. On fixe donc un ordre canonique — l'identifiant
+       de civilisation — qui ne dépend de personne. */
+    const _rivaux=allPlayers().filter(r=>r!==ai)
+      .sort((x,y)=>String(x.civ.id).localeCompare(String(y.civ.id)));
+    for(const r of _rivaux){
       /* ⚠️ LA LIMITE « SEULEMENT LE JOUEUR ACTIF » EST LEVÉE (Marc, 2026-08-15). Elle n'existait que
          parce que `declareWar` ne savait construire qu'une guerre impliquant la nation active ;
          `declarerGuerre(agresseur, cible, …)` ne connaît plus que deux nations. Une IA peut donc
@@ -7888,20 +7978,53 @@ function _doAITurnInterne(aiPlayer,oneShot){
       }
     }
     if(!best)return false;
-    /* CIBLE HUMAINE : on déclare, on ne résout pas. La suite (fenêtre de défense, combat visible)
-       est celle qui existe déjà pour les guerres — inutile d'en écrire une seconde. */
+    /* ═══════ CIBLE HUMAINE : ON FRAPPE, ON N'ANNONCE PAS (Marc, 2026-08-25) ═══════
+       ⚠️ CE BLOC PRÉVENAIT LA VICTIME, ET C'ÉTAIT UNE INVENTION DU CODE, PAS UNE RÈGLE.
+       Il disait : « on déclare, on ne résout pas — la suite est celle qui existe déjà pour les
+       guerres, inutile d'en écrire une seconde ». Une économie de moyens qui a produit trois
+       anomalies, toutes visibles dans la partie DF6A :
+         · une ANNONCE (« marche sur Ganymède — prépare ta défense ») qui n'existait que contre un
+           humain : contre une IA, le même code résolvait le combat sur-le-champ ;
+         · une GUERRE DÉCLARÉE avant le premier coup, à l'envers de la règle — c'est l'attaque qui
+           déclenche la guerre, pas l'inverse ;
+         · et surtout, une échappatoire : une guerre fraîche où l'on n'est pas l'agresseur ouvre
+           d'abord la FENÊTRE DE PAIX (`guerreEtapeFraiche`). Marc a accepté la paix au tour 4,
+           l'assaut annoncé s'est évaporé sans qu'un jeton soit engagé, et le cycle a recommencé au
+           tour 7. Prévenu, puis autorisé à annuler : une IA ne pouvait littéralement rien prendre.
+       Marc, 25/08 : « soit on attaque une colonie par surprise et après l'autre te déclare la
+       guerre — pas parce qu'il le veut mais parce que c'est une réponse obligatoire — soit on ne
+       fait pas la guerre. Il faut que les joueurs et les IA soient traités sur pied d'égalité. »
+
+       C'est exactement ce que fait déjà `playerAssaultColony` quand TU attaques : la guerre s'ouvre
+       DANS l'assaut, `justDeclared` est retombé aussitôt, et la fenêtre de combat s'ouvre. On
+       calque, à la lettre. La seule différence légitime demeure : l'humain choisit ses jetons de
+       DÉFENSE dans une fenêtre (`showAiAssaultDefenseModal`) au lieu de subir un calcul. */
     if(best._isAI===false){
       const _nom=(NODES[bestCol.nodeId]&&NODES[bestCol.nodeId].name)||bestCol.nodeId;
       G._warFocusColony=bestCol.nodeId;
-      /* Voie GÉNÉRALE : deux nations nommées, quelle que soit celle qui est active. */
-      if(!declarerGuerre(ai,best,'Assaut sur '+_nom+' !','ai'))return false;
+      let _w=_warBetween(ai.civ.id,best.civ.id);
+      if(!_w){
+        /* Voie GÉNÉRALE : deux nations nommées, quelle que soit celle qui est active. */
+        if(!declarerGuerre(ai,best,'Assaut surprise sur '+_nom+' !','ai'))return false;
+        _w=_warBetween(ai.civ.id,best.civ.id);
+      }
+      if(!_w)return false;
+      /* Mêmes drapeaux que du côté humain : la guerre est LIVE et n'est plus « fraîche », donc la
+         fin de tour ne proposera pas la paix avant qu'un coup ait été porté. */
+      _w.live=true; _w.justDeclared=false; _w.turnsLeft=99;
+      _w.aiAggressor=true;            // elle a pris l'initiative : elle s'engage vraiment
+      _w._aiAssaultedThisTurn=false;  // …et c'est CET assaut-ci qu'on autorise
       ai.acLeft=Math.max(0,ai.acLeft-1); ai._attacksThisTurn=(ai._attacksThisTurn||0)+1;
-      /* La rétrocession vaut pour TOUT LE MONDE : une IA qui marche sur une colonie humaine pendant
-         sa phase d'actions cède elle aussi l'initiative du soir. Sans cette ligne, la règle n'aurait
-         puni que le joueur — ce qui n'est pas une règle, c'est un handicap. */
-      if(typeof noterAssautDuTour==='function') noterAssautDuTour(_warBetween(ai.civ.id,best.civ.id),ai.civ.id);
-      addLog('⚔️ '+ai.civ.emoji+' '+ai.civ.name+' marche sur '+_nom+' — prépare ta défense.','red');
-      G.aiActions.push({emoji:'⚔️',name:'Marche sur '+_nom,desc:'assaut déclaré'});
+      /* La rétrocession vaut pour TOUT LE MONDE : une IA qui frappe pendant sa phase d'actions cède
+         elle aussi l'initiative du soir. Sans cette ligne, la règle n'aurait puni que le joueur —
+         ce qui n'est pas une règle, c'est un handicap. */
+      if(typeof noterAssautDuTour==='function') noterAssautDuTour(_w,ai.civ.id);
+      addLog('⚔️ '+ai.civ.emoji+' '+ai.civ.name+' frappe '+_nom+' par surprise !','red');
+      G.aiActions.push({emoji:'⚔️',name:'Assaut sur '+_nom,desc:'frappe surprise'});
+      /* La fenêtre de défense s'ouvre chez l'assailli et le combat se résout dans la foulée.
+         Pas de suite nommée : on n'est pas dans la séquence de fin de tour, l'IA poursuit son tour
+         comme après une proposition d'accord (`proposeAccord`), qui emprunte déjà ce chemin. */
+      maybeAiAssaultPlayer(ai,null,best,bestCol.nodeId);
       return true;
     }
     const tens=getTens(ai.civ.id,best.civ.id);
