@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-25 · v9.82';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
+const SOLAR_BUILD_JS = '2026-08-26 · v9.85';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :
@@ -110,6 +110,13 @@ function handle(m){
       else if (STATE._afterLogin){ const f=STATE._afterLogin; STATE._afterLogin=null; f(); }
       break;
     }
+    /* ═══ LA LISTE DES PARTIES REPRENABLES (lot 17, étape 5) ═══
+       Elle arrive SANS être demandée juste après la connexion. On la garde de côté et on
+       rafraîchit l'écran d'accueil s'il est affiché — le joueur ne doit pas avoir à recliquer. */
+    case 'mes_parties':
+      STATE.parties = Array.isArray(m.parties) ? m.parties : [];
+      if (STATE._surLobby) screenLobby();
+      break;
     case 'game':
       STATE.game = m.game;
       // Table civId -> pseudo, pour afficher le nom du joueur (au lieu de « IA ») partout dans le jeu.
@@ -1626,25 +1633,76 @@ function screenAuth(mode){
 // ── Lobby ──
 const CIVS_LIST = [['terriens','🌍 Terriens'],['martiens','🔴 Martiens'],['jupiteriens','🟠 Jupitériens'],['ceinturiens','☄️ Ceinturiens']];
 function civLabel(id){ const c=CIVS_LIST.find(x=>x[0]===id); return c?c[1]:id; }
+/* Date et heure EUROPÉENNES, comme le reste des rapports (Marc). */
+function _dateFr(ms){
+  if(!ms) return '';
+  try{ return new Date(ms).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+  catch(e){ return ''; }
+}
+/* Une ligne de partie reprenable : qui joue, où en est-on, et faut-il y aller MAINTENANT. */
+function _ligneReprise(p){
+  const nomCiv = id => { const t={terriens:'🌍 Terriens',martiens:'🔴 Martiens',jupiteriens:'🟠 Jupitériens',ceinturiens:'☠️ Ceinturiens'}; return t[id]||id; };
+  const joueurs = (p.joueurs||[]).map(j=>{
+    if(j.ia) return '<span style="opacity:.6">'+nomCiv(j.civId)+' (IA)</span>';
+    const pastille = j.connecte ? '🟢' : '⚪';
+    return pastille+' '+nomCiv(j.civId)+(j.moi?' <b>(toi)</b>':(j.user?' <span style="opacity:.7">'+esc(j.user)+'</span>':''));
+  }).join(' · ');
+  const tour = p.tour ? ('tour '+p.tour+(p.maxTours?('/'+p.maxTours):'')) : (p.statut==='lobby'?'pas encore commencée':'—');
+  const urgent = p.aMoiDeJouer;
+  return '<button class="'+(urgent?'pri':'sec')+' sc-reprise" data-code="'+esc(p.code)+'"'
+    +' style="display:block;width:100%;text-align:left;white-space:normal;margin:6px 0;padding:10px 12px">'
+    +'<div style="font-weight:700">'+(urgent?'▶ À TOI DE JOUER — ':'')+'Partie '+esc(p.code)+' · '+tour+'</div>'
+    +'<div style="font-size:.85em;opacity:.9;margin-top:3px">'+joueurs+'</div>'
+    +'<div style="font-size:.78em;opacity:.65;margin-top:3px">dernière activité : '+_dateFr(p.maj)+'</div>'
+    +'</button>';
+}
 function screenLobby(){
   STATE.game=null; STATE.myCiv=null; STATE.started=false;
+  STATE._surLobby=true;
   try{ localStorage.removeItem('sc_ws_game'); }catch(e){}
+  /* ⚠️ LA LISTE VIENT DU SERVEUR, PAS DU NAVIGATEUR. Avant, on ne pouvait rejoindre que la dernière
+     partie mémorisée en local : vider le cache, changer d'appareil ou mener deux parties de front,
+     et la partie devenait introuvable — alors qu'elle vivait toujours côté serveur. */
+  const parties = Array.isArray(STATE.parties) ? STATE.parties : [];
+  const bloc = parties.length
+    ? ('<div style="margin:6px 0 2px;font-weight:700">Reprendre une partie</div>'
+       + parties.map(_ligneReprise).join('')
+       + '<div style="border-top:1px solid #2a3a6a;margin:12px 0 8px"></div>')
+    : '';
   overlay(`
     <h2>Bonjour ${STATE.user}</h2>
+    ${bloc}
     <button class="pri" id="sc-create">Créer une partie</button>
     <div class="row"><input id="sc-code" placeholder="Code d'invitation"><button class="sec" id="sc-join">Rejoindre</button></div>
     <div class="err" id="sc-err"></div>
+    <button class="sec" id="sc-refresh">🔄 Rafraîchir mes parties</button>
     <button class="sec" id="sc-logout">Se déconnecter</button>
     <button class="sec" id="sc-close">↩ Retour au jeu solo</button>
+    <!-- ATTENTION : ce bloc est dans un gabarit JS. Pas de guillemet oblique ici, il refermerait
+         le gabarit et casserait tout le fichier (erreur commise en écrivant ce commentaire).
+         LE LIEN DU TUTORIEL EXISTAIT DEJA, MAIS SUR L'AUTRE ECRAN (Marc, 26/08). L'ecran de saisie
+         de l'email le porte depuis longtemps ; seulement, des qu'un compte est memorise, on ne le
+         voit plus : on arrive directement ICI. C'est donc cet ecran-la qui est la fenetre de
+         connexion pour un joueur qui revient. Les deux le portent maintenant : un lien d'aide doit
+         etre la ou l'on hesite, pas la ou l'on tape. -->
+    <div style="margin-top:10px;text-align:center;font-size:.85em">
+      <a href="tutorial.html" style="color:#8fc8ff;text-decoration:none">🎓 Découvrir le jeu — tutoriel</a>
+      <span style="color:#3a4a6a"> · </span>
+      <a href="regles.html" style="color:#8fc8ff;text-decoration:none">📖 Règles</a>
+    </div>
   `);
   _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
-  document.getElementById('sc-create').onclick = screenCreate;
+  [...document.querySelectorAll('.sc-reprise')].forEach(b=>{
+    b.onclick = ()=>{ STATE._surLobby=false; send({t:'join', code:b.getAttribute('data-code')}); };
+  });
+  document.getElementById('sc-refresh').onclick = ()=> send({t:'mes_parties'});
+  document.getElementById('sc-create').onclick = ()=>{ STATE._surLobby=false; screenCreate(); };
   document.getElementById('sc-join').onclick = ()=>{
     const code=document.getElementById('sc-code').value.trim().toUpperCase();
-    if(code) send({t:'join', code});
+    if(code){ STATE._surLobby=false; send({t:'join', code}); }
   };
   document.getElementById('sc-logout').onclick = ()=>{ try{ if(STATE.game&&STATE.game.code) send({t:'leave'}); }catch(e){} STATE.user=null; STATE.token=null; STATE.game=null; try{localStorage.removeItem('sc_ws_token'); localStorage.removeItem('sc_ws_game');}catch(e){} screenAuth('login'); };
-  document.getElementById('sc-close').onclick = ()=>{ _errCb=null; hideOverlay(); };
+  document.getElementById('sc-close').onclick = ()=>{ _errCb=null; STATE._surLobby=false; hideOverlay(); };
 }
 function screenCreate(){
   const rows = CIVS_LIST.map(([id,label],i)=>`

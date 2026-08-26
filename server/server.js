@@ -211,10 +211,14 @@ function corpsRapport(entry) {
     bloc('Colonies', d.colVP, 'VP du nœud × niveau, ×1 si connectée, ×0,5 si isolée, +1 par colonie reliée',
       det.colonies, 'aucune colonie');
     bloc('Routes', d.routeVP, '+1 VP par route établie', det.routes, 'aucune route établie');
-    bloc('Cartes', d.cardsVP, 'VP inscrit sur la carte : 1 au niveau 1, 3 au niveau 2, 5 au niveau 3',
+    /* ⚠️ LA RÈGLE IMPRIMÉE CONTREDISAIT LA LISTE JUSTE EN DESSOUS. « 1 au niveau 1, 3 au niveau 2,
+       5 au niveau 3 » est vrai des technologies, faux des cartes MILITAIRES : le Supercroiseur est
+       de niveau 2 et vaut +5, les Flottes de Chasseurs de niveau 1 et valent +2. Une règle fausse
+       à côté des chiffres justes, c'est le meilleur moyen de faire douter du calcul. */
+    bloc('Cartes', d.cardsVP, 'VP inscrit sur la carte — technologies : 1 au niveau 1, 3 au niveau 2, 5 au niveau 3 · cartes militaires : valeur propre',
       det.cartes, 'aucune carte porteuse de VP');
-    bloc('Bonus technologiques', d.techBonusVP, '+0,5 VP par technologie, arrondi à l\'inférieur',
-      det.tech, 'aucune carte de type « technologie » (les cartes civiques et militaires ne comptent pas ici)');
+    bloc('Bonus technologiques', d.techBonusVP, '+0,5 VP par technologie (toute carte de l\'arbre technologique), arrondi à l\'inférieur',
+      det.tech, 'aucune carte de l\'arbre technologique');
     bloc('Revenus par tour', d.rptVP, 'par ressource : +2 au-delà de 5/tour, +5 au-delà de 10/tour',
       det.rpt, 'aucune ressource ne dépasse 5 de revenu par tour');
     bloc('Agenda' + (s.agenda ? ' (' + s.agenda + ')' : ''), d.agendasVP,
@@ -378,6 +382,51 @@ function gameView(g) { // ce que le lobby a le droit de voir
     votePour: (g.vote && g.vote.pour) ? g.vote.pour.slice() : []
   };
 }
+/* ═══════════ LES PARTIES QU'ON PEUT REPRENDRE (lot 17, étape 5) ═══════════
+   Jusqu'ici le client ne pouvait rejoindre QUE la dernière partie mémorisée dans son navigateur.
+   Vider le cache, changer d'appareil, ou simplement jouer deux parties en parallèle, et la partie
+   devenait introuvable — alors qu'elle vivait toujours côté serveur, reprise au démarrage depuis
+   `data/parties/`. Le jeu savait donc reprendre ; il ne savait pas le DIRE.
+
+   Cette fonction est PURE et prend la table des parties en argument : c'est ce qui la rend
+   vérifiable sans démarrer un serveur (voir `test_parties_reprenables.js`). Le reste du fichier ne
+   l'est pas, et c'est justement pourquoi les bancs y sont si difficiles à écrire.
+
+   ⚠️ ON NE MONTRE QUE CE QU'ON A LE DROIT DE VOIR. Une entrée n'apparaît que si CE compte occupe un
+   siège dans cette partie. Le code d'invitation d'une partie inconnue reste secret : le lister
+   reviendrait à donner à chacun la liste de toutes les tables du serveur. */
+function mesParties(user, table) {
+  const u = String(user || '').trim().toLowerCase();
+  if (!u) return [];
+  const out = [];
+  for (const g of (table || games).values()) {
+    const moi = g.seats.find(s => s.user && String(s.user).toLowerCase() === u);
+    if (!moi) continue;                       // pas mon siège : pas mon affaire
+    if (g.status !== 'playing' && g.status !== 'lobby') continue;   // terminée : elle n'est plus reprenable
+    let tour = null, maxTours = null;
+    try { const e = g.driver && g.driver.state(); if (e) { tour = e.turn || null; maxTours = e.maxTurns || null; } } catch (e) {}
+    /* « Est-ce à moi de jouer ? » se lit dans le DERNIER ROUTAGE, la même source que le plateau —
+       pas dans une supposition. Sans cela on afficherait « à toi » sur une partie en attente d'un
+       autre, et le joueur cliquerait pour tomber sur un écran muet. */
+    const aMoi = !!(g.lastRoute && g.lastRoute.civId === moi.civId
+                    && (g.lastRoute.kind === 'decision' || g.lastRoute.kind === 'action' || g.lastRoute.kind === 'confirm'));
+    out.push({
+      code: g.code, statut: g.status, tour, maxTours,
+      cree: g.cree || null, maj: g.maj || g.cree || null,
+      moi: moi.civId, aMoiDeJouer: aMoi,
+      joueurs: g.seats.map(s => ({
+        civId: s.civId, ia: !!s.ai, user: s.user || null,
+        connecte: !!(s.ws && s.ws.readyState === 1), moi: s === moi
+      })),
+      nbIA: g.seats.filter(s => s.ai).length,
+      humainsConnectes: g.seats.filter(s => !s.ai && s.ws && s.ws.readyState === 1).length
+    });
+  }
+  /* À MOI DE JOUER D'ABORD : c'est la seule information qui appelle une action immédiate. Ensuite
+     les plus récemment actives — on reprend rarement la plus ancienne. */
+  out.sort((a, b) => (b.aMoiDeJouer - a.aMoiDeJouer) || ((b.maj || 0) - (a.maj || 0)));
+  return out;
+}
 function seatOf(g, wsOrUser) {
   return g.seats.find(s => s.ws === wsOrUser) || g.seats.find(s => s.user === wsOrUser) || null;
 }
@@ -437,6 +486,7 @@ function fichierPartie(code) { return path.join(PARTIES_DIR, String(code) + '.js
 
 function snapshot(g) {
   if (!g.driver || g.status !== 'playing') return;
+  g.maj = Date.now();   // date de dernière activité : c'est elle qui trie la liste des reprises
   try {
     fs.writeFileSync(fichierPartie(g.code), J({
       version: 2, code: g.code, host: g.host, status: g.status,
@@ -453,7 +503,7 @@ function oublierPartie(code) { try { fs.unlinkSync(fichierPartie(code)); } catch
 /* Recharge une partie depuis son fichier. Rend la partie, ou lève. */
 function chargerPartie(fiche) {
   const g = {
-    code: fiche.code, host: fiche.host, cree: fiche.cree, status: 'playing',
+    code: fiche.code, host: fiche.host, cree: fiche.cree, maj: fiche.maj || fiche.cree, status: 'playing',
     seats: fiche.sieges.map(s => ({ civId: s.civId, ai: !!s.ai, user: s.user || null, ws: null })),
     driver: null, timer: null, lastRoute: null
   };
@@ -1429,6 +1479,9 @@ wss.on('connection', (ws) => {
           tokens.set(token, { user: u, vu: Date.now() }); saveTokens(true); // création : écriture immédiate
           sess.user = u;
           sendTo(ws, { t: 'logged', user: u, token, tier: users[u].tier || 1 });
+          /* La liste part SANS qu'on la demande : le joueur qui se connecte doit voir tout de suite
+             ce qui l'attend, pas avoir à deviner qu'un bouton existe. */
+          sendTo(ws, { t: 'mes_parties', parties: mesParties(u) });
           break;
         }
 
@@ -1437,6 +1490,7 @@ wss.on('connection', (ws) => {
           if (!u) return err('token inconnu ou expiré');
           sess.user = u;
           sendTo(ws, { t: 'logged', user: u, token: m.token, tier: users[u].tier || 1 });
+          sendTo(ws, { t: 'mes_parties', parties: mesParties(u) });
           break;
         }
 
@@ -1716,6 +1770,12 @@ wss.on('connection', (ws) => {
            répond alors « maj_requise » plutôt que de laisser la partie dérailler.
            NB : un client ANCIEN n'envoie pas 'hello' du tout — on reste tolérant (proto 1 supposé),
            mais dès qu'un proto ≥ 2 existera, l'absence de hello devra être refusée. */
+        case 'mes_parties': {   // {t:'mes_parties'} → la liste des parties reprenables de ce compte
+          if (!requireAuth()) break;
+          sendTo(ws, { t: 'mes_parties', parties: mesParties(sess.user) });
+          break;
+        }
+
         case 'hello': {
           const proto = parseInt(m.proto, 10) || 0;
           sess.proto = proto; sess.build = String(m.build || '?').slice(0, 40);

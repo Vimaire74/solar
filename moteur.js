@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-25 · v9.82';
+const SOLAR_BUILD_MOTEUR = '2026-08-26 · v9.85';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -622,6 +622,45 @@ function _evAiInfo(ai,obs){var _o=obs||G.player;var pf=perceivedForce(_o,ai);var
    proposer d'accord pendant un sommet, l'un n'apparaissait simplement pas dans la liste de l'autre. */
 /* Existe-t-il DÉJÀ un accord commercial entre ces deux nations ? Le registre des signataires est la
    source ; le propriétaire du nœud ne sert que de repli pour les parties enregistrées avant lui. */
+/* ═══════════ LE PACTE DE NON-AGRESSION NE SERVAIT À RIEN ═══════════
+   ⚠️ DÉFAUT TROUVÉ EN RELISANT LA PARTIE 792D (Marc, 26/08 : « accord diplomatique pas respecté,
+   j'ai pu attaquer le jupitérien »). `G._nonAgg` était ÉCRIT à deux endroits et LU nulle part dans
+   le jeu — seul un banc d'essai le consultait. Aucun contrôle avant un assaut, un raid ou une
+   déclaration de guerre, ni pour le joueur ni pour l'ordinateur. Le pacte était un objet décoratif :
+   on le payait 6🪨, on lisait une belle ligne au journal, et rien n'en découlait.
+   ⚠️ ET IL ÉTAIT INDEXÉ PAR LA SEULE NATION VISÉE, pas par le couple : un pacte signé avec une
+   nation l'aurait protégée de TOUT LE MONDE. C'est la maladie de perspective habituelle — une
+   relation entre deux nations rangée comme une propriété d'une seule.
+   On range donc les pactes PAR COUPLE, et on les fait respecter en un seul point de passage. */
+function _clePacte(a,b){ return [String(a),String(b)].sort().join('|'); }
+/* Rend le tour d'expiration si un pacte lie ces deux nations, sinon null. */
+function pacteEntre(a,b){
+  if(!a||!b)return null;
+  const ida=(a.civ?a.civ.id:a), idb=(b.civ?b.civ.id:b);
+  if(ida===idb)return null;
+  const t=(G.pactes||{})[_clePacte(ida,idb)];
+  return (t!==undefined&&t!==null&&G.turn<=t)?t:null;
+}
+function poserPacte(a,b,tours){
+  if(!a||!b)return;
+  const ida=(a.civ?a.civ.id:a), idb=(b.civ?b.civ.id:b);
+  G.pactes=G.pactes||{};
+  G.pactes[_clePacte(ida,idb)]=G.turn+(tours||4);
+  /* Compat : `G._nonAgg` est conservé en écriture pour les sauvegardes et les bancs antérieurs.
+     Il n'est plus la source de vérité — `G.pactes` l'est. */
+  G._nonAgg=G._nonAgg||{}; G._nonAgg[idb]=G.turn+(tours||4);
+}
+/* LE POINT DE PASSAGE UNIQUE. Rend un message si l'agression est interdite, sinon null.
+   `journaliser` : écrire le refus au journal (on ne le fait pas quand l'IA se contente de filtrer
+   ses cibles, sinon le journal se remplirait de non-événements). */
+function agressionInterditeEntre(a,b,journaliser){
+  const t=pacteEntre(a,b);
+  if(t===null)return null;
+  const msg='🕊️ Pacte de non-agression en vigueur entre '+a.civ.emoji+' '+a.civ.name+' et '
+    +b.civ.emoji+' '+b.civ.name+' jusqu\'au tour '+t+' — aucune agression possible.';
+  if(journaliser)addLog(msg,'red');
+  return msg;
+}
 function accordEntre(a,b){
   if(!a||!b||a===b)return null;
   const ida=a.civ.id, idb=b.civ.id;
@@ -675,6 +714,19 @@ function showCommEventModal(onDone){
    réponse du partenaire peut arriver bien après, quand la perspective a changé). */
 function _evAccordConclude(prop,part){
   if(!prop||!part)return;
+  /* ⚠️ UN ACCORD SE CONCLUT UNE FOIS, PAS UNE FOIS PAR PROPOSANT (Marc, partie 792D).
+     Au sommet SIMULTANÉ, chaque nation choisit dans une liste de candidats calculée AVANT que les
+     réponses n'arrivent. Terriens et Ceinturiens se sont donc choisis mutuellement, et l'accord a
+     été conclu DEUX FOIS — deux lignes au journal, +6 VP au lieu de +3 de chaque côté, et un revenu
+     doublé (« +2🪨 +2🙂 » par tour au lieu de +1/+1) pendant six tours. C'est le rapport détaillé
+     de fin de partie qui l'a rendu visible, en montrant deux fois la même ligne.
+     Marc, 26/08 : « si je le propose et qu'il le propose, alors on devrait juste voir accord signé
+     entre les deux nations, point. » La garde vit donc ICI, au seul endroit qui conclut. */
+  if(typeof accordEntre==='function'&&accordEntre(prop,part)){
+    addLog('🤝 '+prop.civ.emoji+' '+prop.civ.name+' et '+part.civ.emoji+' '+part.civ.name
+      +' se sont proposé un accord l\'un à l\'autre — il n\'en est signé qu\'UN.','dim');
+    return;
+  }
   const col=part.colonies.find(function(c){return c.nodeId!==part.civ.home;})||part.colonies[0];
   if(col)_accordEnregistrer(col.nodeId,prop,part);   // les DEUX signataires sont enregistrés
   const _w=(G.wars||[]).find(function(w){return (w.a===prop.civ.id&&w.b===part.civ.id)||(w.a===part.civ.id&&w.b===prop.civ.id);});
@@ -684,6 +736,15 @@ function _evAccordConclude(prop,part){
   gagnerVP(prop,3,'Accord commercial avec '+part.civ.name);gagnerVP(part,3,'Accord commercial avec '+prop.civ.name);
   if(typeof updateConnections==='function'){updateConnections(prop);updateConnections(part);}
   addLog('🤝 Accord commercial conclu : '+prop.civ.emoji+' '+prop.civ.name+' ↔ '+part.civ.emoji+' '+part.civ.name+' — +3 VP chacun, tension −3.','gold');
+  /* LES DEUX NATIONS DOIVENT VOIR LE RÉSULTAT. Marc, 26/08 : « je propose mon accord et je ne vois
+     pas sa réponse, et lui non plus ». Le journal ne suffit pas : il défile, et en ligne chacun ne
+     lit que le sien. On envoie donc une notice à CHACUN des deux signataires. */
+  if(typeof notifyNationHit==='function'){
+    notifyNationHit(prop,'🤝 Accord commercial signé',
+      'Ton accord avec '+part.civ.emoji+' '+part.civ.name+' est <b>signé</b>.<br>+3 VP pour chacun, tension −3, et +1<i class=ri-materials></i> +1<i class=ri-morale></i> par tour tant qu\'il tient.');
+    notifyNationHit(part,'🤝 Accord commercial signé',
+      'Ton accord avec '+prop.civ.emoji+' '+prop.civ.name+' est <b>signé</b>.<br>+3 VP pour chacun, tension −3, et +1<i class=ri-materials></i> +1<i class=ri-morale></i> par tour tant qu\'il tient.');
+  }
 }
 /* ACCORD COMMERCIAL = UNE PROPOSITION, PAS UNE DÉCISION UNILATÉRALE (règle posée par Marc).
    Avant : celui qui choisissait concluait l'accord tout seul ; l'autre ne voyait jamais de demande,
@@ -811,14 +872,19 @@ function stPacteReponse(ans,civId){
       prop.res.materials-=6;
       const _i=_warIndexBetween(prop.civ.id,part.civ.id);
       if(_i>=0){G.wars.splice(_i,1);halveTensions(prop.civ.id,part.civ.id);if(typeof syncWarState==='function')syncWarState();}
-      G._nonAgg=G._nonAgg||{};G._nonAgg[part.civ.id]=G.turn+4;
+      poserPacte(prop,part,4);
       setTens(prop.civ.id,part.civ.id,0);setTens(part.civ.id,prop.civ.id,0);
       const cap=getResCapFor(prop).morale, cap2=getResCapFor(part).morale;
       prop.res.morale=Math.min(cap,(prop.res.morale||0)+1);
       part.res.morale=Math.min(cap2,(part.res.morale||0)+1);
       addLog('🕊️ Pacte de non-agression : '+prop.civ.emoji+' '+prop.civ.name+' ↔ '+part.civ.emoji+' '+part.civ.name+' (4 tours).','gold');
-      if(typeof _emitNotice==='function')_emitNotice('accord_result', prop,
-        {title:'🕊️ Pacte accepté', body:part.civ.emoji+' '+part.civ.name+' a ACCEPTÉ ton pacte de non-agression (4 tours).'}, 'stRien');
+      /* LES DEUX signataires reçoivent la nouvelle, pas seulement celui qui a proposé. */
+      if(typeof notifyNationHit==='function'){
+        const _t=n=>'Pacte de non-agression signé avec '+n.civ.emoji+' '+n.civ.name+' pour <b>4 tours</b>.'
+          +'<br>Aucune des deux nations ne peut assaillir, piller ni déclarer la guerre à l\'autre pendant ce temps.';
+        notifyNationHit(prop,'🕊️ Pacte de non-agression signé',_t(part));
+        notifyNationHit(part,'🕊️ Pacte de non-agression signé',_t(prop));
+      }
     }
   }
   if(Array.isArray(d.accordsRestants)) _accordsVerifierFin();
@@ -916,6 +982,12 @@ function _evDiploConfirm(propId){
     const _avis=accordAcceptable(o,prop);
     if(!_avis.ok){
       addLog('🕊️ '+o.civ.emoji+' '+o.civ.name+' REFUSE le pacte de non-agression de '+prop.civ.emoji+' '+prop.civ.name+' — '+_avis.raison+'.','red');
+      /* ⚠️ MARC N'A PAS VU CE REFUS (partie 792D : « j'ai pas vu qu'il l'a refusé, il faut que les
+         nations voient la réponse ! »). Une ligne de journal parmi trente ne se voit pas, et en
+         ligne chacun ne lit que le sien. Le proposant reçoit donc une notice. */
+      if(typeof notifyNationHit==='function')notifyNationHit(prop,'🕊️ Pacte refusé',
+        o.civ.emoji+' '+o.civ.name+' a <b>REFUSÉ</b> ton pacte de non-agression.<br>Motif : '+_avis.raison
+        +'.<br><br>Tu ne perds rien — les 6<i class=ri-materials></i> ne sont pas prélevés.');
       continue;
     }
     prop.res.materials-=needM;
@@ -924,10 +996,16 @@ function _evDiploConfirm(propId){
        signé par un joueur protège donc cette nation vis-à-vis de tout le monde. C'est la même
        maladie de perspective, mais changer la forme de cette donnée touche à tous ses lecteurs —
        à traiter à part, pas au milieu de la simultanéité. */
-    G._nonAgg=G._nonAgg||{};G._nonAgg[o.civ.id]=G.turn+4;
+    poserPacte(prop,o,4);
     setTens(prop.civ.id,o.civ.id,0);setTens(o.civ.id,prop.civ.id,0);
     prop.res.morale=Math.min(getResCapFor(prop).morale,(prop.res.morale||0)+1);made++;
     addLog('🕊️ Pacte de non-agression : '+prop.civ.emoji+' '+prop.civ.name+' ↔ '+o.civ.emoji+' '+o.civ.name+' (4 tours).','gold');
+    if(typeof notifyNationHit==='function'){
+      const _txt=n=>'Pacte de non-agression signé avec '+n.civ.emoji+' '+n.civ.name+' pour <b>4 tours</b>.'
+        +'<br>Aucune des deux nations ne peut assaillir, piller ni déclarer la guerre à l\'autre pendant ce temps.';
+      notifyNationHit(prop,'🕊️ Pacte de non-agression signé',_txt(o));
+      notifyNationHit(o,'🕊️ Pacte de non-agression signé',_txt(prop));
+    }
   }
   _evCloseOverlay();
   /* Le journal est PARTAGÉ : « aucun pacte conclu » sans nom laissait croire que PERSONNE n'avait
@@ -1526,9 +1604,17 @@ function isTechAvailable(card,p){
    le message « déjà prise par une autre faction ».
    Le militaire se limite par la POSSESSION, jamais globalement : chacun peut l'acheter une fois
    (contrôle dans le chemin d'achat), personne n'en prive les autres. */
+/* ⚠️ CE TEST COMPARAIT À UNE VALEUR QUI N'EXISTE PAS. `type==='civique'` : aucune carte du jeu ne
+   porte ce type — les types réels sont `colonization`, `technology`, `government`, `economic` et
+   `militaire`. La branche « civique » était donc morte depuis toujours, et les cartes de
+   GOUVERNEMENT étaient traitées comme exclusives alors que la ligne voulait précisément les
+   exempter. Trouvé en relisant la partie 792D avec Marc.
+   ⚠️ Un test qui ne peut jamais être vrai ne se voit pas : il ne casse rien, il applique
+   silencieusement la mauvaise règle. Chercher les valeurs comparées dans les DONNÉES, pas dans le
+   souvenir qu'on en a. */
 function isTechExclusive(card){
   if(card.repeatable) return false;
-  if(card.type==='civique'||card.type==='militaire') return false;
+  if(card.type==='government'||card.type==='militaire'||card.type==='military') return false;
   return !card.branch||card.tier>=3;
 }
 function getEffCost(card,p){
@@ -5574,6 +5660,8 @@ function doRaidTarget(aiId,nodeId,pillard){
        faux dès qu'on passe un pillard explicite. On cherche parmi toutes les nations sauf lui. */
     var target=allPlayers().find(function(a){return a!==p&&a.civ.id===aiId;});
     if(!target){addLog('⚠️ Cible de raid introuvable.','red');return;}
+    /* Un raid est une agression : le pacte l'interdit comme il interdit l'assaut. */
+    if(typeof agressionInterditeEntre==='function'&&agressionInterditeEntre(p,target,true))return;
     if(p.acLeft<1){addLog('⚠️ Raid : besoin 1 AC.','red');return;}
     if(p.forceTokens<tc){addLog('⚠️ Raid : besoin '+tc+' jeton(s) Force.','red');return;}
     if(enCost>0&&(p.res.energy||0)<enCost){addLog('⚠️ Raid : besoin '+enCost+'<i class=ri-energy></i> (carburant).','red');return;}
@@ -5770,6 +5858,9 @@ function attackColony(nodeId,attaquant){
      Un clic mort, impossible à comprendre en jouant. */
   const _atkAI=defenseurPrincipal(nodeId,p);
   if(!_atkAI){addLog('⚠️ Aucune autre nation à assaillir sur ce nœud.','red');return;}
+  /* Le pacte lie aussi CELUI QUI CLIQUE — c'est exactement ce que Marc a pu faire dans la partie
+     792D, faute de contrôle. Le refus est explicite : un bouton qui ne fait rien est pire. */
+  if(typeof agressionInterditeEntre==='function'&&agressionInterditeEntre(p,_atkAI,true))return;
   if(estNoeudPartage(nodeId))addLog('⚔️ '+(node?node.name:nodeId)+' est partagé — l\'assaut rompt la cohabitation.','red');
   /* Capitale assaillable : voir la note dans breakAccordAndAttack(). Sa défense de 10 jetons
      (garrisonOf) suffit à la rendre difficile ; l'interdire n'a plus lieu d'être. */
@@ -5986,9 +6077,24 @@ function maybeAiAssaultPlayer(ai,done,defender,prefNode){
   const afford=Math.min(ai.res.materials||0,ai.res.energy||0);
   const target=_aiPickPlayerTarget(ai,defender,prefNode);
   if(!target||(ai.forceTokens||0)<1||afford<1||(ai.res.morale||0)<1){
-    addLog('🛡️ '+ai.civ.emoji+' '+ai.civ.name+' maintient la guerre mais n\'a pas les moyens d\'attaquer ce tour.','dim');
-    const _na={emoji:'🛡️',name:'En guerre — n\'a pas attaqué ce tour',desc:'moyens insuffisants'};
-    if(ai._turnActions)ai._turnActions.push(_na);else ai._turnActions=[_na];
+    /* ═══ « IL N'A PAS ATTAQUÉ » DOIT SE VOIR, ET NE SE DIRE QU'UNE FOIS ═══
+       Marc, partie 792D : « quand on est en guerre et que l'autre ne m'attaque pas en premier, ce
+       n'est pas clair. Il faudrait un texte disant qu'il n'a pas attaqué. »
+       Deux défauts en un. D'abord la ligne n'existait qu'au JOURNAL : quand on choisit d'encaisser
+       en premier et qu'il ne se passe rien, l'écran reste muet et on croit à un blocage. Ensuite
+       elle s'écrivait DEUX FOIS de suite au tour 9 — cette fonction est atteinte par plusieurs
+       chemins dans la séquence de fin de tour. On mémorise donc le tour DANS la guerre : une
+       annonce par guerre et par tour, et une notice chez l'assailli qui attend. */
+    if(war._silenceTour!==G.turn){
+      war._silenceTour=G.turn;
+      addLog('🛡️ '+ai.civ.emoji+' '+ai.civ.name+' maintient la guerre mais n\'a pas les moyens d\'attaquer ce tour.','dim');
+      const _na={emoji:'🛡️',name:'En guerre — n\'a pas attaqué ce tour',desc:'moyens insuffisants'};
+      if(ai._turnActions)ai._turnActions.push(_na);else ai._turnActions=[_na];
+      if(typeof notifyNationHit==='function')notifyNationHit(defender,'🛡️ Aucun assaut contre toi',
+        ai.civ.emoji+' '+ai.civ.name+' <b>n\'a pas attaqué</b> ce tour-ci.<br>'
+        +'La guerre continue, mais il lui manque les jetons, les ressources ou le moral pour monter un assaut.'
+        +'<br><br>Tes positions sont intactes.');
+    }
     _assautSuite(done);return;
   }
   const commit=Math.min(ai.forceTokens,afford);
@@ -6592,6 +6698,10 @@ function declarerGuerre(agresseur, cible, raison, declaredBy){
   if(!agresseur||!cible||agresseur===cible) return null;
   const A=agresseur.civ.id, B=cible.civ.id;
   if(_warBetween(A,B)) return null;                       // déjà en guerre : rien à faire
+  /* ⚠️ LE PACTE PASSE AVANT TOUT — c'est ici qu'il prend corps. TOUTES les guerres du jeu passent
+     par cette fonction : agression délibérée, guerre populaire à 10 de tension, refus de la Sphère
+     de Dyson. Un seul point de passage, donc une seule garde, donc aucun chemin oublié. */
+  if(typeof agressionInterditeEntre==='function'&&agressionInterditeEntre(agresseur,cible,true)) return null;
   const w=_attachWar({a:A,b:B,winsBy:{[A]:0,[B]:0},turnsLeft:99,justDeclared:true,
     reason:raison, declaredBy:declaredBy||'other', agresseurCiv:A, live:true, aiRecaptureTarget:null});
   w.focusColony=G._warFocusColony||null; G._warFocusColony=null;
@@ -7656,7 +7766,8 @@ function _doAITurnInterne(aiPlayer,oneShot){
        Le joueur humain, lui, garde le droit de tenter un raid perdu d'avance : c'est son choix,
        et le journal le lui dit. */
     let _e=aiEnnemi(ai);
-    const _pillable=n=>n&&n!==ai&&!hasSpec(n,'ia_immune')&&((n.res.energy||0)+(n.res.materials||0))>0;
+    const _pillable=n=>n&&n!==ai&&!hasSpec(n,'ia_immune')&&((n.res.energy||0)+(n.res.materials||0))>0
+      &&!(typeof agressionInterditeEntre==='function'&&agressionInterditeEntre(ai,n,false));
     if(!_pillable(_e)){
       const _autres=(typeof allPlayers==='function'?allPlayers():[G.player].concat(G.ais||[]))
         .filter(_pillable)
@@ -7984,6 +8095,9 @@ function _doAITurnInterne(aiPlayer,oneShot){
     const _rivaux=allPlayers().filter(r=>r!==ai)
       .sort((x,y)=>String(x.civ.id).localeCompare(String(y.civ.id)));
     for(const r of _rivaux){
+      /* Le pacte écarte la cible SANS journaliser : écrire un refus à chaque évaluation remplirait
+         le journal de non-événements. L'IA se contente de regarder ailleurs, comme un joueur. */
+      if(typeof agressionInterditeEntre==='function'&&agressionInterditeEntre(ai,r,false))continue;
       /* ⚠️ LA LIMITE « SEULEMENT LE JOUEUR ACTIF » EST LEVÉE (Marc, 2026-08-15). Elle n'existait que
          parce que `declareWar` ne savait construire qu'une guerre impliquant la nation active ;
          `declarerGuerre(agresseur, cible, …)` ne connaît plus que deux nations. Une IA peut donc
@@ -8519,17 +8633,29 @@ function calcVP(p){
     +p.routes.map(r=>((NODES[r.from]&&NODES[r.from].name)||r.from)+'→'+((NODES[r.to]&&NODES[r.to].name)||r.to)).join(', ')+')');
   const cardsVP=p.cards.reduce((s,c)=>s+(c.vp||0),0);
   for(const c of p.cards){ if(c&&c.vp) det.cartes.push((c.emoji||'')+' '+(c.name||c.id)+' (niveau '+(c.tier||'?')+') : +'+c.vp); }
-  // Bonus Tech : +0.5 VP par carte Technologie (arrondi inférieur), valorise la spécialisation
-  const _nbTech=p.cards.filter(c=>c.type==='technology').length;
+  /* ═══ « TECHNOLOGIE » VOULAIT DIRE DEUX CHOSES DIFFÉRENTES ═══
+     ⚠️ DÉFAUT VU DANS LA PARTIE 792D. Ce bonus comptait les cartes de `type === 'technology'` :
+     douze cartes sur les vingt-et-une que l'arbre technologique propose. Partout ailleurs — agenda
+     « Superpuissance Tech. », espionnage, tension « deux technologies de niveau 3 » — une
+     technologie est une carte qui porte une BRANCHE. Marc avait onze cartes à branche et n'en
+     voyait que quatre comptées : Biosphère Autonome, Végétalisation, Exploitations d'Astéroïdes,
+     Éveil Collectif sont des technologies pour les règles, invisibles pour ce seul calcul.
+     Le joueur compte ses cartes ; le jeu doit compter les mêmes. C'est la branche qui fait foi. */
+  const _nbTech=p.cards.filter(c=>!!c.branch).length;
   const techBonusVP=Math.floor(_nbTech*0.5);
   if(_nbTech)det.tech.push(_nbTech+' technologie(s) × 0,5 = '+String(_nbTech*0.5).replace('.',',')+' → '+techBonusVP+' (arrondi à l\'inférieur)');
   // Bonus revenus/tour (rpt) v6 : par ressource — rpt>5→+2VP, rpt>10→+5VP
   let rptVP=0;
   for(const r of['energy','materials','science','morale']){const v=p.rpt[r]||0;const _g=v>10?5:v>5?2:0;rptVP+=_g;
-    if(_g)det.rpt.push((typeof rEmoji==='function'?rEmoji(r):r)+' '+v+'/tour → +'+_g+(v>10?' (au-delà de 10)':' (au-delà de 5)'));}
+    /* ⚠️ `rEmoji` rend une BALISE HTML, que le rapport texte supprime : la ligne s'affichait
+       « · 6/tour → +2 », sans dire de quelle ressource il s'agissait. On écrit le nom en clair —
+       un rapport lisible ne doit rien devoir au CSS. */
+    if(_g)det.rpt.push((typeof rLabel==='function'?rLabel(r):r)+' : '+v+'/tour → +'+_g+(v>10?' (au-delà de 10/tour)':' (au-delà de 5/tour)'));}
   let agendasVP=p.agenda&&typeof p.agenda.score==='function'?p.agenda.score(p):0;
+  /* La description d'agenda contient déjà « → +8 VP » : on ne le répète pas, on dit seulement si
+     la condition est remplie. */
   if(p.agenda)det.agenda.push((p.agenda.emoji||'')+' '+(p.agenda.name||'?')+' — '+(p.agenda.desc||'')
-    +' → '+(agendasVP>0?('+'+agendasVP+' (condition remplie)'):'0 (condition NON remplie)'));
+    +(agendasVP>0?'  ✔ condition remplie':'  ✘ condition NON remplie'));
   const evtVP=p.tempVP||0;
   /* Le détail des VP d'événement est tenu au fil de la partie par `gagnerVP` : on ne fait ici que
      le recopier. Les parties commencées avant cette version n'en ont pas — on le dit plutôt que de
@@ -8607,9 +8733,9 @@ function buildJournalReport(){
     };
     _bloc('Colonies',v.colVP,'VP du nœud × niveau, ×1 si connectée, ×0,5 si isolée, +1 par colonie reliée',_d.colonies,'aucune colonie');
     _bloc('Routes',v.routeVP,'+1 VP par route établie',_d.routes,'aucune route établie');
-    _bloc('Cartes',v.cardsVP,'VP inscrit sur la carte : 1 au niveau 1, 3 au niveau 2, 5 au niveau 3',_d.cartes,'aucune carte porteuse de VP');
-    _bloc('Bonus technologiques',v.techBonusVP,'+0,5 VP par technologie, arrondi à l\'inférieur',_d.tech,
-      'aucune carte de type « technologie » (les cartes civiques et militaires ne comptent pas ici)');
+    _bloc('Cartes',v.cardsVP,'VP inscrit sur la carte — technologies : 1 au niveau 1, 3 au niveau 2, 5 au niveau 3 · cartes militaires : valeur propre',_d.cartes,'aucune carte porteuse de VP');
+    _bloc('Bonus technologiques',v.techBonusVP,'+0,5 VP par technologie (toute carte de l\'arbre technologique), arrondi à l\'inférieur',_d.tech,
+      'aucune carte de l\'arbre technologique');
     _bloc('Revenus par tour',v.rptVP,'par ressource : +2 au-delà de 5/tour, +5 au-delà de 10/tour',_d.rpt,
       'aucune ressource ne dépasse 5 de revenu par tour');
     _bloc('Agenda'+(p.agenda&&p.agenda.name?' ('+p.agenda.name+')':''),v.agendasVP,
