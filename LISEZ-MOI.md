@@ -1,6 +1,6 @@
 # Lot 17 — ce qu'on met en ligne, et rien d'autre
 
-Dossier prêt à envoyer. Version **v9.87** (`sw.js` **v108**).
+Dossier prêt à envoyer. Version **v9.88** (`sw.js` **v109**).
 
 > ### Ce qui rend ce lot particulier : trois fois, le texte publié décrivait un jeu qui n'existait pas
 >

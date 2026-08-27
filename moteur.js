@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-27 · v9.87';
+const SOLAR_BUILD_MOTEUR = '2026-08-27 · v9.88';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -786,6 +786,18 @@ function _evCommPick(aiId,propId){
   if(!aiId){addLog('🤝 '+prop.civ.emoji+' '+prop.civ.name+' — sommet commercial : aucun accord signé.','dim');_suite();return;}
   const ai=(typeof allPlayers==='function'?allPlayers():G.ais).find(function(a){return a&&a.civ&&a.civ.id===aiId;});
   if(!ai){_suite();return;}
+  /* ⚠️ NE PAS POSER UNE QUESTION DÉJÀ TRANCHÉE. Partie 8B47, tour 4 : Marc a lu, dans cet ordre,
+     « Ceinturiens propose un accord… en attente de sa réponse », « Accord commercial conclu :
+     Terriens ↔ Ceinturiens », puis « Terriens refuse la proposition ». Trois lignes cohérentes
+     entre elles mais incompréhensibles à la lecture — ce sont DEUX transactions du même sommet :
+     il proposait aux Ceinturiens pendant qu'ils lui proposaient. Sa propre proposition s'est
+     conclue, et on lui a quand même demandé de répondre à une offre devenue sans objet.
+     Le couple est déjà lié : on le dit, et on ne demande rien. */
+  if(typeof accordEntre==='function'&&accordEntre(prop,ai)){
+    addLog('🤝 '+prop.civ.emoji+' '+prop.civ.name+' et '+ai.civ.emoji+' '+ai.civ.name
+      +' sont déjà liés par un accord — la seconde proposition du sommet est sans objet.','dim');
+    _suite();return;
+  }
   // Partenaire HUMAIN en ligne → on lui DEMANDE son accord.
   if(_decisionActive()&&!ai._isAI){
     addLog('🤝 '+prop.civ.emoji+' '+prop.civ.name+' propose un accord commercial à '+ai.civ.emoji+' '+ai.civ.name+' — en attente de sa réponse…','dim');
@@ -924,6 +936,23 @@ function stAccordReponse(ans,civId){
   const part=allPlayers().find(p=>p.civ.id===paire.part);
   d.accordProp=null; d.accordPart=null;
   const ok=!!(ans&&(ans.value==='yes'||ans.targetId==='yes'||ans.id==='yes'||ans.accept===true));
+  /* Le lien a pu se nouer PENDANT que la question attendait : au sommet, tout le monde propose en
+     même temps. Traiter la réponse comme un refus ferait croire au joueur que son « non » a été
+     ignoré — puisqu'un accord existe malgré tout. On dit ce qui est. */
+  if(prop&&part&&typeof accordEntre==='function'&&accordEntre(prop,part)){
+    /* ⚠️ ET ON SORT PAR LA MÊME PORTE QUE LA FIN DE FONCTION. J'avais d'abord écrit `_suite()`, qui
+       n'existe pas dans cette portée — c'est la fermeture d'une AUTRE fonction, quarante lignes plus
+       haut. Une `ReferenceError` ici aurait figé le sommet pour tout le monde. */
+    addLog('🤝 '+prop.civ.emoji+' '+prop.civ.name+' et '+part.civ.emoji+' '+part.civ.name
+      +' étaient déjà liés — il n\'existe qu\'un accord par couple de nations.','dim');
+    if(typeof _emitNotice==='function')_emitNotice('accord_result', prop,
+      {title:'🤝 Accord déjà en vigueur',
+       body:'Un accord vous liait déjà à '+part.civ.emoji+' '+part.civ.name
+           +'. Il n\'en existe qu\'un par couple de nations : ta proposition était sans objet.'}, 'stRien');
+    if(Array.isArray(d.accordsRestants)) _accordsVerifierFin();
+    else _appelerSuite(_accordSuite());
+    return;
+  }
   if(prop&&part){
     if(ok)_evAccordConclude(prop,part);
     else addLog('🤝 '+part.civ.emoji+' '+part.civ.name+' refuse la proposition de '+prop.civ.emoji+' '+prop.civ.name+'.','red');
@@ -1417,6 +1446,47 @@ function getNodeOwnerAI(nodeId){const o=ownerNation(nodeId);return (o&&o._isAI!=
    était le joueur.
    On tient donc un registre des DEUX signataires par nœud. La liste de nœuds reste inchangée : ses
    vingt autres lecteurs (carte, routes, colonisation, révocation…) n'ont pas à savoir tout cela. */
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   CE QU'UNE FORME DE GOUVERNEMENT COÛTE EN MORAL — LA PART QUE L'IA NE VOYAIT PAS
+   ----------------------------------------------------------------------------------------------
+   ⚠️ PARTIE 8B47, 27/08 : DEUX IA SUR DEUX SE SONT SABORDÉES AVEC LA TYRANNIE. Les Jupitériens
+   l'ont adoptée au TOUR 1, les Ceinturiens au tour 5, toutes deux pour le +1 AC. Aucune ne savait
+   que la Tyrannie **plafonne leur moral à 6** : manifestations dès le tour 2, guerre civile au tour
+   7 pour les Ceinturiens — dont ils ne sont jamais ressortis —, et 31 VP pour les Jupitériens avec
+   une seule colonie à l'arrivée.
+
+   LA CAUSE. `tryCivic` et `_civicUtil` évaluaient une forme par `formPts + acBonus×6`. Ni le malus
+   ponctuel (`adoptMorale`) ni le plafond (`moraleCap`) n'entraient dans le calcul. L'IA voyait un
+   cadeau là où il y avait un marché.
+
+   ⚠️ UNE SEULE FONCTION POUR DEUX APPELANTS. `tryCivic` DÉCIDE et `_civicUtil` NOTE : deux copies du
+   même barème finiraient par diverger, et l'IA choisirait une chose après en avoir noté une autre.
+
+   ⚠️ MON PREMIER BARÈME ÉTAIT TROP DUR, et seule la mesure l'a montré. Avec une pénalité de 12 pour
+   une nation fragile et 0,8 par point de plafond, la Tyrannie n'était plus JAMAIS adoptée (0 sur 24
+   nations) et le VP médian tombait de 47 à 37 : le +1 AC valait bel et bien son prix, et je venais
+   de l'interdire. Le barème ci-dessous garde la Tyrannie attractive pour une nation en bonne santé
+   et la rend prohibitive pour une nation déjà fragile — ce qui est exactement la décision qu'un
+   joueur prendrait.
+
+   L'unité est celle de `val` : 1 point de gouvernement = 1, une AC permanente = 6.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+function coutMoralForme(nat,f){
+  if(!nat||!f||!f.govForm)return 0;
+  const gf=f.govForm;
+  const moral=nat.res.morale||0;
+  let c=(gf.adoptMorale||0)*1.5;          // le malus d'adoption se paie une fois
+  const cap=gf.moraleCap||0;
+  if(cap>0){
+    const apres=Math.max(0,moral-(gf.adoptMorale||0));
+    if(apres>cap)c+=(apres-cap);          // ce qui sera écrêté dès la fin du tour
+    c+=(10-cap)*0.3;                      // marge de sécurité perdue pour le reste de la partie
+    /* En guerre ou à moral bas, le plafond cesse d'être un coût : il devient un risque de guerre
+       civile, dont on ne ressort pas (plus de revenu → plus de quoi remonter le moral). */
+    if((typeof estEnGuerre==='function'&&estEnGuerre(nat))||apres<=4)c+=6;
+  }
+  return c;
+}
 function _accordEnregistrer(nodeId,a,b){
   if(!nodeId)return null;
   /* ══════ UN SEUL ACCORD PAR COUPLE — ET LA GARDE EST ICI, PAS CHEZ LES APPELANTS ══════
@@ -3074,8 +3144,9 @@ function _runStrategyDraftAfterAnnounce(){
      Marc : « y a toujours un bug sur la détermination du joueur le plus faible » — sans trace, ni
      lui ni moi ne pouvions le prouver. Maintenant si l'ordre est faux, il se voit. */
   try{
-    addLog('🃏 Ordre du draft Stratégie (du plus faible au plus fort) : '
-      + order.map((p,i)=>(i+1)+'. '+p.civ.name+' ('+calcVP(p).total+' VP, '+(p.forceTokens||0)+'⚔️)').join(' · '),'dim');
+    /* Fait de partie, pas d'une nation — voir la note d'auteur du journal. */
+    logAuteur('systeme',()=>addLog('🃏 Ordre du draft Stratégie (du plus faible au plus fort) : '
+      + order.map((p,i)=>(i+1)+'. '+p.civ.name+' ('+calcVP(p).total+' VP, '+(p.forceTokens||0)+'⚔️)').join(' · '),'dim'));
   }catch(e){}
   /* TAILLE DE LA PIOCHE — constante à tous les tours (choix de Marc, 2026-08-07 : option « b »).
      AVANT : `nations + (tour===1 ? 3 : 2)`. La pioche perdait donc une carte entre le tour 1 et le
@@ -3342,7 +3413,13 @@ function applyCalmTension(aiId,mode,amount){
 }
 function skipStrategy(){document.getElementById('strategy-modal').classList.add('hidden');G.player.stratBonus=null;G._playerDraftCard=null;_playerStratDone();}
 /* ============================================================ TURN ============================================================ */
-function startTurn(){ _startTurnPrep(); _startTurnBegin(); }
+/* ⚠️ L'AUTEUR EST `'systeme'`, PAS `null` — et j'ai écrit `null` d'abord, ce qui ne faisait RIEN.
+   `_logCivCourante` teste `if(_auteurLog!==null) return _auteurLog` : `null` est précisément la
+   valeur qui signifie « retombe sur G.player ». Il faut un identifiant qui ne corresponde à aucune
+   nation ; `_logPrefixe` affiche alors « Système ». Les blocs internes (`doAITurn`, revenus nation
+   par nation) posent leur propre auteur et l'emportent — seules les lignes de PARTIE restent au
+   Système, ce qui est exactement le but. */
+function startTurn(){ return logAuteur('systeme', function(){ _startTurnPrep(); _startTurnBegin(); }); }
 // PRÉPARATION DU TOUR (avant le choix des cartes Stratégie) : remet à jour les revenus déjà
 // encaissés, les jetons revenus de récupération, les points de gouvernement ET surtout le NOMBRE
 // D'ACTIONS (AC), pour que tout soit à jour AVANT que le joueur ne choisisse sa stratégie.
@@ -4191,7 +4268,7 @@ function stFinDeTour(){
   refillGeneralRiver();
   if(G.curEvent){
     const evMsg=G.curEvent.resolve(G);
-    if(evMsg)addLog('🎯 ÉVÉNEMENT '+G.curEvent.emoji+' '+G.curEvent.name+' : '+evMsg,'gold');
+    if(evMsg)logAuteur('systeme',()=>addLog('🎯 ÉVÉNEMENT '+G.curEvent.emoji+' '+G.curEvent.name+' : '+evMsg,'gold'));
     if(evMsg)_journalAuto(G.player.civ.name,'Événement : '+G.curEvent.name,evMsg);
     G._pendingEvModal={ev:G.curEvent,msg:evMsg};
   }
@@ -4251,8 +4328,8 @@ function startInterleaved(){
      multijoueur (demande de Marc, 2026-08-07 : « ajouter dans journal qui est désigné par le hasard
      comme premier joueur du tour »). Elle est remontée ici, avant le retour, et nomme les nations
      plutôt que « Toi » : le journal est LU PAR TOUS, « Toi » n'y veut rien dire. */
-  addLog('━ Initiative du tour '+G.turn+' : '+G._order.map(n=>n.civ.emoji+' '+n.civ.name).join(' › ')
-    +' — '+G._order[0].civ.name+' commence ━','dim');
+  logAuteur('systeme',()=>addLog('━ Initiative du tour '+G.turn+' : '+G._order.map(n=>n.civ.emoji+' '+n.civ.name).join(' › ')
+    +' — '+G._order[0].civ.name+' commence ━','dim'));
   if(typeof _journalAuto==='function')_journalAuto(G._order[0].civ.name,'Premier joueur du tour (tirage au sort)',G._order.map(n=>n.civ.name).join(' › '));
   if(_decisionActive()){ G._il=false; G._serverActionPhase=true; return; } // SERVEUR : le driver pilote la phase d'actions (pas l'interleave solo)
   interleaveStep();
@@ -4401,7 +4478,8 @@ function interleaveStep(){
 }
 function playerActed(){ if(!G._il||!G._humanActive) return; _scHideConfirm(); G._ilLines=[]; G._ilMarkEntry=(G.log&&G.log[0])||null; _ilHide(); G._humanActive=false; G._ilIdx++; interleaveStep(); }
 function passTurnIL(){ if(!G._il) return; _scHideConfirm(); G._ilLines=[]; G._ilMarkEntry=(G.log&&G.log[0])||null; _ilHide(); G._humanActive=false; G.player._passedRound=true; G._ilIdx++; interleaveStep(); }
-function runEndOfRound(){
+function runEndOfRound(){ return logAuteur('systeme', _runEndOfRound); }
+function _runEndOfRound(){
   // GARDE-FOU ANTI-RÉEXÉCUTION (indexé sur le tour) : évite que la fin de manche tourne DEUX fois
   // (ex. reprise d'une partie sauvée pendant le bilan → interleaveStep revoit « tous ont passé »
   //  et rappelait runEndOfRound → revenus/pirates/événement en double). Bug corrigé 2026-07-26.
@@ -4710,8 +4788,12 @@ function _applyMoraleFlags(){
   // en fin de phase d'actions, AVANT les revenus (étape 7) et l'entretien (étape 8).
   for(const p of allPlayers()){
     const _m=(p._moraleRev!==undefined?p._moraleRev:(p.res.morale||0));
-    if(_m===0){p._civilWar=true;addLog(p===G.player?'💥 GUERRE CIVILE ! Moral 0 — aucune ressource ce tour.':'💥 Guerre civile IA (moral 0).','red');}
-    else if(_m===1){p._halfResources=true;if(p===G.player)addLog('⚠️ Moral critique (1) — ressources ÷2 ce tour.','red');}
+    if(_m===0){p._civilWar=true;addLog(p===G.player?'💥 GUERRE CIVILE ! Moral 0 — aucune ressource ce tour.':('💥 Guerre civile chez '+p.civ.emoji+' '+p.civ.name+' — moral 0, aucune ressource ce tour.'),'red');}
+    /* ⚠️ CES DEUX MESSAGES ÉTAIENT RÉSERVÉS AU JOUEUR, et leur jumeau IA ne nommait personne.
+       Partie 8B47, tour 8 : Marc lisait coup sur coup « Moral critique (1) — ressources ÷2 » et
+       « Guerre civile IA (moral 0) » — deux états contradictoires, en réalité deux nations
+       différentes, dont aucune n'était nommée. Un journal à quatre nations doit dire QUI. */
+    else if(_m===1){p._halfResources=true;addLog(p===G.player?'⚠️ Moral critique (1) — ressources ÷2 ce tour.':('⚠️ Moral critique chez '+p.civ.emoji+' '+p.civ.name+' (1) — ses ressources sont divisées par deux.'),'red');}
   }
 }
 function doMaintenance(){
@@ -4770,10 +4852,10 @@ function doMaintenance(){
       if(_m===0){
         // Guerre civile : aucune ressource ce tour (reset gains à 0)
         p._civilWar=true;
-        addLog(p===G.player?'💥 GUERRE CIVILE ! Moral 0 — aucune ressource ce tour.':'💥 Guerre civile IA (moral 0).','red');
+        addLog(p===G.player?'💥 GUERRE CIVILE ! Moral 0 — aucune ressource ce tour.':('💥 Guerre civile chez '+p.civ.emoji+' '+p.civ.name+' — moral 0, aucune ressource ce tour.'),'red');
       }else if(_m===1){
         p._halfResources=true;
-        if(p===G.player)addLog('⚠️ Moral critique (1) — ressources ÷2 ce tour.','red');
+        addLog(p===G.player?'⚠️ Moral critique (1) — ressources ÷2 ce tour.':('⚠️ Moral critique chez '+p.civ.emoji+' '+p.civ.name+' (1) — ses ressources sont divisées par deux.'),'red');
       }
     };
     // Payer énergie colonies
@@ -5982,33 +6064,39 @@ function proposeAccord(nodeId,proposant){
   else G.aiActions.push({emoji:'🤝',name:'Accord '+node.name,desc:'avec '+(proprio?proprio.civ.name:'?')});
   return true;
 }
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   ROMPRE L'ACCORD ET ATTAQUER — LA MÊME PORTE QUE L'ASSAUT ORDINAIRE
+   ----------------------------------------------------------------------------------------------
+   ⚠️ C'ÉTAIT UNE SECONDE IMPLÉMENTATION DE L'ASSAUT, ET ELLE A VIEILLI SEULE. Marc, 27/08 :
+   « accord commercial bloque maintenant la conquête ». Reproduit : avec un accord posé sur la
+   colonie d'un HUMAIN, ce bouton était un CLIC MORT — aucun AC dépensé, aucune guerre, et le
+   message « ⚠️ Cette colonie n'appartient à aucune nation ».
+
+   La cause : cette fonction cherchait le défenseur avec `getNodeOwnerAI`, dont la dernière ligne
+   est `return (o && o._isAI !== false) ? o : null` — elle rend donc **null dès que le propriétaire
+   est un joueur humain**. C'est exactement le défaut #77 du 23/08 (« attaquer un joueur humain ne
+   faisait rien »), corrigé à l'époque dans `attackColony` en passant à `defenseurPrincipal`… et
+   jamais reporté ici, parce que personne ne pensait à ce second chemin.
+
+   Elle avait aussi dérivé sur deux autres points : aucun contrôle du pacte de non-agression, et
+   aucune gestion des nœuds partagés.
+
+   ON NE RÉPARE DONC PAS, ON SUPPRIME LE DOUBLON. Rompre un accord pour attaquer, c'est attaquer :
+   la guerre déclarée par l'assaut révoque déjà PROPREMENT tous les accords entre les deux nations
+   (liste ET registre — voir `declarerGuerre`). Il ne reste ici que la phrase qui prévient le joueur.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
 function breakAccordAndAttack(nodeId){
-  if(G.phase!=='actions')return;const node=NODES[nodeId];const p=G.player;
-  const _brkAI=getNodeOwnerAI(nodeId);
-  if(!_brkAI){addLog('⚠️ Cette colonie n\'appartient à aucune nation.','red');return;}
-  /* La capitale N'EST PLUS imprenable (règle décidée par Marc) : elle est défendue d'office par
-     10 jetons automatiquement alimentés, auxquels s'ajoutent les jetons que le défenseur engage
-     s'il peut les payer. On peut donc l'assaillir comme n'importe quelle colonie. */
-  const tc=p.civ.id==='ceinturiens'?1:2;
-  if(p.acLeft<1){addLog('⚠️ Attaque : besoin 1 AC.','red');return;}
-  if(p.forceTokens<tc){addLog('⚠️ Attaque : besoin d\'au moins '+tc+' jeton(s) Force.','red');return;}
-  if(Math.min(p.res.materials||0,p.res.energy||0)<1){addLog('⚠️ Attaque : il faut du <i class=ri-materials></i> et de l\'<i class=ri-energy></i> pour engager des jetons.','red');return;}
-  // LIMITE DE 2 ATTAQUES/TOUR SUPPRIMÉE (demande de Marc) : le nombre d'assauts n'est plus plafonné —
-  // il reste limité naturellement par les AC, les jetons Force et le coût en ressources de chaque combat.
-  /* ⚠️ LA RUPTURE N'ÉTAIT FAITE QU'À MOITIÉ, ET L'ACCORD REVENAIT.
-     Cette ligne retirait le nœud de `G.commercialAccords` mais laissait son entrée dans
-     `G.accordsParties`, le registre des signataires. Deux conséquences vues en partie :
-       · `accordsDe()` lit le registre — l'accord continuait donc de payer son revenu ;
-       · et surtout, `declarerGuerre` (appelé juste après par l'assaut) révoque les accords en
-         partant de `G.commercialAccords` : le nœud n'y étant plus, il n'avait plus rien à révoquer
-         et l'entrée orpheline survivait. D'où « le jeu ne l'enregistre pas et ne le redit pas à
-         l'attaque suivante ».
-     On ne rompt donc plus à la main : l'assaut déclare la guerre, et `declarerGuerre` révoque
-     PROPREMENT tous les accords entre les deux nations — liste ET registre. Une seule copie de la
-     règle de rupture, celle qui la connaît en entier. */
-  addLog('📜 Attaque surprise sur '+node.name+' — l\'accord est rompu par la guerre qui suit.','red');
-  p.acLeft-=1;p.spentThisTurn+=1;closePopup();
-  playerAssaultColony(nodeId,_brkAI); // résout le combat + capture immédiate (déclare la guerre)
+  if(G.phase!=='actions')return;
+  const node=NODES[nodeId];
+  const _def=(typeof defenseurPrincipal==='function')?defenseurPrincipal(nodeId,G.player):null;
+  if(!_def){addLog('⚠️ Aucune autre nation à assaillir sur ce nœud.','red');return;}
+  /* Le message d'avertissement N'EST ÉMIS QUE SI L'ASSAUT VA RÉELLEMENT PARTIR : annoncer « l'accord
+     est rompu » puis se faire refuser l'attaque faute d'AC serait un mensonge de plus. On le pose
+     donc après les contrôles, en s'appuyant sur le fait qu'`attackColony` dépense l'AC. */
+  const _avant=G.player.acLeft;
+  attackColony(nodeId,G.player);
+  if(G.player.acLeft<_avant)
+    addLog('📜 Attaque surprise sur '+((node&&node.name)||nodeId)+' — l\'accord est rompu par la guerre qui suit.','red');
 }
 /* `attaquant` : la nation qui assaille. Sans lui, la nation active. */
 function attackColony(nodeId,attaquant){
@@ -6908,9 +6996,6 @@ function declarerGuerre(agresseur, cible, raison, declaredBy){
      tout, quel que soit son profil de temps de paix (voir `PROFILS_IA.assiegee`). */
   if(typeof marquerAgressee==='function'){ marquerAgressee(cible); marquerAgressee(agresseur); }
   if(typeof syncWarState==='function')syncWarState();
-  /* « dès que la guerre est enclenchée au tour 1 » : on facture immédiatement, sans attendre le
-     tour suivant. Le marqueur `_usureTour` empêche la double facturation à l'ouverture du tour. */
-  _usureDeGuerre(w);
   // La tension reste au MAXIMUM des deux côtés pendant toute la guerre (endWar la halve à la fin).
   setTens(A,B,10); setTens(B,A,10);
 
@@ -6955,6 +7040,11 @@ function declarerGuerre(agresseur, cible, raison, declaredBy){
         +(jetons>0?' — '+jetons+' jeton(s) Force rendu(s)':'')+'.','red');
     }
   }
+  /* ⚠️ L'USURE APRÈS L'ANNONCE, PAS AVANT. Elle était facturée quarante lignes plus haut, si bien
+     que le journal montrait la punition AVANT son motif : partie 8B47, tour 7, Marc lisait deux
+     « usure de guerre −4 » puis seulement « GUERRE DÉCLARÉE ». Un journal se lit dans l'ordre des
+     causes. Le prélèvement lui-même est inchangé — « dès que la guerre est enclenchée au tour 1 ». */
+  _usureDeGuerre(w);
   addLog('🚨 GUERRE DÉCLARÉE : '+agresseur.civ.emoji+' '+agresseur.civ.name+' contre '
     +cible.civ.emoji+' '+cible.civ.name+' — '+raison,'red');
   return w;
@@ -7625,8 +7715,12 @@ function _doAITurnInterne(aiPlayer,oneShot){
   // ── Suivi des coûts IA : snapshot avant chaque action, diff après, enregistré au journal ──
   function _aiSnapRes(){return{energy:ai.res.energy||0,materials:ai.res.materials||0,science:ai.res.science||0,morale:ai.res.morale||0,force:ai.forceTokens||0};}
   function _aiRec(bAc,bRes,fromIdx){
-    const acP=Math.max(0,bAc-ai.acLeft),cost={};
-    for(const r of['energy','materials','science']){const d=(bRes[r]||0)-(ai.res[r]||0);if(d>0)cost[r]=d;}
+    const acP=Math.max(0,bAc-ai.acLeft),cost={},gain={};
+    /* ⚠️ SEULS LES COÛTS ÉTAIENT RELEVÉS. Un pouvoir gratuit qui RAPPORTE des ressources — le
+       « Commerce avec les pirates » des Ceinturiens — s'affichait donc « paie 0 AC (aucune
+       ressource) » alors que la nation venait d'encaisser. Doublement trompeur : on croyait qu'il ne
+       s'était rien passé. On relève les deux sens. */
+    for(const r of['energy','materials','science']){const d=(bRes[r]||0)-(ai.res[r]||0);if(d>0)cost[r]=d;else if(d<0)gain[r]=-d;}
     const df=(bRes.force||0)-(ai.forceTokens||0);if(df>0)cost.force=df;
     for(let i=fromIdx;i<G.aiActions.length;i++){const e=G.aiActions[i];if(e&&!e._rec){e._rec=true;_journalAdd(ai,e.name,acP,cost,e.desc,{war:_isWarAct(e.name)});}}
     // TRANSPARENCE (demande de Marc) : le journal affichait les actions des IA SANS leur coût — impossible de
@@ -7635,6 +7729,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
       const parts=[];
       for(const r of ['energy','materials','science']){ if(cost[r])parts.push('−'+cost[r]+rEmoji(r)); }
       if(cost.force)parts.push('−'+cost.force+' jeton'+(cost.force>1?'s':'')+' Force');
+      for(const r of ['energy','materials','science']){ if(gain[r])parts.push('+'+gain[r]+rEmoji(r)); }
       addLog('   ↳ '+ai.civ.emoji+' '+ai.civ.name+' paie : '+(acP?acP+' AC':'0 AC')+(parts.length?(' '+parts.join(' ')):' (aucune ressource)'),'dim');
     }
   }
@@ -7663,6 +7758,14 @@ function _doAITurnInterne(aiPlayer,oneShot){
       if(_col&&(ai.res.materials||0)>=3&&(ai.res.energy||0)>=3){ai.res.materials-=1;ai.res.energy-=1;_col.level=2;updateConnections(ai);ai.abilityUsed=true;
         G.aiActions.push({emoji:'💫',name:'Forge Orbitale',desc:NODES[_col.nodeId].name+' Nv.2'});}
     }
+  }
+  /* ⚠️ LE POUVOIR NATIONAL GRATUIT N'ÉTAIT ANNONCÉ NULLE PART. Chaque autre action de l'IA écrit sa
+     propre ligne (« 🤖 X colonise Y ») ; ces quatre-là se contentaient de pousser dans `G.aiActions`.
+     Résultat, partie 8B47 : « ↳ ☠️ Ceinturiens paie : 0 AC (aucune ressource) » revenait presque à
+     chaque tour, sans jamais dire ce qui avait été fait. Marc voyait une ligne vide. */
+  for(let _k=_i0;_k<G.aiActions.length;_k++){
+    const _e=G.aiActions[_k]; if(!_e)continue;
+    addLog('🤖 '+ai.civ.emoji+' '+ai.civ.name+' — '+(_e.emoji||'')+' '+_e.name+(_e.desc?(' : '+_e.desc):''),'dim');
   }
   _aiRec(_bA,_bR,_i0);}
   ai._milBoughtThisTurn=new Set(); // militaires : 1× par carte par tour (IA)
@@ -8152,7 +8255,8 @@ function _doAITurnInterne(aiPlayer,oneShot){
       if(f.type!=='government'||f.id===ai.govForm||!f.govForm)continue;
       const cost=f.cost||{};if(!Object.entries(cost).every(([r,a])=>(ai.res[r]||0)>=a))continue;
       const _pts=_auPlafond?0:(f.govForm.formPts||0);
-      const val=_pts+(f.govForm.acBonus||0)*6-curVal;
+      /* Le coût en moral fait partie du prix, au même titre que les 🪨 — voir `coutMoralForme`. */
+      const val=_pts+(f.govForm.acBonus||0)*6-curVal-coutMoralForme(ai,f);
       if(val>bestVal){bestVal=val;bestForm=f;}
     }
     if(bestForm){aiBuyCivic(ai,bestForm);return true;}
@@ -8644,7 +8748,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
   }
   function _civicUtil(){
     let v=0;const curVal=(ai.govFormPts||0)+(ai.govFormAC||0)*6;
-    for(const f of (typeof CIVIC_MARKET!=='undefined'?CIVIC_MARKET:[])){if(f.type!=='government'||f.id===ai.govForm||!f.govForm)continue;const cost=f.cost||{};if(!Object.entries(cost).every(([r,a])=>(ai.res[r]||0)>=a))continue;const val=(f.govForm.formPts||0)+(f.govForm.acBonus||0)*6-curVal;if(val>0)v=Math.max(v,6+val*0.4);}
+    for(const f of (typeof CIVIC_MARKET!=='undefined'?CIVIC_MARKET:[])){if(f.type!=='government'||f.id===ai.govForm||!f.govForm)continue;const cost=f.cost||{};if(!Object.entries(cost).every(([r,a])=>(ai.res[r]||0)>=a))continue;const val=(f.govForm.formPts||0)+(f.govForm.acBonus||0)*6-curVal-coutMoralForme(ai,f);if(val>0)v=Math.max(v,6+val*0.4);}
     const _reform=(typeof CIVIC_MARKET!=='undefined'?CIVIC_MARKET:[]).find(c=>c.id==='cm_reform');
     if(_reform&&!(ai._civicTaken&&ai._civicTaken.has('cm_reform'))&&(ai.gov_pts||0)<15){const rc=_reform.cost||{};if(Object.entries(rc).every(([r,a])=>(ai.res[r]||0)>=a))v=Math.max(v,10);}
     if((ai.res.morale||0)<=3)v=Math.max(v,7);
@@ -11136,8 +11240,15 @@ function renderLogLegend(){
    D'OÙ VIENT L'AUTEUR :
      · `_auteurLog`, posé explicitement autour d'un bloc dont on sait à qui il appartient
        (le tour d'une IA, une boucle d'entretien nation par nation) ;
-     · à défaut, `G.player` — qui est bien la nation agissante, en solo comme sur le serveur,
-       puisque le pilote active la nation avant d'appliquer son action.
+     · à défaut, `G.player` — la nation agissante, puisque le pilote l'active avant d'appliquer son
+       action.
+   ⚠️ MAIS CE DÉFAUT NE VAUT RIEN POUR LES LIGNES QUI N'APPARTIENNENT À PERSONNE. Le draft
+   Stratégie, l'ordre d'initiative, la résolution d'un événement : ce sont des faits de PARTIE, pas
+   d'une nation. Le pilote réassigne `G.player` à chaque siège activé (`driver.activate`), si bien
+   que ces lignes se retrouvaient signées par le dernier joueur ayant agi — partie 8B47, elles sont
+   attribuées aux Terriens jusqu'au tour 7 puis aux Ceinturiens à partir du tour 8, sans qu'aucune
+   règle n'ait changé. C'est la maladie de fond du projet : la perspective lue dans une globale.
+   `startTurn` et `runEndOfRound` déclarent donc explicitement un auteur NUL — rendu « Système ».
    ⚠️ `_auteurLog` est volontairement une variable de PORTÉE, pas un champ de `G` : elle ne vaut
    que le temps d'un appel et `logAuteur` la restaure dans un `finally`. Rien à sauvegarder. */
 let _auteurLog=null;

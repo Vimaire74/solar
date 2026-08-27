@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-27 · v9.87';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
+const SOLAR_BUILD_JS = '2026-08-27 · v9.88';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :
@@ -1779,8 +1779,19 @@ function askLocalDecision(pending){
   return new Promise(resolve=>{
     const o=pending.payload||{}; const k=pending.kind;
     const done=(ans)=>{ closeDecision(); resolve(ans); };
-    const TITLES={raid_target:'💰 Quelle nation piller ?',accord_request:'🤝 Proposition d\'accord commercial',agenda:'Choisis ton agenda secret',strategy:'Carte Stratégie',strategy_calm:'Calmer une tension',invest1:'Investissement (Niv.1)',invest2:'Investissement (Niv.2)',espionage:'🕵️ Espionnage : quelle filière copies-tu ?',extrasolar:'Exploration extra-solaire',empath_copy:'Télépathie : carte à copier',ai_dyson:'Sphère de Dyson adverse',dyson_build:'Ta Sphère de Dyson',peace_offer:'Offre de paix',war_combat:'Combat',accord_confirm:'Accord commercial',defense:'Défense !',peace_answer:'🕊️ Proposition de paix',war_initiative:'🌀 Hyperpropulsion : qui frappe en premier ?'};
-    let body='<h2>'+(TITLES[k]||k)+'</h2>';
+    const TITLES={raid_result:'💰 Résultat du raid',raid_hit:'⚠️ Tu es pillé',accord_result:'🤝 Réponse à ton accord',raid_target:'💰 Quelle nation piller ?',accord_request:'🤝 Proposition d\'accord commercial',agenda:'Choisis ton agenda secret',strategy:'Carte Stratégie',strategy_calm:'Calmer une tension',invest1:'Investissement (Niv.1)',invest2:'Investissement (Niv.2)',espionage:'🕵️ Espionnage : quelle filière copies-tu ?',extrasolar:'Exploration extra-solaire',empath_copy:'Télépathie : carte à copier',ai_dyson:'Sphère de Dyson adverse',dyson_build:'Ta Sphère de Dyson',peace_offer:'Offre de paix',war_combat:'Combat',accord_confirm:'Accord commercial',defense:'Défense !',peace_answer:'🕊️ Proposition de paix',war_initiative:'🌀 Hyperpropulsion : qui frappe en premier ?'};
+    /* ⚠️ LE REPLI AFFICHAIT LE NOM TECHNIQUE DE LA FENÊTRE. Marc, 27/08 : « le résultat du raid
+       indique : raid_result mais pas ce qu'on a gagné ». `TITLES[k]||k` : quand le type n'est pas
+       dans la table, l'utilisateur lisait `raid_result` — un identifiant de code, sans le moindre
+       contenu, alors que le moteur avait pourtant envoyé titre ET butin dans la charge utile.
+       Le défaut n'est pas ce type-là, c'est le REPLI : il reviendra à chaque nouveau type de
+       fenêtre. On lit donc d'abord ce que le moteur a écrit (`payload.title`), et on ne montre un
+       identifiant de code que s'il n'y a vraiment rien d'autre — cas où l'on préfère encore un mot
+       obscur à une fenêtre vide. */
+    let body='<h2>'+esc(o.title||TITLES[k]||k)+'</h2>';
+    /* Et le CORPS envoyé par le moteur doit s'afficher, quel que soit le type : c'est là que vivent
+       le butin d'un raid, le motif d'un refus, le détail d'un combat. */
+    if(o.body) body+='<div style="margin:4px 0 10px">'+o.body+'</div>';
     if(k==='defense'){
       // CHOIX TACTIQUE DE DÉFENSE : combien de jetons engager (0 = ne pas défendre) + Supercroiseur éventuel.
       const max=o.maxDef||0;
