@@ -33,7 +33,7 @@
 <nav class="som">
 <strong>Sommaire</strong>
 <ul>
-<li><a href="#s1">1. Le jeu en bref</a></li>
+<li><a href="#s1">1. En bref</a></li>
 <li><a href="#s2">2. Nations</a></li>
 <li><a href="#s3">3. Ressources</a></li>
 <li><a href="#s4">4. Actions et gouvernement</a></li>
@@ -54,27 +54,35 @@
 </ul>
 </nav>
 
-<h2 id="s1">1. Le jeu en bref</h2>
-<p>Chaque nation colonise le système solaire, développe ses technologies et accumule des points de victoire (VP). La partie dure 10 tours ; le plus de VP l'emporte.</p>
-<p>À chaque tour, tu dépenses des <strong>Actions de Commandement</strong> (AC) pour coloniser, construire des routes, acheter des technologies, commercer ou attaquer. Les colonies reliées à ta base par des routes produisent des ressources en fin de tour.</p>
+<h2 id="s1">1. En bref</h2>
+<p>Colonise le système solaire, développe tes technologies, accumule des points de victoire (VP). La partie dure <strong>10 tours</strong> ; le plus de VP l'emporte. Chaque tour, tu dépenses des <strong>Actions de Commandement</strong> (AC) ; les colonies reliées à ta base produisent en fin de tour.</p>
 
 <h2 id="s2">2. Nations</h2>
-<p>Tu choisis ta nation au début ; les autres sont attribuées au hasard. Chacune a des ressources de départ, une base toujours connectée, des jetons Force, un passif permanent et une capacité active utilisable une fois par tour. Sa branche bonus donne <strong>−1🔬</strong> sur les technologies de cette branche.</p>
+<p>Tu choisis ta nation, les autres sont tirées au sort. Sa branche bonus donne <strong>−1🔬</strong> sur les technologies de cette branche.</p>
 <table>
 <tr><th>Nation</th><th>Départ</th><th>Force</th><th>Branche bonus</th><th>Passif et base</th></tr>
-<tr><td>🌍 Terriens</td><td>2⚡ 6🪨 3🔬 4❤️</td><td>5</td><td>Spiritualité &amp; Nature</td><td>Moral ≥ 5 → +1 pt Gouvernement/tour. Base : Lune.</td></tr>
+<tr><td>🌍 Terriens</td><td>2⚡ 6🪨 3🔬 4❤️</td><td>5</td><td>Spiritualité &amp; Nature</td><td>Moral ≥ 7 → +1 AC. Base : Lune.</td></tr>
 <tr><td>🔴 Martiens</td><td>4⚡ 4🪨 2🔬 3❤️</td><td>5</td><td>Expansion</td><td>Colonisation −1🪨 −1⚡. Base : Phobos.</td></tr>
-<tr><td>🟠 Jupitériens</td><td>5⚡ 2🪨 3🔬 3❤️</td><td>4</td><td>Mines &amp; Énergie</td><td>Base : Io, le monde le plus riche en ⚡ (3⚡/tour dès le tour 1, sans rien construire).</td></tr>
-<tr><td>☠️ Ceinturiens</td><td>6⚡ 4🪨 1🔬 2❤️</td><td>3</td><td>Navigation &amp; Moteurs</td><td>Raids à 1 jeton au lieu de 2. Immunisés contre les pirates. +1⚡/tour. Base : Éris (1⚡ 1🪨).</td></tr>
+<tr><td>🟠 Jupitériens</td><td>5⚡ 2🪨 3🔬 3❤️</td><td>4</td><td>Mines &amp; Énergie</td><td>Base : Io, 3⚡/tour dès le tour 1.</td></tr>
+<tr><td>☠️ Ceinturiens</td><td>6⚡ 4🪨 1🔬 2❤️</td><td>3</td><td>Navigation &amp; Moteurs</td><td>Raid à 1 jeton. Immunisés contre les pirates. +1⚡/tour. Base : Éris.</td></tr>
 </table>
-
-<h3>Capacités actives — gratuites, une fois par tour</h3>
+<p>Capacité active, gratuite, une fois par tour :</p>
 <table>
 <tr><th>Nation</th><th>Capacité</th><th>Coût</th></tr>
 <tr><td>🌍 Terriens</td><td>Diplomatie Verte : +3 pts Gouvernement</td><td>3🪨</td></tr>
 <tr><td>🔴 Martiens</td><td>Surtension : +1 AC ce tour</td><td>2⚡</td></tr>
-<tr><td>🟠 Jupitériens</td><td>Forge Orbitale : une lune de Jupiter passe du niveau 1 au niveau 2</td><td>1🪨 1⚡</td></tr>
-<tr><td>☠️ Ceinturiens</td><td>Commerce avec les pirates : 75 % → 2 ressources au hasard, 15 % → 1, 5 % → rien</td><td>gratuit</td></tr>
+<tr><td>🟠 Jupitériens</td><td>Forge Orbitale : une lune de Jupiter passe au niveau 2</td><td>1🪨 1⚡</td></tr>
+<tr><td>☠️ Ceinturiens</td><td>Commerce pirate : 75 % → 2 ressources au hasard, 15 % → 1, 5 % → rien</td><td>gratuit</td></tr>
+</table>
+
+<h3>Tempéraments des nations tenues par l'ordinateur</h3>
+<table>
+<tr><th>Tempérament</th><th>Manière de jouer</th></tr>
+<tr><td>🏗️ Bâtisseur</td><td>Ne pille jamais. Développe et récolte plutôt que de prendre.</td></tr>
+<tr><td>⚔️ Conquérant</td><td>Économise ses jetons pour conquérir. Cherche le renseignement, puis frappe qui ne peut plus se défendre.</td></tr>
+<tr><td>🎯 Opportuniste</td><td>Court les événements, la diplomatie et son agenda.</td></tr>
+<tr><td>🛡️ Assiégée</td><td><em>Temporaire, 3 tours.</em> Une nation attaquée, pillée ou dépossédée riposte et s'arme avant tout.</td></tr>
+<tr><td>😰 Acculée</td><td><em>Temporaire.</em> Une nation enfermée (voir Étouffement, §12.1) s'arme d'abord, puis force le passage.</td></tr>
 </table>
 
 <h2 id="s3">3. Ressources</h2>
@@ -82,54 +90,35 @@
 <tr><th>Symbole</th><th>Ressource</th><th>Rôle</th></tr>
 <tr><td>⚡</td><td>Énergie</td><td>Actions et entretien</td></tr>
 <tr><td>🪨</td><td>Matériaux</td><td>Construction, colonisation, routes</td></tr>
-<tr><td>🔬</td><td>Savoir</td><td>Achat des technologies</td></tr>
+<tr><td>🔬</td><td>Savoir</td><td>Technologies</td></tr>
 <tr><td>❤️</td><td>Moral</td><td>Protège les AC et les revenus</td></tr>
 </table>
-<p><strong>Plafonds de stockage</strong> : 12⚡, 20🪨, 10🔬, 10❤️. Tout excédent est perdu en fin de tour. Certaines technologies relèvent ces plafonds.</p>
-
-<h3>Moral critique</h3>
+<p><strong>Plafonds</strong> : 12⚡, 20🪨, 10🔬, 10❤️. L'excédent est perdu en fin de tour ; certaines technologies relèvent ces plafonds.</p>
 <table>
-<tr><th>Moral</th><th>Effet au tour suivant</th></tr>
-<tr><td>0</td><td>Guerre civile : aucun revenu, AC réduits de moitié</td></tr>
-<tr><td>1</td><td>Tous les revenus divisés par deux</td></tr>
+<tr><th>Moral</th><th>Effet</th></tr>
+<tr><td>0</td><td>Guerre civile : aucun revenu, et AC réduits de moitié au tour suivant</td></tr>
+<tr><td>1</td><td>Revenus divisés par deux</td></tr>
 </table>
-<p class="cle">Ces pénalités se calculent sur ton moral <strong>à la fin de ta phase d'actions</strong>, pas après les combats de fin de tour. Une chute de moral due à une guerre ne te pénalise donc qu'au tour suivant : tu as un tour pour le remonter. Même règle pour toutes les nations.</p>
+<p class="cle">Ces pénalités se calculent sur le moral que tu as <strong>au moment où tu termines ton tour</strong>, pas sur celui qui reste une fois les guerres résolues. Une chute due à une ou plusieurs guerres ne te pénalise donc qu'à la fin du tour suivant : tu as un tour entier pour la corriger.</p>
 
 <h2 id="s4">4. Actions de commandement et gouvernement</h2>
-<h3>4.1 AC par tour</h3>
-<p>AC = niveau de gouvernement + 1. Au départ, niveau 1 → <strong>2 AC</strong>. Le niveau 4 donne 5 AC, maximum du jeu. La Tyrannie ajoute 1 AC.</p>
-
-<h3>4.2 Gouvernement</h3>
-<p>Les points de gouvernement viennent de deux sources :</p>
-<ul>
-<li><strong>Permanents</strong> : technologies et action 📜 Réforme Institutionnelle (+5 pts, une fois par partie).</li>
-<li><strong>Forme de gouvernement</strong> active. En adopter une nouvelle remplace la précédente et fait perdre sa contribution. Les points venus des technologies restent acquis.</li>
-</ul>
+<p><strong>AC par tour = niveau de gouvernement + 1</strong>, plus les bonus (Tyrannie, Surtension, Mobilisation). Le maximum du jeu est 5.</p>
 <table>
-<tr><th>Niveau</th><th>Points requis</th><th>AC</th></tr>
+<tr><th>Niveau</th><th>Points requis</th><th>AC de base</th></tr>
 <tr><td>1</td><td>0</td><td>2</td></tr>
 <tr><td>2</td><td>5</td><td>3</td></tr>
 <tr><td>3</td><td>10</td><td>4</td></tr>
-<tr><td>4</td><td>15</td><td>5 (maximum)</td></tr>
+<tr><td>4</td><td>15</td><td>5</td></tr>
 </table>
+<p>Les points viennent des <strong>technologies</strong> et de la 📜 Réforme Institutionnelle — acquis définitivement — ou de ta <strong>forme de gouvernement</strong>. En adopter une nouvelle remplace l'ancienne et fait perdre sa contribution ; les pertes de moral, elles, sont immédiates et ne sont jamais récupérées.</p>
 <table>
 <tr><th>Forme</th><th>Effet</th><th>Coût (1 AC +)</th></tr>
-<tr><td>Tyrannie</td><td>+1 AC/tour, sans points de gouvernement</td><td>−2❤️</td></tr>
-<tr><td>Domination des Corporations</td><td>+5 pts Gouvernement</td><td>2🪨, −1❤️</td></tr>
-<tr><td>Sénat Solaire</td><td>+5 pts Gouvernement</td><td>3🪨</td></tr>
-<tr><td>Démocratie Instantanée</td><td>+10 pts Gouvernement, +1❤️/tour</td><td>3🪨 2⚡ 1🔬, puis 2🪨 2⚡/tour</td></tr>
+<tr><td>Tyrannie</td><td>+1 AC/tour, aucun point de gouvernement, moral plafonné à 6</td><td>−2❤️</td></tr>
+<tr><td>Domination des Corporations</td><td>+5 pts, moral plafonné à 7</td><td>2🪨, −1❤️</td></tr>
+<tr><td>Sénat Solaire</td><td>+5 pts</td><td>3🪨</td></tr>
+<tr><td>Démocratie Instantanée</td><td>+10 pts, +1❤️/tour</td><td>3🪨 2⚡ 1🔬, puis 2🪨 2⚡/tour</td></tr>
 </table>
-<p>Les pertes de moral à l'adoption sont définitives. La Tyrannie n'apporte aucun point de gouvernement : elle achète de la puissance d'action, pas de la légitimité.</p>
-
-<h3>Tempéraments des nations dirigées par l'ordinateur</h3>
-<p>Chaque nation que tu n'incarnes pas joue selon un tempérament, tiré au début de la partie. À trois adversaires, les trois sortent ; en dessous, ils sont tirés au sort sans doublon.</p>
-<table>
-<tr><th>Tempérament</th><th>Manière de jouer</th></tr>
-<tr><td>🏗️ Bâtisseur</td><td>Ne pille jamais. Développe ses colonies et ses technologies ; quand une ressource lui manque, il la récolte (hélium-3, astéroïdes, recherche) au lieu d'aller la prendre.</td></tr>
-<tr><td>⚔️ Conquérant</td><td>Ne pille pas : il économise ses jetons pour conquérir. Cherche d'abord le renseignement, puis frappe les nations à court de ressources — elles ne peuvent plus se défendre.</td></tr>
-<tr><td>🎯 Opportuniste</td><td>Court les événements, la diplomatie et son agenda secret</td></tr>
-</table>
-<p>Une nation qu'on attaque, qu'on pille ou à qui l'on prend une colonie devient <strong>🛡️ Assiégée</strong> pendant trois tours : elle riposte et s'arme avant tout, quel que soit son tempérament. Passé ce délai, elle le retrouve.</p>
+<p class="cle">Quand une forme impose un <strong>maximum de moral</strong>, ton moral ne peut pas dépasser ce point, quelles que soient tes technologies, tes accords ou tes revenus. L'excédent est écrêté en fin de tour, au même moment que le plafond ordinaire de 10❤️. Changer de forme lève le plafond aussitôt — mais le moral déjà perdu ne revient pas.</p>
 
 <h2 id="s5">5. La carte</h2>
 <table>
@@ -139,77 +128,78 @@
 <tr><td>Saturnienne</td><td>Titan, Encelade</td></tr>
 <tr><td>Externe</td><td>Triton, Pluton, Éris</td></tr>
 </table>
-<p>La Station Jupiter et les anneaux orbitaux sont du décor : ni colonisables, ni attaquables.</p>
+<p>La Station Jupiter et les anneaux sont du décor : ni colonisables, ni attaquables.</p>
 
 <h2 id="s6">6. Les actions</h2>
 <table>
 <tr><th>Action</th><th>AC</th><th>Coût</th></tr>
-<tr><td>Coloniser</td><td>1</td><td>2🪨 1⚡ — donne 1 jeton Force</td></tr>
+<tr><td>Coloniser</td><td>1</td><td>2🪨 1⚡ (Martiens −1🪨 −1⚡) — donne 1 jeton Force</td></tr>
 <tr><td>Améliorer une colonie</td><td>1</td><td>3🪨 1⚡ 1🔬</td></tr>
-<tr><td>Établir une route</td><td>1</td><td>1🪨 (+ 1 jeton Force si tu veux la protéger)</td></tr>
+<tr><td>Établir une route</td><td>1</td><td>1🪨 (+1 jeton Force pour la protéger)</td></tr>
 <tr><td>Raid</td><td>1</td><td>2 jetons Force (1 pour les Ceinturiens)</td></tr>
-<tr><td>Accord commercial</td><td>1</td><td>2🪨</td></tr>
-<tr><td>Attaque directe</td><td>1</td><td>jetons Force engagés — déclenche la guerre</td></tr>
-<tr><td>Acheter une carte</td><td>1</td><td>coût de la carte</td></tr>
-<tr><td>Capacité de nation</td><td>0</td><td>propre à chaque nation</td></tr>
+<tr><td>Accord commercial</td><td>1</td><td>2🪨 <strong>donnés</strong> à l'autre nation</td></tr>
+<tr><td>Assaut</td><td>1</td><td>jetons engagés — déclenche la guerre</td></tr>
+<tr><td>Acheter une carte</td><td>1 (2 au niveau 3)</td><td>coût de la carte</td></tr>
+<tr><td>Capacité de nation</td><td>0</td><td>voir §2</td></tr>
 </table>
 
-<h3>6.1 Coloniser</h3>
-<p>Coût : 1 AC + 2🪨 1⚡ (Martiens : −1🪨 −1⚡). Un nœud déjà occupé ne peut pas être colonisé — sauf par l'Exploration Extra-Solaire.</p>
+<h3>6.1 Améliorer</h3>
+<p><strong>Niveau 2</strong> : revenus ×1,5, +1❤️/tour, +1🔬/tour.<br>
+<strong>Niveau 3</strong> : revenus ×2, +2❤️/tour, +2🔬/tour.</p>
+<p class="cle">Le ×1,5 est arrondi vers le bas : une colonie qui produit 1⚡ en produit encore 1 au niveau 2. Le rendement des trois niveaux est affiché sur chaque nœud de la carte — regarde-le avant de coloniser.</p>
 
-<h3>6.2 Cohabitation</h3>
+<h3>6.2 Route</h3>
+<p>Entretien 1⚡/tour, compensé par 1🪨 de revenu commercial. Une route reste connectée tant qu'elle existe ; le jeton posé dessus sert <strong>uniquement</strong> à la protéger des pirates.</p>
+
+<h3>6.3 Raid</h3>
+<p>Tu prends la <strong>production d'une colonie</strong> — son revenu du tour en ⚡, 🪨 et 🔬, jamais son ❤️ — dans la limite de ce que la nation possède. Sans cible désignée, c'est la plus productive. Tes jetons partent 2 tours en récupération (1 avec Stratégie Guerrière). Tension : <strong>+5</strong> victime, <strong>+1</strong> pillard.</p>
+<p>🔍 IA Défensive annule le vol, 🛰️ Drones de Surveillance le réduit de moitié. Un raid bloqué coûte quand même AC et jetons, donne +1 de tension, et le pillard en est averti.</p>
+
+<h3>6.4 Accord commercial</h3>
+<ul>
+<li>Tension −3 des deux côtés. Tant qu'il tient : <strong>+1🪨 +1❤️/tour pour chacun</strong> — par accord, pas par colonie.</li>
+<li>Tes routes sur ses colonies ne créent plus de tension, et tu peux <strong>traverser son territoire</strong> pour aller connecter des colonies à toi plus lointaines sans risquer la guerre. Coloniser ses nœuds reste interdit.</li>
+<li><strong>Un seul accord par couple.</strong> Si les deux se le proposent au même sommet, un seul est signé — et les deux en sont avertis.</li>
+<li>Rompu par une déclaration de guerre ou un assaut, pas par un raid. En guerre, une route entre deux colonies ennemies est détruite et son jeton te revient.</li>
+</ul>
+
+<h3>6.5 Cohabitation</h3>
 <p>Seule l'Exploration Extra-Solaire permet à deux nations d'occuper le même nœud, sur Éris, Pluton ou Triton.</p>
 <ul>
 <li>L'occupant d'origine garde sa colonie intacte.</li>
 <li>Le nouvel arrivant reçoit une colonie de <strong>niveau 1, non améliorable</strong>, avec un <strong>accord commercial forcé</strong> sur ce nœud. Elle compte pleinement pour les VP et les agendas.</li>
-<li>Un cohabitant peut <strong>assaillir l'autre</strong>. Le vainqueur reste seul : sa colonie prend le niveau de la colonie conquise moins un, l'interdiction d'améliorer est levée et l'accord forcé tombe.</li>
-<li>Face à une nation <strong>extérieure</strong>, les deux cohabitants défendent ensemble : leurs jetons et bonus s'additionnent. Si l'assaillant gagne, il les expulse tous les deux et prend le nœud.</li>
+<li>Un cohabitant peut assaillir l'autre : le vainqueur reste seul, sa colonie prend le niveau de la conquise moins un, l'interdiction d'améliorer et l'accord forcé tombent.</li>
+<li>Face à une nation extérieure, les deux cohabitants défendent <strong>ensemble</strong>. Si l'assaillant gagne, il les expulse tous les deux.</li>
 </ul>
 
-<h3>6.3 Améliorer</h3>
-<p>Niveau 2 : revenus ×1,5 et +1❤️/tour. Niveau 3 : revenus ×2 et +2❤️/tour. Sur un nœud à hub technologique : +1🔬/tour au niveau 2, +2🔬/tour au niveau 3.</p>
-
-<h3>6.4 Route</h3>
-<p>Coût : 1 AC + 1🪨. Entretien 1⚡/tour, compensé par 1🪨 de revenu commercial. Une route reste connectée tant qu'elle existe ; un jeton Force posé dessus sert <strong>uniquement</strong> à la protéger des pirates.</p>
-
-<h3>6.5 Raid</h3>
-<p>Le raid <strong>pille la production d'une colonie</strong> : tu prends ce que cette colonie rapporte ce tour-ci en ⚡, 🪨 et 🔬 — jamais son ❤️ — dans la limite de ce que la nation possède réellement. Si tu ne désignes pas de colonie, c'est la plus productive qui est pillée. Tes jetons partent 2 tours en récupération (1 avec Stratégie Guerrière).</p>
-<p>La nation pillée gagne <strong>+5 de tension</strong> envers toi, et toi <strong>+1</strong> envers elle : on se méfie de qui l'on a dépouillé.</p>
-<p>🔍 <strong>IA Défensive</strong> annule entièrement le vol ; 🛰️ <strong>Drones de Surveillance</strong> le réduit de moitié. Un raid bloqué coûte quand même son AC et ses jetons au pillard, donne +1 de tension à la victime, et le pillard en est <strong>averti</strong> pour ne pas recommencer.</p>
-
-<h3>6.6 Accord commercial</h3>
-<p>Coût : 1 AC + 2🪨 <strong>donnés</strong> à l'autre nation. La tension baisse de 3 des deux côtés.</p>
-<p><strong>Un accord ne se signe qu'une fois entre deux nations.</strong> Si les deux se le proposent mutuellement au cours du même sommet, il n'en est conclu qu'un seul — et les deux signataires en sont avertis.</p>
-<p>Tant que l'accord tient, les <strong>deux signataires</strong> reçoivent +1🪨 +1❤️/tour — par accord, pas par colonie. Tes routes sur ses colonies ne créent plus de tension, et tu peux <strong>traverser son territoire</strong> pour relier une colonie lointaine (un accord par colonie). Une colonie reliée de cette façon rapporte les ressources brutes du nœud, sans le bonus de niveau. L'accord ne permet pas de coloniser ses nœuds.</p>
-<p>L'accord est rompu par une déclaration de guerre ou une attaque directe — pas par un raid. Pendant une guerre, une route qui touche une de tes colonies tient ; une route entre deux colonies ennemies est détruite et son jeton te revient.</p>
-
 <h2 id="s7">7. Technologies</h2>
-<p>7 branches, 3 niveaux. Le déblocage est <strong>partagé</strong> : dès qu'une nation achète un niveau 1, le niveau 2 s'ouvre pour tout le monde. Le niveau 3 coûte 2 AC. Chaque carte est <strong>exclusive</strong> : un seul acheteur par partie.</p>
+<p>7 branches, 3 niveaux. Le déblocage est <strong>partagé</strong> : dès qu'une nation achète un niveau 1, le niveau 2 s'ouvre pour tout le monde. Le niveau 3 coûte 2 AC.</p>
+<p class="cle"><strong>Exclusivité :</strong> seules les technologies de <strong>niveau 3</strong> sont réservées à leur premier acheteur. Les niveaux 1 et 2 peuvent être achetés par plusieurs nations. Les actions Économie &amp; Société non répétables (§7.1) sont, elles aussi, exclusives : un seul acheteur par partie.</p>
 <table>
 <tr><th>Niv</th><th>Carte</th><th>Effet</th><th>Coût</th><th>VP</th></tr>
 <tr><td>T1</td><td>🏗️ Biosphère Autonome</td><td>Colonies de niveau 1 sans entretien ⚡</td><td>2🪨 1🔬</td><td>1</td></tr>
 <tr><td>T2</td><td>🏗️ Biosphère Avancée</td><td>+1🪨/tour par colonie ; niveaux 2-3 sans entretien ⚡</td><td>4🔬 2⚡ 2🪨</td><td>3</td></tr>
 <tr><td>T3</td><td>🏗️ Terraformation</td><td>+1🪨 +1❤️/tour par colonie ; niveaux 2-3 sans aucun entretien</td><td>6🔬 4🪨 4⚡</td><td>5</td></tr>
-<tr><td>T1</td><td>⚗️ Propulsion Ionique</td><td>Construction de route : <strong>0🪨</strong> au lieu de 1. (L'entretien d'une route se paie en ⚡ — voir Hyperpropulsion.)</td><td>2🔬 1⚡</td><td>1</td></tr>
+<tr><td>T1</td><td>⚗️ Propulsion Ionique</td><td>Route : 0🪨 au lieu de 1 (l'entretien ⚡ reste dû)</td><td>2🔬 1⚡</td><td>1</td></tr>
 <tr><td>T2</td><td>⚗️ IA de Navigation</td><td>+2 jetons Force ; coût de guerre divisé par deux</td><td>4🔬 1⚡</td><td>3</td></tr>
-<tr><td>T3</td><td>⚗️ Hyperpropulsion</td><td>+5 pts Gouvernement, routes gratuites, +3 jetons Force, et <strong>tu choisis l'ordre des combats</strong> (§14.3)</td><td>6🔬 2⚡ 2🪨</td><td>5</td></tr>
-<tr><td>T1</td><td>🔍 Drones de Surveillance</td><td>+1🔬/tour ; raids subis allégés de 1 ressource</td><td>2🔬 1⚡ 1🪨</td><td>1</td></tr>
+<tr><td>T3</td><td>⚗️ Hyperpropulsion</td><td>+5 pts Gouvernement, routes gratuites, +3 jetons, et <strong>tu choisis l'ordre des combats</strong> (§14.3)</td><td>6🔬 2⚡ 2🪨</td><td>5</td></tr>
+<tr><td>T1</td><td>🔍 Drones Surveillance</td><td>+1🔬/tour ; raids subis réduits de moitié</td><td>2🔬 1⚡ 1🪨</td><td>1</td></tr>
 <tr><td>T2</td><td>🔍 Réseau Orbital</td><td>+1🔬/tour ; informations complètes sur les rivaux ; immunité pirates</td><td>3🔬 2⚡ 2🪨</td><td>3</td></tr>
 <tr><td>T3</td><td>🔍 IA Défensive</td><td>+4 jetons Force ; immunité raids et pirates</td><td>5🔬 2⚡ 2🪨</td><td>5</td></tr>
 <tr><td>T1</td><td>🧪 Ordinateur Quantique</td><td>+3🔬/tour, −1⚡/tour</td><td>2🔬 2🪨</td><td>1</td></tr>
 <tr><td>T2</td><td>🧪 Robotisation Avancée</td><td>+2🪨/tour</td><td>3🔬 2🪨 2⚡</td><td>3</td></tr>
-<tr><td>T3</td><td>🧪 Exploration Extra-Solaire</td><td>Colonise une planète externe (Éris, Pluton ou Triton), même occupée — voir §6.2. +8 VP si tu as 5 technologies ou plus</td><td>5🔬 3⚡ 2🪨</td><td>5</td></tr>
+<tr><td>T3</td><td>🧪 Exploration Extra-Solaire</td><td>Colonise Éris, Pluton ou Triton même occupée (§6.5). +8 VP si tu as 5 technologies ou plus</td><td>5🔬 3⚡ 2🪨</td><td>5</td></tr>
 <tr><td>T1</td><td>🕊️ Végétalisation</td><td>+2❤️ immédiat, +1❤️/tour</td><td>2🪨 1🔬</td><td>1</td></tr>
 <tr><td>T2</td><td>🕊️ Réseau Empathique</td><td>+1❤️ immédiat, +2❤️/tour, +1🔬/tour</td><td>2🔬 2🪨 2⚡</td><td>3</td></tr>
 <tr><td>T3</td><td>🕊️ Éveil Collectif</td><td>+2🔬/tour ; +1 VP par colonie connectée au score final</td><td>5🔬 2🪨</td><td>5</td></tr>
-<tr><td>T1</td><td>⛏️ Exploitation d'Astéroïdes</td><td>+3🪨/tour</td><td>1🪨 2⚡ 1🔬</td><td>1</td></tr>
+<tr><td>T1</td><td>⛏️ Exploitations d'Astéroïdes</td><td>+3🪨/tour</td><td>1🪨 2⚡ 1🔬</td><td>1</td></tr>
 <tr><td>T2</td><td>⛏️ Extracteurs Solaires</td><td>+3⚡/tour</td><td>4🪨 1⚡ 2🔬</td><td>3</td></tr>
-<tr><td>T3</td><td>⛏️ Sphère de Dyson</td><td>+5⚡/tour ; les nations qui acceptent ton monopole reçoivent +3⚡/tour, celles qui refusent te déclarent la guerre</td><td>6🪨 3⚡ 6🔬</td><td>5</td></tr>
+<tr><td>T3</td><td>⛏️ Sphère de Dyson</td><td>+5⚡/tour ; qui accepte ton monopole reçoit +3⚡/tour, qui refuse te déclare la guerre</td><td>6🪨 3⚡ 6🔬</td><td>5</td></tr>
 <tr><td>T1</td><td>🔮 Liens Empathes</td><td>Routes sans jeton, +1⚡ par 2 routes, +2 jetons de combat permanents</td><td>4🔬</td><td>1</td></tr>
 <tr><td>T2</td><td>🔮 Communications Instantanées</td><td>+2❤️/tour, +1🔬/tour, +5 pts Gouvernement</td><td>5🔬</td><td>3</td></tr>
 <tr><td>T3</td><td>🔮 Télépathie</td><td>Copie une technologie adverse, +2 jetons de combat, +3🔬/tour, −2❤️/tour en guerre</td><td>6🔬</td><td>5</td></tr>
 </table>
-<p>La branche 🔮 Empathes ne s'ouvre que par l'investissement « Union Sacrée » (§8.2), avec 3 tours d'exclusivité pour celui qui la débloque.</p>
+<p>La branche 🔮 Empathes ne s'ouvre que par l'investissement « Union Sacrée » (§8), avec 3 tours d'exclusivité pour celui qui la débloque.</p>
 
 <h3>7.1 Actions Économie &amp; Société</h3>
 <p>Disponibles en permanence, 1 AC chacune.</p>
@@ -219,56 +209,54 @@
 <tr><td>☄️ Capture d'astéroïdes</td><td>+2🪨</td><td>1⚡ 1🔬</td><td>répétable</td></tr>
 <tr><td>🌿 Programmes Sociaux</td><td>+2❤️ +1🔬</td><td>2🪨</td><td>répétable</td></tr>
 <tr><td>🕊️ Calmer la population</td><td>+1❤️ ; −3 tension envers une nation</td><td>1🪨 1⚡</td><td>répétable</td></tr>
-<tr><td>🎨 Campagne culturelle</td><td>+3❤️</td><td>2🪨</td><td>1×</td></tr>
-<tr><td>📣 Propagande</td><td>+1❤️</td><td>1⚡</td><td>1×</td></tr>
-<tr><td>📖 Investissement Recherche</td><td>+2🔬</td><td>2🪨</td><td>1×</td></tr>
-<tr><td>🎓 Universités des colonies</td><td>+1🔬/tour, permanent</td><td>1⚡ 1🪨</td><td>1×</td></tr>
-<tr><td>📜 Réforme Institutionnelle</td><td>+5 pts Gouvernement, permanent</td><td>3🔬</td><td>1× par partie</td></tr>
+<tr><td>🎨 Campagne culturelle</td><td>+3❤️</td><td>2🪨</td><td>1× dans la partie</td></tr>
+<tr><td>📣 Propagande</td><td>+1❤️</td><td>1⚡</td><td>1× dans la partie</td></tr>
+<tr><td>📖 Investissement Recherche</td><td>+2🔬</td><td>2🪨</td><td>1× dans la partie</td></tr>
+<tr><td>🎓 Universités des colonies</td><td>+1🔬/tour, permanent</td><td>1⚡ 1🪨</td><td>1× dans la partie</td></tr>
+<tr><td>📜 Réforme Institutionnelle</td><td>+5 pts Gouvernement, permanent</td><td>3🔬</td><td>1× dans la partie</td></tr>
 </table>
 
 <h3>7.2 Cartes militaires</h3>
-<p>Toujours visibles, achetables une fois par carte et par tour.</p>
+<p>Toujours visibles, une fois par carte et par tour.</p>
 <table>
 <tr><th>Carte</th><th>Effet</th><th>Coût</th><th>Prérequis</th></tr>
-<tr><td>🪖 Investissements militaires</td><td>+2 jetons Force, perdus au tour suivant</td><td>1 AC, 2⚡ 1🪨</td><td>—</td></tr>
-<tr><td>🛩️ Drones de combat</td><td>+1 jeton Force, perdu au tour suivant</td><td>1 AC, 1⚡ 1🪨</td><td>Drones de Surveillance</td></tr>
-<tr><td>🛸 Flottes de chasseurs</td><td>+4 jetons Force, la moitié perdue au tour suivant. <strong>Une fois par partie et par nation.</strong></td><td>2 AC, 3⚡ 3🪨 1🔬</td><td>Robotisation Avancée</td></tr>
-<tr><td>⚔️ Supercroiseur</td><td>+5 de puissance en guerre, permanent — voir §14.7. <strong>Une fois par partie et par nation</strong> : chacun peut l'acheter, personne n'en prive les autres.</td><td>3 AC, 4🪨 3⚡ 1🔬</td><td>—</td></tr>
+<tr><td>🪖 Investissements militaires</td><td>+2 jetons, perdus au tour suivant</td><td>1 AC, 2⚡ 1🪨</td><td>—</td></tr>
+<tr><td>🛩️ Drones de combat</td><td>+1 jeton, perdu au tour suivant</td><td>1 AC, 1⚡ 1🪨</td><td>Drones de Surveillance</td></tr>
+<tr><td>🛸 Flottes de chasseurs</td><td>+4 jetons, la moitié perdue au tour suivant. <strong>1× par partie et par nation.</strong></td><td>2 AC, 3⚡ 3🪨 1🔬</td><td>Robotisation Avancée</td></tr>
+<tr><td>⚔️ Supercroiseur</td><td>+5 de puissance en guerre, permanent (§14.7). <strong>1× par partie et par nation</strong> — chacun peut l'acheter.</td><td>3 AC, 4🪨 3⚡ 1🔬</td><td>—</td></tr>
 </table>
 
 <h2 id="s8">8. Investissements</h2>
-<p>Deux choix dans la partie. Ils ne sont pas exclusifs : plusieurs nations peuvent prendre le même.</p>
-
-<h3>8.1 Niveau 1 — choisi au tour 2, actif des tours 3 à 5</h3>
+<p>Deux choix dans la partie, non exclusifs : plusieurs nations peuvent prendre le même.</p>
+<p><strong>Niveau 1</strong> — choisi au tour 2, actif des tours 3 à 5.</p>
 <table>
 <tr><th>Carte</th><th>Bénéfice</th><th>Contrepartie</th></tr>
-<tr><td>🕵️ Espionnage</td><td>Aux tours 3, 4 et 5 (une seule fois, reportable) : la liste des technologies rivales s'affiche par nation et par catégorie. Tu coches de une à trois technologies, dans <strong>une seule catégorie chez une seule nation</strong>.</td><td>Tension chez la nation pillée : +6 pour une technologie, +8 pour deux, +10 pour trois</td></tr>
+<tr><td>🕵️ Espionnage</td><td>Une fois aux tours 3, 4 ou 5 (reportable) : tu prends 1 à 3 technologies rivales, dans <strong>une seule catégorie chez une seule nation</strong>.</td><td>Tension victime : +6, +8 ou +10</td></tr>
 <tr><td>🏭 Industrialisation lourde</td><td>+4🪨/tour</td><td>−3❤️</td></tr>
 <tr><td>🔬 Recherche intensive</td><td>+3🔬/tour</td><td>−3🪨 −1⚡</td></tr>
 <tr><td>🌾 Agriculture durable</td><td>+2❤️/tour</td><td>−2🪨 −1🔬</td></tr>
 <tr><td>🚀 Expansion rapide</td><td>1 colonisation et 1 route gratuites</td><td>−1❤️ −1🪨 −1⚡</td></tr>
 </table>
-
-<h3>8.2 Niveau 2 — choisi au tour 6, actif des tours 7 à 9</h3>
+<p><strong>Niveau 2</strong> — choisi au tour 6, actif des tours 7 à 9.</p>
 <table>
 <tr><th>Carte</th><th>Bénéfice</th><th>Contrepartie</th></tr>
 <tr><td>⚔️ Stratégie guerrière</td><td>Les jetons reviennent en 1 tour au lieu de 2</td><td>−4🪨 −2⚡</td></tr>
 <tr><td>🕊️ Confort de la population</td><td>+4❤️/tour</td><td>−4🪨</td></tr>
-<tr><td>🏗️ Colonies avancées</td><td>Toutes tes colonies actuelles passent au niveau maximum, gratuitement. Les colonies acquises ensuite ne sont pas concernées, et l'entretien reste dû.</td><td>🪨 divisés par deux, −3⚡</td></tr>
+<tr><td>🏗️ Colonies avancées</td><td>Tes colonies <em>actuelles</em> passent au niveau maximum gratuitement. Celles acquises ensuite ne sont pas concernées ; l'entretien reste dû.</td><td>🪨 divisés par deux, −3⚡</td></tr>
 <tr><td>🔮 Union sacrée</td><td>Débloque la branche Empathes, 3 tours d'exclusivité</td><td>−3🪨 −4🔬</td></tr>
 </table>
 
 <h2 id="s9">9. Cartes Stratégie</h2>
-<p>Au début de chaque tour, un lot commun est proposé (environ le nombre de nations + 2). Les nations choisissent dans l'<strong>ordre inverse des points de victoire</strong> : la plus faible sert en premier, à égalité c'est la moins armée. Chaque carte prise disparaît du lot. Une carte par nation, ou passer. Les effets expirent en fin de tour.</p>
+<p>Au début de chaque tour, un lot commun est proposé (nombre de nations + 2). On choisit dans l'<strong>ordre inverse des VP</strong> — la plus faible sert en premier, à égalité la moins armée. Une carte par nation, ou passer. Les effets expirent en fin de tour.</p>
 <table>
 <tr><th>Carte</th><th>Effet</th></tr>
 <tr><td>Expansion rapide</td><td>Colonisation gratuite ce tour</td></tr>
-<tr><td>Surge militaire</td><td>+2 jetons Force, perdus en fin de tour</td></tr>
+<tr><td>Surge militaire</td><td>+2 jetons, perdus en fin de tour</td></tr>
 <tr><td>Sprint scientifique</td><td>+3🔬</td></tr>
 <tr><td>Récolte urgente</td><td>+2🪨 +2⚡</td></tr>
-<tr><td>Diplomatie</td><td>−3 de tension envers une nation de ton choix</td></tr>
+<tr><td>Diplomatie</td><td>−3 de tension envers une nation</td></tr>
 <tr><td>Mobilisation</td><td>+1 AC ce tour</td></tr>
-<tr><td>Effort de guerre</td><td>+1 jeton Force, conservé</td></tr>
+<tr><td>Effort de guerre</td><td>+1 jeton, conservé</td></tr>
 <tr><td>Consolidation</td><td>+1❤️ et −1🪨 d'entretien ce tour</td></tr>
 </table>
 
@@ -280,147 +268,139 @@
 <tr><td>Source d'énergie</td><td>+3⚡</td></tr>
 <tr><td>Données scientifiques</td><td>+2🔬</td></tr>
 <tr><td>Relique alien</td><td>+2🔬 et +1 VP</td></tr>
-<tr><td>Arsenal orbital secret</td><td>+2 jetons Force, conservés</td></tr>
+<tr><td>Arsenal orbital secret</td><td>+2 jetons, conservés</td></tr>
 <tr><td>Minerais rares</td><td>+1🪨/tour, permanent</td></tr>
 <tr><td>Anomalie spatiale</td><td>+1 VP</td></tr>
 <tr><td>Terrain rocailleux</td><td>aucun effet</td></tr>
 </table>
 
 <h2 id="s11">11. Revenus et entretien</h2>
-<h3>11.1 Revenus</h3>
-<p>Une colonie <strong>connectée</strong> rapporte les ressources de son nœud multipliées par son niveau : ×1, ×1,5 ou ×2. S'y ajoutent +1❤️/tour au niveau 2, +2❤️/tour au niveau 3, et les bonus des cartes. Les revenus sont plafonnés par le stockage.</p>
-<p>En fin de tour, chaque colonie acquise pendant le tour donne 1 jeton Force, une seule fois.</p>
-<p>Passe la souris sur la barre de ressources (ou touche-la sur mobile) pour voir le détail : ce que rapporte chaque colonie, les bonus, les entretiens et le revenu net.</p>
-
-<h3>11.2 Entretien</h3>
+<p>Une colonie <strong>connectée</strong> rapporte les ressources de son nœud × son niveau (×1, ×1,5, ×2), plus +1❤️ au niveau 2 ou +2❤️ au niveau 3, plus les bonus de cartes — dans la limite du stockage. Chaque colonie fondée dans le tour donne 1 jeton Force, une seule fois.</p>
 <table>
-<tr><th>Élément</th><th>Coût par tour</th></tr>
+<tr><th>Élément</th><th>Entretien par tour</th></tr>
 <tr><td>Colonie niveau 1</td><td>1⚡</td></tr>
 <tr><td>Colonie niveau 2</td><td>1⚡ 1🪨</td></tr>
 <tr><td>Colonie niveau 3</td><td>1⚡ 2🪨</td></tr>
 <tr><td>Route</td><td>1⚡ (compensé par 1🪨 de commerce)</td></tr>
 </table>
-<p>Ta base est exemptée d'entretien. Chaque ressource manquante coûte 1❤️.</p>
+<p>Ta base est exemptée. Chaque ressource manquante coûte 1❤️. Touche la barre de ressources pour voir le détail colonie par colonie.</p>
 
 <h2 id="s12">12. Tension</h2>
-<p>Une jauge de 0 à 10 mesure le ressentiment d'une nation envers une autre. Elle est <strong>indépendante pour chaque couple de nations</strong> et s'applique à toutes, y compris entre deux nations que tu ne joues pas : deux rivales peuvent entrer en guerre sans que tu y sois pour rien.</p>
-<p>Une guerre en cours <strong>ne gèle que le couple concerné</strong> : les deux belligérants restent à 10 tant qu'ils se battent, mais toutes les autres jauges du plateau continuent de vivre normalement.</p>
+<p>Une jauge de 0 à 10 par <strong>couple de nations</strong>, y compris entre deux nations que tu ne joues pas : deux rivales peuvent entrer en guerre sans que tu y sois pour rien. Une guerre en cours ne gèle que le couple concerné.</p>
 
-<h3>12.1 Ce qui fait monter la tension</h3>
-<p>Les griefs de <strong>voisinage</strong> sont réévalués à chaque fin de tour : tant que la situation dure, elle se repaie. Les griefs d'<strong>acte</strong> se paient au moment où ils se produisent.</p>
+<h3>12.1 Ce qui la fait monter</h3>
+<p>Les griefs de <strong>voisinage</strong> se repaient chaque tour tant que la situation dure ; les griefs d'<strong>acte</strong> se paient au moment où ils surviennent.</p>
 <table>
 <tr><th>Cause</th><th>Points</th><th>Quand</th></tr>
-<tr><td>Une route de l'autre nation touchant une de tes colonies, sans accord entre vous deux</td><td>+1 par route</td><td>chaque tour</td></tr>
+<tr><td>Route adverse touchant une de tes colonies, sans accord entre vous</td><td>+1 par route</td><td>chaque tour</td></tr>
 <tr><td>Route partagée avec un jeton de défense adverse</td><td>+1 par route</td><td>chaque tour</td></tr>
 <tr><td>Nation dominante — 4 colonies connectées d'avance</td><td>+3</td><td>chaque tour</td></tr>
-<tr><td>Nation suprême — 6 colonies connectées d'avance</td><td>+6</td><td>chaque tour</td></tr>
+<tr><td>Nation suprême — 6 colonies d'avance</td><td>+6</td><td>chaque tour</td></tr>
 <tr><td>Nation possédant 2 technologies de niveau 3</td><td>+4</td><td>chaque tour</td></tr>
-<tr><td><strong>Blocage de chemin</strong> — elle occupe une de tes sorties alors qu'il ne t'en reste au plus qu'une seule de libre</td><td>+4</td><td>une fois, au moment où le blocage s'installe</td></tr>
-<tr><td><strong>Étouffement</strong> — tu plafonnes à 2 colonies connectées quand une autre nation en a 3 ou plus (à partir du tour 2). La colère ne vise que <strong>celle qui occupe le plus de tes sorties</strong> — une seule ennemie désignée, pas trois fronts.</td><td>+6 puis +1</td><td>+6 quand la situation s'installe, +1 chaque tour tant qu'elle dure</td></tr>
-<tr><td>Raid subi</td><td>+5 chez la victime, +1 chez le pillard</td><td>à chaque raid</td></tr>
-<tr><td>Raid bloqué par 🔍 IA Défensive</td><td>+1 chez la victime</td><td>à chaque tentative</td></tr>
-<tr><td>Espionnage détecté</td><td>+6, +8 ou +10 chez la victime selon 1, 2 ou 3 technologies volées</td><td>à la détection</td></tr>
-<tr><td>Assaut d'une colonie</td><td>+3 chez l'assailli, +1 chez l'assaillant</td><td>à chaque assaut</td></tr>
+<tr><td><strong>Blocage de chemin</strong> — elle tient une de tes sorties et il t'en reste au plus une de libre</td><td>+4</td><td>une seule fois</td></tr>
+<tr><td><strong>Étouffement</strong> — 2 colonies quand <em>toutes</em> les autres en ont 3 ou plus (dès le tour 2). Vise uniquement celle qui occupe le plus de tes sorties.</td><td>+6 puis +1</td><td>+6 à l'installation, +1 par tour ensuite</td></tr>
+<tr><td>Raid subi</td><td>+5 victime, +1 pillard</td><td>à chaque raid</td></tr>
+<tr><td>Raid bloqué par 🔍 IA Défensive</td><td>+1 victime</td><td>à chaque tentative</td></tr>
+<tr><td>Espionnage détecté</td><td>+6, +8 ou +10 chez la victime</td><td>à la détection</td></tr>
+<tr><td>Assaut d'une colonie</td><td>+3 assailli, +1 assaillant</td><td>à chaque assaut</td></tr>
 <tr><td>Attaque de pirates sur tes routes</td><td>+1 envers les Ceinturiens</td><td>à chaque attaque</td></tr>
-<tr><td>Déclaration de guerre</td><td>les deux jauges passent à 10</td><td>immédiatement</td></tr>
+<tr><td>Déclaration de guerre</td><td>les deux jauges à 10</td><td>immédiatement</td></tr>
 </table>
 
 <h3>12.2 Ce qui la fait baisser</h3>
 <table>
 <tr><th>Cause</th><th>Effet</th></tr>
-<tr><td>Aucun grief ce tour-ci</td><td>−1 par tour</td></tr>
-<tr><td>Accord commercial signé ou renouvelé</td><td>−3 des deux côtés</td></tr>
-<tr><td>🕊️ Calmer la population (action civique)</td><td>−3 envers une nation</td></tr>
+<tr><td>Aucun grief ce tour-ci</td><td>−1</td></tr>
+<tr><td>Accord commercial signé</td><td>−3 des deux côtés</td></tr>
+<tr><td>🕊️ Calmer la population</td><td>−3 envers une nation</td></tr>
 <tr><td>Sommet des accords — proposition acceptée</td><td>−5 entre le proposant et chaque nation qui accepte</td></tr>
 <tr><td>Pacte de non-agression</td><td>les deux jauges à 0</td></tr>
 <tr><td>Événement Sommet commercial</td><td>−2 avec chaque nation</td></tr>
 <tr><td>Événement Sommet diplomatique</td><td>−5 partout</td></tr>
-<tr><td>Événement Diplomatie</td><td>−3 envers une nation de ton choix</td></tr>
-<tr><td>Accepter le monopole de la Sphère de Dyson</td><td>les deux jauges à 2, et la guerre à peine déclarée s'arrête</td></tr>
-<tr><td>Fin de guerre</td><td>vainqueur 0, perdant 5 — paix blanche : 4 des deux côtés</td></tr>
+<tr><td>Carte Diplomatie</td><td>−3 envers une nation</td></tr>
+<tr><td>Accepter le monopole de la Sphère de Dyson</td><td>les deux jauges à 2, la guerre à peine déclarée s'arrête</td></tr>
+<tr><td>Fin de guerre</td><td>vainqueur 0, perdant 5 · paix blanche : 4 partout</td></tr>
 </table>
 
 <h3>12.3 Effets</h3>
 <table>
 <tr><th>Tension</th><th>Effet</th></tr>
-<tr><td>6 ou plus</td><td>Manifestations : −1❤️/tour par nation concernée. Aucune pénalité envers une nation avec qui tu es déjà en guerre.</td></tr>
-<tr><td>8 ou plus</td><td>+1 de risque de guerre par tour</td></tr>
-<tr><td>10</td><td>Guerre populaire forcée. Les deux belligérants perdent 2❤️ ; les autres nations ne paient rien.</td></tr>
+<tr><td>6 ou plus</td><td>Manifestations : −1❤️/tour par nation concernée. Rien envers une nation avec qui tu es déjà en guerre.</td></tr>
+<tr><td>10</td><td>Guerre populaire forcée : les deux camps perdent 2❤️. Les autres nations ne paient rien.</td></tr>
 </table>
+<p>Un accord commercial ou un pacte est refusé au-dessus de <strong>7</strong> de tension, ou en cas de guerre.</p>
 
 <h2 id="s13">13. Pirates</h2>
-<p>Les pirates occupent Triton. Ils n'attaquent jamais les Ceinturiens, qui font de la contrebande avec eux.</p>
-<p>Le risque qu'ils frappent est de 10 % au tour 1 et augmente de 10 points par tour — 50 % au tour 5, certain à partir du tour 9. Ils ne s'en prennent qu'aux <strong>routes non protégées</strong>, qui sont détruites : il faut les reconstruire (1 AC + 1🪨). Les colonies ne sont jamais touchées.</p>
-<p>Après une attaque, la tension envers les Ceinturiens monte de 1. La technologie 🔍 IA Défensive rend immunisé : à son achat, tous les jetons posés sur tes routes reviennent gratuitement dans ta réserve.</p>
+<p>Ils occupent Triton et épargnent les Ceinturiens, qui font de la contrebande avec eux. Chaque route <strong>non protégée</strong> risque d'être détruite : <strong>20 % au tour 1, +10 points par tour</strong>, certain dès le tour 9. Reconstruction : 1 AC + 1🪨. Les colonies ne sont jamais touchées, et la tension envers les Ceinturiens monte de 1 à chaque attaque.</p>
+<p>🔍 Réseau Orbital, 🔍 IA Défensive et 🔮 Liens Empathes rendent immunisé — à l'achat, les jetons posés sur tes routes reviennent gratuitement.</p>
 
 <h2 id="s14">14. Guerre</h2>
+
 <h3>14.1 Déclenchement</h3>
-<p>La guerre éclate quand la tension atteint 10, quand une attaque directe est menée, ou quand un accord commercial est rompu par une attaque.</p>
-<p><strong>On ne déclare pas la guerre : on attaque.</strong> Un assaut est une <strong>frappe surprise</strong> — l'assaillant ne prévient pas, et la nation assaillie n'apprend l'attaque qu'au moment où elle doit s'y opposer. Elle choisit alors combien de jetons engager (et si elle déploie son Supercroiseur), le combat se résout aussitôt, et <strong>la guerre s'ouvre en conséquence</strong> : c'est une réponse obligatoire, pas une décision. Aucune paix ne peut être conclue avant qu'un premier coup ait été porté.</p>
-<p>Cette règle est la même pour tout le monde. Que l'assaut vienne d'un joueur ou d'une nation tenue par l'ordinateur, le déroulé est identique : frappe, défense, combat, guerre.</p>
+<p class="cle"><strong>On ne déclare pas la guerre : on attaque.</strong> Un assaut est une <strong>frappe surprise</strong> — l'assaillant ne prévient pas. L'assailli l'apprend au moment de s'y opposer : il choisit ses jetons (et son Supercroiseur), le combat se résout aussitôt, et <strong>la guerre s'ouvre en conséquence</strong>. C'est une réponse obligatoire, pas une décision. Aucune paix avant qu'un premier coup ait été porté.</p>
+<p>Même déroulé, que l'assaut vienne d'un joueur ou de l'ordinateur. La guerre éclate aussi à 10 de tension, ou quand un accord commercial est rompu par un assaut.</p>
 
 <h3>14.2 Le combat</h3>
-<p>Tout se joue avec des <strong>jetons Force</strong> : il n'y a pas de puissance abstraite. Tu choisis combien en engager ; chaque jeton engagé coûte <strong>1🪨 + 1⚡</strong>. Ce coût plafonne la taille d'un assaut : tu ne peux engager que ce que tu peux payer. L'IA de Navigation divise ce coût par deux, la moitié étant prélevée sur l'énergie.</p>
-<p>S'ajoutent gratuitement le bonus Empathes (+2 ou +4 selon tes technologies) et, si tu le déploies, le Supercroiseur (+5).</p>
-<p>Le défenseur <strong>choisit</strong> sa défense. Si personne ne défend, l'attaquant prend la cible sans rien dépenser et sans mettre de jetons en récupération : engager des jetons en défense est le seul moyen de faire perdre des forces à l'ennemi.</p>
-<p>Le nombre d'assauts par tour n'est pas limité — seuls tes AC, tes jetons et tes ressources le bornent. Une nation dirigée par l'ordinateur, elle, ne t'assaille qu'une fois par tour.</p>
-<p><strong>Tenir position</strong> : si le conflit n'est pas le tien, tu peux garder tes jetons. Si l'ennemi attaque, tu choisis quand même ta défense ; si les deux camps tiennent, il ne se passe rien. Tant que le combat n'est pas résolu, tu peux annuler ton choix et revenir en arrière sans rien dépenser.</p>
-<p>Il n'y a pas d'attaque-surprise : les distances entre les corps célestes rendent toute flotte visible longtemps à l'avance, et la garnison est donc toujours prête. L'Hyperpropulsion fait exception — ses jetons représentent de la vitesse, pas des troupes : ils ne sont ni dépensés ni perdus au combat.</p>
+<p>Tout se joue en <strong>jetons Force</strong>. Chaque jeton engagé coûte <strong>1🪨 + 1⚡</strong> : tu ne peux engager que ce que tu peux payer (l'IA de Navigation divise ce coût par deux). S'ajoutent gratuitement le bonus Empathes (+2 ou +4) et le Supercroiseur (+5) si tu le déploies.</p>
+<ul>
+<li>Le défenseur <strong>choisit</strong> sa défense. Sans défense, l'attaquant prend la cible sans rien dépenser : engager des jetons est le seul moyen de lui faire perdre des forces.</li>
+<li>Tes assauts ne sont pas plafonnés — seuls tes AC, tes jetons et tes ressources les bornent. Une nation tenue par l'ordinateur ne t'assaille qu'une fois par tour.</li>
+<li><strong>Tenir position</strong> : tu peux garder tes jetons ; si les deux camps tiennent, il ne se passe rien. Tant que le combat n'est pas résolu, tu peux revenir en arrière sans rien dépenser.</li>
+</ul>
 
 <h3>14.3 L'ordre des combats en fin de tour</h3>
-<p>Le <strong>premier tour</strong> d'une guerre appartient à celui qui l'a déclarée : lui seul frappe, l'autre se défend.</p>
-<p>Dès le <strong>tour suivant</strong>, chaque camp mène un assaut et subit celui de l'autre : <strong>deux combats</strong> par fin de tour. Comme chaque jeton engagé se paie, il faut répartir jetons et ressources entre l'attaque et la défense — c'est là que se joue la guerre.</p>
-<p>L'<strong>initiative</strong> ne dit pas qui frappe en premier : elle dit <em>qui choisit</em> lequel des deux frappe en premier. Une nation la détient, et le jeu lui demande alors : attaquer d'abord, ou encaisser d'abord ?</p>
-<p>Elle se détermine par la première règle qui départage :</p>
+<p>Le <strong>premier tour</strong> appartient à celui qui a ouvert la guerre : lui seul frappe. Dès le <strong>tour suivant</strong>, chaque camp mène un assaut et subit celui de l'autre — <strong>deux combats</strong> par soirée. Chaque jeton se payant, il faut répartir jetons et ressources entre attaque et défense : c'est là que se joue la guerre.</p>
+<p>L'<strong>initiative</strong> ne dit pas qui frappe en premier, mais <em>qui choisit</em> lequel des deux frappe en premier. Elle se détermine par la première règle qui départage :</p>
 <table>
 <tr><th>#</th><th>Critère</th><th>Qui l'emporte</th></tr>
-<tr><td>1</td><td>🌀 <strong>Hyperpropulsion</strong></td><td>Son porteur, quoi qu'il arrive. Si les deux l'ont — elle se copie par Télépathie ou Espionnage — les pouvoirs s'annulent et on passe au critère suivant.</td></tr>
-<tr><td>2</td><td><strong>Rétrocession</strong></td><td>Celui qui a le <em>moins</em> assailli l'autre pendant sa phase d'actions. On ne frappe pas dans la journée pour imposer encore le tempo du soir.</td></tr>
-<tr><td>3</td><td>Technologies</td><td>Le plus de technologies de <strong>rang 2 ou 3</strong>.</td></tr>
+<tr><td>1</td><td>🌀 Hyperpropulsion</td><td>Son porteur. Si les deux l'ont, les pouvoirs s'annulent et on passe au critère suivant.</td></tr>
+<tr><td>2</td><td>Rétrocession</td><td>Celui qui a le <em>moins</em> assailli l'autre pendant la phase d'actions.</td></tr>
+<tr><td>3</td><td>Technologies</td><td>Le plus de technologies de rang 2 ou 3.</td></tr>
 <tr><td>4</td><td>Jetons Force</td><td>Le plus de jetons.</td></tr>
-<tr><td>5</td><td>Ressources</td><td>Le plus de jetons <em>payables</em> — un jeton coûte 1🪨 + 1⚡, donc 20🪨 sans énergie ne valent rien.</td></tr>
-<tr><td>6</td><td>Dernier recours</td><td>Celui qui a déclaré la guerre.</td></tr>
+<tr><td>5</td><td>Ressources</td><td>Le plus de jetons <em>payables</em> — 20🪨 sans énergie ne valent rien.</td></tr>
+<tr><td>6</td><td>Dernier recours</td><td>Celui qui a ouvert la guerre.</td></tr>
 </table>
-<p class="cle">Défendre en premier, c'est savoir ce qu'il te reste avant de choisir ton assaut. Attaquer en premier, c'est frapper avec tous tes jetons pendant que tu les as encore. Aucun des deux n'est meilleur : cela dépend de ce que l'adversaire peut encore payer. Le journal indique à chaque fois qui détient l'initiative et pourquoi.</p>
+<p class="cle">Défendre en premier, c'est savoir ce qu'il te reste avant de choisir ton assaut. Attaquer en premier, c'est frapper pendant que tu as encore tes jetons. Aucun n'est meilleur : tout dépend de ce que l'adversaire peut encore payer. Le journal dit à chaque fois qui détient l'initiative et pourquoi.</p>
 
 <h3>14.4 Réserve et garnison</h3>
-<p>Chaque colonie connectée, hors ta base, immobilise <strong>1 jeton Force en réserve</strong>. Les jetons engageables en attaque sont donc tes jetons totaux moins ton nombre de colonies connectées. Plus tu t'étends, moins tu peux attaquer.</p>
-<p>Toute colonie attaquée se défend automatiquement avec 1 jeton de garnison, qui s'ajoute à ce que le défenseur engage : aucune colonie n'est sans défense. Si elle tombe, ce jeton est détruit ; si elle tient, il est conservé.</p>
-<p>La <strong>capitale</strong> est attaquable, mais défendue par 10 jetons supplémentaires. Une nation qui perd toutes ses colonies devient vassale et la guerre s'arrête.</p>
+<p>Chaque colonie connectée hors ta base immobilise <strong>1 jeton en réserve</strong> : tes jetons attaquables sont tes jetons totaux moins tes colonies connectées. Plus tu t'étends, moins tu peux attaquer.</p>
+<p>Toute colonie ajoute <strong>1 jeton de garnison</strong> à la défense engagée : aucune n'est sans défense. Si elle tombe, ce jeton est détruit. La <strong>capitale</strong> est attaquable, mais défendue par 10 jetons de plus. Une nation qui perd toutes ses colonies devient vassale et la guerre s'arrête.</p>
 
 <h3>14.5 Résultats</h3>
 <table>
 <tr><th>Issue</th><th>Conséquences</th></tr>
-<tr><td>Victoire</td><td>+2 VP et capture de la colonie, qui passe un niveau en dessous. La moitié de tes jetons engagés revient aussitôt, l'autre part 2 tours en récupération (1 avec Stratégie Guerrière). Une colonie conquise est hostile : −2❤️ le premier tour, puis −1❤️ les deux suivants ; l'améliorer apaise la population.</td></tr>
+<tr><td>Victoire</td><td>+2 VP, capture de la colonie un niveau en dessous. La moitié de tes jetons revient aussitôt, l'autre part 2 tours en récupération (1 avec Stratégie Guerrière).</td></tr>
 <tr><td>Défaite</td><td>Tu perds définitivement la moitié des jetons engagés, et −1❤️.</td></tr>
 <tr><td>Égalité</td><td>−1❤️ pour les deux camps.</td></tr>
 </table>
-<p>Une guerre dure une manche, puis s'arrête — sauf si la nation attaquée décide de la poursuivre. À la fin, le vainqueur gagne +1❤️ ; sa tension retombe à 0, celle du perdant à 5.</p>
+<p>Une colonie conquise est hostile : −2❤️ le premier tour, puis −1❤️ les deux suivants. L'améliorer apaise la population.</p>
+<p>Une guerre dure tant que les deux camps ne font pas la paix. À la fin, le vainqueur gagne +1❤️, sa tension retombe à 0 et celle du perdant à 5. Une guerre encore ouverte au tour 10 est conclue au journal, décompte des combats à l'appui.</p>
 
 <h3>14.6 Attaquer une route</h3>
-<p>Bien plus facile qu'une colonie : un seul assaut suffit et une route ne peut pas être défendue. Il faut 1 jeton pour une route non protégée, 2 pour une route protégée — dans ce cas le jeton défenseur est détruit. Après un succès, tu choisis de <strong>récupérer</strong> la route (elle devient tienne et tu en paies l'entretien) ou de la <strong>détruire</strong>. Dans les deux cas l'adversaire perd son revenu et doit la reconstruire.</p>
+<p>Un seul assaut suffit, et une route ne se défend pas. 1 jeton si elle est non protégée, 2 si elle l'est — le jeton défenseur est alors détruit. Puis tu la <strong>récupères</strong> (elle devient tienne, entretien compris) ou tu la <strong>détruis</strong> ; dans les deux cas l'adversaire perd son revenu.</p>
 
 <h3>14.7 Supercroiseur</h3>
-<p>Il apporte 5 points de puissance en guerre, et rien contre les raids ou les pirates. À chaque combat, le jeu te demande si tu le déploies : le déploiement coûte <strong>5🪨 + 5⚡</strong>. Il n'est jamais perdu ; en cas de défaite il part 2 tours en réparation (1 avec Stratégie Guerrière). Il peut servir une fois en attaque et une fois en défense dans le même tour, si tu peux payer deux fois.</p>
+<p>+5 de puissance en guerre — rien contre les raids ni les pirates. Le jeu demande à chaque combat si tu le déploies ; le déploiement coûte <strong>5🪨 + 5⚡</strong>. Jamais perdu : en cas de défaite, 2 tours de réparation (1 avec Stratégie Guerrière). Utilisable une fois en attaque et une fois en défense le même tour, si tu peux payer deux fois.</p>
 
 <h3>14.8 Renseignement</h3>
-<p>Sans la technologie Réseau Orbital, tu ne vois qu'une <strong>estimation à ±3</strong> de la force des rivaux, et leur économie et leur moral te sont cachés. Colonies, routes et VP restent publics. En combat, la défense adverse est inconnue — tu engages à l'aveugle. Les autres nations subissent exactement le même brouillard et peuvent donc se tromper.</p>
+<p>Sans 🔍 Réseau Orbital : <strong>estimation à ±3</strong> de la force des rivaux, économie et moral cachés, défense adverse inconnue au moment d'engager. Colonies, routes et VP restent publics. Les nations tenues par l'ordinateur subissent le même brouillard et se trompent donc aussi.</p>
 
 <h2 id="s15">15. Événements</h2>
-<p>Un événement survient aux tours pairs. Il est annoncé au tour précédent pour que chacun s'y prépare, et se résout en fin de tour.</p>
+<p>Un événement survient aux tours pairs, annoncé au tour précédent, résolu en fin de tour.</p>
 <table>
 <tr><th>Événement</th><th>Effet</th></tr>
-<tr><td>⛏️ Ruée minière</td><td>+6 VP à la nation ayant le plus de colonies. À égalité, les deux premières les reçoivent ; à trois ou plus, personne.</td></tr>
-<tr><td>🔬 Conférence scientifique</td><td>+6 VP à la nation produisant le plus de 🔬</td></tr>
-<tr><td>⚔️ Suprématie militaire</td><td>+6 VP à la nation ayant le plus de jetons Force, récupération comprise</td></tr>
-<tr><td>🛠️ Avance technologique</td><td>+6 VP à la nation ayant le plus de technologies de niveau 2 et 3. Partagé à deux ; personne à trois ou plus.</td></tr>
-<tr><td>✨ Nation la plus attractive</td><td>La nation au meilleur moral attire immigrants et capitaux : +2🪨 +2🔬 +3 VP. Partagé à deux ; personne à trois ou plus.</td></tr>
-<tr><td>🌩️ Tempêtes solaires</td><td>Sans IA Défensive, chaque nation perd 1 jeton Force, 1 route et 2🪨</td></tr>
-<tr><td>☠️ Prolifération des pirates</td><td>Les pirates frappent toutes les routes de la nation la plus riche en 🪨. Les routes non protégées sont détruites ; les protégées ont 1 chance sur 2 de tomber.</td></tr>
-<tr><td>🤝 Accords commerciaux</td><td>Un accord <strong>gratuit</strong> peut être conclu avec la nation de ton choix : +3 VP chacune, et fin immédiate d'une guerre entre elles. Une nation peut refuser si tu es très en avance ; elle acceptera si elle est en difficulté.</td></tr>
-<tr><td>🕊️ Accords diplomatiques</td><td>Pacte de non-agression de 4 tours. Coût 6🪨 par nation (plus 2⚡ si vous êtes en guerre). Il met fin à la guerre, ramène la tension à 0 entre les signataires et rapporte +1❤️ par pacte. L'événement fait baisser la tension de 5 partout.<br><strong>Pendant ces 4 tours, aucune des deux nations ne peut assaillir l'autre, la piller, ni lui déclarer la guerre</strong> — y compris par guerre populaire. Le pacte ne lie que ses <strong>deux signataires</strong> : chacun reste libre d'attaquer les autres nations. Une proposition de pacte peut être refusée, et <strong>le refus est notifié au proposant</strong> — il ne paie alors rien.</td></tr>
+<tr><td>⛏️ Ruée minière</td><td>+6 VP à qui a le plus de colonies. Partagé à deux ; personne à trois ou plus.</td></tr>
+<tr><td>🔬 Conférence scientifique</td><td>+6 VP à qui produit le plus de 🔬</td></tr>
+<tr><td>⚔️ Suprématie militaire</td><td>+6 VP à qui a le plus de jetons, récupération comprise</td></tr>
+<tr><td>🛠️ Avance technologique</td><td>+6 VP à qui a le plus de technologies de niveau 2 et 3</td></tr>
+<tr><td>✨ Nation la plus attractive</td><td>Au meilleur moral : +2🪨 +2🔬 +3 VP</td></tr>
+<tr><td>🌩️ Tempêtes solaires</td><td>Sans IA Défensive : −1 jeton, −1 route, −2🪨 pour chaque nation</td></tr>
+<tr><td>☠️ Prolifération des pirates</td><td>Routes de la nation la plus riche en 🪨 : non protégées détruites, protégées 1 chance sur 2.</td></tr>
+<tr><td>🤝 Accords commerciaux</td><td>Accord <strong>gratuit</strong> avec la nation de ton choix : +3 VP chacune, fin immédiate d'une guerre. Elle peut refuser si tu es très en avance.</td></tr>
+<tr><td>🕊️ Accords diplomatiques</td><td>Pacte de non-agression de 4 tours : 6🪨 (+2⚡ si vous êtes en guerre). Met fin à la guerre, tension à 0, +1❤️. L'événement baisse la tension de 5 partout.</td></tr>
 <tr><td>🏆 Jugement final (tour 10)</td><td>Calcul des scores</td></tr>
 </table>
+<p class="cle"><strong>Le pacte de non-agression lie vraiment.</strong> Pendant ses 4 tours, aucun des deux signataires ne peut assaillir l'autre, le piller ni lui déclarer la guerre — pas même par guerre populaire. Il ne lie que ces deux-là : chacun reste libre d'attaquer les autres. Un refus est notifié au proposant, qui ne paie alors rien.</p>
 
 <h2 id="s16">16. Agendas secrets</h2>
 <p>Au tour 2, chaque nation choisit secrètement un agenda parmi 5 tirés au hasard. Le bonus n'est compté qu'au score final.</p>
@@ -428,7 +408,7 @@
 <tr><th>Agenda</th><th>Condition</th><th>Bonus</th></tr>
 <tr><td>🚀 Explorateur</td><td>5 colonies connectées ou plus</td><td>+8 VP</td></tr>
 <tr><td>⚗️ Superpuissance technologique</td><td>Plus de technologies que toute autre nation</td><td>+8 VP</td></tr>
-<tr><td>⚔️ Armada solaire</td><td>15 jetons Force ou plus, récupération comprise</td><td>+8 VP</td></tr>
+<tr><td>⚔️ Armada solaire</td><td>15 jetons ou plus, récupération comprise</td><td>+8 VP</td></tr>
 <tr><td>🏛️ Gouvernance éclairée</td><td>Gouvernement niveau 4 et moral ≥ 8</td><td>+8 VP</td></tr>
 <tr><td>🛤️ Maître des routes</td><td>5 routes ou plus</td><td>+6 VP</td></tr>
 <tr><td>🟠 Hub jovien</td><td>3 colonies joviennes ou plus</td><td>+6 VP</td></tr>
@@ -439,21 +419,22 @@
 <h2 id="s17">17. Points de victoire</h2>
 <table>
 <tr><th>Source</th><th>Calcul</th></tr>
-<tr><td>Colonies</td><td>VP du nœud × niveau, ×1 si connectée, ×0,5 si isolée</td></tr>
+<tr><td>Colonies</td><td>VP du nœud × niveau, ×1 si connectée, ×0,5 si isolée, <strong>+1 par colonie reliée</strong></td></tr>
 <tr><td>Routes</td><td>+1 VP chacune</td></tr>
-<tr><td>Technologies</td><td>VP inscrit sur la carte : 1 au niveau T1, 3 au T2, 5 au T3</td></tr>
-<tr><td>Bonus technologique</td><td>+0,5 VP par technologie, arrondi à l'inférieur</td></tr>
-<tr><td>Revenus</td><td>Par ressource : +2 VP au-delà de 5 de revenu, +5 VP au-delà de 10</td></tr>
+<tr><td>Cartes</td><td>VP inscrit sur la carte : technologies 1 / 3 / 5 selon le niveau ; cartes militaires, valeur propre</td></tr>
+<tr><td>Bonus technologique</td><td>+0,5 VP par carte de l'arbre technologique, arrondi à l'inférieur</td></tr>
+<tr><td>Revenus par tour</td><td>Par ressource : +2 VP au-delà de 5/tour, +5 VP au-delà de 10/tour</td></tr>
 <tr><td>Agenda</td><td>Bonus si la condition est remplie</td></tr>
-<tr><td>Guerre</td><td>VP gagnés lors des victoires</td></tr>
-<tr><td>Bonus spéciaux</td><td>Exploration Extra-Solaire, Éveil Collectif, découvertes…</td></tr>
+<tr><td>Événements</td><td>VP des événements, +2 par combat gagné, découvertes, accords</td></tr>
+<tr><td>Bonus divers</td><td>Exploration Extra-Solaire (+8), Éveil Collectif (+1 par colonie reliée)</td></tr>
 </table>
+<p>Le rapport de fin de partie détaille chaque poste ligne par ligne : colonie par colonie, carte par carte, et l'origine de chaque point d'événement.</p>
 
 <h2 id="s18">18. Déroulement d'un tour</h2>
 <ol>
 <li>Annonce de l'événement, s'il y en a un.</li>
-<li>Choix des cartes Stratégie, de la nation la plus faible à la plus forte.</li>
-<li>Phase d'actions : chacun dépense ses AC. L'ordre est tiré au sort à chaque tour.</li>
+<li>Cartes Stratégie, de la nation la plus faible à la plus forte.</li>
+<li>Phase d'actions : chacun dépense ses AC. L'ordre est tiré au sort chaque tour.</li>
 <li>Mise à jour des tensions.</li>
 <li>Combats, si une guerre est en cours.</li>
 <li>Revenus, puis entretien.</li>

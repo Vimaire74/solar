@@ -60,6 +60,13 @@ function buildSandbox() {
     alert(){}, confirm(){ return true; }, prompt(){ return null; },
     getComputedStyle(){ return { getPropertyValue(){ return ''; } }; }
   };
+  /* ⚠️ LE BAC À SABLE DOIT SE DÉCLARER, PAS SE FAIRE DEVINER. Le `document` ci-dessus est un décor :
+     il répond à tout, mais ses éléments n'ont ni parent, ni géométrie, ni style réel. Le moteur
+     lisait ce décor comme s'il était vrai et suivait des références nulles — d'où
+     `slider.parentElement.style` qui jetait, et une fin de tour entière abandonnée (mesuré le
+     27/08 : un tiers de l'économie du jeu perdue). Le moteur teste maintenant ce drapeau via
+     `_aUnEcran()` avant tout dessin. Ne pas le retirer : sans lui, le moteur redevient aveugle. */
+  sb.SOLAR_SANS_ECRAN = true;
   sb.window = sb; sb.globalThis = sb; sb.self = sb;
   sb.window.addEventListener = function(){}; sb.window.removeEventListener = function(){};
   return sb;

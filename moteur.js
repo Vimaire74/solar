@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-26 · v9.85';
+const SOLAR_BUILD_MOTEUR = '2026-08-27 · v9.87';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -111,18 +111,18 @@ const PLANETS_DECO=[
      · Callisto 1052,425 → 1052,397 — montée plus modestement : la route Ganymède→Titan passait à
        21 px de Callisto (rayon 16), elle passe à 43. Les deux voies vers Titan se distinguent. */
 const NODES={
-  // upgradeCost:'standard'=2AC / 'remote'=3AC | strategic:'full'=+1jeton/tour / 'half'=50%
+  // strategic:'full'=+1jeton/tour / 'half'=50%
   // Colonisation colonie 'remote' → −1<i class=ri-morale></i> one-time | Niv.1 → +1<i class=ri-morale></i> toutes | Niv.2 → +1<i class=ri-morale></i> si attractive, +2<i class=ri-morale></i> Callisto
   // ATTRACTIVE_COLS=['lune','europe','titan','encelade','triton']
-  lune:{id:'lune',name:'Lune',emoji:'🌕',color:'#B0BEC5',type:'moon',baseVP:2,maxLv:3,r:15,upgradeCost:'standard',strategic:'half',res:{energy:1,materials:2},x:420,y:475,conn:['phobos','ceres','deimos','io','vesta'],desc:'Satellite terrestre. Vue sur la Terre — habitat confortable.'},
-  phobos:{id:'phobos',name:'Phobos',emoji:'⚫',color:'#8D6E63',type:'moon',baseVP:2,maxLv:3,r:11,upgradeCost:'standard',strategic:'half',res:{energy:1,materials:2},x:555,y:260,conn:['lune','deimos','ceres','vesta'],desc:'Lune intérieure de Mars. Proche des routes de propulsion.'},
-  deimos:{id:'deimos',name:'Déimos',emoji:'🟤',color:'#795548',type:'moon',baseVP:1,maxLv:3,r:12,upgradeCost:'remote',strategic:null,res:{materials:1},x:452,y:322,conn:['phobos','lune'],desc:'Petite lune aride de Mars. Conditions difficiles.'},
-  ceres:{id:'ceres',name:'Cérès',emoji:'⬜',color:'#CFD8DC',type:'dwarf_planet',baseVP:3,maxLv:3,r:21,upgradeCost:'standard',strategic:'full',res:{energy:1,materials:3},x:625,y:548,conn:['lune','phobos','vesta','io','ganymede'],desc:'Hub de la ceinture d\'astéroïdes. Carrefour stratégique des routes.'},
-  vesta:{id:'vesta',name:'Vesta',emoji:'🪨',color:'#78909C',type:'asteroid',baseVP:2,maxLv:3,r:17,upgradeCost:'remote',strategic:null,res:{materials:2},x:715,y:212,conn:['ceres','ganymede','phobos','io','europe','lune'],desc:'Grand astéroïde métallique. Éloigné des routes principales.'},
-  io:{id:'io',name:'Io',emoji:'🟡',color:'#FFD54F',type:'moon',baseVP:3,maxLv:3,r:15,upgradeCost:'standard',strategic:'half',res:{energy:3,materials:1},x:862,y:328,conn:['ceres','europe','ganymede','vesta','lune'],desc:'Lune volcanique. Énergie géothermique intense.'},
-  europe:{id:'europe',name:'Europe',emoji:'🔵',color:'#42a5f5',type:'moon',baseVP:4,maxLv:3,r:15,upgradeCost:'remote',strategic:null,res:{energy:1,materials:1},x:1072,y:266,conn:['io','callisto','titan','vesta','pluto'],desc:'Océan sous-glaciaire. Paysage saisissant sous Jupiter. Radiation intense.'},
-  ganymede:{id:'ganymede',name:'Ganymède',emoji:'🟤',color:'#A1887F',type:'moon',baseVP:4,maxLv:3,r:18,upgradeCost:'standard',strategic:'full',res:{energy:1,materials:2},x:922,y:432,conn:['io','vesta','callisto','titan','ceres'],desc:'Plus grande lune du système. Hub jovien majeur, carrefour de routes.'},
-  callisto:{id:'callisto',name:'Callisto',emoji:'🔘',color:'#607D8B',type:'moon',baseVP:3,maxLv:3,r:16,upgradeCost:'standard',strategic:'half',res:{energy:1,materials:2},x:1052,y:397,conn:['europe','ganymede','titan'],desc:'Hors de la radiation jovienne. Meilleur habitat humain du système jovien.'},
+  lune:{id:'lune',name:'Lune',emoji:'🌕',color:'#B0BEC5',type:'moon',baseVP:2,maxLv:3,r:15,strategic:'half',res:{energy:1,materials:2},x:420,y:475,conn:['phobos','ceres','deimos','io','vesta'],desc:'Satellite terrestre. Vue sur la Terre — habitat confortable.'},
+  phobos:{id:'phobos',name:'Phobos',emoji:'⚫',color:'#8D6E63',type:'moon',baseVP:2,maxLv:3,r:11,strategic:'half',res:{energy:1,materials:2},x:555,y:260,conn:['lune','deimos','ceres','vesta'],desc:'Lune intérieure de Mars. Proche des routes de propulsion.'},
+  deimos:{id:'deimos',name:'Déimos',emoji:'🟤',color:'#795548',type:'moon',baseVP:1,maxLv:3,r:12,strategic:null,res:{materials:1},x:452,y:322,conn:['phobos','lune'],desc:'Petite lune aride de Mars. Conditions difficiles.'},
+  ceres:{id:'ceres',name:'Cérès',emoji:'⬜',color:'#CFD8DC',type:'dwarf_planet',baseVP:3,maxLv:3,r:21,strategic:'full',res:{energy:1,materials:3},x:625,y:548,conn:['lune','phobos','vesta','io','ganymede'],desc:'Hub de la ceinture d\'astéroïdes. Carrefour stratégique des routes.'},
+  vesta:{id:'vesta',name:'Vesta',emoji:'🪨',color:'#78909C',type:'asteroid',baseVP:2,maxLv:3,r:17,strategic:null,res:{materials:2},x:715,y:212,conn:['ceres','ganymede','phobos','io','europe','lune'],desc:'Grand astéroïde métallique. Éloigné des routes principales.'},
+  io:{id:'io',name:'Io',emoji:'🟡',color:'#FFD54F',type:'moon',baseVP:3,maxLv:3,r:15,strategic:'half',res:{energy:3,materials:1},x:862,y:328,conn:['ceres','europe','ganymede','vesta','lune'],desc:'Lune volcanique. Énergie géothermique intense.'},
+  europe:{id:'europe',name:'Europe',emoji:'🔵',color:'#42a5f5',type:'moon',baseVP:4,maxLv:3,r:15,strategic:null,res:{energy:1,materials:1},x:1072,y:266,conn:['io','callisto','titan','vesta','pluto'],desc:'Océan sous-glaciaire. Paysage saisissant sous Jupiter. Radiation intense.'},
+  ganymede:{id:'ganymede',name:'Ganymède',emoji:'🟤',color:'#A1887F',type:'moon',baseVP:4,maxLv:3,r:18,strategic:'full',res:{energy:1,materials:2},x:922,y:432,conn:['io','vesta','callisto','titan','ceres'],desc:'Plus grande lune du système. Hub jovien majeur, carrefour de routes.'},
+  callisto:{id:'callisto',name:'Callisto',emoji:'🔘',color:'#607D8B',type:'moon',baseVP:3,maxLv:3,r:16,strategic:'half',res:{energy:1,materials:2},x:1052,y:397,conn:['europe','ganymede','titan'],desc:'Hors de la radiation jovienne. Meilleur habitat humain du système jovien.'},
   /* ⚠️ « STATION JUPITER » N'EST PLUS QU'UN DESSIN (2026-08-07, décision de Marc).
      Elle n'est pas SUPPRIMÉE de la table des nœuds, et c'est délibéré : c'est elle qui DESSINE la
      planète Jupiter sur la carte tactique (`mapImg` la traduit en image `jupiter`, `MAP_RAD` lui
@@ -132,35 +132,48 @@ const NODES={
      possible à travers elle, exclue de tous les calculs. Un décor, rien de plus.
      À noter : elle portait déjà `noColonize`, donc personne ne pouvait la posséder — l'exception
      d'entretien jovienne qu'on vient de retirer ne s'appliquait en réalité à RIEN. */
-  jorbital1:{id:'jorbital1',name:'Jupiter',emoji:'🟠',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:16,upgradeCost:'standard',strategic:null,noColonize:true,decorative:true,res:{},x:960,y:415,conn:[],desc:'Géante gazeuse — non colonisable. La base jupitérienne est Io.'},
-  jorbital2:{id:'jorbital2',name:'Anneau J-2',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,upgradeCost:'standard',strategic:null,res:{},decorative:true,x:421,y:159,conn:['jorbital1','jorbital3'],desc:'Territoire jovien — non colonisable.'},
-  jorbital3:{id:'jorbital3',name:'Anneau J-3',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,upgradeCost:'standard',strategic:null,res:{},decorative:true,x:429,y:194,conn:['jorbital2','jorbital4'],desc:'Territoire jovien — non colonisable.'},
-  jorbital4:{id:'jorbital4',name:'Anneau J-4',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,upgradeCost:'standard',strategic:null,res:{},decorative:true,x:406,y:223,conn:['jorbital3','jorbital5'],desc:'Territoire jovien — non colonisable.'},
-  jorbital5:{id:'jorbital5',name:'Anneau J-5',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,upgradeCost:'standard',strategic:null,res:{},decorative:true,x:370,y:223,conn:['jorbital4','jorbital6'],desc:'Territoire jovien — non colonisable.'},
-  jorbital6:{id:'jorbital6',name:'Anneau J-6',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,upgradeCost:'standard',strategic:null,res:{},decorative:true,x:347,y:194,conn:['jorbital5','jorbital7'],desc:'Territoire jovien — non colonisable.'},
-  jorbital7:{id:'jorbital7',name:'Anneau J-7',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,upgradeCost:'standard',strategic:null,res:{},decorative:true,x:355,y:159,conn:['jorbital6','jorbital1'],desc:'Territoire jovien — non colonisable.'},
-  titan:{id:'titan',name:'Titan',emoji:'🌫️',color:'#FF8F00',type:'moon',baseVP:5,maxLv:3,r:18,upgradeCost:'standard',strategic:'full',res:{energy:2,materials:1},x:1400,y:485,conn:['ganymede','callisto','encelade','triton','europe','pluto'],desc:'Hydrocarbures atmosphériques. Paysage orange unique. Hub saturnien.'},
-  encelade:{id:'encelade',name:'Encelade',emoji:'❄️',color:'#E0F7FA',type:'moon',baseVP:3,maxLv:3,r:14,upgradeCost:'remote',strategic:null,res:{energy:1,materials:1},x:1325,y:580,conn:['titan','triton'],desc:'Geysers spectaculaires. Lune éloignée dans l\'ombre de Saturne.'},
-  triton:{id:'triton',name:'Triton',emoji:'💜',color:'#7C4DFF',type:'moon',baseVP:4,maxLv:3,r:16,upgradeCost:'remote',strategic:'half',res:{energy:1,materials:1},x:1745,y:620,conn:['titan','pluto','eris','encelade'],desc:'Lune rétrograde de Neptune. Paysage unique — carrefour vers Kuiper.'},
-  pluto:{id:'pluto',name:'Pluton',emoji:'🩶',color:'#90A4AE',type:'dwarf_planet',baseVP:4,maxLv:3,r:15,upgradeCost:'remote',strategic:null,res:{materials:1},x:1590,y:215,conn:['triton','eris','titan','europe'],desc:'Porte de la ceinture de Kuiper. Très éloigné, conditions extrêmes.'},
-  eris:{id:'eris',name:'Éris',emoji:'⬡',color:'#B0BEC5',type:'dwarf_planet',baseVP:5,maxLv:3,r:17,upgradeCost:'remote',strategic:null,res:{materials:1,energy:1},x:1790,y:190,conn:['pluto','triton'],desc:'Aux confins du système solaire. Avant-poste visible d\'un réseau de colonies dispersées dans la Ceinture — VP élevés.'},
+  jorbital1:{id:'jorbital1',name:'Jupiter',emoji:'🟠',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:16,strategic:null,noColonize:true,decorative:true,res:{},x:960,y:415,conn:[],desc:'Géante gazeuse — non colonisable. La base jupitérienne est Io.'},
+  jorbital2:{id:'jorbital2',name:'Anneau J-2',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:421,y:159,conn:['jorbital1','jorbital3'],desc:'Territoire jovien — non colonisable.'},
+  jorbital3:{id:'jorbital3',name:'Anneau J-3',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:429,y:194,conn:['jorbital2','jorbital4'],desc:'Territoire jovien — non colonisable.'},
+  jorbital4:{id:'jorbital4',name:'Anneau J-4',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:406,y:223,conn:['jorbital3','jorbital5'],desc:'Territoire jovien — non colonisable.'},
+  jorbital5:{id:'jorbital5',name:'Anneau J-5',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:370,y:223,conn:['jorbital4','jorbital6'],desc:'Territoire jovien — non colonisable.'},
+  jorbital6:{id:'jorbital6',name:'Anneau J-6',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:347,y:194,conn:['jorbital5','jorbital7'],desc:'Territoire jovien — non colonisable.'},
+  jorbital7:{id:'jorbital7',name:'Anneau J-7',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:355,y:159,conn:['jorbital6','jorbital1'],desc:'Territoire jovien — non colonisable.'},
+  titan:{id:'titan',name:'Titan',emoji:'🌫️',color:'#FF8F00',type:'moon',baseVP:5,maxLv:3,r:18,strategic:'full',res:{energy:2,materials:1},x:1400,y:485,conn:['ganymede','callisto','encelade','triton','europe','pluto'],desc:'Hydrocarbures atmosphériques. Paysage orange unique. Hub saturnien.'},
+  encelade:{id:'encelade',name:'Encelade',emoji:'❄️',color:'#E0F7FA',type:'moon',baseVP:3,maxLv:3,r:14,strategic:null,res:{energy:1,materials:1},x:1325,y:580,conn:['titan','triton'],desc:'Geysers spectaculaires. Lune éloignée dans l\'ombre de Saturne.'},
+  triton:{id:'triton',name:'Triton',emoji:'💜',color:'#7C4DFF',type:'moon',baseVP:4,maxLv:3,r:16,strategic:'half',res:{energy:1,materials:1},x:1745,y:620,conn:['titan','pluto','eris','encelade'],desc:'Lune rétrograde de Neptune. Paysage unique — carrefour vers Kuiper.'},
+  pluto:{id:'pluto',name:'Pluton',emoji:'🩶',color:'#90A4AE',type:'dwarf_planet',baseVP:4,maxLv:3,r:15,strategic:null,res:{materials:1},x:1590,y:215,conn:['triton','eris','titan','europe'],desc:'Porte de la ceinture de Kuiper. Très éloigné, conditions extrêmes.'},
+  eris:{id:'eris',name:'Éris',emoji:'⬡',color:'#B0BEC5',type:'dwarf_planet',baseVP:5,maxLv:3,r:17,strategic:null,res:{materials:1,energy:1},x:1790,y:190,conn:['pluto','triton'],desc:'Aux confins du système solaire. Avant-poste visible d\'un réseau de colonies dispersées dans la Ceinture — VP élevés.'},
 };
-const TYPE_COLORS={economic:'#4CAF50',military:'#ef5350',technology:'#42a5f5',colonization:'#FF9800',government:'#AB47BC',civique:'#AB47BC',militaire:'#ef5350'};
+/* ⚠️ CETTE TABLE APLATISSAIT LES BRANCHES, et le renommage du 26/08 l'a mise à nu.
+   Elle donnait une couleur par `type` : toutes les cartes marquées `technology` — Navigation,
+   Renseignement, Sciences, Empathes — sortaient du même bleu, alors que `TECH_BRANCHES` définit
+   depuis toujours UNE COULEUR PAR BRANCHE, et que `docs/CARTES_INVENTAIRE.md` prescrit noir sur
+   blanc « bord = couleur de branche ».
+   Depuis que `type` porte le nom de la branche, aucune clé de cette table ne correspondait plus :
+   les bordures seraient toutes tombées sur le gris de repli. On lit donc la branche quand il y en
+   a une, et cette table ne sert plus qu'aux cartes militaires, qui n'ont pas de branche. */
+const TYPE_COLORS={militaire:'#ef5350',military:'#ef5350'};
+function couleurCarte(card){
+  if(!card)return '#2a2a5a';
+  if(card.branch&&TECH_BRANCHES[card.branch])return TECH_BRANCHES[card.branch].color;
+  return TYPE_COLORS[card.type]||'#2a2a5a';
+}
 // Cartes disposant d'une illustration servie dans assets/cards/<id>.png (ajouter l'id au fil des illustrations)
 const CARD_ART=new Set(['bio1','prop1','drones1','quant1','bio2','nav2','hyper3','reseau2','vegetal1','exploit1','terra3','iadef3','robo2','extra3','empathic2','eveil3','extract2','dyson3','mil3','mil2','liens1','gov_senat','gov_democratie','mil_invest','mil1','comm2','tele3','gov_corpo','cm_culture','cm_propagande','cm_social','cm_calm','cm_research','cm_univ','cm_reform','gov_tyrannie','cm_explore','cm_forages']);
 const CARDS_POOL=[
   // ── EXPANSION ────────────────────────────────────────────────────────────────
-  {id:'bio1',branch:'expansion',tier:1,type:'colonization',name:'Biosphère Autonome',emoji:'🏗️',
+  {id:'bio1',branch:'expansion',tier:1,type:'expansion',name:'Biosphère Autonome',emoji:'🏗️',
    effect:'Tes colonies de <b>niveau 1</b> ne coûtent plus aucun entretien en <i class=ri-energy></i>.',spec:'upkeep_e_disc',
    cost:{materials:2,science:1},vp:1},
-  {id:'bio2',branch:'expansion',tier:2,type:'colonization',name:'Biosphère Avancée',emoji:'🌱',
+  {id:'bio2',branch:'expansion',tier:2,type:'expansion',name:'Biosphère Avancée',emoji:'🌱',
    effect:'Tes colonies ne coûtent PLUS AUCUN entretien (ni <i class=ri-energy></i> ni <i class=ri-materials></i>). Supprime le malus moral des colonies difficiles.',spec:'bio2_bonus',
    cost:{science:4,energy:2,materials:2},vp:3},
-  {id:'terra3',branch:'expansion',tier:3,type:'colonization',name:'Terraformation',emoji:'🌍',
+  {id:'terra3',branch:'expansion',tier:3,type:'expansion',name:'Terraformation',emoji:'🌍',
    effect:'+1<i class=ri-materials></i> +1<i class=ri-morale></i>/tour par colonie de niveau 2 ou 3.',spec:'terra3',
    cost:{science:6,materials:4,energy:4},vp:5},
   // ── NAVIGATION & MOTEURS ─────────────────────────────────────────────────────
-  {id:'prop1',branch:'navigation',tier:1,type:'technology',name:'Propulsion Ionique',emoji:'⚗️',
+  {id:'prop1',branch:'navigation',tier:1,type:'navigation',name:'Propulsion Ionique',emoji:'⚗️',
    /* ⚠️ MARC DEMANDAIT « préciser que le rabais vaut pour la construction ET l'entretien ».
       Vérifié dans le moteur : `route_disc` met le coût de CONSTRUCTION à 0🪨 (une route coûte
       1🪨 sans lui). L'entretien d'une route, lui, se paie en ÉNERGIE — il n'existe aucun entretien
@@ -169,7 +182,7 @@ const CARDS_POOL=[
       un texte qui promet un rabais inexistant est pire qu'un texte trop court. */
    effect:'Construction de route : <b>0</b><i class=ri-materials></i> au lieu de 1. (L\'entretien d\'une route se paie en <i class=ri-energy></i> — voir Hyperpropulsion pour le supprimer.)',spec:'route_disc',
    cost:{science:2,energy:1},vp:1},
-  {id:'nav2',branch:'navigation',tier:2,type:'technology',name:'IA de Navigation',emoji:'🧠',
+  {id:'nav2',branch:'navigation',tier:2,type:'navigation',name:'IA de Navigation',emoji:'🧠',
    effect:'+2 jetons Force. Coût de guerre ÷2 (division exacte : si le nombre de jetons engagés est impair, la demi-part est prélevée sur l\'<i class=ri-energy></i> — ex. 5 jetons = 2<i class=ri-materials></i> et 3<i class=ri-energy></i>).',spec:'nav2_war',forceBonus:2,
    cost:{science:4,energy:1},vp:3},
   /* ⚠️ SECOND POUVOIR AJOUTÉ LE 17/08 — L'INITIATIVE DE GUERRE (demande de Marc).
@@ -178,58 +191,58 @@ const CARDS_POOL=[
      savoir ce qui reste avant de choisir son assaut. Une flotte capable de se déplacer plus vite que
      les autres doit pouvoir imposer ce tempo — et ce choix se paie, puisqu'il faut répartir des
      jetons et des ressources entre les deux combats. */
-  {id:'hyper3',branch:'navigation',tier:3,type:'technology',name:'Hyperpropulsion',emoji:'🌀',
+  {id:'hyper3',branch:'navigation',tier:3,type:'navigation',name:'Hyperpropulsion',emoji:'🌀',
    effect:'+5 Gov. Routes sans entretien. +3 jetons. En guerre : tu choisis d\'attaquer ou de défendre en premier.',
    spec:'route_force_free',spec2:'guerre_initiative',govPts:5,forceBonus:3,
    cost:{science:6,energy:2,materials:2},vp:5},
   // ── IA & RENSEIGNEMENT ───────────────────────────────────────────────────────
-  {id:'drones1',branch:'ia_renseignement',tier:1,type:'technology',name:'Drones Surveillance',emoji:'🔍',
+  {id:'drones1',branch:'ia_renseignement',tier:1,type:'ia_renseignement',name:'Drones Surveillance',emoji:'🔍',
    effect:'+1<i class=ri-science></i>/tour. Raids subis : −1 ressource volée.',spec:'intel_1',rGain:{science:1},
    cost:{science:2,energy:1,materials:1},vp:1},
-  {id:'reseau2',branch:'ia_renseignement',tier:2,type:'technology',name:'Réseau Orbital',emoji:'📡',
+  {id:'reseau2',branch:'ia_renseignement',tier:2,type:'ia_renseignement',name:'Réseau Orbital',emoji:'📡',
    effect:'+1<i class=ri-science></i>/tour. Infos complètes des nations. Immunité pirates.',spec:'intel_2',rGain:{science:1},
    cost:{science:3,energy:2,materials:2},vp:3},
-  {id:'iadef3',branch:'ia_renseignement',tier:3,type:'technology',name:'IA Défensive',emoji:'🛡️',
+  {id:'iadef3',branch:'ia_renseignement',tier:3,type:'ia_renseignement',name:'IA Défensive',emoji:'🛡️',
    effect:'+4 jetons. Immunité raids/pirates. Rappelle tes jetons des routes.',spec:'ia_immune',spec2:'storm_immune',forceBonus:4,
    cost:{science:5,energy:2,materials:2},vp:5},
   // ── SCIENCES EXPÉRIMENTALES ──────────────────────────────────────────────────
-  {id:'quant1',branch:'sciences_exp',tier:1,type:'technology',name:'Ordinateur Quantique',emoji:'🧪',
+  {id:'quant1',branch:'sciences_exp',tier:1,type:'sciences_exp',name:'Ordinateur Quantique',emoji:'🧪',
    effect:'+3<i class=ri-science></i>/tour. −1<i class=ri-energy></i>/tour.',rGain:{science:3,energy:-1},
    cost:{science:2,materials:2},vp:1},
-  {id:'robo2',branch:'sciences_exp',tier:2,type:'technology',name:'Robotisation Avancée',emoji:'🤖',
+  {id:'robo2',branch:'sciences_exp',tier:2,type:'sciences_exp',name:'Robotisation Avancée',emoji:'🤖',
    effect:'+2<i class=ri-materials></i>/tour. Automatisation industrielle — rendement accru.',rGain:{materials:2},
    cost:{science:3,materials:2,energy:2},vp:3},
-  {id:'extra3',branch:'sciences_exp',tier:3,type:'technology',name:'Exploration Extra-Solaire',emoji:'🚀',
+  {id:'extra3',branch:'sciences_exp',tier:3,type:'sciences_exp',name:'Exploration Extra-Solaire',emoji:'🚀',
    effect:'+8 VP si ≥5 techs. Colonise Éris/Pluton/Triton.',spec:'extrasolar',spec2:'gas_unlock',
    cost:{science:5,energy:3,materials:2},vp:5},
   // ── SPIRITUALITÉ & NATURE ────────────────────────────────────────────────────
-  {id:'vegetal1',branch:'spiritualite_nature',tier:1,type:'government',name:'Végétalisation',emoji:'🌿',
+  {id:'vegetal1',branch:'spiritualite_nature',tier:1,type:'spiritualite_nature',name:'Végétalisation',emoji:'🌿',
    effect:'+2<i class=ri-morale></i> immédiat. +1<i class=ri-morale></i>/tour.',resGain:{morale:2},rGain:{morale:1},
    cost:{materials:2,science:1},vp:1},
-  {id:'empathic2',branch:'spiritualite_nature',tier:2,type:'government',name:'Réseau Empathique',emoji:'🧘',
+  {id:'empathic2',branch:'spiritualite_nature',tier:2,type:'spiritualite_nature',name:'Réseau Empathique',emoji:'🧘',
    effect:'+1<i class=ri-morale></i> immédiat. +2<i class=ri-morale></i>/tour. +1<i class=ri-science></i>/tour.',resGain:{morale:1},rGain:{morale:2,science:1},
    cost:{science:2,materials:2,energy:2},vp:3},
-  {id:'eveil3',branch:'spiritualite_nature',tier:3,type:'government',name:'Éveil Collectif',emoji:'✨',
+  {id:'eveil3',branch:'spiritualite_nature',tier:3,type:'spiritualite_nature',name:'Éveil Collectif',emoji:'✨',
    effect:'+2<i class=ri-science></i>/tour. +1 VP/colonie connectée au final.',spec:'colony_vp',rGain:{science:2},
    cost:{science:5,materials:2},vp:5},
   // ── MINES & ÉNERGIE ──────────────────────────────────────────────────────────
-  {id:'exploit1',branch:'mines_energie',tier:1,type:'economic',name:"Exploitations d'Astéroïdes",emoji:'⛏️',
+  {id:'exploit1',branch:'mines_energie',tier:1,type:'mines_energie',name:"Exploitations d'Astéroïdes",emoji:'⛏️',
    effect:'+3<i class=ri-materials></i>/tour',rGain:{materials:3},
    cost:{materials:1,energy:2,science:1},vp:1},
-  {id:'extract2',branch:'mines_energie',tier:2,type:'economic',name:'Extracteurs Solaires',emoji:'🏭',
+  {id:'extract2',branch:'mines_energie',tier:2,type:'mines_energie',name:'Extracteurs Solaires',emoji:'🏭',
    effect:'+3<i class=ri-energy></i>/tour',rGain:{energy:3},
    cost:{materials:4,energy:1,science:2},vp:3},
-  {id:'dyson3',branch:'mines_energie',tier:3,type:'economic',name:'Sphère de Dyson',emoji:'⚡',
+  {id:'dyson3',branch:'mines_energie',tier:3,type:'mines_energie',name:'Sphère de Dyson',emoji:'⚡',
    effect:'+5<i class=ri-energy></i>/tour. Les autres acceptent (+3<i class=ri-energy></i>) ou guerre.',spec:'dyson3',rGain:{energy:5},
    cost:{materials:6,energy:3,science:6},vp:5},
   // ── EMPATHES (Union Sacrée requise) ──────────────────────────────────────────
-  {id:'liens1',branch:'empathes',tier:1,type:'technology',name:'Liens Empathes',emoji:'🔮',
+  {id:'liens1',branch:'empathes',tier:1,type:'empathes',name:'Liens Empathes',emoji:'🔮',
    effect:'Routes sans jeton (rappelle les tiens). +1<i class=ri-energy></i>/2 routes. +2 tokens combat.',spec:'empath_routes',combatBonus:2,
    cost:{science:4},vp:1},
-  {id:'comm2',branch:'empathes',tier:2,type:'technology',name:'Communications Instantanées',emoji:'🌐',
+  {id:'comm2',branch:'empathes',tier:2,type:'empathes',name:'Communications Instantanées',emoji:'🌐',
    effect:'+2<i class=ri-morale></i>/tour. +1<i class=ri-science></i>/tour. +5 gouvernement.',rGain:{morale:2,science:1},govPts:5,
    cost:{science:5},vp:3},
-  {id:'tele3',branch:'empathes',tier:3,type:'technology',name:'Télépathie',emoji:'🧬',
+  {id:'tele3',branch:'empathes',tier:3,type:'empathes',name:'Télépathie',emoji:'🧬',
    effect:'Copie tech adverse. +2 tokens combat. −2<i class=ri-morale></i>/tour si guerre. +3<i class=ri-science></i>/tour.',spec:'empath_tele',combatBonus:2,rGain:{science:3},
    cost:{science:6},vp:5},
   // ── CIVIQUES héritées supprimées (refonte civique). Le civique vit désormais dans CIVIC_MARKET :
@@ -417,11 +430,11 @@ const CIVIC_MARKET=[
    govPts:5, cost:{science:3}},
   // ── GOUVERNEMENT (formes : une seule active à la fois, remplace la précédente) ──
   {id:'gov_tyrannie', name:'Tyrannie', emoji:'👑', type:'government',
-   effect:'+1 AC/tour. −2<i class=ri-morale></i> à l\'adoption.', desc:'Pouvoir autoritaire — efficacité par la contrainte.',
-   govForm:{formPts:0,acBonus:1,adoptMorale:2}, cost:{}},
+   effect:'+1 AC/tour. −2<i class=ri-morale></i> à l\'adoption. Moral plafonné à 6.', desc:'Pouvoir autoritaire — efficacité par la contrainte : on obéit, on ne s\'enthousiasme pas.',
+   govForm:{formPts:0,acBonus:1,adoptMorale:2,moraleCap:6}, cost:{}},
   {id:'gov_corpo', name:'Domination des Corporations', emoji:'🏢', type:'government',
-   effect:'+5 pts Gouv. −1<i class=ri-morale></i> à l\'adoption.', desc:'Les conglomérats dirigent — ordre marchand.',
-   govForm:{formPts:5,adoptMorale:1}, cost:{materials:2}},
+   effect:'+5 pts Gouv. −1<i class=ri-morale></i> à l\'adoption. Moral plafonné à 7.', desc:'Les conglomérats dirigent — ordre marchand, adhésion tiède.',
+   govForm:{formPts:5,adoptMorale:1,moraleCap:7}, cost:{materials:2}},
   {id:'gov_senat', name:'Sénat Solaire', emoji:'⚖️', type:'government',
    effect:'+5 pts Gouvernement.', desc:'Élus de toutes les colonies et de la mère — décisions coordonnées.',
    govForm:{formPts:5}, cost:{materials:3}},
@@ -453,7 +466,12 @@ const EVENTS=[
        }
        const _mat=Math.min(2,p.res.materials||0);
        p.res.materials=Math.max(0,(p.res.materials||0)-2);
+       /* Marc, 27/08 : « événements négatifs qui t'affectent, −1 moral ». On l'applique aux nations
+          RÉELLEMENT touchées — celles que l'IA Défensive épargne sont sorties plus haut par `continue`,
+          elles ne perdent donc rien, ce qui est le sens même d'être protégé. */
+       p.res.morale=Math.max(0,(p.res.morale||0)-1);
        const perte=[]; if(_j)perte.push('−'+_j+' jeton'); if(_rte)perte.push('route '+_rte+' détruite'); if(_mat)perte.push('−'+_mat+'<i class=ri-materials></i>');
+       perte.push('−1<i class=ri-morale></i>');
        touches.push(p.civ.emoji+' '+p.civ.name+' : '+(perte.join(', ')||'rien à perdre'));
        addLog('🌩️ '+p.civ.emoji+' '+p.civ.name+' — tempête : '+(perte.join(', ')||'rien à perdre')+'.','red');
      }
@@ -462,7 +480,10 @@ const EVENTS=[
        +(proteges.length?('<br><span style="color:#9ad89a">🛡️ Épargnées (IA Défensive) : '+proteges.join(', ')+'</span>'):'');
    }},
   {id:'pirates',type:'menace',name:'Prolifération des pirates',emoji:'☠️',preview:'Les pirates frappent les routes de la nation la plus riche en <i class=ri-materials></i> : les routes sans jeton NI technologie de protection sont détruites ; celles avec un jeton ont 50% de chance d\'être perdues, mais 2 au maximum.',
-   resolve(G){const h=_evTop(function(p){return p.res.materials||0;});if(h.length!==1)return 'Prolifération des pirates — aucune cible claire.';const tgt=h[0];let unp=0,prot=0,tech=0;const keep=[];for(const r of tgt.routes){if((r.tokens||0)>0){/* jeton posé : 50% chacune, MAX 2 perdues */ if(prot<2&&Math.random()<0.5){tgt.forceCooldown.push({count:r.tokens,returnTurn:getCooldownTurn(tgt)});prot++;}else keep.push(r);}else if(routeProtegee(tgt,r)){keep.push(r);tech++;/* protégée par une TECHNOLOGIE : elle n'a pas besoin de jeton */}else unp++;/* ni jeton ni technologie : détruite */}tgt.routes=keep;updateConnections(tgt);if(tech)addLog('🛡️ '+tech+' route(s) de '+_evName(tgt)+' épargnée(s) — protégées par une technologie, sans jeton nécessaire.','gold');if((unp+prot)===0)return 'Prolifération des pirates — '+_evName(tgt)+' est la nation la plus riche en <i class=ri-materials></i> et devient la cible des pirates, mais AUCUNE route n\'est perdue.';
+   resolve(G){const h=_evTop(function(p){return p.res.materials||0;});if(h.length!==1)return 'Prolifération des pirates — aucune cible claire.';const tgt=h[0];let unp=0,prot=0,tech=0;const keep=[];for(const r of tgt.routes){if((r.tokens||0)>0){/* jeton posé : 50% chacune, MAX 2 perdues */ if(prot<2&&Math.random()<0.5){tgt.forceCooldown.push({count:r.tokens,returnTurn:getCooldownTurn(tgt)});prot++;}else keep.push(r);}else if(routeProtegee(tgt,r)){keep.push(r);tech++;/* protégée par une TECHNOLOGIE : elle n'a pas besoin de jeton */}else unp++;/* ni jeton ni technologie : détruite */}tgt.routes=keep;updateConnections(tgt);
+    /* −1 moral SEULEMENT si les pirates ont mordu : une nation visée mais dont toutes les routes
+       étaient protégées n'a rien subi, et son peuple n'a aucune raison de s'en émouvoir. */
+    if((unp+prot)>0)tgt.res.morale=Math.max(0,(tgt.res.morale||0)-1);if(tech)addLog('🛡️ '+tech+' route(s) de '+_evName(tgt)+' épargnée(s) — protégées par une technologie, sans jeton nécessaire.','gold');if((unp+prot)===0)return 'Prolifération des pirates — '+_evName(tgt)+' est la nation la plus riche en <i class=ri-materials></i> et devient la cible des pirates, mais AUCUNE route n\'est perdue.';
     return 'Prolifération des pirates — '+_evName(tgt)+' est visé (nation la plus riche en <i class=ri-materials></i>) et perd '+(unp+prot)+' route(s) : '+unp+' sans jeton détruite(s)'+(prot?', '+prot+' protégée(s) pillée(s) (max 2 — jetons en récupération)':'')+'.';}},
   {id:'sci',type:'competition',name:'Conférence Scientifique Solaire',emoji:'🔬',preview:'La nation avec la plus grande production de <i class=ri-science></i> gagne +6 VP.',
    resolve(G){const h=_evTop(_sciProd);return 'Conférence Scientifique — '+_evAwardVP(h,6);}},
@@ -1397,10 +1418,33 @@ function getNodeOwnerAI(nodeId){const o=ownerNation(nodeId);return (o&&o._isAI!=
    On tient donc un registre des DEUX signataires par nœud. La liste de nœuds reste inchangée : ses
    vingt autres lecteurs (carte, routes, colonisation, révocation…) n'ont pas à savoir tout cela. */
 function _accordEnregistrer(nodeId,a,b){
-  if(!nodeId)return;
+  if(!nodeId)return null;
+  /* ══════ UN SEUL ACCORD PAR COUPLE — ET LA GARDE EST ICI, PAS CHEZ LES APPELANTS ══════
+     ⚠️ CE DÉFAUT A ÉTÉ « CORRIGÉ » UNE PREMIÈRE FOIS LE 26/08, ET IL EST REVENU. Marc, partie 792D :
+     l'accord commercial avait été signé deux fois entre les mêmes nations. J'avais ajouté la garde
+     dans `_evAccordConclude` — le chemin du SOMMET — et considéré l'affaire close. Le banc
+     `test_pacte_et_accords.js` ne testait que ce chemin-là : il est resté vert, et le défaut a
+     survécu partout ailleurs.
+
+     Or un accord n'est pas enregistré entre deux NATIONS mais sur un NŒUD, et quatre fonctions en
+     créent. Signer avec le même voisin sur trois de ses colonies donnait trois accords, donc
+     +3🪨 +3🙂 par tour. Mesuré le 27/08 : Terriens et Ceinturiens en avaient deux (Cérès et Vesta),
+     et les Jupitériens en cumulaient cinq à quatre nations — ce que Marc a repéré d'un coup d'œil
+     dans le relevé du moral (« tu m'expliques accords commerciaux ×5 à 4 nations ? »).
+
+     LA LEÇON : garder une règle chez ses APPELANTS, c'est la réécrire autant de fois qu'il y a
+     d'appelants, et l'oublier une fois de trop. `_accordEnregistrer` est le seul passage obligé ;
+     la règle vit ici. Un chemin ajouté demain en héritera sans rien avoir à savoir.
+
+     On rend le nœud de l'accord existant : l'appelant qui veut prévenir son joueur peut le nommer. */
+  if(a&&b&&typeof accordEntre==='function'){
+    const deja=accordEntre(a,b);
+    if(deja)return deja;
+  }
   if(!G.commercialAccords.includes(nodeId))G.commercialAccords.push(nodeId);
   G.accordsParties=G.accordsParties||{};
   G.accordsParties[nodeId]=[a&&a.civ?a.civ.id:a, b&&b.civ?b.civ.id:b].filter(Boolean);
+  return nodeId;
 }
 function _accordSignataires(nodeId){ return (G.accordsParties&&G.accordsParties[nodeId])||null; }
 /* ═══════ « AI-JE UN ACCORD ICI ? » — LA QUESTION QUE PERSONNE NE POSAIT ═══════
@@ -1527,6 +1571,12 @@ function capturerNoeud(vainqueur, nodeId){
 function accordAcceptable(nat, proposant){
   if(!nat||!proposant) return {ok:false, raison:'nation inconnue'};
   if(_warBetween(nat.civ.id, proposant.civ.id)) return {ok:false, raison:'vous êtes en guerre'};
+  /* La garde de `_accordEnregistrer` empêcherait le doublon de toute façon — mais en silence, APRÈS
+     que le proposant a dépensé 1 AC et donné 2🪨. Refuser ici, c'est refuser avant de faire payer,
+     et pouvoir dire pourquoi. Les deux gardes ne font pas double emploi : celle-ci protège le
+     joueur, celle-là protège la règle. */
+  if(typeof accordEntre==='function'&&accordEntre(nat,proposant))
+    return {ok:false, raison:'un accord vous lie déjà — il n\'en existe qu\'un par couple de nations'};
   const tension=tensEff(nat.civ.id, proposant.civ.id);
   if(tension>=7) return {ok:false, raison:'tensions trop élevées ('+tension+'/10)'};
   try{
@@ -1540,7 +1590,12 @@ function recomputeGov(p){
   const prev=p.gov_level;
   p.gov_pts=(p.govPermPts||0)+(p.govFormPts||0);
   p.gov_level=p.gov_pts>=15?4:p.gov_pts>=10?3:p.gov_pts>=5?2:1;
-  if(p.gov_level>prev&&p===G.player)addLog('🏛️ Gouvernement niveau '+p.gov_level+' ! (→'+p.gov_level+' AC base/tour)','gold');
+  /* ⚠️ CE MESSAGE ANNONÇAIT LE NIVEAU À LA PLACE DES AC. « Gouvernement niveau 4 ! (→4 AC) » alors
+     que `calcAC` rend `gov_level + 1`, soit 5. Le calcul était juste, l'annonce fausse — le pire cas
+     pour qui essaie de comprendre son propre tableau de bord, et de quoi faire douter des règles
+     écrites, elles, correctement. Trouvé en relisant regles.html avec Marc (26/08). */
+  if(p.gov_level>prev&&p===G.player)addLog('🏛️ Gouvernement niveau '+p.gov_level+' ! (→'
+    +(typeof calcAC==='function'?calcAC(p):(p.gov_level+1))+' AC de base par tour)','gold');
 }
 function addGovPts(p,pts){
   // points de gouvernement PERMANENTS (techs, capacités) — distincts de la contribution de la forme
@@ -1555,6 +1610,12 @@ function adoptGovForm(p,card){
   p.govFormAC=f.acBonus||0;            // Tyrannie : +1 AC/tour sans monter le niveau
   p.govFormMorale=f.moralePerTurn||0;  // Démocratie : +1<i class=ri-morale></i>/tour
   p.govFormUpkeep=f.upkeep||null;      // Démocratie : entretien −1<i class=ri-materials></i> −1<i class=ri-energy></i>/tour
+  /* ⚠️ PLAFOND DE MORAL PROPRE À LA FORME (Tyrannie 6, Corporations 7). Il ne coupe RIEN au moment
+     de l'adoption : c'est `enforceCaps()` qui écrête, au même instant que le plafond ordinaire de 10.
+     Adopter la Tyrannie à 9❤️ te laisse donc à 7 jusqu'à la fin du tour, puis te ramène à 6 — le
+     joueur voit la redescente se produire là où il a l'habitude de la voir. Et comme le plafond est
+     porté par la FORME et non par la nation, en changer le lève aussitôt. */
+  p.govFormMoraleCap=f.moraleCap||0;
   if(f.adoptMorale)p.res.morale=Math.max(0,(p.res.morale||0)-f.adoptMorale); // malus ponctuel (non rendu si on rechange)
   recomputeGov(p);
   if(p===G.player)addLog('🏛️ Forme de gouvernement : '+card.emoji+' '+card.name,'gold');
@@ -1614,20 +1675,41 @@ function isTechAvailable(card,p){
    souvenir qu'on en a. */
 function isTechExclusive(card){
   if(card.repeatable) return false;
-  if(card.type==='government'||card.type==='militaire'||card.type==='military') return false;
+  /* ⚠️ CORRECTION DE MA PROPRE CORRECTION (26/08). En remplaçant le `'civique'` mort par
+     `'government'`, j'ai exempté trois VRAIES technologies de la branche Spiritualité — dont
+     🕊️ Éveil Collectif, de rang 3, qui perdait ainsi son exclusivité. Les cartes de type
+     `government` du pool ne sont pas des cartes civiques : ce sont des technologies comme les
+     autres, et le rang 3 doit rester réservé à son premier acheteur.
+     Seules les cartes MILITAIRES sont hors de ce régime : chacun peut acheter le Supercroiseur.
+     `test_regles.js` a attrapé l'écart en comptant 6 T3 exclusives sur 7. */
+  if(card.type==='militaire'||card.type==='military') return false;
   return !card.branch||card.tier>=3;
 }
 function getEffCost(card,p){
   const c={...card.cost};
   if(p.civ.id==='martiens'){
     if((card.type==='military'||card.type==='militaire')&&c.energy)c.energy=Math.max(0,c.energy-1);
-    if(card.type==='colonization'){if(c.materials)c.materials=Math.max(0,c.materials-1);if(c.energy)c.energy=Math.max(0,c.energy-1);}
+    /* ⚠️ REMISE MARTIENNE CACHÉE — SUPPRIMÉE LE 2026-08-26 (décision de Marc).
+       Les Martiens recevaient ici −1🪨 −1⚡ sur les trois cartes de la branche Expansion, EN PLUS de
+       leur remise sur l'action Coloniser (calculée dans `colonizeCost`). Cette seconde remise
+       n'était écrite dans aucune règle : un joueur qui comparait les coûts affichés à ceux du
+       document ne pouvait que conclure à une erreur de comptabilité.
+       Le passif martien reste ce que les règles annoncent : « Colonisation −1🪨 −1⚡ », c'est-à-dire
+       l'ACTION. Rien sur les cartes. */
   }
   if(card.branch&&p.civ.techBonus===card.branch&&c.science)c.science=Math.max(0,c.science-1);
-  if(p.stratBonus&&p.stratBonus.spec==='strat_free_sci'&&card.type==='technology'&&c.science)c.science=0;
+  /* ⚠️ UNE TECHNOLOGIE, C'EST UNE CARTE DE L'ARBRE — donc `branch`, jamais `type`.
+     Ce test lisait `type==='technology'` : 12 cartes sur 21. La carte Stratégie « coût en savoir
+     annulé » ne fonctionnait donc pas sur Biosphère, Végétalisation ni Exploitations d'Astéroïdes,
+     sans que rien ne l'explique au joueur. Corrigé le 26/08 (décision de Marc : compter les 21). */
+  if(p.stratBonus&&p.stratBonus.spec==='strat_free_sci'&&card.branch&&c.science)c.science=0;
   return c;
 }
-function realResCap(p){return{energy:12,materials:20,science:10+(p._resCap||0),morale:10};}
+/* Le plafond de moral n'est plus le même pour tout le monde : une forme de gouvernement autoritaire
+   l'abaisse (Tyrannie 6, Domination des Corporations 7). Il est lu ICI plutôt qu'appliqué à
+   l'adoption, pour que TOUTES les sources de moral — revenus, techs, accords, événements — se
+   heurtent au même mur, sans qu'aucune ait à connaître la forme de gouvernement. */
+function realResCap(p){return{energy:12,materials:20,science:10+(p._resCap||0),morale:(p&&p.govFormMoraleCap)||10};}
 function getResCapFor(p){return{energy:9999,materials:9999,science:9999,morale:9999};} // v18 : plafonds NON appliqués en cours de tour (on peut créer au-delà) ; l'écrêtage se fait via enforceCaps à la frontière de tour, APRÈS l'entretien.
 function enforceCaps(){for(const p of allPlayers()){const cap=realResCap(p);for(const r in cap){if((p.res[r]||0)>cap[r])p.res[r]=cap[r];}}}
 function rEmoji(r){return{energy:'<i class=ri-energy></i>',materials:'<i class=ri-materials></i>',science:'<i class=ri-science></i>',morale:'<i class=ri-morale></i>',force:'⚔️'}[r]||r;}
@@ -1713,7 +1795,7 @@ function mkPlayer(civId){
   const startCols=[{nodeId:civ.home,level:1,connected:true}];
   if(civ.extraStartCols)for(const nid of civ.extraStartCols)startCols.push({nodeId:nid,level:1,connected:true});
   const startRoutes=civ.extraStartCols?civ.extraStartCols.map(nid=>({from:civ.home,to:nid,tokens:1})):[];
-  return{civ,res:{...civ.start},gov_pts:0,gov_level:1,govPermPts:0,govForm:null,govFormPts:0,govFormAC:0,govFormMorale:0,govFormUpkeep:null,acMax:2,acLeft:2,
+  return{civ,res:{...civ.start},gov_pts:0,gov_level:1,govPermPts:0,govForm:null,govFormPts:0,govFormAC:0,govFormMorale:0,govFormUpkeep:null,govFormMoraleCap:0,acMax:2,acLeft:2,
     forceTokens:civ.startForce-(civ.extraStartCols?civ.extraStartCols.length:0),forceCooldown:[],cards:[],
     colonies:startCols,
     routes:startRoutes,rpt:{},govRpt:0,tempVP:0,abilityUsed:false,
@@ -1770,7 +1852,14 @@ function initGame(civId,aiCivIds){
   const others=Object.keys(CIVS).filter(id=>id!==civId);
   let aiIds=(aiCivIds&&aiCivIds.length>0)?aiCivIds:[others[Math.floor(Math.random()*others.length)]];
   const branchCards=CARDS_POOL.filter(c=>c.branch);
-  const civCards=CARDS_POOL.filter(c=>!c.branch&&c.type==='civique');
+  /* ⚠️ LA RIVIÈRE CIVIQUE EST VIDE DEPUIS LA REFONTE, ET IL FAUT LE DIRE PLUTÔT QUE DE FILTRER
+     DANS LE VIDE. Les cartes `civique` (gov1, gov2, gov3, eco1, eco2) ont réellement existé dans
+     CARDS_POOL ; elles ont été retirées lors de la refonte civique (voir docs/RESUME_PROJET.md) et
+     le civique vit désormais dans CIVIC_MARKET. Le filtre survivait aux données et rendait toujours
+     un tableau vide — c'est ce genre de survivance qui m'a fait « corriger » un test mort le 25/08
+     et retirer son exclusivité à Éveil Collectif. On garde le champ (l'affichage le lit) mais on
+     écrit ce qu'il est : vide, et pourquoi. */
+  const civCards=[];
   const milCards=CARDS_POOL.filter(c=>!c.branch&&c.type==='militaire');
   G={turn:1,maxTurns:10,phase:'actions',
     player:mkPlayer(civId),ais:aiIds.map(id=>mkPlayer(id)),
@@ -3257,9 +3346,49 @@ function startTurn(){ _startTurnPrep(); _startTurnBegin(); }
 // PRÉPARATION DU TOUR (avant le choix des cartes Stratégie) : remet à jour les revenus déjà
 // encaissés, les jetons revenus de récupération, les points de gouvernement ET surtout le NOMBRE
 // D'ACTIONS (AC), pour que tout soit à jour AVANT que le joueur ne choisisse sa stratégie.
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   L'USURE DE GUERRE — CE QU'UNE GUERRE COÛTE, MÊME QUAND ON NE SE BAT PAS
+   ----------------------------------------------------------------------------------------------
+   Règle de Marc, 27/08 : « −4 de malus pour la guerre, dès que la guerre est enclenchée au tour 1,
+   et ensuite au tour 2 en début de tour. » Autrement dit : une fois par guerre et par tour, prélevé
+   sur le STOCK, pour les DEUX belligérants.
+
+   ⚠️ POURQUOI SUR LE STOCK ET EN DÉBUT DE TOUR — la première version a échoué, et l'échec est
+   instructif. Elle valait −2 et se retranchait du REVENU de fin de tour, pour apparaître au bilan.
+   Mesurée sur trois tirages identiques : aucun effet mesurable. La raison est arithmétique — après
+   écrêtage, `moral = min(plafond, moral + revenu − malus)`. Une nation qui gagne +9 avec un plafond
+   de 6 revient à 6 quoi qu'on retranche : le malus était pris sur un surplus déjà jeté.
+   Prélevé en début de tour, il frappe le stock AVANT la phase d'actions — donc avant l'instant où
+   `_moraleRev` fige le moral qui décide de la guerre civile et des revenus ÷2. La guerre devient
+   alors une vraie dépense, pas une écriture comptable.
+
+   ⚠️ UNE FOIS PAR GUERRE ET PAR TOUR, marqué DANS la guerre (`w._usureTour`) et non sur la nation :
+   à quatre nations plusieurs conflits coexistent, et un drapeau posé sur la nation ferait payer une
+   seule usure à qui en mène deux. La règle est cumulative — c'est ce que Marc a demandé.
+   Le marqueur vit dans l'objet guerre, donc il est sérialisé avec elle : une partie reprise ne
+   refacture pas le tour en cours.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+const USURE_GUERRE_MORAL = 4;
+function _usureDeGuerre(w){
+  if(!w||w.ended)return;
+  if(w._usureTour===G.turn)return;         // déjà facturée ce tour-ci
+  w._usureTour=G.turn;
+  for(const id of [w.a,w.b]){
+    const nat=allPlayers().find(function(n){return n&&n.civ&&n.civ.id===id;});
+    if(!nat)continue;
+    const avant=nat.res.morale||0;
+    nat.res.morale=Math.max(0,avant-USURE_GUERRE_MORAL);
+    const reel=avant-(nat.res.morale||0);
+    if(reel>0)addLog('⚔️ '+nat.civ.emoji+' '+nat.civ.name+' — usure de guerre : −'+reel+'<i class=ri-morale></i> (guerre en cours).','red');
+  }
+}
+/* Toutes les guerres en cours, une fois chacune. Appelée à l'ouverture du tour ET à la déclaration,
+   pour que la guerre déclenchée au tour 1 se paie dès le tour 1. */
+function usureDesGuerres(){ for(const w of (G.wars||[])) _usureDeGuerre(w); }
 function _startTurnPrep(){
   if(G._prepDoneTurn===G.turn)return; // une seule préparation par tour
   G._prepDoneTurn=G.turn;
+  usureDesGuerres();   // AVANT tout le reste : le moral du tour part déjà entamé
   if(typeof enforceCaps==='function')enforceCaps(); // écrêtage : correction des excès du tour précédent (après entretien)
   G.phase='actions';G.turnActions=[];G.aiActions=[];G._raidsThisTurn=[];
   /* ⚠️ CES COMPTEURS SONT PAR NATION — les remettre à zéro sur G.player SEUL ne réinitialisait que
@@ -4355,7 +4484,7 @@ function stApresEvenement(){
 }
 function continueAfterEOT(){
   document.getElementById('eot-modal').classList.add('hidden');
-  enforceCaps(); // DÉBUT DU TOUR SUIVANT : ressources plafonnées à leur maximum (12⚡ / 20🪨 / 10🔬 / 10🙂)
+  enforceCaps(); // DÉBUT DU TOUR SUIVANT : ressources plafonnées (12⚡ / 20🪨 / 10🔬 / 10🙂, moins sous forme autoritaire)
   if(G.turn>=G.maxTurns)doEndGame();
   else if(G.turn===2&&!G.player._inv1){showInvestmentModal();}   // niv.1 : choix fin T2, effet T3→T5
   else if(G.turn===6&&!G.player._inv2){showInvestmentModal2();} // niv.2 : choix fin T6, effet T7→T9
@@ -4738,7 +4867,15 @@ function revenueBreakdownHTML(p){
   const nr=p.routes.length;
   if(nr){if(hasSpec(p,'route_force_free'))mal.push('🛤️ Routes ×'+nr+' : entretien gratuit (Hyperpropulsion) +'+nr+'<i class=ri-materials></i>');else mal.push('🛤️ Routes ×'+nr+' : −'+nr+'<i class=ri-energy></i> +'+nr+'<i class=ri-materials></i>');}
   if(p.govFormUpkeep){const o={};for(const r in p.govFormUpkeep)o[r]=-p.govFormUpkeep[r];mal.push('🗳️ Forme de gouvernement : '+fmt(o)+'/tour');}
-  if(hasSpec(p,'empath_tele')&&estEnGuerre(p))mal.push('🧬 Télépathie (en guerre) : −2<i class=ri-morale></i>/tour');   // par NATION, pas par perspective
+  if(hasSpec(p,'empath_tele')&&estEnGuerre(p))mal.push('🧬 Télépathie (en guerre) : −2<i class=ri-morale></i>/tour');
+  /* ⚠️ SECONDE COPIE DU BARÈME — celle-ci ne calcule rien, elle EXPLIQUE. Le calcul vit dans
+     `revenusBruts` ; si une ligne y est ajoutée sans l'être ici, l'infobulle « Revenu par tour »
+     annonce un net qu'elle n'est pas capable de justifier, et le joueur cherche l'erreur là où elle
+     n'est pas. C'est la divergence décrite dans ARCHITECTURE_AVENIR.md §4. */
+  {
+    const _gu=(G.wars||[]).filter(function(w){return w&&!w.ended&&(w.a===p.civ.id||w.b===p.civ.id);}).length;
+    if(_gu>0)mal.push('⚔️ Usure de guerre ×'+_gu+' : −'+(USURE_GUERRE_MORAL*_gu)+'<i class=ri-morale></i> au DÉBUT de chaque tour');
+  }   // par NATION, pas par perspective
   const m=(p.res.morale||0);
   if(m===0)mal.push('💥 Moral 0 : GUERRE CIVILE — aucun revenu ce tour !');
   else if(m===1)mal.push('⚠️ Moral 1 : revenus ÷2 ce tour');
@@ -4890,11 +5027,22 @@ function revenuDuneColonie(p,col){
   const add=(k,v)=>{ if(v) o[k]=(o[k]||0)+v; };
   const _mult=col.level>=3?2:(col.level>=2?1.5:1);      // v18 : ressources du nœud × niveau
   for(const[r,a]of Object.entries(node.res)) add(r,Math.floor(a*_mult));
-  // v18 : bonus moral RÉCURRENT par niveau — Nv2 +1, Nv3 +2
-  if(col.level>=3)add('morale',2); else if(col.level>=2)add('morale',1);
+  /* Bonus moral RÉCURRENT — NIVEAU 3 SEULEMENT (Marc, 27/08 : « supprime le bonus moral des
+     colonies niveau 2, fais seulement un bonus moral colonie niv 3 »).
+     ⚠️ POURQUOI CE RETRAIT. Mesuré le même jour, une partie lue tour par tour : le moral saturait
+     dès le tour 5 et 61 % des tours-nation se passaient collés au plafond. Chaque colonie améliorée
+     ajoutait un revenu PERMANENT au moral, alors que le stock, lui, reste plafonné à 10 — le
+     surplus était jeté sans que rien ne l'indique. Retirer l'échelon 2 divise par deux le nombre de
+     colonies qui alimentent ce revenu.
+     ⚠️ Le bonus PONCTUEL à l'amélioration (colonies attractives, Callisto) est autre chose et
+     subsiste : il récompense le geste, il ne gonfle pas un revenu par tour. */
+  if(col.level>=3)add('morale',2);
   // Terraformation : +1🪨 +1❤️/tour par colonie de niveau 2 ou 3
   if(hasSpec(p,'terra3')&&(col.level||1)>=2){ add('materials',1); add('morale',1); }
-  // Hub technologique : savoir par niveau
+  /* Savoir par niveau — TOUTE colonie, sans exception. Ce commentaire disait « Hub technologique »
+     et les règles en avaient déduit un hub qui n'a jamais existé : aucun nœud ne porte de marque de
+     ce genre, et la condition ci-dessous ne teste que le niveau. Corrigé le 27/08 après vérification
+     avec Marc, qui a choisi de garder la règle universelle — plus simple à lire et à jouer. */
   if(col.level>=3)add('science',2); else if(col.level>=2)add('science',1);
   return o;
 }
@@ -4982,6 +5130,14 @@ function revenusBruts(p, opts){
   if(hasSpec(p,'empath_tele')&&estEnGuerre(p)){
     gains.morale=(gains.morale||0)-2;_det('🧬 Télépathie (en guerre)',{morale:-2});
   }
+  /* ⚠️ L'USURE DE GUERRE N'EST PLUS ICI — et l'échec de la première version mérite d'être gardé.
+     Elle valait −2 par guerre et se retranchait du REVENU, pour apparaître au bilan de fin de tour.
+     Mesuré sur trois tirages identiques : aucun effet. Une nation qui gagne +9 de moral avec un
+     plafond de 6 revient à 6 quoi qu'il arrive — un malus retranché du revenu est simplement
+     absorbé par un surplus déjà jeté. Tant que le revenu dépasse le plafond, AUCUNE perte placée
+     du côté du revenu ne peut survivre.
+     Elle est désormais prélevée sur le STOCK, en début de tour (`_usureDeGuerre`), donc AVANT la
+     phase d'actions qui fige le moral servant aux pénalités. Voir cette fonction. */
   if(p.govFormMorale){gains.morale=(gains.morale||0)+p.govFormMorale;_det('🗳️ Forme de gouvernement',{morale:p.govFormMorale});} // Démocratie Instantanée : +1<i class=ri-morale></i>/tour
   return gains;
 }
@@ -5148,7 +5304,7 @@ function buyGeneral(cardId, nation){
      ne devrait pas être le cas. »
      Le militaire se limite désormais par la POSSESSION (voir le contrôle plus haut) : chacun peut
      l'acheter une fois, personne ne prive les autres. */
-  if(!card.repeatable&&card.type!=='civique'&&card.type!=='militaire') G.techTaken.add(cardId);
+  if(!card.repeatable&&card.type!=='militaire') G.techTaken.add(cardId);
   addLog('✅ '+card.emoji+' '+card.name+' ('+acCost+' AC)','green');
   addAction(card.emoji,card.name,acCost,cost,card.effect);
   scArmConfirm(card.emoji+' '+card.name,_scCardGains(card));
@@ -5246,7 +5402,10 @@ function applyCard(card,p){
   }
   // Exploration Extra-Solaire : choisir UNE planète parmi Éris/Pluton/Triton (≥5 techs)
   if(card.spec==='extrasolar'){
-    const techCount=p.cards.filter(c=>c.type==='technology').length;
+    /* Même correction : « 5 technologies ou plus » compte TOUTE carte de l'arbre technologique.
+       Avec `type==='technology'` la condition n'en voyait que 12 sur 21, et le +8 VP promis par les
+       règles était donc bien plus dur à obtenir que ce qu'elles annoncent. */
+    const techCount=p.cards.filter(c=>!!c.branch).length;
     if(techCount>=5){
       const cand=['eris','pluto','triton'].filter(nid=>!p.colonies.find(c=>c.nodeId===nid));
       if(p===G.player){
@@ -5372,7 +5531,6 @@ function doUpgrade(nodeId,nat){
   if(!col){addLog('⚠️ Pas de colonie sur '+node.name+'.','red');return;}
   if(col.noUpgrade){addLog('⚠️ '+node.name+' (colonisée par accord forcé) ne peut pas être améliorée.','red');return;}
   if(col.level>=node.maxLv){addLog('⚠️ '+node.name+' est au niveau maximum.','red');return;}
-  const isRemote=node.upgradeCost==='remote';
   const targetLv=col.level+1;
   const ac=1;
   const mat=3;
@@ -5678,6 +5836,9 @@ function doRaidTarget(aiId,nodeId,pillard){
       stolen.push('+'+_q+rEmoji(_k));
     }
     var _nomCol=_col?((NODES[_col.nodeId]&&NODES[_col.nodeId].name)||_col.nodeId):null;
+    /* Moral : −1 chez la victime (Marc, 27/08). Se faire piller une colonie humilie la population ;
+       jusqu'ici le raid ne coûtait que des ressources et de la tension, jamais de moral. */
+    target.res.morale=Math.max(0,(target.res.morale||0)-1);
     /* Tension : +5 chez la victime (Marc, 24/08 — « le raid doit faire mal »). Le pillard, lui,
        gagne +1 envers celle qu'il vient de voler : on se méfie de qui l'on a dépouillé. */
     addTens(target.civ.id,p.civ.id,5);
@@ -5875,6 +6036,38 @@ function attackColony(nodeId,attaquant){
 }
 // ── ASSAUT DE COLONIE : combat résolu IMMÉDIATEMENT (1 manche), capture si victoire. (Le modèle « guerre en 2 tours » est supprimé.) ──
 /* `attaquant` : la nation qui monte l'assaut. Sans lui, la nation active. */
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   Y A-T-IL UN ÉCRAN DEVANT CE MOTEUR ?
+   ----------------------------------------------------------------------------------------------
+   ⚠️ LE MOTEUR TOURNE DANS DEUX MONDES, ET IL NE SAVAIT PAS DANS LEQUEL IL ÉTAIT. Dans le
+   navigateur, `document` est réel. Sur le serveur, `server/game-core.js` en fabrique un décor de
+   carton dont chaque élément rend `parentElement: null`. Tant qu'on se contente de lire, le décor
+   tient ; dès qu'on suit une référence — `slider.parentElement.style` — il s'effondre.
+
+   CE QUE ÇA A COÛTÉ, MESURÉ LE 27/08. `_warShowAttackSlider` faisait exactement cela. L'exception
+   remontait jusqu'à `runEndOfRound`, qui abandonnait TOUTE la fin de tour : revenus, entretien,
+   tension, événements — perdus, pour toutes les nations. Sur 8 parties : 4 fins de tour avortées, et
+   les nations terminaient avec 19,5 ressources au lieu de 28,2. Soit **un tiers de l'économie du
+   jeu**, disparue sans un mot dans un `catch`. C'est la cause du point #81 (« les IA n'ont plus
+   d'énergie »), cherchée du côté du comportement des IA pendant des jours.
+
+   POURQUOI UN DRAPEAU EXPLICITE PLUTÔT QU'UNE DEVINETTE. On pourrait tester `typeof window`, ou
+   sonder un élément pour voir s'il « a l'air vrai ». Les deux sont des devinettes qui retomberont en
+   panne au prochain changement du bac à sable. Le bac à sable SAIT qu'il n'a pas d'écran : il le
+   déclare (`SOLAR_SANS_ECRAN`), et le moteur le lit. Une information connue vaut mieux qu'une
+   information reconstituée.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+function _aUnEcran(){ return typeof SOLAR_SANS_ECRAN==='undefined' || !SOLAR_SANS_ECRAN; }
+
+/* Cette fenêtre appartient à l'ATTAQUANT, et à lui seul : elle n'a de sens que devant l'écran de
+   la nation qui frappe. Une IA n'a pas d'écran ; un humain distant a le sien, ailleurs. */
+function _ouvrirFenetreAssaut(nodeId,attaquant){
+  if(!_aUnEcran())return;
+  if(attaquant!==G.player||attaquant._isAI)return;
+  try{document.getElementById('wcm-turn').textContent=G.turn;}catch(e){}
+  document.getElementById('war-combat-modal').classList.remove('hidden');
+  _warSelectColonyTarget(nodeId);
+}
 function playerAssaultColony(nodeId,enemyAI,attaquant){
   const _atk=attaquant||G.player;
   enemyAI=enemyAI||defenseurPrincipal(nodeId,_atk);
@@ -5907,16 +6100,21 @@ function playerAssaultColony(nodeId,enemyAI,attaquant){
      guerre que MOI je regarde ». Les poser quand c'est quelqu'un d'autre qui attaque affichait à ce
      joueur-ci un conflit qui n'était pas le sien. La vérité vit dans `war`, pas dans ces trois-là. */
   if(_atk===G.player){G.warWith=enemyAI.civ.id;G.warWins=war.wins;G.warTurnsLeft=99;}
+  /* ⚠️ `_warAttackColonyTarget` EST DE LA RÈGLE, PAS DE L'AFFICHAGE, malgré son nom. `resolveWarCombat`
+     le relit pour la garnison, la défense automatique de la capitale, les co-défenseurs d'un nœud
+     partagé et la cible de la capture. Le laisser filer dans le bloc d'affichage ci-dessous aurait
+     fait combattre le serveur sur une cible nulle — un défaut bien pire que celui qu'on corrige. */
   _warAttackColonyTarget=nodeId;
-  try{document.getElementById('wcm-turn').textContent=G.turn;}catch(e){}
   // La CIBLE et l'ENNEMI vont dans `G._flux.donnees` : ils vivaient dans la fermeture ci-dessous,
   // et un assaut interrompu (sauvegarde, rafraîchissement) perdait « sur quoi » on se battait.
   fluxDonnees().assautCible=nodeId;
   fluxDonnees().assautEnnemi=enemyAI.civ.id;
   fluxDonnees().suiteCombat='stAssautJoueurChoisi';
   G._warChoiceCb='stAssautJoueurChoisi';
-  document.getElementById('war-combat-modal').classList.remove('hidden');
-  _warSelectColonyTarget(nodeId);
+  /* ══════ ICI FINIT LA RÈGLE, ICI COMMENCE L'AFFICHAGE ══════
+     Tout ce qui précède doit se produire partout — navigateur, serveur, banc d'essai. Ce qui suit
+     n'a de sens que devant un écran, et devant CELUI DE L'ATTAQUANT. */
+  _ouvrirFenetreAssaut(nodeId,_atk);
 }
 // ── Économie de combat UNIFIÉE (attaque ET défense identiques) ──
 // Engager e jetons coûte 1<i class=ri-materials></i> +1<i class=ri-energy></i> par jeton. Les jetons engagés quittent le pool :
@@ -6710,6 +6908,9 @@ function declarerGuerre(agresseur, cible, raison, declaredBy){
      tout, quel que soit son profil de temps de paix (voir `PROFILS_IA.assiegee`). */
   if(typeof marquerAgressee==='function'){ marquerAgressee(cible); marquerAgressee(agresseur); }
   if(typeof syncWarState==='function')syncWarState();
+  /* « dès que la guerre est enclenchée au tour 1 » : on facture immédiatement, sans attendre le
+     tour suivant. Le marqueur `_usureTour` empêche la double facturation à l'ouverture du tour. */
+  _usureDeGuerre(w);
   // La tension reste au MAXIMUM des deux côtés pendant toute la guerre (endWar la halve à la fin).
   setTens(A,B,10); setTens(B,A,10);
 
@@ -7529,7 +7730,6 @@ function _doAITurnInterne(aiPlayer,oneShot){
     const cands=ai.colonies.filter(c=>c.connected&&c.level===1&&!c.noUpgrade&&(c.nodeId==='callisto'||ATTRACTIVE_COLS.includes(c.nodeId)));
     for(const col of cands){
       const node=NODES[col.nodeId];if(!node||node.type==='orbital_station')continue;
-      const isRemote=node.upgradeCost==='remote';
       const ac=1,mat=3,en=1,sci=1; // Nv.1 → 2 (v18 : 1 AC fixe)
       if(ai.acLeft<ac||(ai.res.materials||0)<mat||(ai.res.energy||0)<en||(ai.res.science||0)<sci)continue;
       ai.acLeft-=ac;ai.res.materials-=mat;ai.res.energy-=en;ai.res.science-=sci;ai.spentThisTurn+=ac+mat+en+sci;
@@ -7703,7 +7903,6 @@ function _doAITurnInterne(aiPlayer,oneShot){
     }
     if(!bestCol)return false;
     const node=NODES[bestCol.nodeId];
-    const isRemote=node.upgradeCost==='remote';
     const targetLv=bestCol.level+1;
     const ac=1,mat=3,en=1,sci=1;
     if(ai.acLeft<ac||(ai.res.materials||0)<mat||(ai.res.energy||0)<en||(ai.res.science||0)<sci)return false;
@@ -8670,7 +8869,7 @@ function calcVP(p){
      DÉTAIL au fil du calcul — c'est gratuit, et cela évite de reconstituer après coup un
      raisonnement qu'on vient de faire. */
   let extraVP=0; const extraDetail=[];
-  if(hasSpec(p,'extrasolar')&&p.cards.filter(c=>c.type==='technology').length>=5){
+  if(hasSpec(p,'extrasolar')&&p.cards.filter(c=>!!c.branch).length>=5){
     extraVP+=8; extraDetail.push('🚀 Exploration Extra-Solaire : +8 (au moins 5 technologies)'); }
   if(hasSpec(p,'colony_vp')){
     const _n=p.colonies.filter(c=>c.connected).length;
@@ -9482,13 +9681,13 @@ function renderTechTree(){
     for(const card of shown){
       // Civique : taken = joueur l'a déjà (1× par joueur). Militaire : grisé si déjà acheté CE tour (1×/tour). Autre : techTaken global.
       const milThisTurn=card.type==='militaire'&&G.player._milBoughtThisTurn&&G.player._milBoughtThisTurn.has(card.id);
-      const taken=milThisTurn||(card.repeatable?false:card.type==='civique'?G.player.cards.some(c=>c.id===card.id):G.techTaken.has(card.id));
+      const taken=milThisTurn||(card.repeatable?false:G.techTaken.has(card.id));
       const mine=G.player.cards.some(c=>c.id===card.id);
       const cost=getEffCost(card,G.player);
       const costHtmlStr=costHtml(cost);
       const _acN=card.ac||1;const _reqOk=!card.reqCard||G.player.cards.some(c=>c.id===card.reqCard);
       const canBuy=!taken&&_reqOk&&G.phase==='actions'&&G.player.acLeft>=_acN&&Object.entries(cost).every(([res,a])=>(G.player.res[res]||0)>=a);
-      const border=TYPE_COLORS[card.type]||'#2a2a5a';
+      const border=couleurCarte(card);
       const artBg=border+'20';
       /* ⚠️ LE ROULEAU AUSSI SUR LES CARTES ÉCO&SOC ET MILITAIRES (Marc, 2026-08-08).
          Elles n'avaient qu'une opacité de 0,4 posée EN LIGNE — qui écrasait au passage
@@ -9592,7 +9791,7 @@ function renderRight(){
   // Active cards
   const el=document.getElementById('r-cards');
   el.innerHTML=p.cards.length===0?'<span style="color:#3a3a6a;font-size:.72em">Aucune carte active.</span>':p.cards.map(card=>{
-    const border=TYPE_COLORS[card.type]||'#2a2a5a';
+    const border=couleurCarte(card);
     const copyBadge=card.espCopy?'<span style="font-size:.58em;color:#ff9040;margin-left:3px">ESP</span>':card._empathCopy?'<span style="font-size:.58em;color:#c080ff;margin-left:3px">TÉLÉP</span>':'';
     return`<div class="acard" style="border-color:${border}${card.espCopy||card._empathCopy?';border-style:dashed':''}" title="${card.effect}"><div class="acard-name">${card.emoji} ${card.name}${copyBadge}</div><div class="acard-effect">${card.effect}</div></div>`;
   }).join('');
@@ -9610,6 +9809,38 @@ function renderActions(){
   document.getElementById('btn-route').classList.toggle('on',mode==='route');
   if(active){const p=G.player;const tc=p.civ.id==='ceinturiens'?1:2;document.getElementById('btn-raid').disabled=p.acLeft<1||p.forceTokens<tc;}
   else document.getElementById('btn-raid').disabled=true;
+}
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   LE RENDEMENT D'UN NŒUD, NIVEAU PAR NIVEAU
+   ----------------------------------------------------------------------------------------------
+   Marc, 27/08 : « j'aimerais que tu indiques sur les colonies du jeu le revenu niv 1, niv 2 et
+   niv 3 [...] comme ça on peut choisir la meilleure colonie dès le départ. »
+
+   ⚠️ CE TEXTE NE RECALCULE RIEN. Il appelle `revenuDuneColonie` — la fonction qui produit vraiment
+   les ressources à chaque fin de tour. Recopier la formule ici (×1,5, ×2, +❤️, +🔬) aurait créé une
+   seconde vérité, et c'est la maladie documentée du projet : deux chemins finissent toujours par
+   diverger, et c'est l'affichage qui ment sans que rien ne le signale.
+
+   Ce que l'affichage révèle, et qui n'était visible nulle part : le ×1,5 du niveau 2 est ARRONDI
+   VERS LE BAS. Europe, Encelade, Triton et Pluton ne gagnent donc rien sur leurs ressources de base
+   en passant au niveau 2 — seulement le ❤️ et le 🔬. Io et Cérès, eux, décollent. Le joueur pouvait
+   difficilement le deviner ; maintenant il le lit avant de coloniser.
+
+   `nat` sert à refléter les techs de CELUI QUI REGARDE (Terraformation change le rendement) : cette
+   fonction AFFICHE, elle n'applique aucune règle, donc lire la nation courante est légitime.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+function revenusParNiveau(nodeId,nat){
+  const node=NODES[nodeId];
+  if(!node||node.decorative) return '';
+  const p=nat||(typeof G!=='undefined'&&G.player)||null;
+  const max=node.maxLv||3;
+  const bloc=[];
+  for(let lv=1;lv<=max;lv++){
+    const o=revenuDuneColonie(p,{nodeId:nodeId,level:lv,connected:true});
+    const txt=Object.entries(o).map(([r,a])=>a+rEmoji(r)).join(' ')||'—';
+    bloc.push('<span style="color:#7a8aa0">Nv'+lv+'</span> '+txt);
+  }
+  return bloc.join(' <span style="color:#3a3a6a">·</span> ');
 }
 /* ============================================================ NODE POPUP ============================================================ */
 function showNodePopup(nodeId){
@@ -9637,9 +9868,10 @@ function showNodePopup(nodeId){
   const aCol=aColInfo?aColInfo.col:null;const aColAI=aColInfo?aColInfo.ai:null;
   document.getElementById('npop-title').textContent=node.emoji+' '+node.name;
   const resStr=Object.entries(node.res).map(([r,a])=>'+'+a+rEmoji(r)).join(' ');
+  const revStr=revenusParNiveau(nodeId,G.player);
   /* LE défaut signalé par Marc : c'est MON accord qui compte, pas celui du voisin d'en face. */
   const accord=accordAvecMoi(nodeId,G.player);
-  document.getElementById('npop-info').innerHTML=`VP: ${node.baseVP} | ${resStr}<br>Type: ${({moon:'Lune',dwarf_planet:'Planète naine',asteroid:'Astéroïde',orbital_station:'Station orbitale',planet:'Planète',gas_giant:'Géante gazeuse'})[node.type]||node.type}${pCol?`<br>✅ <b style="color:${G.player.civ.color}">${G.player.civ.emoji} ${G.player.civ.name} (toi)</b> — Nv.${pCol.level}${pCol.connected?' ✓':' ✗ déconnectée'}`:''}${_occupants.map(o=>`<br>🏴 Colonie de <b style="color:${o.nat.civ.color}">${o.nat.civ.emoji} ${o.nat.civ.name}</b> — Nv.${o.col.level}${(o.nat===aColAI&&accord)?' 🤝 accord':''}${(_occupants.length>1&&o.nat===aColAI)?' <span style="color:#ffcc88">← cible de tes actions</span>':''}`).join('')}${(_occupants.length>1||(pCol&&_occupants.length))?'<br><span style="color:#ffcc88;font-size:.9em">⚠️ Nœud PARTAGÉ — les occupants se défendent ensemble contre un tiers ; entre eux, l\'un peut chasser l\'autre.</span>':''}${!pCol&&!aCol?'<br><span style="color:#7a8aa0">Inoccupé</span>':''}${getPiratePos(G.turn)===nodeId?'<br><span style="color:#ff8888">⚠️ Pirates ici !</span>':''}`;
+  document.getElementById('npop-info').innerHTML=`VP: ${node.baseVP} | ${resStr}<br>${revStr}<br>Type: ${({moon:'Lune',dwarf_planet:'Planète naine',asteroid:'Astéroïde',orbital_station:'Station orbitale',planet:'Planète',gas_giant:'Géante gazeuse'})[node.type]||node.type}${pCol?`<br>✅ <b style="color:${G.player.civ.color}">${G.player.civ.emoji} ${G.player.civ.name} (toi)</b> — Nv.${pCol.level}${pCol.connected?' ✓':' ✗ déconnectée'}`:''}${_occupants.map(o=>`<br>🏴 Colonie de <b style="color:${o.nat.civ.color}">${o.nat.civ.emoji} ${o.nat.civ.name}</b> — Nv.${o.col.level}${(o.nat===aColAI&&accord)?' 🤝 accord':''}${(_occupants.length>1&&o.nat===aColAI)?' <span style="color:#ffcc88">← cible de tes actions</span>':''}`).join('')}${(_occupants.length>1||(pCol&&_occupants.length))?'<br><span style="color:#ffcc88;font-size:.9em">⚠️ Nœud PARTAGÉ — les occupants se défendent ensemble contre un tiers ; entre eux, l\'un peut chasser l\'autre.</span>':''}${!pCol&&!aCol?'<br><span style="color:#7a8aa0">Inoccupé</span>':''}${getPiratePos(G.turn)===nodeId?'<br><span style="color:#ff8888">⚠️ Pirates ici !</span>':''}`;
   const acts=document.getElementById('npop-acts');acts.innerHTML='';
   if(!pCol){
     const{ac,mat,en}=colonizeCost(G.player);
@@ -9666,7 +9898,7 @@ function showNodePopup(nodeId){
     }
   }
   if(pCol&&pCol.level<node.maxLv&&!pCol.noUpgrade){
-    const _isRem=node.upgradeCost==='remote';const _tLv=pCol.level+1;
+    const _tLv=pCol.level+1;
     const _uac=1;const _umat=3;const _uen=1;
     const _uok=G.player.acLeft>=_uac&&(G.player.res.materials||0)>=_umat&&(G.player.res.energy||0)>=_uen&&(G.player.res.science||0)>=1;
     const _ubonus=nodeId==='callisto'?'+2<i class=ri-morale></i>':ATTRACTIVE_COLS.includes(nodeId)?'+1<i class=ri-morale></i>':'';
@@ -10245,10 +10477,12 @@ function warAttackColony(){
 }
 let _warAttackColonyTarget=null;
 function _warSelectColonyTarget(nodeId){
-  _warAttackColonyTarget=nodeId;
+  _warAttackColonyTarget=nodeId;      // règle : la cible, même sans écran
+  if(!_aUnEcran())return;             // le reste est du dessin
   _warShowAttackSlider();
 }
 function _warShowAttackSlider(){
+  if(!_aUnEcran())return;   // dessine un curseur : sans écran, il n'y a rien à dessiner
   const p=G.player;const ai=G.warWith?G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0]:G.ais[0];
   const aiTok=ai?ai.forceTokens:0;
   // Défense RÉELLEMENT engageable par l'IA = ce qu'elle peut PAYER (1🪨+1⚡/jeton). Déterministe → l'affichage ne ment pas.
@@ -10667,16 +10901,16 @@ function showGeneralDetail(cardId){
   if(!card)return;
   _techDetailId=cardId;_detailIsGeneral=true;
   const _milThisTurn=card.type==='militaire'&&G.player._milBoughtThisTurn&&G.player._milBoughtThisTurn.has(cardId);
-  const taken=_milThisTurn||(card.repeatable?false:card.type==='civique'?G.player.cards.some(c=>c.id===cardId):G.techTaken.has(cardId));
+  const taken=_milThisTurn||(card.repeatable?false:G.techTaken.has(cardId));
   const cost=getEffCost(card,G.player);
   const _acN=card.ac||1;const _reqOk=!card.reqCard||G.player.cards.some(c=>c.id===card.reqCard);
   const canBuy=!taken&&_reqOk&&G.phase==='actions'&&G.player.acLeft>=_acN&&Object.entries(cost).every(([r,a])=>(G.player.res[r]||0)>=a);
-  const typeColor=TYPE_COLORS[card.type]||'#2a2a5a';
+  const typeColor=couleurCarte(card);
   document.getElementById('td-card').style.borderTop=`4px solid ${typeColor}`;
   const artEl2=document.getElementById('td-art');
   if(CARD_ART.has(cardId)){artEl2.style.background=`#0a0a18 url('assets/cards/${cardId}.png') center/cover no-repeat`;artEl2.style.height='230px';}
   else{artEl2.style.background=typeColor+'22';artEl2.style.height='';}
-  const genLabel=card.type==='militaire'?'Militaire':card.type==='civique'?'Civique':'Général';
+  const genLabel=card.type==='militaire'?'Militaire':'Général';
   artEl2.innerHTML=`<span class="td-tier-badge" id="td-tier">${genLabel}</span>${CARD_ART.has(cardId)?'':`<span id="td-emoji">${card.emoji}</span>`}<span class="td-taken-badge hidden" id="td-taken"></span>`;
   document.getElementById('td-name').textContent=card.name;
   document.getElementById('td-branch').textContent=card.type||'';
