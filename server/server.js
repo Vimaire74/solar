@@ -242,6 +242,13 @@ function corpsRapport(entry) {
     L.push(String(b.text || '').split('\n').map(x => '   ' + x).join('\n'));
   }
   L.push('');
+  /* ⚠️ L'ANALYSE AVANT LE JOURNAL BRUT. Marc, 27/08 : « veille à ce que le fichier debug puisse être
+     efficace dans le recueil d'informations, pas juste le journal d'une partie. » Le journal dit ce
+     qui s'est passé ; il ne dit ni comment chaque nation a progressé, ni pourquoi une IA a préféré
+     un coup à un autre. Ces deux manques nous ont coûté plusieurs enquêtes à l'aveugle.
+     Le texte est produit par le MOTEUR (`_analyseTexte`) : solo et serveur ne peuvent donc pas dire
+     deux choses différentes — c'est la règle qu'on a le plus souvent payée pour l'avoir oubliée. */
+  if (Array.isArray(entry.analyse) && entry.analyse.length) { for (const l of entry.analyse) L.push(l); L.push(''); }
   L.push('═══════════ JOURNAL COMPLET DE LA PARTIE ═══════════');
   L.push('(' + (entry.journal || []).length + ' lignes, du début à la fin)');
   L.push('');
@@ -251,7 +258,7 @@ function corpsRapport(entry) {
   return L.join('\n');
 }
 function archiveGame(g) {
-  let scores = [], journal = [], turn = null;
+  let scores = [], journal = [], turn = null, analyse = [];
   try {
     const sb = g.driver.sb, G = g.driver.state();
     turn = G.turn;
@@ -281,13 +288,16 @@ function archiveGame(g) {
       if (!l || typeof l !== 'object') return txt;
       return ('T' + (l.turn !== undefined ? l.turn : '?')).padEnd(4) + String(l.civ || 'système').padEnd(12) + ' │ ' + txt;
     }).reverse();   // archive et email : journal ENTIER
+    /* La trajectoire des nations et les décisions des IA, produites par le MOTEUR — une seule
+       source pour le solo et pour le serveur. */
+    try { if (typeof sb._analyseTexte === 'function') analyse = sb._analyseTexte(); } catch (e) {}
   } catch (e) { console.error('archiveGame:', e.message); }
   const endedAt = Date.now();
   const humans = g.seats.filter(s => !s.ai && s.user);
   const entry = {
     code: g.code, endedAt, dateFr: frDate(endedAt), turn,
     joueurs: g.seats.map(s => ({ civ: s.civId, ai: !!s.ai, user: s.user || null })),
-    scores, journal, bugs: (g._bugs || [])
+    scores, journal, analyse, bugs: (g._bugs || [])
   };
   const corps = corpsRapport(entry);
   for (const s of humans) {

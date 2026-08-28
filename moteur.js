@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-27 · v9.88';
+const SOLAR_BUILD_MOTEUR = '2026-08-28 · v9.94';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -1162,6 +1162,20 @@ function _decisionsRegistre(){ const f=fluxEtatObj(); return (f.decisions||(f.de
    `cb` et `adapt` acceptent un NOM (chaîne, résolu dans `ST`) — c'est la forme à utiliser — ou
    encore une fonction, pour les flux pas encore migrés. */
 function _emitDecision(kind, nation, payload, cb, adapt){
+  /* ══════ PENDANT UNE SIMULATION, ON NE POSE AUCUNE QUESTION ══════
+     ⚠️ C'EST LA PANNE QUI A ARRÊTÉ LES PARTIES AU TOUR 2, et elle mérite d'être comprise en entier.
+     L'identifiant d'une question vient de `f.seqDecision`, qui vit DANS le flux — donc dans `G`,
+     donc restauré après une simulation. Mais la continuation d'une question non migrée est rangée
+     dans `_suitesVolatiles`, une variable de MODULE que rien ne restaure.
+     Conséquence : une simulation qui émettait une question laissait `_suitesVolatiles['d7']`
+     derrière elle, le compteur revenait à 6, et la question RÉELLE suivante recevait l'identifiant
+     `d7`… puis se résolvait avec la continuation de la simulation. La chaîne de fin de tour partait
+     dans une suite fantôme : les revenus tombaient, et plus rien après. Le journal s'arrêtait net
+     sur « Revenus nets », sans erreur, sans message.
+     Détecter cela « après coup » en comptant les questions ne suffisait pas : le mal était fait à
+     l'émission. On refuse donc d'émettre, et on le SIGNALE — `simulerCoup` déclare alors le coup non
+     simulable et lui laisse son rang d'utilité. */
+  if(G&&G._simulationIA){ G._simuQuestion=true; }
   const f=fluxEtatObj();
   const id='d'+(f.seqDecision=(f.seqDecision||0)+1);
   const nomCb=(typeof cb==='string')?cb:null, nomAd=(typeof adapt==='string')?adapt:null;
@@ -1173,6 +1187,9 @@ function _emitDecision(kind, nation, payload, cb, adapt){
      dernières — largement au-delà du nombre de questions simultanées possibles. */
   const reg=_decisionsRegistre(), ids=Object.keys(reg);
   if(ids.length>50) for(const vieux of ids.slice(0, ids.length-50)){ delete reg[vieux]; delete _suitesVolatiles[vieux]; }
+  /* Simulation : on retient l'identifiant pour purger `_suitesVolatiles` au retour en arrière —
+     c'est la seule partie de l'état de décision qui ne vit PAS dans `G` (voir `simulerCoup`). */
+  if(G&&G._simulationIA&&_simuIdsCourants)_simuIdsCourants.push(id);
   const pending={id, kind, nation:(nation&&nation.civ?nation.civ.id:(nation||null)), payload:payload||{}};
   _decisionsRegistre()[id].nation=pending.nation;   // QUI doit répondre — on le rend à la suite (voir plus bas)
   _questionsPoser(pending);
@@ -4265,6 +4282,7 @@ function guerreFraichePaixRepondue(peaceResult){
 function stFinDeTour(){
   _applyMoraleFlags();
   const revs=doRevenues(); const maint=doMaintenance(); _emitNetRevenueLog(maint);
+  _photographierTour();   // l'état de chaque nation, une fois le tour soldé — voir la note plus haut
   refillGeneralRiver();
   if(G.curEvent){
     const evMsg=G.curEvent.resolve(G);
@@ -6120,7 +6138,24 @@ function attackColony(nodeId,attaquant){
   // LIMITE DE 2 ATTAQUES/TOUR SUPPRIMÉE (demande de Marc) : le nombre d'assauts n'est plus plafonné —
   // il reste limité naturellement par les AC, les jetons Force et le coût en ressources de chaque combat.
   p.acLeft-=1;p.spentThisTurn+=1;closePopup();
-  playerAssaultColony(nodeId,_atkAI);
+  /* ⚠️ TROISIÈME ARGUMENT : QUI ASSAILLE. Il manquait, et son absence a coûté cher.
+     `playerAssaultColony(nodeId, ennemi, attaquant)` retombe sur `G.player` quand on ne le lui dit
+     pas. Or `attackColony` SAIT qui attaque — il vient de lui débiter son AC et ses jetons deux
+     lignes plus haut — et le passait quand même sous silence. Résultat : la guerre était ouverte au
+     nom de la nation ACTIVE, le combat livré par elle, les pertes et la capture portées à son compte.
+     En solo, la nation active est toi et l'illusion tient. À quatre nations sur un serveur, l'assaut
+     d'une IA était imputé à qui regardait l'écran.
+     ⚠️ CE DÉFAUT EST ANCIEN ET N'A ÉCLATÉ QUE LE 28/08. Tant qu'`historique` décidait, les IA
+     n'assaillaient presque jamais : le chemin fautif n'était pas emprunté. `tacticien` assaille dès
+     le tour 1, et `test_equivalence` est passé au rouge le jour même. Un banc qui devient rouge
+     après un changement de comportement n'accuse pas toujours le changement — ici il a révélé ce que
+     l'ancien comportement dissimulait.
+     TROUVÉ PAR BISSECTION, pas à la lecture (`diag_equivalence_coups.js`) : en retirant les familles
+     de coups une à une, `assaut` seul ramenait la divergence de 10/12 à 0/12.
+     Les deux AUTRES appels de `playerAssaultColony` (guerre populaire, poursuite de guerre) omettent
+     l'argument à BON DROIT : ils partent de `G.warWith` et de la fenêtre du joueur actif — c'est bien
+     de lui qu'il s'agit. */
+  playerAssaultColony(nodeId,_atkAI,p);
 }
 // ── ASSAUT DE COLONIE : combat résolu IMMÉDIATEMENT (1 manche), capture si victoire. (Le modèle « guerre en 2 tours » est supprimé.) ──
 /* `attaquant` : la nation qui monte l'assaut. Sans lui, la nation active. */
@@ -7687,6 +7722,636 @@ function profilActifDe(nat){
   return PROFILS_IA[nat._profil]||null;
 }
 function nomProfilDe(nat){ const p=profilActifDe(nat); return p?(p.emoji+' '+p.nom):'—'; }
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   LE CERVEAU DES IA — ÉTAPE 0 : LUI DONNER UNE PORTE
+   ----------------------------------------------------------------------------------------------
+   Marc, 27/08 : « les IA appliquent une recette de cuisine au lieu de réfléchir ». Il a raison, et
+   `docs/ARCHITECTURE_AVENIR.md` §Cas 2 dit pourquoi rien ne pouvait changer : « l'IA actuelle n'est
+   pas une fonction état → action, elle est ENTREMÊLÉE au moteur ». `actionUtilities` et
+   `chooseAndAct` sont des fermetures internes à `doAITurn` : impossible de les appeler, de les
+   tester, ou d'en essayer une autre.
+
+   ⚠️ CETTE ÉTAPE NE CHANGE AUCUN COMPORTEMENT — c'est sa seule raison d'être. Elle installe une
+   porte : le choix final passe désormais par un CERVEAU NOMMÉ, et le cerveau `historique` fait
+   exactement ce que faisait la boucle d'avant (prendre la première action réalisable du classement
+   d'utilité). `test_cerveau_ia.js` le prouve, coup par coup, sur une partie entière à graine fixe.
+   Toucher au comportement AVANT d'avoir cette preuve reviendrait à mélanger un changement de
+   structure et un changement de jeu — et à ne plus savoir lequel des deux a cassé quoi.
+
+   CE QUE LA PORTE PERMET ENSUITE :
+     · étape 1 — une fonction d'évaluation de POSITION, au lieu de 95 poids par action ;
+     · étape 2 — une recherche à un coup : essayer chaque candidat, évaluer, garder le meilleur.
+       C'est ce qui transforme « coloniser, est-ce bien en général ? » en « que vaut ma position si
+       je colonise CE nœud-là ? ». Mesuré : l'état pèse 9,1 Ko et se clone en 0,73 ms — 500
+       évaluations par tour tiennent en ~365 ms, y compris sur mobile hors ligne.
+
+   L'INTERFACE, VOLONTAIREMENT ÉTROITE. Un cerveau reçoit :
+     · `nation`   — la nation qui joue (jamais `G.player` : c'est la maladie de fond du projet) ;
+     · `utilites` — la note de chaque action candidate, telle que le tempérament l'a modulée ;
+     · `classees` — ces actions triées, de la meilleure à la moins bonne ;
+     · `executer(k)` — TENTE l'action `k` et rend `true` si elle a eu lieu. Une action peut échouer
+       après coup (ressources qui manquent au dernier moment) : le cerveau doit le supporter.
+   Il rend `true` s'il a agi. Rien d'autre ne lui est offert : un cerveau qui aurait besoin de plus
+   devra le demander explicitement, ce qui rendra sa dépendance visible.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   ÉTAPE 1 — CE QUE VAUT UNE POSITION
+   ----------------------------------------------------------------------------------------------
+   Une seule fonction, à la place des 95 `score += …` disséminés dans `actionUtilities`. La
+   différence n'est pas cosmétique : un poids par action répond à « coloniser, est-ce bien EN
+   GÉNÉRAL ? », une évaluation de position répond à « que vaut ma situation APRÈS ce coup-ci ? ».
+   Seule la seconde question permet de comparer deux coups de natures différentes — une colonie
+   contre une technologie — sans arbitrage arbitraire.
+
+   ⚠️ L'UNITÉ EST LE POINT DE VICTOIRE, et rien d'autre. Tout ce qui n'est pas déjà un VP doit être
+   converti en VP ESPÉRÉS d'ici la fin de partie. C'est ce qui rend les termes comparables et le
+   réglage discutable : chaque coefficient répond à « combien de VP cela rapportera-t-il ? », une
+   question à laquelle on peut opposer une mesure.
+
+   ⚠️ L'HORIZON CHANGE TOUT, et c'est ce qu'une note par action ne peut pas exprimer. Au tour 2, une
+   technologie qui produit du savoir vaut ses dix tours de rendement ; au tour 10, elle ne vaut plus
+   que ses VP inscrits. Une colonie améliorable vaut son potentiel au début, plus rien à la fin.
+   `restants` porte cette décote, et c'est de loin le terme le plus important de la fonction.
+
+   ⚠️ LE MORAL N'EST PAS UNE RESSOURCE COMME LES AUTRES : à 0 il supprime TOUT revenu (guerre civile)
+   et l'on n'en ressort pas, faute de moyens pour remonter. C'est une falaise, pas une pente — d'où
+   un malus qui n'a rien de proportionnel.
+
+   `nat` est reçue en argument, jamais lue dans `G.player` : c'est une fonction de RÈGLE au sens de
+   la convention du 24/08, et elle doit pouvoir juger la position de n'importe qui — y compris celle
+   d'un rival, ce dont l'étape 3 aura besoin.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+function evaluerPosition(nat){
+  if(!nat||!nat.civ)return 0;
+  const acquis=calcVP(nat).total;
+  const total=G.maxTurns||10;
+  const restants=Math.max(0,total-(G.turn||1)+1);
+  const horizon=restants/total;                      // 1 au premier tour, ~0 au dernier
+
+  /* PRODUCTION — ce que la position rapportera d'ici la fin. Les coefficients disent combien de VP
+     vaut UNE unité par tour : le savoir mène aux technologies (les mieux notées au score), les
+     matériaux aux colonies et aux routes, l'énergie ne fait qu'accompagner. */
+  let rev={};
+  try{ rev=revenusBruts(nat)||{}; }catch(e){ rev={}; }
+  const parTour=(rev.materials||0)*0.55+(rev.energy||0)*0.40+(rev.science||0)*0.85;
+  const production=parTour*restants*0.30;
+
+  /* TRÉSORERIE — convertible tout de suite, mais elle ne vaut que si l'on a encore le temps de la
+     dépenser. Un stock de 20🪨 au dernier tour ne vaut rien. */
+  const tresorerie=((nat.res.materials||0)*0.14+(nat.res.energy||0)*0.12+(nat.res.science||0)*0.22)*horizon;
+
+  /* POTENTIEL DE DÉVELOPPEMENT — une colonie de niveau 1 reliée vaut bien plus que sa valeur
+     actuelle, tant qu'il reste des tours pour l'améliorer. */
+  let potentiel=0;
+  for(const c of (nat.colonies||[])){
+    const n=NODES[c.nodeId]; if(!n||n.decorative)continue;
+    const marge=Math.max(0,(n.maxLv||3)-(c.level||1));
+    potentiel+=marge*(n.baseVP||1)*0.45*horizon;
+    if(!c.connected)potentiel-=(n.baseVP||1)*0.5;    // isolée : la moitié des VP, et un revenu nul
+  }
+
+  /* SÉCURITÉ — le moral est une falaise. Et la force sert autant à dissuader qu'à conquérir. */
+  const moral=nat.res.morale||0;
+  const perilMoral=moral<=0?-18:moral<=1?-11:moral<=3?-4:0;
+  const force=Math.min(12,nat.forceTokens||0)*0.45*horizon;
+
+  return acquis+production+tresorerie+potentiel+perilMoral+force;
+}
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   ÉTAPE 3b — CE QU'UN COUP RETIRE À L'ADVERSAIRE COMPTE AUTANT QUE CE QU'IL ME RAPPORTE
+   ----------------------------------------------------------------------------------------------
+   `evaluerPosition` ne regarde qu'une nation. Conséquence mesurée : le cerveau `chercheur` refusait
+   d'assaillir une cible DÉSARMÉE (`test_defense_attendue`), parce qu'il ne voyait que le coût de
+   l'assaut — jetons engagés, moral, guerre ouverte — et jamais la colonie arrachée au rival.
+   Or on ne gagne pas une partie dans l'absolu : on la gagne CONTRE quelqu'un. Le score d'une
+   position est donc l'écart avec le rival le mieux placé.
+
+   ⚠️ COEFFICIENT 0,6, PAS 1. À poids égal, nuire deviendrait aussi rentable que construire, et l'IA
+   se contenterait de saboter. Le rival pèse un peu moins que soi : on préfère avancer, mais gêner
+   celui qui mène cesse d'être invisible.
+   ⚠️ ON N'ÉVALUE QUE LE MEILLEUR RIVAL, pas tous. Deux évaluations par coup candidat au lieu d'une :
+   le budget mesuré (0,73 ms le clone) reste tenable, y compris sur mobile hors ligne.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+function evaluerPositionRelative(nat){
+  if(!nat||!nat.civ)return 0;
+  const moi=evaluerPosition(nat);
+  let meilleur=0, somme=0, n=0;
+  for(const o of allPlayers()){
+    if(!o||o===nat||!o.civ)continue;
+    const v=evaluerPosition(o);
+    somme+=v; n++;
+    if(v>meilleur)meilleur=v;
+  }
+  if(!n)return moi;
+  /* ⚠️ NE PAS SE COMPARER AU SEUL MEILLEUR RIVAL — c'est la faute que j'ai commise d'abord, et elle
+     rendait l'IA incapable d'attaquer. Diagnostiqué le 27/08 sur le banc `test_defense_attendue` :
+     prendre une colonie SANS DÉFENSE était noté 3,2, la plus basse de toutes les actions jouables
+     (carte militaire 6,4 · amélioration 5,6 · technologie 5,1 · colonisation 4,1). L'IA ne refusait
+     pas d'attaquer par accident : l'évaluation lui disait que c'était le pire coup.
+     La raison : en ne retranchant que le MEILLEUR rival, affaiblir n'importe qui d'autre était
+     rigoureusement invisible. Or on prend rarement une colonie au leader — on la prend au voisin.
+     On se compare donc à la MOYENNE du peloton (tout le monde compte), plus un supplément sur celui
+     qui mène (seul le premier gagne la partie). */
+  const moyenne=somme/n;
+  return moi-0.55*moyenne-0.35*meilleur;
+}
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   ÉTAPE 2 — ESSAYER UN COUP, REGARDER, REVENIR EN ARRIÈRE
+   ----------------------------------------------------------------------------------------------
+   C'est la brique qui manquait pour que les IA « réfléchissent » : pouvoir jouer un coup POUR DE
+   FAUX, mesurer la position obtenue, puis remettre le plateau comme il était.
+
+   ⚠️ POURQUOI ON NE PEUT PAS FAIRE `G = scDeserialize(sauvegarde)`. `G` est bien réassignable, mais
+   tout le moteur détient des RÉFÉRENCES vers l'intérieur : `ai` pointe sur `G.ais[2]`, une guerre
+   pointe sur ses belligérants, les fermetures d'`doAITurn` capturent la nation. Remplacer `G` les
+   laisserait toutes braquées sur un plateau fantôme — le genre de panne qui ne se voit qu'en partie
+   réelle, trois jours plus tard.
+   On RECOUD donc l'ancien état DANS les objets existants (`_fusionEnPlace`), récursivement et sans
+   liste de champs : une liste, on l'oublie, et un champ oublié corrompt la partie en silence.
+
+   ⚠️ TROIS CHOSES QUE LA SIMULATION NE DOIT PAS TOUCHER. Le journal (il raconterait des coups qui
+   n'ont pas eu lieu), les questions en attente (une fenêtre de défense envoyée pendant une
+   simulation partirait pour de bon chez un joueur), et l'affichage. Le journal est donc coupé et
+   tronqué, et tout coup qui POSE UNE QUESTION est déclaré non simulable — voir ci-dessous.
+
+   ⚠️ CE QU'ON NE SAIT PAS SIMULER, ON LE DIT. Un assaut ouvre une fenêtre de combat : le simuler
+   demanderait de deviner la réponse du défenseur. Ces coups-là ne sont pas évalués par recherche ;
+   ils gardent leur note d'utilité historique. Mieux vaut une IA qui cherche sur les trois quarts de
+   ses coups qu'une IA qui prétend chercher sur tous et se trompe sur les combats.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+function _fusionEnPlace(dst,src){
+  if(dst instanceof Set&&src instanceof Set){ dst.clear(); for(const v of src)dst.add(v); return dst; }
+  if(dst instanceof Map&&src instanceof Map){ dst.clear(); for(const e of src)dst.set(e[0],e[1]); return dst; }
+  if(Array.isArray(dst)&&Array.isArray(src)){
+    dst.length=src.length;
+    for(let i=0;i<src.length;i++)dst[i]=_recoudre(dst[i],src[i]);
+    return dst;
+  }
+  /* ⚠️ NE JAMAIS SUPPRIMER UNE FONCTION. C'est la panne la plus coûteuse de l'étape 2, et la plus
+     instructive : JSON ne transporte pas les fonctions, donc une restauration naïve les EFFACE.
+     `G.curEvent` pointe sur une entrée de la table globale `EVENTS`, laquelle porte une méthode
+     `resolve(G)`. Recoudre l'état supprimait ce `resolve` — non pas dans une copie, mais dans la
+     TABLE GLOBALE, définitivement, pour toute la partie. `stFinDeTour` appelait ensuite
+     `G.curEvent.resolve(G)` sur un objet mutilé : la fin de tour mourait juste après les revenus,
+     sans erreur visible, et la partie s'arrêtait au tour 2.
+     Même piège pour les agendas (`score`) et les cartes d'investissement (`applyBenefit`).
+     La règle est donc générale et sans exception : ce que la sérialisation ne sait pas porter, la
+     restauration n'a pas le droit de détruire. */
+  for(const k of Object.keys(dst))if(!(k in src)&&typeof dst[k]!=='function')delete dst[k];
+  for(const k of Object.keys(src))dst[k]=_recoudre(dst[k],src[k]);
+  return dst;
+}
+function _recoudre(a,b){
+  if(typeof a==='function'&&(b===undefined||b===null))return a;   // voir la note ci-dessus
+  if(a&&b&&typeof a==='object'&&typeof b==='object'
+     &&Array.isArray(a)===Array.isArray(b)
+     &&(a instanceof Set)===(b instanceof Set)
+     &&(a instanceof Map)===(b instanceof Map)) return _fusionEnPlace(a,b);
+  return b;
+}
+/* Combien de questions attendent une réponse ? Sert à détecter qu'un coup simulé en a posé une.
+   ⚠️ ON NE PASSE PAS PAR `_questionsListe()` : elle CRÉE `G._pendings` si le champ manque. Une
+   simulation doit être sans trace, or elle ajoutait ce champ à l'état — l'aller-retour n'était donc
+   pas rigoureusement neutre, et c'est la comparaison octet à octet qui l'a montré. Une fonction qui
+   observe ne doit rien écrire. */
+function _nbQuestions(){
+  if(!G)return 0;
+  if(Array.isArray(G._pendings))return G._pendings.length;
+  return G._pending?1:0;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   ÉTAPE 3 — RÉPONDRE AUX QUESTIONS QU'ON POSE, POUR POUVOIR ÉVALUER UN ASSAUT
+   ----------------------------------------------------------------------------------------------
+   L'étape 2 déclarait les coups militaires « non simulables » : un assaut ouvre une fenêtre de
+   combat, et la simulation s'arrêtait là. Conséquence mesurée : le cerveau `chercheur` jouait mieux
+   à l'économie (+12 % de VP) mais devenait aveugle à la guerre, au point d'INVERSER la hiérarchie
+   d'agressivité des tempéraments — 2 assauts pour le conquérant contre 10 pour le bâtisseur.
+
+   ⚠️ ON NE RECOPIE PAS LA RÉSOLUTION DU COMBAT. Ce serait une seconde vérité, exactement la maladie
+   que `ARCHITECTURE_AVENIR.md` §4 décrit. On laisse le MOTEUR résoudre son combat, et on se contente
+   de répondre à ses questions — avec les fonctions qu'il expose déjà (`defenseIA`, `iaChoixDeCombat`,
+   `iaVeutLaPaix`), celles-là mêmes que le pilote du serveur utilise. Le barème de combat reste donc
+   à un seul endroit.
+
+   ⚠️ ET ON PURGE `_suitesVolatiles`. Les continuations non migrées vivent dans une variable de
+   MODULE, hors de `G` : une simulation qui pose une question la laisserait derrière elle, le
+   compteur d'identifiants reculerait avec l'état, et la question RÉELLE suivante se résoudrait avec
+   la continuation fantôme. C'est la panne qui arrêtait les parties au tour 2 (§52.3). On retient
+   donc les identifiants créés pendant la simulation, et on les efface au retour en arrière.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+/* ⚠️ HORS DE `G`, ET C'EST LE POINT. Ma première version rangeait ces identifiants dans `G._simuIds`
+   — donc la RESTAURATION les écrasait juste avant qu'on s'en serve, et la purge portait sur une
+   liste vide. Ce qui sert à défaire la restauration ne peut pas vivre dans ce qu'elle restaure. */
+let _simuIdsCourants=null;
+function _reponseSimulee(p){
+  const o=(p&&p.payload)||{}, k=p&&p.kind, opts=o.options||[];
+  const nat=(p&&p.nation)?allPlayers().find(function(n){return n&&n.civ&&n.civ.id===p.nation;}):null;
+  if(k==='peace_offer'){
+    const ennemi=allPlayers().find(function(n){return n&&n.civ&&n.civ.id===G.warWith;});
+    const veut=(typeof iaVeutLaPaix==='function')?iaVeutLaPaix(nat,ennemi):true;
+    return veut?{accept:true,offer:{materials:0,energy:0,science:0}}:{accept:false};
+  }
+  if(k==='peace_answer'||k==='accord_request')return {id:'yes',accept:true};
+  if(k==='war_initiative'){
+    const j=nat?Math.min(nat.forceTokens||0,nat.res.materials||0,nat.res.energy||0):0;
+    return {id:j>=2?'attaque':'defense'};
+  }
+  if(k==='war_combat')return (typeof iaChoixDeCombat==='function')?iaChoixDeCombat(nat):{action:'hold'};
+  if(k==='defense'){
+    /* ⚠️ SUPPOSER « 2 JETONS » FAISAIT MENTIR LA SIMULATION. Un défenseur à sec était crédité d'une
+       défense qu'il n'avait pas, et l'IA renonçait à des assauts gagnés d'avance. Le moteur sait
+       déjà calculer cette défense — `defenseIA`, la même fonction que le serveur appelle quand une
+       nation tenue par l'ordinateur se défend. On l'utilise plutôt que de deviner. */
+    let n=null;
+    if(typeof defenseIA==='function'){
+      const att=allPlayers().find(function(x){return x&&x.civ&&x.civ.id===o.attacker;});
+      const noeud=(o.target&&(o.target.id||o.target.node))||o.node||null;
+      try{ n=defenseIA(nat,att,noeud); }catch(e){ n=null; }
+    }
+    if(n===null||n===undefined||isNaN(n))n=Math.min(2,o.maxDef||0);
+    return {defTokens:Math.max(0,Math.min(n,o.maxDef||0))};
+  }
+  if(k==='route_capture')return {capture:true};
+  if(k==='forced_war'){
+    if(o.colTarget)return {colony:o.colTarget};
+    if(Array.isArray(o.routes)&&o.routes.length)return {route:0};
+    return {peace:true};
+  }
+  if(k==='raid_target')return {targetId:opts.length?opts[0].id:null};
+  if(k==='ai_dyson'||k==='human_dyson')return {war:false};
+  if(k==='dyson_build')return {force:false};
+  if(k==='event_comm'){const c=o.cands||[];return {aiId:c.length?c[0].id:null};}
+  if(k==='event_diplo'){const r=o.rows||[];return {selected:r.length?[r[0].id]:[]};}
+  if(!opts.length)return {};
+  const cle=k==='agenda'?'agendaId':(k==='strategy'?'cardId':((k==='invest1'||k==='invest2')?'cardId':(k==='espionage'?'id':(k==='extrasolar'?'node':'targetId'))));
+  const a={}, op=opts[0];
+  a[cle]=(op.id!==undefined)?op.id:(op.node!==undefined?op.node:op.branch);
+  return a;
+}
+/* Vide la file des questions en y répondant nous-mêmes. Bornée : une chaîne qui ne se termine pas
+   doit rendre la main plutôt que boucler — le coup sera simplement déclaré non évaluable. */
+function _viderQuestionsSimulees(){
+  for(let garde=0;garde<24;garde++){
+    const liste=(G&&Array.isArray(G._pendings))?G._pendings:(G&&G._pending?[G._pending]:[]);
+    if(!liste.length)return true;
+    const q=liste[0];
+    try{ resolveDecision(q.id,_reponseSimulee(q)); }catch(e){ return false; }
+  }
+  return false;
+}
+/* Joue `fn` pour de faux et rend `{ ok, valeur }` ; le plateau est remis comme avant, toujours. */
+function simulerCoup(nat,fn){
+  const avantLog=(G.log||[]).length, avantJ=(G._journal||[]).length, avantQ=_nbQuestions();
+  const sauvegarde=scSerialize();
+  const silence=G._simulationIA; G._simulationIA=true; G._simuQuestion=false;
+  const idsAvant=_simuIdsCourants; const mesIds=[]; _simuIdsCourants=mesIds;
+  let ok=false, valeur=-Infinity, poseQuestion=false;
+  try{
+    ok=!!fn();
+    /* La chaîne de décisions se déroule ICI, répondue par le moteur lui-même : c'est ce qui rend un
+       assaut évaluable. Si elle ne se termine pas, le coup est déclaré non évaluable plutôt que
+       noté au hasard. */
+    const close=_viderQuestionsSimulees();
+    poseQuestion=!close;
+    if(ok&&close) valeur=evaluerPositionRelative(nat);
+  }catch(e){ ok=false; }
+  finally{
+    try{
+      _fusionEnPlace(G,scDeserialize(sauvegarde));
+      /* ⚠️ RECOUDRE LES VALEURS NE SUFFIT PAS : IL FAUT RÉANIMER L'ÉTAT. Une guerre porte un accesseur
+         `aiId` posé par `_attachWar` (Object.defineProperty, non énumérable) ; la sérialisation ne le
+         voit pas, et une guerre restaurée ressort muette. `rehydrateState` et `refreshWarViews` sont
+         exactement ce que le chemin de reprise normal exécute après une lecture de sauvegarde
+         (`scLoadGame`) — s'en dispenser ici, c'est restaurer à moitié.
+         MESURÉ : sans ces deux lignes, une partie jouée par le cerveau chercheur s'arrêtait au
+         TOUR 2. Le banc `test_cerveau_ia.js` en fait un échec. */
+      if(typeof rehydrateState==='function')rehydrateState(G);
+      if(typeof refreshWarViews==='function')refreshWarViews();
+    }catch(e){}
+    /* Le journal n'est pas dans la sauvegarde utile : on le tronque à sa longueur d'avant, ce qui
+       efface les lignes écrites pendant la simulation sans toucher aux précédentes. */
+    if(G.log&&G.log.length>avantLog)G.log.length=avantLog;
+    if(G._journal&&G._journal.length>avantJ)G._journal.length=avantJ;
+    /* Les continuations volatiles créées pendant la simulation ne sont PAS dans `G` : on les efface
+       à la main, sans quoi la prochaine question réelle hériterait de l'une d'elles. */
+    for(const id of mesIds) delete _suitesVolatiles[id];
+    _simuIdsCourants=idsAvant;
+    G._simulationIA=silence; delete G._simuQuestion;
+  }
+  return {ok:ok&&!poseQuestion, valeur:valeur, question:poseQuestion};
+}
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   L'ÉNUMÉRATEUR DE COUPS CONCRETS — LA BRIQUE QUI MANQUAIT
+   ----------------------------------------------------------------------------------------------
+   Marc, 27/08 : « je préfère un système qui n'a pas de notes sur les actions préalables, je veux une
+   IA qui réfléchisse coup après coup comme un humain, sans se limiter par une recette initiale. »
+
+   ⚠️ CE QUE LA RECETTE FAISAIT, ET POURQUOI C'EST LE VRAI PROBLÈME. L'ancienne IA choisissait une
+   CATÉGORIE (« coloniser », notée 30,4 par un barème écrit à la main), puis une sous-fonction
+   décidait seule OÙ coloniser. Deux préjugés empilés : la note de la catégorie, et le choix interne
+   de la cible. L'IA ne comparait jamais « coloniser Vesta » à « coloniser Europe », encore moins à
+   « assaillir Io ». Diagnostiqué le 27/08 : prendre une colonie SANS DÉFENSE était noté 1,5, dernier
+   de tous les coups jouables, et l'IA passait à côté.
+
+   ICI, PAS DE NOTE. Cette fonction ne juge rien : elle DÉCRIT ce qui est jouable, coup par coup, avec
+   sa cible. C'est au chercheur d'essayer chacun et de regarder ce que ça donne.
+
+   ⚠️ ET PAS DE SECONDE COPIE DES RÈGLES. La légalité et le coût sont demandés au moteur lui-même —
+   `colonizeCost`, `routeCost`, `getEffCost`, `isTechAvailable`, `isTechExclusive`. Recopier ces
+   conditions ici aurait créé la divergence que `ARCHITECTURE_AVENIR.md` §4 décrit : deux vérités qui
+   s'éloignent. Quand un filtre serait ambigu, on préfère PROPOSER le coup et laisser la simulation
+   le rejeter — un coup impossible coûte une simulation, un coup oublié coûte une partie.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+function coupsPossibles(nat){
+  const coups=[];
+  if(!nat||!nat.civ||(nat.acLeft||0)<1)return coups;
+  const abordable=o=>Object.entries(o||{}).every(([r,a])=>(nat.res[r]||0)>=a);
+  const occupe=id=>allPlayers().some(n=>n.colonies&&n.colonies.some(c=>c.nodeId===id));
+  const mien=id=>(nat.colonies||[]).some(c=>c.nodeId===id);
+
+  /* COLONISER — chaque nœud libre, nommément. */
+  {
+    const c=colonizeCost(nat);
+    if((nat.acLeft||0)>=c.ac&&(nat.res.materials||0)>=c.mat&&(nat.res.energy||0)>=c.en){
+      for(const id in NODES){
+        const n=NODES[id]; if(!n||n.decorative||n.noColonize)continue;
+        if(occupe(id))continue;
+        coups.push({type:'coloniser',node:id,libelle:'coloniser '+n.name});
+      }
+    }
+  }
+  /* AMÉLIORER — chacune de mes colonies améliorables. */
+  for(const col of (nat.colonies||[])){
+    const n=NODES[col.nodeId]; if(!n||n.decorative||col.noUpgrade)continue;
+    if((col.level||1)>=(n.maxLv||3))continue;
+    if((nat.res.materials||0)>=3&&(nat.res.energy||0)>=1&&(nat.res.science||0)>=1)
+      coups.push({type:'ameliorer',node:col.nodeId,libelle:'améliorer '+n.name+' Nv.'+((col.level||1)+1)});
+  }
+  /* ROUTE — chaque liaison constructible depuis mes positions. */
+  {
+    const r=routeCost(nat);
+    if((nat.res.materials||0)>=r.mat&&(nat.forceTokens||0)>=(r.force||0)){
+      const depuis=(nat.colonies||[]).map(c=>c.nodeId).concat([nat.civ.home]);
+      for(const a2 of depuis){
+        const n=NODES[a2]; if(!n)continue;
+        for(const b2 of (n.conn||[])){
+          if((nat.routes||[]).some(x=>(x.from===a2&&x.to===b2)||(x.from===b2&&x.to===a2)))continue;
+          coups.push({type:'route',from:a2,to:b2,libelle:'route '+n.name+'→'+((NODES[b2]||{}).name||b2)});
+        }
+      }
+    }
+  }
+  /* TECHNOLOGIE — chaque carte réellement achetable, nommément. */
+  for(const card of CARDS_POOL){
+    if((nat.cards||[]).some(c=>c.id===card.id))continue;
+    if(isTechExclusive(card)&&G.techTaken.has(card.id))continue;
+    if(!isTechAvailable(card,nat))continue;
+    if(card.reqCard&&!(nat.cards||[]).some(c=>c.id===card.reqCard))continue;
+    const ac=card.tier===3?2:1;
+    if((nat.acLeft||0)<ac)continue;
+    if(!abordable(getEffCost(card,nat)))continue;
+    coups.push({type:'tech',card:card.id,libelle:'acheter '+card.name});
+  }
+  /* CIVIQUE — chaque carte du marché abordable. */
+  for(const card of (typeof CIVIC_MARKET!=='undefined'?CIVIC_MARKET:[])){
+    if(card.id===nat.govForm)continue;
+    if(nat._civicTaken&&nat._civicTaken.has(card.id)&&!card.repeatable)continue;
+    if(!abordable(card.cost))continue;
+    coups.push({type:'civique',card:card.id,libelle:'civique : '+card.name});
+  }
+  /* RAID, ASSAUT, ACCORD — sur chaque colonie adverse, nommément. */
+  {
+    const jetons=nat.civ.id==='ceinturiens'?1:2;
+    for(const o of allPlayers()){
+      if(o===nat||!o.civ)continue;
+      for(const col of (o.colonies||[])){
+        const nom=(NODES[col.nodeId]||{}).name||col.nodeId;
+        if((nat.forceTokens||0)>=jetons)
+          coups.push({type:'raid',cible:o.civ.id,node:col.nodeId,libelle:'raid sur '+nom+' ('+o.civ.name+')'});
+        if((nat.forceTokens||0)>=jetons&&(nat.res.materials||0)>=1&&(nat.res.energy||0)>=1)
+          coups.push({type:'assaut',node:col.nodeId,libelle:'assaillir '+nom+' ('+o.civ.name+')'});
+        if((nat.res.materials||0)>=2&&!mien(col.nodeId))
+          coups.push({type:'accord',node:col.nodeId,libelle:'accord sur '+nom+' ('+o.civ.name+')'});
+      }
+    }
+  }
+  /* POUVOIR NATIONAL — gratuit, une fois par tour. */
+  if(!nat.abilityUsed)coups.push({type:'pouvoir',libelle:'pouvoir national'});
+  return coups;
+}
+/* Joue un coup DÉCRIT. Chaque type délègue à la fonction du moteur qui porte déjà la règle : on ne
+   réimplémente rien, on appelle. Rend `true` si le coup a eu lieu. */
+function appliquerCoup(nat,coup){
+  if(!nat||!coup)return false;
+  const avantAc=nat.acLeft;
+  switch(coup.type){
+    case 'coloniser': doColonize(coup.node,nat); break;
+    case 'ameliorer': doUpgrade(coup.node,nat); break;
+    case 'route':     doEstablishRoute(coup.from,coup.to,nat); break;
+    case 'tech':      buyTech(coup.card,nat); break;
+    case 'civique': {
+      const c=(typeof CIVIC_MARKET!=='undefined'?CIVIC_MARKET:[]).find(x=>x.id===coup.card);
+      if(c)aiBuyCivic(nat,c); break;
+    }
+    case 'raid':      doRaidTarget(coup.cible,coup.node,nat); break;
+    case 'assaut':    attackColony(coup.node,nat); break;
+    case 'accord':    proposeAccord(coup.node,nat); break;
+    case 'pouvoir':   if(typeof useAbility==='function')useAbility(nat); break;
+    default: return false;
+  }
+  /* ⚠️ « LE COUP A-T-IL EU LIEU ? » SE MESURE, IL NE SE SUPPOSE PAS. Les fonctions du moteur
+     refusent en silence (ressources manquantes au dernier moment, cible devenue invalide) et ne
+     rendent rien d'exploitable. Une action réussie consomme TOUJOURS au moins un AC — sauf le
+     pouvoir national, qui est gratuit et se marque par `abilityUsed`. */
+  const fait=(coup.type==='pouvoir')?!!nat.abilityUsed:(nat.acLeft<avantAc);
+  /* ⚠️ UNE ACTION QUI N'EST PAS ENREGISTRÉE N'A PAS EU LIEU, POUR LE JOUEUR. Les anciennes fonctions
+     `tryColonize`, `tryTech`… poussaient elles-mêmes dans `G.aiActions` : c'est de là que viennent
+     les lignes « 🤖 Ceinturiens colonise Titan » du journal, le récapitulatif de fin de tour, et le
+     comptage des bancs. En appelant `doColonize` directement, je court-circuitais tout cela.
+     Constaté sur `test_profils_ia` : « 0 assaut contre 0 » ET « 0 construction contre 0 », alors que
+     l'IA jouait normalement — elle agissait dans le silence complet. Marc aurait vu ses adversaires
+     jouer sans qu'une seule ligne ne le dise.
+     On enregistre donc ici, avec les MÊMES libellés que l'ancien chemin pour que le journal, les
+     rapports de fin de partie et les bancs continuent de s'y retrouver. */
+  if(fait&&typeof G!=='undefined'&&Array.isArray(G.aiActions)){
+    const nom=id=>(NODES[id]||{}).name||id;
+    let e=null;
+    switch(coup.type){
+      case 'coloniser': e={emoji:'🏗️',name:'Colonise '+nom(coup.node),desc:''}; break;
+      case 'ameliorer': {
+        const col=(nat.colonies||[]).find(c=>c.nodeId===coup.node);
+        e={emoji:'⬆️',name:'Améliore '+nom(coup.node),desc:'Nv.'+((col&&col.level)||'?')}; break;
+      }
+      case 'route':     e={emoji:'🛤️',name:'Route → '+nom(coup.to),desc:'depuis '+nom(coup.from)}; break;
+      case 'tech': {
+        const c=CARDS_POOL.find(x=>x.id===coup.card);
+        e={emoji:(c&&c.emoji)||'✅',name:'Achète '+((c&&c.name)||coup.card),desc:(c&&c.effect)||''}; break;
+      }
+      case 'civique': {
+        const c=(typeof CIVIC_MARKET!=='undefined'?CIVIC_MARKET:[]).find(x=>x.id===coup.card);
+        e={emoji:(c&&c.emoji)||'📜',name:'Achète '+((c&&c.name)||coup.card),desc:(c&&c.effect)||''}; break;
+      }
+      case 'raid':      e={emoji:'💰',name:'Raid sur '+nom(coup.node),desc:coup.cible||''}; break;
+      case 'assaut':    e={emoji:'⚔️',name:'Assaut sur '+nom(coup.node),desc:''}; break;
+      case 'accord':    e={emoji:'🤝',name:'Accord '+nom(coup.node),desc:''}; break;
+      case 'pouvoir':   e={emoji:'💫',name:'Pouvoir national',desc:''}; break;
+    }
+    /* ⚠️ SEULEMENT SI PERSONNE NE L'A DÉJÀ FAIT. Certaines fonctions du moteur enregistrent leur
+       propre entrée (l'assaut, le raid) : en ajouter une seconde ferait compter l'action deux fois
+       dans les bancs et l'afficherait en double au joueur. */
+    if(e&&!G.aiActions.some(x=>x&&!x._rec&&x.name===e.name))G.aiActions.push(e);
+    /* ⚠️ ET LA LIGNE DE JOURNAL, QUI EST CE QUE LE JOUEUR LIT VRAIMENT. Les anciennes enveloppes
+       (`tryColonize`, `tryUpgrade`, `tryRoute`, `tryTech`) écrivaient « 🤖 Ceinturiens colonise
+       Titan » avant d'agir. `doColonize` et consorts, eux, ne disent rien — ils appliquent la règle,
+       c'est tout, et c'est très bien ainsi. Il faut donc l'annoncer ici.
+       Le raid, l'assaut et l'accord s'annoncent DÉJÀ eux-mêmes : on ne les répète pas.
+       ⚠️ On garde la tournure EXACTE de l'ancien chemin (« 🤖 <nation> colonise <nœud> », sans
+       emoji de nation) : le journal, les rapports de fin de partie et plusieurs bancs la relisent. */
+    const phrase={
+      coloniser: function(){ return 'colonise '+nom(coup.node); },
+      ameliorer: function(){ const c=(nat.colonies||[]).find(x=>x.nodeId===coup.node);
+                             return 'améliore '+nom(coup.node)+' Nv.'+((c&&c.level)||''); },
+      route:     function(){ return 'route → '+nom(coup.to); },
+      tech:      function(){ const c=CARDS_POOL.find(x=>x.id===coup.card); return 'achète '+((c&&c.name)||coup.card); },
+      civique:   function(){ const c=(typeof CIVIC_MARKET!=='undefined'?CIVIC_MARKET:[]).find(x=>x.id===coup.card);
+                             return 'achète '+((c&&c.name)||coup.card); },
+      pouvoir:   function(){ return 'utilise son pouvoir national'; }
+    }[coup.type];
+    if(phrase)addLog('🤖 '+nat.civ.name+' '+phrase(),'dim');
+  }
+  return fait;
+}
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   LA TRACE DE DÉCISION — CE QUE L'IA A COMPARÉ, ET DE COMBIEN ELLE A TRANCHÉ
+   ----------------------------------------------------------------------------------------------
+   Une ligne par décision : le coup retenu, sa note, le dauphin, l'écart entre les deux, et combien
+   de coups ont été réellement évalués. C'est ce qui permet, en relisant une partie, de distinguer
+   « elle a choisi ça franchement » de « ça s'est joué à 0,1 point » — et de voir POURQUOI elle n'a
+   pas attaqué, plutôt que de le supposer.
+
+   ⚠️ BORNÉE, PARCE QU'ELLE VOYAGE. Cette trace vit dans `G`, donc elle est sauvegardée avec la
+   partie et traverse le réseau. Une partie de dix tours produit ~150 décisions ; on en garde les
+   200 dernières, ce qui couvre toujours la partie entière sans faire enfler les sauvegardes.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+function _tracerDecisionIA(nat,coup,valeur,second,valeurSeconde,evalues,proposes){
+  if(!G||!nat||!nat.civ)return;
+  if(!Array.isArray(G._traceIA))G._traceIA=[];
+  G._traceIA.push({
+    t:G.turn||0, nat:nat.civ.id,
+    choix:(coup&&coup.libelle)||'?',
+    val:Math.round((valeur||0)*10)/10,
+    second:(second&&second.libelle)||null,
+    val2:(valeurSeconde===-Infinity||valeurSeconde===undefined)?null:Math.round(valeurSeconde*10)/10,
+    evalues:evalues||0, proposes:proposes||0
+  });
+  if(G._traceIA.length>200)G._traceIA.splice(0,G._traceIA.length-200);
+}
+/* La PHOTO de fin de tour : où en est chaque nation, tour par tour. Quarante lignes pour une partie
+   entière — assez pour lire une trajectoire (qui décroche, quand, et sur quelle ressource), et
+   assez léger pour tenir dans une sauvegarde. */
+function _photographierTour(){
+  if(!G)return;
+  if(!Array.isArray(G._photos))G._photos=[];
+  for(const p of allPlayers()){
+    if(!p||!p.civ)continue;
+    let vp=0; try{ vp=calcVP(p).total; }catch(e){}
+    G._photos.push({ t:G.turn||0, nat:p.civ.id, vp:vp,
+      e:p.res.energy||0, m:p.res.materials||0, s:p.res.science||0, mo:p.res.morale||0,
+      col:(p.colonies||[]).length, rt:(p.routes||[]).length, ca:(p.cards||[]).length,
+      jt:p.forceTokens||0,
+      guerre:(G.wars||[]).some(w=>w&&!w.ended&&(w.a===p.civ.id||w.b===p.civ.id)) });
+  }
+  if(G._photos.length>240)G._photos.splice(0,G._photos.length-240);
+}
+const CERVEAUX_IA={};
+function enregistrerCerveau(nom,fn){ CERVEAUX_IA[nom]=fn; }
+/* ⚠️ DEUX CERVEAUX SEULEMENT, ET C'EST VOULU.
+   `historique` — la recette d'origine : une table de 95 poids écrits à la main note les CATÉGORIES
+   d'action (« coloniser » vaut 30), et une sous-fonction choisit seule la cible. Il ne sert plus que
+   de TÉMOIN : sans lui, aucune mesure ne serait comparable à quoi que ce soit.
+   `tacticien`  — aucune note préalable. Il énumère les coups CONCRETS (`coupsPossibles`), les joue
+   tous pour de faux, et garde celui qui laisse la meilleure position.
+
+   Un troisième, `chercheur`, a existé entre les deux : il réordonnait les six premières catégories
+   du classement d'utilité. Il a été SUPPRIMÉ le 27/08 dès que `tacticien` l'a surpassé — un
+   intermédiaire qu'on garde « au cas où » devient une troisième chose à maintenir, à tester et à
+   faire diverger. Marc : « nettoie bien le code histoire qu'on paye pas les restes plus tard. »
+
+   ⚠️ `tacticien` EST LE CERVEAU DU JEU DEPUIS LE 27/08 — décision de Marc, prise sur mesures.
+   Il gagne nettement : 11 parties contre 5, 51,3 VP de moyenne contre 40,5 (+27 %).
+
+   ⚠️ ET IL N'ATTAQUE PAS AU MÊME MOMENT QUE L'ANCIENNE IA — c'est une qualité, pas un défaut. Mesuré
+   coup par coup, la valeur du meilleur coup MILITAIRE contre celle du meilleur coup PACIFIQUE :
+
+       tour  2 : 8,3 contre 9,3 → elle bâtit        tour  8 : 6,8 contre 6,2 → ELLE ATTAQUE
+       tour  4 : 7,8 contre 8,3 → elle bâtit        tour 10 : 6,3 contre 6,1 → ELLE ATTAQUE
+       tour  6 : 7,3 contre 7,2 → ELLE ATTAQUE
+
+   La bascule se fait au tour 6, et personne ne l'a programmée. Au tour 2, coloniser rapporte huit
+   tours de revenus ; au tour 8 il ne reste rien à récolter, alors qu'une colonie prise compte ses
+   points IMMÉDIATEMENT et les retire à l'autre. Marc, qui attaque lui-même vers le tour 8, y a vu
+   la même logique avant la mesure.
+   ⚠️ Mon « elle n'attaque jamais » de la veille était donc FAUX PAR EXCÈS : j'avais mesuré zéro
+   assaut dans des parties où quatre tacticiens jouent tous pacifiquement — personne ne s'affaiblit,
+   donc aucune proie n'apparaît. Contre un joueur humain qui attaque, la situation est autre.
+
+   `historique` reste enregistré comme TÉMOIN : sans lui, plus aucune mesure ne serait comparable. */
+function nomCerveauCourant(){ return (G&&G._cerveauIA)||'tacticien'; }
+function cerveauCourant(){ return CERVEAUX_IA[nomCerveauCourant()]||CERVEAUX_IA.historique; }
+/* Le cerveau d'origine : la première action réalisable du classement. Rigoureusement l'ancienne
+   boucle, déplacée — pas réécrite. */
+enregistrerCerveau('historique', function(ctx){
+  for(const k of ctx.classees){ if(ctx.executer(k)) return true; }
+  return false;
+});
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   LE CERVEAU `tacticien` — AUCUNE NOTE PRÉALABLE, QUE DES COUPS ESSAYÉS
+   ----------------------------------------------------------------------------------------------
+   C'est ce que Marc a demandé le 27/08 : « une IA qui réfléchisse coup après coup comme un humain,
+   sans se limiter par une recette initiale ».
+
+   Il n'y a plus de table d'utilité du tout — elle n'est même pas calculée quand ce cerveau joue.
+   L'IA énumère ses coups CONCRETS (`coupsPossibles` : « coloniser Vesta », « assaillir Io », et non
+   « coloniser » en général), les joue tous pour de faux, et garde celui qui laisse la meilleure
+   position. Le seul jugement porté est celui que le jeu lui-même calcule.
+
+   ⚠️ POURQUOI CE N'EST PAS LA MÊME CHOSE QUE `chercheur`. Ce dernier partait encore du classement
+   d'utilité et n'en réordonnait que les six premières CATÉGORIES ; la cible restait choisie par une
+   sous-fonction. Il ne pouvait donc jamais préférer « coloniser Europe » à « coloniser Vesta », ni
+   voir qu'un assaut précis valait mieux qu'une colonisation quelconque. `tacticien` compare des
+   coups nommés, tous contre tous.
+
+   ⚠️ MESURÉ AVANT D'ÊTRE ÉCRIT : 50 coups concrets dans une position typique, 1,4 ms l'essai, soit
+   70 ms par décision et ~1,4 s par tour pour quatre nations. Tenable hors ligne sur téléphone —
+   c'était la condition posée par Marc.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+enregistrerCerveau('tacticien', function(ctx){
+  const coups=ctx.coups();
+  if(!coups.length)return false;
+  let meilleur=null, meilleureValeur=-Infinity, second=null, secondeValeur=-Infinity, evalues=0;
+  for(const c of coups){
+    const r=simulerCoup(ctx.nation, function(){ return ctx.jouer(c); });
+    if(!r.ok)continue;
+    evalues++;
+    if(r.valeur>meilleureValeur){ second=meilleur; secondeValeur=meilleureValeur;
+                                  meilleureValeur=r.valeur; meilleur=c; }
+    else if(r.valeur>secondeValeur){ secondeValeur=r.valeur; second=c; }
+  }
+  if(!meilleur)return false;
+  /* ⚠️ ON GARDE LE POURQUOI, PAS SEULEMENT LE QUOI. Marc, 27/08 : « veille à ce que le fichier
+     debug puisse être efficace dans le recueil d'informations, pas juste le journal d'une partie ».
+     Le journal dit « Ceinturiens colonise Titan ». Il ne dit pas que l'IA a comparé 47 coups, que
+     Titan l'emportait de 0,2 point sur un assaut, ni qu'elle a hésité. Sans cela, quand une IA joue
+     bizarrement, on ne peut que deviner. */
+  _tracerDecisionIA(ctx.nation, meilleur, meilleureValeur, second, secondeValeur, evalues, coups.length);
+  /* Le coup gagnant a été DÉFAIT par la simulation : on le rejoue pour de vrai. S'il échoue à la
+     seconde tentative (un tirage a pu changer), on prend le suivant plutôt que de passer son tour. */
+  if(ctx.jouer(meilleur))return true;
+  for(const c of coups){ if(c!==meilleur&&ctx.jouer(c))return true; }
+  return false;
+});
 function doAITurn(aiPlayer,oneShot){
   /* Tout ce que cette fonction journalise appartient à CETTE IA. Sans ce marquage, ses lignes
      étaient attribuées à `G.player` — c'est-à-dire à l'humain que le serveur avait activé, ce qui
@@ -8885,10 +9550,23 @@ function _doAITurnInterne(aiPlayer,oneShot){
     if(ai.colonies.some(c=>!c.connected&&c.nodeId!==ai.civ.home)&&tryRoute())return true;
     // En guerre et trésorerie basse → on THÉSAURISE (on ne dépense pas ce qui servira à se défendre).
     if(_belowReserve())return false;
-    const U=_appliquerProfil(actionUtilities());
-    const ranked=Object.keys(U).filter(k=>U[k]>0).sort((a,b)=>U[b]-U[a]);
-    for(const k of ranked){ if(execMap[k]&&execMap[k]()) return true; }
-    return false;
+    /* ⚠️ LA TABLE DE NOTES N'EST CALCULÉE QUE SI LE CERVEAU LA DEMANDE. Marc, 27/08 : « je préfère
+       un système qui n'a pas de notes sur les actions préalables ». Le cerveau `tacticien` n'en veut
+       pas — et grâce à ces accesseurs paresseux, elle ne tourne même pas quand il joue. Les anciens
+       cerveaux, eux, continuent d'y accéder normalement. C'est la façon de la retirer sans casser
+       le témoin qui sert à la mesurer. */
+    let _U=null;
+    const utilites=function(){ if(_U===null)_U=_appliquerProfil(actionUtilities()); return _U; };
+    const ctx={
+      nation: ai,
+      get utilites(){ return utilites(); },
+      get classees(){ const U=utilites(); return Object.keys(U).filter(k=>U[k]>0).sort((a,b)=>U[b]-U[a]); },
+      executer: function(k){ return !!(execMap[k]&&execMap[k]()); },
+      /* Les deux seules portes dont le tacticien a besoin : « que puis-je jouer ? » et « joue-le ». */
+      coups: function(){ return coupsPossibles(ai); },
+      jouer: function(c){ return appliquerCoup(ai,c); }
+    };
+    return !!cerveauCourant()(ctx);
   }
   ai._aiSetupDone=true;
   if(oneShot){ // INTERLACÉ : UNE action puis la main tourne
@@ -9050,6 +9728,9 @@ function buildJournalReport(){
     L.push('   '+'─'.repeat(50));
     L.push('   TOTAL : '+v.total+'   [somme des huit postes ci-dessus]');
   }
+  /* La trajectoire et les décisions des IA — voir `_analyseTexte`. Placées APRÈS le décompte, pour
+     que le lecteur pressé trouve d'abord son score, et l'enquêteur ce qu'il lui faut ensuite. */
+  try{ for(const l of _analyseTexte())L.push(l); }catch(e){}
   return L.join('\n');
 }
 function buildFullLog(){ return buildJournalReport(); }
@@ -9060,6 +9741,55 @@ function _natColorByName(name){
 }
 function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 // Même rapport que buildJournalReport mais en HTML coloré (chaque nation dans SA couleur).
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   LA SECTION « ANALYSE » DU RAPPORT — CE QUE LE JOURNAL SEUL NE DIT PAS
+   ----------------------------------------------------------------------------------------------
+   Marc, 27/08 : « veille à ce que le fichier debug puisse être efficace dans le recueil
+   d'informations pour que ça nous serve. Pas juste le journal d'une partie. »
+
+   Le journal raconte CE QUI s'est passé. Il ne dit pas comment chaque nation a progressé tour après
+   tour, ni pourquoi une IA a préféré un coup à un autre. Ces deux manques ont coûté plusieurs
+   sessions d'enquête à l'aveugle. Deux tableaux les comblent :
+     · la TRAJECTOIRE — une ligne par nation et par tour : VP, ressources, colonies, en guerre ou
+       non. On y lit d'un coup d'œil qui décroche, à quel tour et sur quelle ressource ;
+     · les DÉCISIONS de l'IA — le coup retenu, sa note, le dauphin et l'écart. C'est ce qui distingue
+       « elle a tranché franchement » de « ça s'est joué à un dixième de point ».
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+function _analyseTexte(){
+  const L=[];
+  const photos=(G&&G._photos)||[], trace=(G&&G._traceIA)||[];
+  L.push('');
+  L.push('═══════════ ANALYSE — TRAJECTOIRE DES NATIONS ═══════════');
+  L.push('(par tour : VP · ⚡🪨🔬❤️ · colonies/routes/cartes · jetons · ⚔ si en guerre)');
+  if(!photos.length)L.push('  (aucune photo — partie trop courte ou version antérieure)');
+  else{
+    const tours=[...new Set(photos.map(x=>x.t))].sort((a,b)=>a-b);
+    for(const t of tours){
+      L.push('  Tour '+t);
+      for(const x of photos.filter(y=>y.t===t)){
+        L.push('    '+String(x.nat).padEnd(12)+' VP '+String(x.vp).padStart(3)
+          +'  '+String(x.e).padStart(2)+'⚡ '+String(x.m).padStart(2)+'🪨 '+String(x.s).padStart(2)+'🔬 '+String(x.mo).padStart(2)+'❤️'
+          +'  '+x.col+' col / '+x.rt+' rt / '+x.ca+' cartes  '+String(x.jt).padStart(2)+' jetons'
+          +(x.guerre?'  ⚔ EN GUERRE':''));
+      }
+    }
+  }
+  L.push('');
+  L.push('═══════════ ANALYSE — DÉCISIONS DES IA ═══════════');
+  L.push('(coup retenu · sa note · le dauphin et sa note · nombre de coups réellement évalués)');
+  L.push('Cerveau : '+((typeof nomCerveauCourant==='function')?nomCerveauCourant():'?'));
+  if(!trace.length)L.push('  (aucune décision tracée — cerveau historique, ou partie sans IA)');
+  else{
+    for(const d of trace){
+      const ecart=(d.val2===null||d.val2===undefined)?null:Math.round((d.val-d.val2)*10)/10;
+      L.push('  T'+String(d.t).padStart(2)+' '+String(d.nat).padEnd(12)
+        +' → '+String(d.choix).padEnd(34)+' ('+d.val+')'
+        +(d.second?('   dauphin : '+d.second+' ('+d.val2+', écart '+ecart+')'):'')
+        +'   ['+d.evalues+'/'+d.proposes+' coups]');
+    }
+  }
+  return L;
+}
 function buildJournalReportHTML(){
   const H=[];
   try{
@@ -11277,6 +12007,9 @@ function _logPrefixe(e){
        + '<span style="opacity:.45"> │ </span>';
 }
 function addLog(msg,cls=''){
+  /* Pendant une simulation de l'IA, le moteur joue des coups qui n'auront pas lieu : les journaliser
+     raconterait au joueur une partie imaginaire. Voir `simulerCoup`. */
+  if(G&&G._simulationIA)return;
   if(G)G._lastProgress=Date.now(); // battement de cœur pour le chien de garde anti-blocage
   /* ⚠️ LE JOURNAL N'EST PLUS TRONQUÉ (Marc, 2026-08-08 : « le journal doit être entier »).
      Il gardait 80 lignes et jetait les plus anciennes : une partie de dix tours n'en conservait donc

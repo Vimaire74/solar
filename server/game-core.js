@@ -78,6 +78,13 @@ function buildSandbox() {
      · `uiFillIncome` (revenu net) : le correctif était du code mort pendant une semaine ;
      · `doRaidTarget` (raid ciblé)  : le serveur retombait toujours sur un raid sans cible.
    On vérifie donc explicitement, et on échoue BRUYAMMENT. */
+/* ⚠️ N'AJOUTER ICI QUE CE QUI EXISTE AUSSI DANS LE TÉMOIN GELÉ `temoin_v9.69/`. Cette liste échoue
+   BRUYAMMENT quand une fonction manque — c'est sa raison d'être. Mais plusieurs bancs chargent le
+   témoin pour comparer l'avant et l'après : y inscrire une fonction NEUVE (`_analyseTexte`,
+   `coupsPossibles`, `appliquerCoup`, ajoutées le 27/08) rend le témoin illisible et fait échouer
+   `test_impasse_guerre`, `test_accords_signataires` et `test_guerre_deux_combats` au CHARGEMENT,
+   sans le moindre rapport avec ce qu'ils vérifient. Fait, et corrigé, le jour même.
+   Une fonction récente s'appelle avec `typeof x === 'function'`, pas en l'exigeant ici. */
 const FONCTIONS_MOTEUR_REQUISES = [
   'initGame', 'startTurn', 'endTurn', 'runEndOfRound', 'doMaintenance', 'doRevenues', 'advancePirates',
   'doColonize', 'doEstablishRoute', 'doUpgrade', 'buyTech', 'useAbility', 'doRaid', 'doRaidTarget',
@@ -89,6 +96,7 @@ const FONCTIONS_MOTEUR_REQUISES = [
      retomber l'assaut en silence, comme `getNodeOwnerAI` l'a fait pendant des semaines. */
   'defenseurPrincipal', 'playerAssaultColony', 'stAssautJoueurChoisi', '_warBetween', 'defenseIA',
   'setDecisionSink', 'resolveDecision', 'refreshWarViews', 'scSetG', 'scDeserialize', 'rehydrateState',
+
   'showAgendaSelModal', 'confirmRouteToken', 'dismissDiscovery', 'cruiserAvailable', 'cruiserAfford',
   'routeManageDeploy', 'routeManageRecall', '_forgeUpgrade',
   /* Bloc @flux — la machine à états. Elle vit dans `moteur.js` (et non côté serveur) parce que le
