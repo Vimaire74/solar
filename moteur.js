@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-28 · v9.95';
+const SOLAR_BUILD_MOTEUR = '2026-08-28 · v10.00';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -1334,9 +1334,27 @@ function rehydrateState(g){
   // Re-lier l'ordre d'initiative (et le raccourci player) aux objets CANONIQUES : la désérialisation JSON
   // duplique les objets, donc G._order contenait des copies ≠ G.player/G.ais → ta nation était jouée comme une IA
   // et la manche ne se terminait jamais (le tour restait bloqué après une reprise). On remappe par civ.id.
+  /* ⚠️ ON REMAPPE EN PLACE — L'IDENTITÉ DU TABLEAU EST UNE DONNÉE, PAS UN DÉTAIL.
+     Ces trois lignes faisaient `g._order = g._order.map(…)`, et `.map()` fabrique TOUJOURS un
+     nouveau tableau, même quand aucun élément ne change. Or `server/driver.js` détecte le début
+     d'une nouvelle manche en comparant `G._order` à la référence qu'il avait gardée :
+        if(order !== this._aorderRef){ this._aorderRef = order; this._aptr = 0; }
+     Un tableau neuf lui faisait donc croire à une manche neuve, et il REMBOBINAIT le tour de rôle
+     au premier joueur de l'ordre.
+     Tant que `rehydrateState` n'était appelée qu'à la reprise d'une partie, personne ne le voyait.
+     Depuis que le cerveau `tacticien` SIMULE (chaque coup essayé restaure `G`, donc passe ici), cela
+     arrivait plusieurs fois par tour : l'IA reprenait la main au lieu de la céder, et Marc a vu ses
+     adversaires « jouer plusieurs actions de suite », de plus en plus souvent à mesure que la partie
+     avance et que le nombre de coups à simuler augmente (signalé le 28/08 sur la partie 6D02, tour 7).
+     ⚠️ La leçon dépasse ce défaut : une restauration ne doit pas remplacer les objets vivants que
+     d'autres modules tiennent par référence. C'est la même famille que « la restauration effaçait
+     des fonctions » (§52.3) — ce que la sérialisation ne sait pas porter, la restauration n'a pas le
+     droit de le détruire, et l'identité d'un tableau en fait partie. */
   if(Array.isArray(g._order)){
     const _all=[g.player].concat(g.ais||[]);
-    g._order=g._order.map(function(o){const id=o&&o.civ&&o.civ.id;return _all.find(function(n){return n&&n.civ&&n.civ.id===id;})||o;}).filter(Boolean);
+    const _remap=g._order.map(function(o){const id=o&&o.civ&&o.civ.id;return _all.find(function(n){return n&&n.civ&&n.civ.id===id;})||o;}).filter(Boolean);
+    g._order.length=0;
+    for(let i=0;i<_remap.length;i++)g._order.push(_remap[i]);
   }
   fluxOublierVolatiles(); // voir le bandeau : sinon une réponse peut exécuter la suite d'une AUTRE partie
   g.events=EVENTS;
@@ -1935,10 +1953,62 @@ function startGame(){
   installBackGuard();
   initGame(selectedCiv, selectedAiCivs);
 }
+/* ═══════ L'ARBRE TECHNOLOGIQUE, LU UNE FOIS AU DÉBUT DE LA PARTIE ═══════
+   Marc, 28/08 : « il faut aussi qu'elle connaisse toutes les tech en jeu au début du jeu avec
+   avantages et défauts. Elle doit lire ça pendant que les joueurs choisissent leur agenda secret. »
+
+   ⚠️ PRÉCISION HONNÊTE SUR CE QUE ÇA APPORTE, ET CE QUE ÇA N'APPORTE PAS. L'IA VOYAIT DÉJÀ toutes
+   les cartes : `CARDS_POOL` est une donnée publique, `coupsPossibles` énumère toutes celles qu'elle
+   peut acheter, et le tacticien les ESSAIE une par une. Une « phase de lecture » n'ajoute donc rien
+   à ce qu'elle voit.
+   Ce qui lui manquait est ailleurs, et l'intuition de Marc le désignait juste : une technologie
+   était valorisée sur son effet IMMÉDIAT seulement. Sa valeur de PRÉREQUIS — Biosphère Autonome
+   ouvre Biosphère Avancée, qui ouvre Terraformation — était invisible, parce que l'IA ne regarde
+   jamais un coup plus loin (§61.3). Elle achetait un rang 1 pour ce qu'il rapporte tout de suite,
+   jamais pour ce qu'il DÉBLOQUE.
+
+   On lit donc l'arbre UNE FOIS, au démarrage, et on retient pour chaque carte la valeur de ce
+   qu'elle rend atteignable. C'est un demi-pas de profondeur, là où il coûte le moins cher : le
+   calcul est fait une seule fois par partie, pas à chaque décision.
+
+   ⚠️ ET C'EST BIEN UNE NOTE SUR UNE ACTION — ce que Marc a refusé par ailleurs (« je ne veux pas de
+   notes sur les actions préalables »). La différence, et elle est réelle : ce nombre n'est pas écrit
+   à la main, il est DÉDUIT des données du jeu. Changer un rang, un coût ou un VP dans `CARDS_POOL`
+   change la valeur sans qu'on touche à l'IA. Si l'arbre est retouché demain, elle suivra seule. */
+function lireArbreTechnologique(){
+  const chaines={};
+  try{
+    for(const c of (typeof CARDS_POOL!=='undefined'?CARDS_POOL:[])){
+      if(!c||!c.branch)continue;
+      let v=0;
+      for(const suivante of CARDS_POOL){
+        if(!suivante||suivante.branch!==c.branch)continue;
+        if((suivante.tier||0)!==(c.tier||0)+1)continue;
+        v+=(suivante.vp||0);
+      }
+      if(v>0)chaines[c.id]=v;
+    }
+  }catch(e){ return {}; }
+  return chaines;
+}
+/* Ce qu'ACHETER cette carte rend atteignable — décoté par l'horizon : débloquer une suite au tour 9
+   ne sert plus à rien, il ne reste pas de tours pour l'emprunter. */
+function valeurDeblocage(cardId){
+  try{
+    const c=(G&&G._chainesTech)?(G._chainesTech[cardId]||0):0;
+    if(!c)return 0;
+    const total=G.maxTurns||10;
+    const horizon=Math.max(0,total-(G.turn||1)+1)/total;
+    return c*0.35*horizon;
+  }catch(e){ return 0; }
+}
 function initGame(civId,aiCivIds){
   const others=Object.keys(CIVS).filter(id=>id!==civId);
   let aiIds=(aiCivIds&&aiCivIds.length>0)?aiCivIds:[others[Math.floor(Math.random()*others.length)]];
   const branchCards=CARDS_POOL.filter(c=>c.branch);
+  /* La lecture de l'arbre, une fois pour la partie. Rangée dans `G` : simple objet de nombres, donc
+     sérialisé avec la partie et retrouvé tel quel après une reprise. */
+  const _chainesTech=lireArbreTechnologique();
   /* ⚠️ LA RIVIÈRE CIVIQUE EST VIDE DEPUIS LA REFONTE, ET IL FAUT LE DIRE PLUTÔT QUE DE FILTRER
      DANS LE VIDE. Les cartes `civique` (gov1, gov2, gov3, eco1, eco2) ont réellement existé dans
      CARDS_POOL ; elles ont été retirées lors de la refonte civique (voir docs/RESUME_PROJET.md) et
@@ -1958,6 +2028,7 @@ function initGame(civId,aiCivIds){
     agendas:[],  // compat display — chaque joueur a son propre .agenda
     events:EVENTS,eventSchedule:buildEventSchedule(),curEvent:null,nextEvent:null,
     log:[],turnActions:[],aiActions:[],_raidsThisTurn:[],_journal:[],
+    _chainesTech:_chainesTech,   // l'arbre technologique lu au démarrage (voir lireArbreTechnologique)
     wars:[],warRisk:0,warState:null,warTurnsLeft:0,warWins:{player:0,ai:0},_warDeclaredBy:'other',_aiWarTarget:null,_aiWarStance:'hold',
     warWith:null,tensions:{},
     commercialAccords:[],accordsParties:{},mapPanel:0,wormholeUsed:false,_pendingEvModal:null,
@@ -7521,7 +7592,44 @@ function endWar(aiId){
 }
 /* ============================================================ AI ============================================================ */
 // ── Choix STRATÉGIQUE d'un investissement par une IA (Niv.1 ou Niv.2) ──
+/* ═══════ L'IA ESSAIE LES INVESTISSEMENTS AU LIEU DE LES NOTER ═══════
+   Marc, 28/08 : « la tech Colonies Avancées est tellement brutale à elle seule qu'on peut gagner en
+   la prenant ; il faut que les IA comprennent vraiment les pouvoirs à l'œuvre. »
+
+   ⚠️ ELLE NE POUVAIT PAS LES COMPRENDRE : les investissements ne sont pas des actions de la phase de
+   jeu, `coupsPossibles` n'en propose aucun, et le cerveau `tacticien` ne les voyait donc JAMAIS. Ils
+   restaient choisis par le barème écrit à la main de `chooseInvestmentForAI`, où « Colonies
+   Avancées » vaut `belowMax × 1,5` — un poids parmi d'autres, sans rapport avec le fait qu'elle peut
+   emporter la partie.
+
+   On applique donc ici le principe du tacticien : on JOUE chaque investissement pour de faux, on
+   note la position obtenue, on garde le meilleur. Aucune connaissance du jeu n'est écrite — c'est
+   `investAppliquer`, la fonction qui applique VRAIMENT l'effet, qui est essayée. Le jour où un
+   investissement change, l'IA le découvre sans qu'on touche à un barème.
+
+   ⚠️ LE BARÈME EST CONSERVÉ COMME REPLI, et ce n'est pas de la prudence excessive : le cerveau
+   `historique` (le témoin de toutes nos mesures) doit continuer à se comporter exactement comme
+   avant, sinon on perd le point de comparaison. Il sert aussi si aucun investissement n'est
+   simulable — mieux vaut un choix imparfait qu'aucun choix. */
+function iaSimuleInvestissement(ai,level){
+  if(typeof simulerCoup!=='function'||typeof investAppliquer!=='function')return null;
+  if(nomCerveauCourant()!=='tacticien')return null;
+  const pool=level===2?INVESTMENT_CARDS_2:INVESTMENT_CARDS;
+  let best=null,bestV=-Infinity,essayes=0;
+  for(const carte of pool){
+    if(!investPayable(carte,ai))continue;
+    let r=null;
+    try{ r=simulerCoup(ai,function(){ investAppliquer(carte,ai); }); }catch(e){ r=null; }
+    if(!r||!r.ok)continue;
+    essayes++;
+    if(r.valeur>bestV){ bestV=r.valeur; best=carte; }
+  }
+  /* Un seul candidat essayé ne prouve rien : on ne remplace le barème que si l'on a pu COMPARER. */
+  return (best&&essayes>=2)?best.id:null;
+}
 function chooseInvestmentForAI(ai,level){
+  const parSimulation=iaSimuleInvestissement(ai,level);
+  if(parSimulation)return parSimulation;
   const pool=level===2?INVESTMENT_CARDS_2:INVESTMENT_CARDS;
   const connCols=ai.colonies.filter(c=>c.connected).length;
   const morale=ai.res.morale||0;
@@ -7781,9 +7889,39 @@ function nomProfilDe(nat){ const p=profilActifDe(nat); return p?(p.emoji+' '+p.n
    la convention du 24/08, et elle doit pouvoir juger la position de n'importe qui — y compris celle
    d'un rival, ce dont l'étape 3 aura besoin.
    ══════════════════════════════════════════════════════════════════════════════════════════════ */
-function evaluerPosition(nat){
+/* `observateur` : la nation qui REGARDE. Absent ⇒ on évalue sa propre position, tout est connu.
+   ⚠️ CE PARAMÈTRE EXISTE PARCE QUE L'IA TRICHAIT. `evaluerPositionRelative` évalue chaque rival avec
+   CETTE fonction — qui lit `res.energy`, `res.materials`, `res.science`, `res.morale`,
+   `forceTokens` et `revenusBruts()`. C'est-à-dire l'économie exacte, le moral exact, la force exacte
+   et les revenus de tous les adversaires. Or les règles disent l'inverse (§14.7) : l'économie et le
+   moral d'une rivale sont CACHÉS sans le 📡 Réseau Orbital, sa force n'est connue qu'à ±3. Le joueur
+   humain ne les voit pas ; l'IA, si.
+   C'est exactement la faute commise puis corrigée le 25/08 sur `defenseAttendue` (§41.2) — « une
+   correction qui fait tricher n'est pas une correction ». Elle est revenue par une autre porte,
+   celle de l'évaluation relative, et aucun banc ne la surveillait.
+   ⚠️ ON N'APPELLE PAS `perceivedForce` pour estimer la force à ±3 : elle ÉCRIT dans `G._fog` et
+   consomme du hasard. Une fonction qui évalue ne doit rien écrire (§52.3). Sans renseignement, la
+   force d'un rival est donc simplement IGNORÉE — l'ignorance est neutre, l'invention ne l'est pas. */
+function evaluerPosition(nat,observateur){
   if(!nat||!nat.civ)return 0;
-  const acquis=calcVP(nat).total;
+  /* Ce que je vois d'un rival sans le Réseau Orbital : son SCORE et sa CARTE. Rien d'autre. */
+  const aveugle=!!(observateur&&observateur!==nat&&(typeof getIntelLevel!=='function'||getIntelLevel(observateur)<2));
+  /* ═══════ LES POINTS DE VICTOIRE NE VALENT PAS AUTANT AU TOUR 1 QU'AU TOUR 10 ═══════
+     Doctrine de Marc, 28/08, après la partie 6D02 perdue 195 à 20 par l'IA : « viser les points de
+     victoire dès le début est une erreur. D'abord on établit un système pour gagner des ressources,
+     ensuite on améliore le système […] et à partir du milieu de la partie on veut plus de points. »
+
+     MESURÉ AVANT (`mesure_evaluation.js`) : au début de partie, les VP déjà marqués pesaient 43 % de
+     la note contre 41 % à la production. Autrement dit l'IA jouait le SCORE avant d'avoir une
+     économie — et se retrouvait à sec au tour 7, incapable d'engager un seul jeton.
+     La décote par l'horizon existait, mais elle ne portait que sur la production : les VP, eux,
+     comptaient à plein poids dès le premier tour.
+
+     ⚠️ ON NE TOUCHE PAS AU CALCUL DES VP, on change ce qu'ils PÈSENT DANS LA DÉCISION. `calcVP` reste
+     la seule vérité du score ; c'est l'IA qui apprend qu'un point marqué tôt vaut moins qu'un moteur
+     économique qui en produira dix. Le poids monte de 0,45 au tour 1 à ~0,95 au tour 10 : au début
+     elle construit, à la fin elle encaisse. */
+  const acquis=calcVP(nat).total*(0.45+0.55*(1-((Math.max(0,(G.maxTurns||10)-(G.turn||1)+1))/(G.maxTurns||10))));
   const total=G.maxTurns||10;
   const restants=Math.max(0,total-(G.turn||1)+1);
   const horizon=restants/total;                      // 1 au premier tour, ~0 au dernier
@@ -7794,11 +7932,14 @@ function evaluerPosition(nat){
   let rev={};
   try{ rev=revenusBruts(nat)||{}; }catch(e){ rev={}; }
   const parTour=(rev.materials||0)*0.55+(rev.energy||0)*0.40+(rev.science||0)*0.85;
-  const production=parTour*restants*0.30;
+  /* 0,30 → 0,36 : contrepartie du poids réduit des VP ci-dessus. Le but n'est pas de gonfler la
+     production dans l'absolu, c'est de rendre le MOTEUR ÉCONOMIQUE plus attirant que le point marqué
+     tout de suite, tant qu'il reste des tours pour le faire tourner. */
+  const production=aveugle?0:parTour*restants*0.36;   // revenus : cachés (§14.7)
 
   /* TRÉSORERIE — convertible tout de suite, mais elle ne vaut que si l'on a encore le temps de la
      dépenser. Un stock de 20🪨 au dernier tour ne vaut rien. */
-  const tresorerie=((nat.res.materials||0)*0.14+(nat.res.energy||0)*0.12+(nat.res.science||0)*0.22)*horizon;
+  const tresorerie=aveugle?0:((nat.res.materials||0)*0.14+(nat.res.energy||0)*0.12+(nat.res.science||0)*0.22)*horizon;   // stocks : cachés
 
   /* POTENTIEL DE DÉVELOPPEMENT — une colonie de niveau 1 reliée vaut bien plus que sa valeur
      actuelle, tant qu'il reste des tours pour l'améliorer. */
@@ -7812,10 +7953,46 @@ function evaluerPosition(nat){
 
   /* SÉCURITÉ — le moral est une falaise. Et la force sert autant à dissuader qu'à conquérir. */
   const moral=nat.res.morale||0;
-  const perilMoral=moral<=0?-18:moral<=1?-11:moral<=3?-4:0;
-  const force=Math.min(12,nat.forceTokens||0)*0.45*horizon;
+  const perilMoral=aveugle?0:(moral<=0?-18:moral<=1?-11:moral<=3?-4:0);   // moral d'une rivale : caché
+  /* ═══════ ÊTRE À SEC EST UNE FALAISE, PAS UN MANQUE À GAGNER ═══════
+     Engager un jeton Force coûte 1🪨 + 1⚡. Une nation dont l'une des deux est à zéro ne peut donc
+     RIEN engager : ni attaquer, ni se défendre. Sa capitale n'est plus tenue que par sa garnison.
+     C'est exactement ce qui a tué les Ceinturiens dans la partie 6D02 de Marc : ⚡ à 2 au tour 7,
+     puis 0 aux tours 8, 9 et 10 → **0 jeton engagé en défense**, quatre colonies perdues sans un
+     combat, 195 à 20.
+     AVANT, l'évaluation ne voyait là qu'un petit terme de trésorerie en moins (mesuré : 2 à 5 % de
+     la note). Tomber à sec ne coûtait presque rien à l'IA, alors que dans le jeu ça coûte la partie.
+     On calque donc la forme qui marche déjà pour le moral : une FALAISE, pas une pente.
+     ⚠️ Le seuil est en JETONS PAYABLES (`min(🪨,⚡)`), pas en ressources brutes : c'est la vraie
+     grandeur du jeu — 20🪨 et 0⚡ ne permettent d'engager aucun jeton (même raison qu'au §10bis P1,
+     où l'initiative se départage sur `min(matériaux, énergie)`).
+     ⚠️ Et la falaise s'arrête à 3 : au-delà, accumuler ne rapporte plus rien. Sans ce plafond l'IA
+     thésauriserait au lieu de jouer — on remplacerait une pathologie par une autre. */
+  const payables=Math.min(nat.res.materials||0,nat.res.energy||0);
+  const perilRessources=aveugle?0:(payables<=0?-12:payables<=1?-6:payables<=2?-2:0);   // découle des stocks, donc caché
+  /* ═══════ POINT 4 DE LA DOCTRINE — ESSAYÉ, MESURÉ, RETIRÉ (28/08) ═══════
+     Marc voulait que l'IA « réagisse à l'autre » et « empêche l'autre de prendre la tech 3 ». Deux
+     termes ont été écrits ici puis SUPPRIMÉS parce que la mesure les a condamnés :
 
-  return acquis+production+tresorerie+potentiel+perilMoral+force;
+     · `optionsTech` — la valeur des technologies de rang 3 encore atteignables. Première version,
+       comptée pour tout le monde : **6 victoires sur 16 au lieu de 10**, VP 45,2 contre 55,0. La
+       raison est instructive : ajoutée à MA note, elle me payait pour AVOIR une T3 accessible — or
+       l'acheter fait disparaître l'option. L'IA était donc récompensée de ne jamais la prendre,
+       l'inverse exact de la demande.
+       Seconde version, comptée seulement chez le rival (donc soustraite, = ce que je peux lui
+       retirer) : **8 sur 16**. Meilleure, toujours en dessous des 10 sur 16 sans elle.
+     · `vulnerabilite` — la menace d'un rival mieux armé, visible seulement avec le 📡 Réseau Orbital
+       (la lire sans renseignement serait de la triche, §41.2). Mesurée NEUTRE : elle ne se déclenche
+       presque jamais, faute de renseignement acquis.
+
+     ⚠️ ON NE GARDE PAS DU CODE MORT « au cas où » : il se paierait plus tard (consigne de Marc).
+     Le raisonnement complet est en REPRISE §61 — s'y reporter avant de retenter, pour ne pas
+     réessayer la version qui a déjà échoué.
+     👉 La piste qui reste à explorer n'est PAS l'évaluation de position : c'est que le tacticien
+     n'anticipe qu'UN coup. Refuser une T3 à un rival suppose de voir ce qu'il jouera ENSUITE. */
+  const force=aveugle?0:Math.min(12,nat.forceTokens||0)*0.45*horizon;   // force exacte : réservée au Réseau Orbital
+
+  return acquis+production+tresorerie+potentiel+perilMoral+perilRessources+force;
 }
 /* ══════════════════════════════════════════════════════════════════════════════════════════════
    ÉTAPE 3b — CE QU'UN COUP RETIRE À L'ADVERSAIRE COMPTE AUTANT QUE CE QU'IL ME RAPPORTE
@@ -7838,7 +8015,7 @@ function evaluerPositionRelative(nat){
   let meilleur=0, somme=0, n=0;
   for(const o of allPlayers()){
     if(!o||o===nat||!o.civ)continue;
-    const v=evaluerPosition(o);
+    const v=evaluerPosition(o,nat);   // ⚠️ `nat` = qui regarde : le brouillard s'applique (voir `evaluerPosition`)
     somme+=v; n++;
     if(v>meilleur)meilleur=v;
   }
@@ -8367,9 +8544,14 @@ enregistrerCerveau('tacticien', function(ctx){
     const r=simulerCoup(ctx.nation, function(){ return ctx.jouer(c); });
     if(!r.ok)continue;
     evalues++;
-    if(r.valeur>meilleureValeur){ second=meilleur; secondeValeur=meilleureValeur;
-                                  meilleureValeur=r.valeur; meilleur=c; }
-    else if(r.valeur>secondeValeur){ secondeValeur=r.valeur; second=c; }
+    /* ⚠️ LE SEUL ENDROIT OÙ LA SIMULATION NE SUFFIT PAS. Simuler un achat montre ce que la carte
+       rapporte MAINTENANT ; ça ne peut pas montrer qu'elle ouvre la suivante, parce qu'il faudrait
+       simuler deux coups d'affilée. On ajoute donc ce que l'arbre — lu au démarrage — dit qu'elle
+       débloque. C'est le demi-pas de profondeur demandé par Marc le 28/08. */
+    const valeur=r.valeur+((c.type==='tech'&&typeof valeurDeblocage==='function')?valeurDeblocage(c.card):0);
+    if(valeur>meilleureValeur){ second=meilleur; secondeValeur=meilleureValeur;
+                                  meilleureValeur=valeur; meilleur=c; }
+    else if(valeur>secondeValeur){ secondeValeur=valeur; second=c; }
   }
   if(!meilleur)return false;
   /* ⚠️ ON GARDE LE POURQUOI, PAS SEULEMENT LE QUOI. Marc, 27/08 : « veille à ce que le fichier

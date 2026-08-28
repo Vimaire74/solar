@@ -285,7 +285,19 @@ class GameDriver {
   _currentActor(){
     const G=this.sb.__G;
     const order=G._order||[];
-    if(order!==this._aorderRef){ this._aorderRef=order; this._aptr=0; } // nouvelle manche
+    /* ⚠️ « NOUVELLE MANCHE » SE RECONNAÎT À SON CONTENU, PAS À L'IDENTITÉ DU TABLEAU.
+       Cette ligne comparait `order !== this._aorderRef`. Le moteur, lui, reconstruisait `G._order`
+       à chaque restauration d'état (`rehydrateState` faisait un `.map()`, qui rend toujours un
+       tableau neuf). Le pilote croyait donc à une manche neuve et REMBOBINAIT `_aptr` au premier
+       joueur — l'IA reprenait la main au lieu de la céder. Invisible tant que les restaurations
+       étaient rares ; permanent depuis que le cerveau `tacticien` simule chaque coup.
+       La cause a été traitée dans `moteur.js` (remappage EN PLACE), mais on ne laisse pas le piège :
+       une rotation de tour ne doit pas dépendre de l'identité d'un objet JavaScript, qui ne survit
+       ni à un JSON ni à une reprise de partie (c'est déjà ce qui avait cassé `G._stratOrder`, §30.7).
+       On compare donc l'ORDRE DES NATIONS et le NUMÉRO DE TOUR : ce qui définit réellement une
+       manche, et ce qui survit à tout. */
+    const sig=order.map(n=>(n&&n.civ&&n.civ.id)||'?').join('|')+'#'+((this.sb.__G&&this.sb.__G.turn)||0);
+    if(sig!==this._aorderSig){ this._aorderSig=sig; this._aptr=0; } // nouvelle manche
     if(!order.length) return null;
     for(let k=0;k<order.length;k++){
       const nat=order[(this._aptr+k)%order.length];

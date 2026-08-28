@@ -1,6 +1,6 @@
 # Lot 17 — ce qu'on met en ligne, et rien d'autre
 
-Dossier prêt à envoyer. Version **v9.95** (`sw.js` **v116**).
+Dossier prêt à envoyer. Version **v10.00** (`sw.js` **v121**).
 
 > ### Ce qui rend ce lot particulier : les IA réfléchissent, et en réfléchissant elles ont réveillé un défaut vieux de plusieurs versions
 >
@@ -54,6 +54,132 @@ Dossier prêt à envoyer. Version **v9.95** (`sw.js` **v116**).
 > joueur, que le joueur reste enregistré (sans quoi on « réparerait » en cassant tout), et il a été
 > **vu rougir** — sans la protection, 8 actions d'IA retombent dans le carnet du joueur.
 
+> ### Correctif v9.97 — l'IA construit d'abord, elle marque ensuite
+>
+> Doctrine dictée par Marc après la partie 6D02 (perdue 195 à 20 par l'IA) : *« viser les points de
+> victoire dès le début est une erreur. D'abord on établit un système pour gagner des ressources,
+> ensuite on améliore le système […] et à partir du milieu de la partie on veut plus de points. »*
+>
+> **Mesuré avant de toucher à quoi que ce soit** (`mesure_evaluation.js`, qui décompose la note de
+> l'IA poste par poste et vérifie que sa somme retombe sur celle du moteur) : en début de partie, les
+> VP déjà marqués pesaient **43 %** de la note contre 41 % à la production. L'IA jouait le score
+> avant d'avoir une économie.
+>
+> Deux changements, tous deux dans `evaluerPosition` :
+> · **le poids des VP monte avec la partie** (0,45 au tour 1 → ~0,95 au tour 10) au lieu d'être plein
+>   dès le début. Le calcul du score n'est pas touché — seul change ce qu'il PÈSE dans la décision ;
+> · **être à sec devient une falaise**, comme le moral l'était déjà. Engager un jeton coûte 1🪨+1⚡ :
+>   une nation à 0 sur l'une des deux ne peut ni attaquer ni se défendre. Dans la partie de Marc, les
+>   Ceinturiens étaient à 0⚡ des tours 8 à 10 → **0 jeton engagé en défense**, quatre colonies
+>   perdues sans un combat. L'évaluation n'y voyait qu'un petit bonus manquant.
+>
+> Après : les VP pèsent **15 %** en début de partie, la production **52 %**.
+>
+> **Vérifié en tête-à-tête, 16 parties de chaque côté, mêmes graines, sièges permutés :**
+>
+> | | victoires | VP moyen IA | VP moyen témoin |
+> |---|---|---|---|
+> | sans les changements | 7 / 16 | 52,8 | 58,3 |
+> | **avec** | **10 / 16** | 49,8 | **49,2** |
+>
+> Elle marque un peu moins dans l'absolu, et elle gagne nettement plus souvent — c'est exactement ce
+> que la doctrine annonçait.
+>
+> ⚠️ **Au passage, un chiffre à corriger** : le « 11 victoires sur 16, +27 % de VP » annoncé pour le
+> tacticien datait d'AVANT les trois correctifs du 28/08. Remesuré sur le code du jour, il était
+> retombé à **7 sur 16**. Une bonne part de son avance venait de l'assaut mal attribué, corrigé
+> depuis. Un chiffre de performance se remesure après chaque correctif ; sinon on livre une promesse
+> périmée.
+
+> ### v9.98 — l'IA essaie les investissements ; et un ajout mesuré puis RETIRÉ
+>
+> **Elle découvre Colonies Avancées au lieu qu'on la lui note.** Les investissements n'étaient pas
+> des coups que l'IA simule : ils restaient choisis par un barème écrit à la main, où « Colonies
+> Avancées » valait un poids parmi d'autres — sans rapport avec le fait qu'elle peut emporter la
+> partie. Désormais l'IA JOUE chaque investissement pour de faux, note la position obtenue et garde
+> le meilleur. Aucune connaissance du jeu n'est écrite : c'est la fonction qui applique vraiment
+> l'effet qui est essayée. Le jour où un investissement change, l'IA le découvre seule.
+>
+> **Et une chose qui n'a PAS été livrée, parce que la mesure l'a condamnée.** « Empêcher l'autre de
+> prendre la tech 3 » a été codé — la valeur des technologies encore atteignables — puis retiré :
+>
+> | | victoires | VP IA | VP témoin |
+> |---|---|---|---|
+> | sans | **10 / 16** | 49,8 | 49,2 |
+> | avec, 1ʳᵉ version | 6 / 16 | 45,2 | 55,0 |
+> | avec, version corrigée | 8 / 16 | 49,3 | 52,3 |
+>
+> La première version était à l'envers : en valorisant le fait d'AVOIR une T3 accessible, elle payait
+> l'IA pour ne jamais la prendre — l'acheter faisait disparaître l'option. Corrigée (l'option ne
+> compte que chez le rival, donc comme ce qu'on peut lui retirer), elle reste en dessous.
+> **Retiré, code compris** — on ne garde pas de code mort « au cas où ». Le raisonnement est
+> conservé dans le fichier pour ne pas refaire deux fois la même tentative.
+>
+> Ce que ça apprend : refuser une technologie à quelqu'un suppose de voir ce qu'il jouera ENSUITE.
+> L'IA n'anticipe qu'un coup. C'est là qu'est la vraie limite, pas dans l'évaluation.
+
+> ### v9.99 — l'IA ne triche plus, et elle joue mieux
+>
+> Marc, 28/08 : *« est-ce que les IA connaissent les règles du jeu au début du jeu ? »* En
+> vérifiant, la réponse était pire que prévu : **elles en savaient trop**.
+>
+> Pour comparer sa position à celle des rivaux, l'IA évaluait chaque adversaire avec la même
+> fonction que la sienne — qui lit ses ressources, son moral, sa force et ses revenus. Autrement dit
+> **l'économie exacte de tout le monde**, alors que les règles (§14.7) la déclarent cachée sans le
+> 📡 Réseau Orbital. Toi, tu ne la vois pas. Elle, si.
+>
+> Désormais un rival n'est jugé que sur ce qui est **public** : son score et sa carte — ses colonies,
+> leurs niveaux, ses routes. Son économie n'apparaît qu'avec le Réseau Orbital, ce qui donne enfin à
+> cette technologie la valeur que les règles lui promettent.
+>
+> **Et le résultat est le contraire de ce qu'on pouvait craindre.** Sur 20 parties en tête-à-tête,
+> mêmes graines, sièges permutés :
+>
+> | | victoires | VP moyen IA | VP moyen témoin |
+> |---|---|---|---|
+> | en trichant | 10 / 16 | 49,8 | 49,2 |
+> | **sans tricher** | 9 / 20 | **56,5** | 47,5 |
+>
+> Elle marque **19 % de plus**. En cessant de courir après la position exacte de l'adversaire, elle
+> s'occupe de son propre développement — et c'est plus payant. Le compteur de victoires (meilleure
+> nation d'un camp contre meilleure de l'autre) reste autour de la moitié ; les deux chiffres sont
+> donnés tels quels, sans en choisir un.
+>
+> Banc neuf : **`test_brouillard_ia.js`**. Il ne compte pas des lignes de code — un renommage
+> passerait au vert. Il MESURE : on bouleverse ce qui est censé être caché chez un rival et on exige
+> que la note ne bouge pas ; puis, en contre-épreuve, qu'une colonie VISIBLE la fasse bouger (sans
+> quoi une évaluation devenue aveugle à tout passerait aussi) ; puis qu'avec le Réseau Orbital elle
+> voie ; puis qu'elle connaisse toujours sa propre situation.
+
+> ### v10.00 — l'IA lit l'arbre technologique au démarrage
+>
+> Marc, 28/08 : *« il faut qu'elle connaisse toutes les tech en jeu au début du jeu […] elle doit
+> lire ça pendant que les joueurs choisissent leur agenda secret. »*
+>
+> **Précision honnête sur ce que ça apporte.** Elle VOYAIT déjà toutes les cartes : l'arbre est une
+> donnée publique, elle énumère celles qu'elle peut acheter et les essaie une par une. Une phase de
+> lecture n'ajoute rien à ce qu'elle voit.
+> Ce qui lui manquait est ailleurs, et l'intuition désignait juste : une technologie était valorisée
+> sur son effet **immédiat** seulement. Sa valeur de **prérequis** — Biosphère Autonome ouvre
+> Biosphère Avancée, qui ouvre Terraformation — était invisible, parce qu'elle ne regarde jamais un
+> coup plus loin. Elle achetait un rang 1 pour ce qu'il rapporte tout de suite, jamais pour ce qu'il
+> débloque.
+>
+> L'arbre est donc lu **une fois, au démarrage** (14 cartes ouvrent une suite), et ce que chaque
+> carte débloque entre dans la décision. Un demi-pas de profondeur, là où il coûte le moins cher :
+> calculé une seule fois par partie, pas à chaque coup. Le nombre n'est pas écrit à la main, il est
+> déduit des données : changer un rang ou un VP dans l'arbre change la valeur sans toucher à l'IA.
+>
+> **Mesuré, et le signal est mitigé — les deux chiffres sont donnés :**
+>
+> | | victoires | VP moyen IA | VP moyen témoin |
+> |---|---|---|---|
+> | sans la lecture de l'arbre | 9 / 20 | 56,5 | 47,5 |
+> | **avec** | **11 / 20** (1 nulle) | 57,7 | 51,3 |
+>
+> Elle gagne plus souvent (9 → 11 sur les mêmes graines), mais son avance en points se resserre
+> (+9,0 → +6,4). Amélioration sur ce qui décide la partie, léger recul sur l'écart de score.
+
 ## Ce qu'il contient — et pourquoi seulement ça
 
 | Fichier | Va où | Pourquoi |
@@ -103,5 +229,5 @@ Dossier prêt à envoyer. Version **v9.95** (`sw.js` **v116**).
 
 ## Après l'envoi
 
-Vider le cache du navigateur ou attendre que le service worker bascule (**v116**). L'écran de
-connexion affiche les trois versions (`HTML`, `JS`, `moteur`) : elles doivent toutes dire **v9.95**.
+Vider le cache du navigateur ou attendre que le service worker bascule (**v121**). L'écran de
+connexion affiche les trois versions (`HTML`, `JS`, `moteur`) : elles doivent toutes dire **v10.00**.
