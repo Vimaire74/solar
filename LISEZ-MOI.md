@@ -1,6 +1,6 @@
 # Lot 17 — ce qu'on met en ligne, et rien d'autre
 
-Dossier prêt à envoyer. Version **v9.94** (`sw.js` **v115**).
+Dossier prêt à envoyer. Version **v9.95** (`sw.js` **v116**).
 
 > ### Ce qui rend ce lot particulier : les IA réfléchissent, et en réfléchissant elles ont réveillé un défaut vieux de plusieurs versions
 >
@@ -28,6 +28,31 @@ Dossier prêt à envoyer. Version **v9.94** (`sw.js` **v115**).
 >
 > Effet de bord : `test_guerre4_ws`, rouge et accepté comme tel depuis l'usure de guerre à −4, est
 > repassé au vert. L'usure frappait les mauvais belligérants.
+
+> ### Correctif v9.95 — le carnet de bord mélangeait tes actions et celles des IA
+>
+> Marc, en jouant la v9.94 : *« il me semble maintenant que l'IA joue toutes ses actions d'un coup
+> avant ou après moi »*. Le déroulé du jeu était pourtant intact — mesuré : chaque tour d'IA ne
+> consomme qu'un point d'action, et la main tourne correctement.
+>
+> Ce qui avait changé, c'est **à qui les actions étaient imputées**. Le cerveau `tacticien` appelle
+> les fonctions du joueur (`doColonize`, `doUpgrade`, `buyTech`…) — c'est voulu, c'est ce qui garantit
+> qu'une IA et un humain obéissent aux mêmes règles écrites une seule fois. Mais toutes se terminent
+> par `addAction`, **le carnet de bord du joueur local**, qui code la nation active en dur. Chaque
+> coup d'IA était donc inscrit dans TES actions, la ligne de journal signée de TON nom, un toast
+> affiché sur TON écran — et en solo, la fonction programmait même le passage de TA main.
+>
+> Les deux carnets mélangés, seules les lignes `🤖` restaient identifiables : de quoi lire le journal
+> comme si l'IA jouait en bloc.
+>
+> **Correctif** : une nation courante d'action, posée à UN SEUL endroit (`appliquerCoup`) et lue par
+> `addAction` — le mécanisme exact de `logAuteur`, qui rend déjà ce service pour le journal. Ajouter
+> un paramètre à `addAction` et le propager dans les huit fonctions appelantes aurait été la même
+> règle maintenue à huit endroits, donc la divergence garantie.
+>
+> Banc neuf : **`test_carnet_du_joueur.js`**. Il vérifie qu'aucune action d'IA n'atterrit chez le
+> joueur, que le joueur reste enregistré (sans quoi on « réparerait » en cassant tout), et il a été
+> **vu rougir** — sans la protection, 8 actions d'IA retombent dans le carnet du joueur.
 
 ## Ce qu'il contient — et pourquoi seulement ça
 
@@ -78,5 +103,5 @@ Dossier prêt à envoyer. Version **v9.94** (`sw.js` **v115**).
 
 ## Après l'envoi
 
-Vider le cache du navigateur ou attendre que le service worker bascule (**v115**). L'écran de
-connexion affiche les trois versions (`HTML`, `JS`, `moteur`) : elles doivent toutes dire **v9.94**.
+Vider le cache du navigateur ou attendre que le service worker bascule (**v116**). L'écran de
+connexion affiche les trois versions (`HTML`, `JS`, `moteur`) : elles doivent toutes dire **v9.95**.

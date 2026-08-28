@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-28 · v9.94';
+const SOLAR_BUILD_MOTEUR = '2026-08-28 · v9.95';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -8142,9 +8142,38 @@ function coupsPossibles(nat){
 }
 /* Joue un coup DÉCRIT. Chaque type délègue à la fonction du moteur qui porte déjà la règle : on ne
    réimplémente rien, on appelle. Rend `true` si le coup a eu lieu. */
+/* ═══════ QUI EST EN TRAIN D'AGIR ? — le pendant de `logAuteur` pour les ACTIONS ═══════
+   ⚠️ CE BLOC EXISTE À CAUSE D'UN DÉFAUT QUE J'AI INTRODUIT LE 27/08 ET QUE MARC A VU LE 28.
+   `appliquerCoup` appelle les fonctions DU JOUEUR (`doColonize`, `doUpgrade`, `buyTech`…) — c'est
+   voulu, c'est ce qui garantit qu'une IA et un humain obéissent aux mêmes règles, écrites une seule
+   fois. Mais ces fonctions se terminent toutes par `addAction`, qui est le CARNET DE BORD DU JOUEUR
+   LOCAL et qui code la nation active en dur : elle inscrivait donc chaque coup d'IA dans les actions
+   de Marc, signait la ligne de journal de SON nom, faisait apparaître un toast sur SON écran, et en
+   mode solo programmait `_ilMaybePass` — c'est-à-dire qu'elle passait SA main.
+   Résultat vu en jouant : « l'IA joue toutes ses actions d'un coup avant ou après moi ». Les deux
+   carnets étaient mélangés, et les seules lignes encore identifiables étaient les `🤖`.
+   L'ancienne IA n'y passait jamais : ses enveloppes (`tryColonize`…) enregistraient dans
+   `G.aiActions` via `_aiRec`. Le défaut est donc né avec le cerveau `tacticien`, pas avant.
+
+   ⚠️ CE QU'ON NE FAIT SURTOUT PAS : ajouter un paramètre `acteur` à `addAction` et le propager dans
+   `doColonize`, `doUpgrade`, `buyTech`, `aiBuyCivic`, `doRaidTarget`, `attackColony`… Ce serait la
+   même règle maintenue à huit endroits, avec la divergence garantie à terme que décrit
+   `ARCHITECTURE_AVENIR.md` §4. On pose la nation À UN SEUL ENDROIT et `addAction` la lit — exactement
+   le mécanisme de `logAuteur`/`_auteurLog`, qui rend déjà ce service pour le journal. */
+let _acteurAction=null;
+function acteurAction(nat,fn){
+  const av=_acteurAction;
+  _acteurAction=nat||null;
+  try{ return fn(); } finally { _acteurAction=av; }
+}
+/* La nation qui agit en ce moment. Sans acteur désigné, c'est le joueur local — donc TOUS les appels
+   existants (clics du joueur) se comportent rigoureusement comme avant. */
+function _acteurCourant(){ return _acteurAction||(typeof G!=='undefined'&&G?G.player:null); }
+
 function appliquerCoup(nat,coup){
   if(!nat||!coup)return false;
   const avantAc=nat.acLeft;
+  const connu=acteurAction(nat,function(){
   switch(coup.type){
     case 'coloniser': doColonize(coup.node,nat); break;
     case 'ameliorer': doUpgrade(coup.node,nat); break;
@@ -8160,6 +8189,9 @@ function appliquerCoup(nat,coup){
     case 'pouvoir':   if(typeof useAbility==='function')useAbility(nat); break;
     default: return false;
   }
+  return true;
+  });
+  if(!connu)return false;
   /* ⚠️ « LE COUP A-T-IL EU LIEU ? » SE MESURE, IL NE SE SUPPOSE PAS. Les fonctions du moteur
      refusent en silence (ressources manquantes au dernier moment, cible devenue invalide) et ne
      rendent rien d'exploitable. Une action réussie consomme TOUJOURS au moins un AC — sauf le
@@ -10799,7 +10831,17 @@ function _normCost(cost){
   return out;
 }
 function _isWarAct(name){return /guerre|assaut|capture|pill|raid|repouss|attaque|reprend|combat|paix|cessez/i.test(String(name||''));}
-function addAction(emoji,name,acPaid,resPaid,gainDesc){if(!G.turnActions)G.turnActions=[];const _entry={emoji,name,acPaid:acPaid||0,resPaid:resPaid||{},gainDesc:gainDesc||''};G.turnActions.push(_entry);if(G.player){if(!G.player._turnActions)G.player._turnActions=[];G.player._turnActions.push(_entry);}/* journal par nation : indispensable au bilan en multijoueur */if(G){G._scStuckTries=0;try{G._journal=G._journal||[];G._journal.push({turn:G.turn||0,nat:(G.player&&G.player.civ&&G.player.civ.name)||'Toi',name:name,ac:acPaid||0,cost:_normCost(resPaid),gain:_riToText(gainDesc),war:_isWarAct(name),auto:false});}catch(e){}}showToast(emoji,name,acPaid,resPaid,gainDesc);if(G&&G._il){G._ilPassTries=0;setTimeout(_ilMaybePass,60);}}
+/* ⚠️ `addAction` EST LE CARNET DE BORD DU JOUEUR LOCAL — voir le bandeau de `acteurAction`.
+   Quand c'est une AUTRE nation qui agit (une IA passée par `appliquerCoup`), elle ne s'en mêle pas :
+   son coup est déjà enregistré par `appliquerCoup` dans `G.aiActions`, avec les libellés que lisent
+   le journal, le bilan de fin de tour et les bancs. Enregistrer ici EN PLUS le compterait deux fois.
+   Ce qui est neutralisé pour une IA, et pourquoi :
+     · `G.turnActions` / `G.player._turnActions` — les actions DU SIÈGE ACTIF ; y verser celles d'une
+       IA attribuait ses coups à Marc dans son propre bilan ;
+     · la ligne de journal — elle était signée `G.player.civ.name`, donc du nom du lecteur ;
+     · `showToast` — un toast pour une action qui n'est pas la sienne ;
+     · `_ilMaybePass` — le pire : en solo, chaque action d'IA PASSAIT LA MAIN DU JOUEUR. */
+function addAction(emoji,name,acPaid,resPaid,gainDesc){if(!G.turnActions)G.turnActions=[];/* ⚠️ L'INITIALISATION VIENT AVANT LA GARDE, ET CE N'EST PAS COSMÉTIQUE : si le premier coup du tour est celui d'une IA, sortir avant cette ligne laisserait `G.turnActions` à `undefined` pour tout le reste du tour. `test_passer.js` l'a attrapé dans l'heure (la main revenait au même joueur après un skip). */if(typeof _acteurCourant==='function'&&G&&_acteurCourant()!==G.player)return;const _entry={emoji,name,acPaid:acPaid||0,resPaid:resPaid||{},gainDesc:gainDesc||''};G.turnActions.push(_entry);if(G.player){if(!G.player._turnActions)G.player._turnActions=[];G.player._turnActions.push(_entry);}/* journal par nation : indispensable au bilan en multijoueur */if(G){G._scStuckTries=0;try{G._journal=G._journal||[];G._journal.push({turn:G.turn||0,nat:(G.player&&G.player.civ&&G.player.civ.name)||'Toi',name:name,ac:acPaid||0,cost:_normCost(resPaid),gain:_riToText(gainDesc),war:_isWarAct(name),auto:false});}catch(e){}}showToast(emoji,name,acPaid,resPaid,gainDesc);if(G&&G._il){G._ilPassTries=0;setTimeout(_ilMaybePass,60);}}
 function showToast(emoji,name,acPaid,resPaid,gainDesc){
   const el=document.getElementById('action-toast');if(!el)return;
   const paid=[];if(acPaid)paid.push(acPaid+' AC');for(const[r,a]of Object.entries(resPaid||{}))if(a>0)paid.push(a+rEmoji(r));
