@@ -1,6 +1,6 @@
 # Lot 17 — ce qu'on met en ligne, et rien d'autre
 
-Dossier prêt à envoyer. Version **v10.00** (`sw.js` **v121**).
+Dossier prêt à envoyer. Version **v10.02** (`sw.js` **v123**).
 
 > ### Ce qui rend ce lot particulier : les IA réfléchissent, et en réfléchissant elles ont réveillé un défaut vieux de plusieurs versions
 >
@@ -180,6 +180,47 @@ Dossier prêt à envoyer. Version **v10.00** (`sw.js` **v121**).
 > Elle gagne plus souvent (9 → 11 sur les mêmes graines), mais son avance en points se resserre
 > (+9,0 → +6,4). Amélioration sur ce qui décide la partie, léger recul sur l'écart de score.
 
+> ### v10.01 — trois défauts de la partie 4680
+>
+> **1. La fenêtre de Dyson s'ouvrait chez le mauvais joueur.** Marc : *« j'ai eu la fenêtre de Dyson
+> pour choisir si je renonce alors que c'est l'IA qui l'a créée, et je l'ai refusée. »* Cette
+> fenêtre-là appartient au **bâtisseur** : ouverte chez lui, elle lui faisait annuler l'achat d'une
+> autre nation. Et la fenêtre qui lui revenait — accepter le monopole ou déclarer la guerre — n'était
+> jamais posée. `buyTech` avait été rendue explicite côté RÈGLE, sa queue d'AFFICHAGE était restée
+> écrite pour le joueur local. Les trois cartes à fenêtre étaient touchées : Télépathie,
+> Extra-Solaire, Sphère de Dyson.
+>
+> **2. Une technologie volée pouvait être rachetée — et comptait deux fois.** L'espionnage range la
+> carte sous `<id>_esp` ; le garde-fou comparait `<id>` et ne la voyait pas. Dans le décompte de la
+> partie 4680, Extracteurs Solaires figure deux fois (+3 puis +3), et son bonus par tour s'appliquait
+> deux fois lui aussi. L'espionnage était devenu une machine à dupliquer.
+>
+> **3. L'IA construisait la Sphère sans que personne ne soit consulté.** Le drapeau qui pose la
+> question aux autres nations vivait dans l'ancienne enveloppe de l'IA, que le nouveau cerveau
+> n'emprunte plus.
+>
+> ⚠️ **Les trois relèvent du même motif, et c'est la troisième fois qu'il se paie** (le carnet de
+> bord, l'assaut, ici) : tout ce que faisaient les vieilles enveloppes de l'IA et qui n'est pas DANS
+> la fonction de règle disparaît dès qu'on appelle la règle directement.
+>
+> Banc neuf : **`test_espionnage_dyson.js`**, six points dont trois contre-épreuves — un achat normal
+> reste possible, le joueur garde ses propres fenêtres, et il ne s'en ouvre aucune quand c'est l'IA
+> qui achète.
+
+> ### v10.02 — une techno volée est enfin « prise » partout
+>
+> Marc : *« la tech elle-même n'est pas écrite comme prise comme c'est le cas si tu l'achètes toi,
+> elle est toujours disponible comme achetable dans la rivière de cartes et dans le détail. »*
+>
+> Bloquer le rachat (v10.01) ne suffisait pas : tant que l'écran la présente comme disponible, on
+> clique et on se fait refuser sans comprendre. La copie d'espionnage porte l'identifiant `<id>_esp`
+> — voulu, pour qu'elle ne prenne pas l'exclusivité d'un achat — et **huit endroits** comparaient
+> l'identifiant nu : la rivière, le détail de la carte, et les filtres de candidats des IA.
+>
+> Une seule fonction, `possedeCarte(nation, id)`, répond désormais à la question, et les huit sites
+> l'appellent. Le jour où l'espionnage change de convention, il y a UN endroit à corriger — pas huit
+> à retrouver.
+
 ## Ce qu'il contient — et pourquoi seulement ça
 
 | Fichier | Va où | Pourquoi |
@@ -229,5 +270,5 @@ Dossier prêt à envoyer. Version **v10.00** (`sw.js` **v121**).
 
 ## Après l'envoi
 
-Vider le cache du navigateur ou attendre que le service worker bascule (**v121**). L'écran de
-connexion affiche les trois versions (`HTML`, `JS`, `moteur`) : elles doivent toutes dire **v10.00**.
+Vider le cache du navigateur ou attendre que le service worker bascule (**v123**). L'écran de
+connexion affiche les trois versions (`HTML`, `JS`, `moteur`) : elles doivent toutes dire **v10.02**.

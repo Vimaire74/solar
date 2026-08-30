@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-28 · v10.00';
+const SOLAR_BUILD_MOTEUR = '2026-08-29 · v10.02';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -1734,6 +1734,21 @@ function calcAC(p){
   return base;
 }
 function hasSpec(p,s){return p.cards.some(c=>c.spec===s||c.spec2===s);}
+/* ═══════ « CETTE NATION A-T-ELLE CETTE CARTE ? » — UN SEUL ENDROIT QUI SAIT RÉPONDRE ═══════
+   ⚠️ UNE COPIE D'ESPIONNAGE PORTE L'IDENTIFIANT `<id>_esp`. `espPiller` la range ainsi pour qu'elle
+   ne prenne pas l'exclusivité d'un achat — c'est voulu. Mais TOUS les autres endroits comparaient
+   `<id>` et ne la voyaient donc pas.
+   Marc, partie 4680 : « la tech elle-même n'est pas écrite comme prise comme c'est le cas si tu
+   l'achètes toi, elle est toujours disponible comme achetable dans la rivière de cartes et dans le
+   détail de la tech. » Exact, et à sept endroits à la fois : la rivière, le détail de carte, et les
+   filtres de candidats de l'IA.
+   👉 On ne recopie pas le test huit fois — c'est ainsi qu'on fabrique la divergence
+   (`ARCHITECTURE_AVENIR.md` §4). Une fonction, appelée partout. Le jour où l'espionnage change de
+   convention de nommage, il y a UN endroit à corriger. */
+function possedeCarte(nat,cardId){
+  if(!nat||!nat.cards||!cardId)return false;
+  return nat.cards.some(c=>c&&(c.id===cardId||c.id===cardId+'_esp'));
+}
 /* POURQUOI cette techno est-elle inaccessible ? Le jeu connaît trois raisons bien distinctes ;
    les confondre dans un même grisage muet n'aidait personne (retour de Marc). Texte court, destiné
    à la carte REPLIÉE — le détail complet reste sur la grande carte. */
@@ -5399,10 +5414,20 @@ function buyTech(cardId, nation){
     return;
   }
   if(card.branch==='empathes'&&!isEmpathesAvailableFor(_n)){addLog('⚠️ Branche Empathes non disponible (Union Sacrée requise ou exclusivité fondateur).','red');return;}
+  /* ⚠️ UNE COPIE D'ESPIONNAGE PORTE UN AUTRE IDENTIFIANT, ET LE GARDE-FOU NE LA VOYAIT PAS.
+     `resoudreEspionnage` range la carte volée sous `<id>_esp` (pour la distinguer d'un achat, elle
+     ne prend pas l'exclusivité). Mais ce contrôle-ci comparait `<id>` : on pouvait donc RACHETER une
+     technologie déjà volée. Conséquences, toutes visibles dans la partie 4680 de Marc :
+       · la carte compte DEUX FOIS dans le décompte final (Extracteurs Solaires, +3 puis +3) ;
+       · `applyCard` s'applique deux fois, donc le bonus par tour est DOUBLÉ ;
+       · et l'espionnage devient une machine à dupliquer, ce qu'aucune règle ne prévoit.
+     Le contrôle symétrique existait déjà côté vol (on ne vole pas ce qu'on possède) — il manquait
+     dans l'autre sens. On compare désormais les deux formes, dans les DEUX branches : une T3 volée
+     n'entre pas dans `G.techTaken`, donc sans cela on pouvait aussi la voler puis l'acheter. */
+  const _dejaPossedee=possedeCarte(_n,cardId);
+  if(_dejaPossedee){addLog('⚠️ Vous possédez déjà cette carte (achetée ou copiée par espionnage).','red');return;}
   if(isTechExclusive(card)){
     if(G.techTaken.has(cardId)){addLog('⚠️ Cette carte est déjà prise par une autre faction.','red');return;}
-  }else{
-    if(_n.cards.some(c=>c.id===cardId)){addLog('⚠️ Vous possédez déjà cette carte.','red');return;}
   }
   const acCost=card.tier===3?2:1;
   if(_n.acLeft<acCost){addLog('⚠️ Pas assez d\'AC (besoin '+acCost+').','red');return;}
@@ -5413,16 +5438,44 @@ function buyTech(cardId, nation){
   _n.spentThisTurn+=acCost+Object.values(cost).reduce((s,v)=>s+v,0);
   for(const[r,a]of Object.entries(cost))_n.res[r]-=a;
   _n.cards.push(card);applyCard(card,_n);
+  /* ⚠️ LA SPHÈRE DE DYSON DOIT DEMANDER SON AVIS AU RESTE DU MONDE — et elle ne le faisait plus.
+     La règle : le bâtisseur monopolise l'énergie, les autres acceptent (+3⚡) ou c'est la guerre.
+     Le drapeau qui déclenche cette question (`G._aiDysonBuilt`, lu en fin de tour) était posé dans
+     l'ANCIENNE enveloppe `tryTech` de l'IA. Le cerveau `tacticien` appelle `buyTech` directement :
+     depuis qu'il est le défaut, une IA pouvait construire la Sphère **sans que personne ne soit
+     consulté** — vu par Marc dans la partie 4680, tour 9.
+     C'est la troisième fois que ce motif se paie (le carnet de bord §58, l'assaut §57, ici) : tout
+     ce que faisaient les vieilles enveloppes et qui n'est pas DANS la fonction de règle disparaît
+     quand on appelle la règle directement. On le pose donc ICI, au point de passage obligé.
+     ⚠️ Seulement pour une nation NON LOCALE : le joueur, lui, a déjà sa propre fenêtre
+     (`showDysonModal`, ouverte avant l'achat) — la poser deux fois lui redemanderait son avis à
+     lui-même. */
+  if(card.id==='dyson3'&&_n!==G.player)G._aiDysonBuilt=_n.civ.id;
   if(isTechExclusive(card))G.techTaken.add(cardId);
   if(card.branch)G.branchTiers[card.branch]=Math.max(G.branchTiers[card.branch]||0,card.tier);
   const costStr=Object.entries(cost).map(([r,a])=>'-'+a+rEmoji(r)).join(' ');
   addLog('✅ '+card.emoji+' '+card.name+' — '+acCost+' AC'+(costStr?' '+costStr:''),'green');
   addAction(card.emoji,card.name,acCost,cost,card.effect);
-  if(card.id==='tele3'){const ais=G.ais.filter(a=>a.cards.length>0);if(ais.length>0){closePopup();showEmpathCopyModal();return;}}
-  if(card.id==='extra3'&&G._pendingExtraSolar&&G._pendingExtraSolar.length){closePopup();showExtraSolarChoice();return;}
-  if(card.id==='dyson3'){closePopup();showDysonModal();return;}
-  scArmConfirm(card.emoji+' '+card.name,_scCardGains(card));
-  closePopup();render();
+  /* ══ ICI FINIT LA RÈGLE, ICI COMMENCE L'AFFICHAGE ══
+     ⚠️ CES TROIS FENÊTRES S'OUVRAIENT CHEZ LE JOUEUR QUAND C'ÉTAIT UNE IA QUI ACHETAIT.
+     Marc, partie 4680 : « j'ai eu la fenêtre de Dyson pour choisir si je renonce alors que c'est
+     l'IA qui l'a créée, et je l'ai refusée ». `showDysonModal` est la fenêtre du BÂTISSEUR (forcer
+     ou renoncer à SON achat) : ouverte chez lui, elle lui faisait annuler l'achat de quelqu'un
+     d'autre. La fenêtre qui lui revenait — accepter le monopole ou déclarer la guerre — n'a jamais
+     été posée.
+     `buyTech` avait été rendue explicite côté RÈGLE (le `_n` partout) et sa queue d'AFFICHAGE était
+     restée écrite pour le joueur local. Les trois cartes à fenêtre sont concernées : Télépathie,
+     Extra-Solaire, Sphère de Dyson.
+     👉 La règle du projet, énoncée en §39.3 : *si une fonction applique une RÈGLE elle reçoit la
+     nation ; si elle AFFICHE elle peut lire `G.player`* — à condition de vérifier d'abord que c'est
+     bien de lui qu'il s'agit. C'est cette vérification qui manquait. */
+  if(_n===G.player){
+    if(card.id==='tele3'){const ais=G.ais.filter(a=>a.cards.length>0);if(ais.length>0){closePopup();showEmpathCopyModal();return;}}
+    if(card.id==='extra3'&&G._pendingExtraSolar&&G._pendingExtraSolar.length){closePopup();showExtraSolarChoice();return;}
+    if(card.id==='dyson3'){closePopup();showDysonModal();return;}
+    scArmConfirm(card.emoji+' '+card.name,_scCardGains(card));
+    closePopup();render();
+  }
 }
 /* ═══ LA NATION QUI AGIT EST UN ARGUMENT, PLUS UNE VARIABLE GLOBALE ═══
    ⚠️ Cette action lisait `G.player` — « la nation actuellement affichée » — et non « celle qui
@@ -8281,10 +8334,10 @@ function coupsPossibles(nat){
   }
   /* TECHNOLOGIE — chaque carte réellement achetable, nommément. */
   for(const card of CARDS_POOL){
-    if((nat.cards||[]).some(c=>c.id===card.id))continue;
+    if(possedeCarte(nat,card.id))continue;                 // achetée OU volée : voir `possedeCarte`
     if(isTechExclusive(card)&&G.techTaken.has(card.id))continue;
     if(!isTechAvailable(card,nat))continue;
-    if(card.reqCard&&!(nat.cards||[]).some(c=>c.id===card.reqCard))continue;
+    if(card.reqCard&&!possedeCarte(nat,card.reqCard))continue;
     const ac=card.tier===3?2:1;
     if((nat.acLeft||0)<ac)continue;
     if(!abordable(getEffCost(card,nat)))continue;
@@ -8669,7 +8722,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
       const tier=(G.branchTiers[branch]||0)+1;
       const card=CARDS_POOL.find(c=>c.branch===branch&&c.tier===tier&&
         (!isTechExclusive(c)||!G.techTaken.has(c.id))&&
-        !ai.cards.find(x=>x.id===c.id)&&
+        !possedeCarte(ai,c.id)&&
         (!filterFn||filterFn(c))&&
         (c.tier<3||ai.cards.some(x=>x.branch===c.branch&&x.tier===2)));
       if(!card||(card.branch==='empathes'&&!isEmpathesAvailableFor(ai)))continue;
@@ -9506,7 +9559,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
     let best=-1;
     for(const branch of Object.keys(TECH_BRANCHES)){
       const tier=(G.branchTiers[branch]||0)+1;
-      const card=CARDS_POOL.find(c=>c.branch===branch&&c.tier===tier&&(!isTechExclusive(c)||!G.techTaken.has(c.id))&&!ai.cards.find(x=>x.id===c.id)&&(c.tier<3||ai.cards.some(x=>x.branch===c.branch&&x.tier===2)));
+      const card=CARDS_POOL.find(c=>c.branch===branch&&c.tier===tier&&(!isTechExclusive(c)||!G.techTaken.has(c.id))&&!possedeCarte(ai,c.id)&&(c.tier<3||ai.cards.some(x=>x.branch===c.branch&&x.tier===2)));
       if(!card||(card.branch==='empathes'&&!isEmpathesAvailableFor(ai)))continue;
       const acCost=card.tier===3?2:1;if(ai.acLeft<acCost)continue;
       const cost=getEffCost(card,ai);if(!Object.entries(cost).every(([r,a])=>(ai.res[r]||0)>=a))continue;
@@ -10612,11 +10665,11 @@ function renderTechTree(){
          une autre nation ne passe donc PAS par ici : elle garde ses propres marques (✓ et ⛔).
          C'est voulu (Marc, 2026-08-08) : deux signalétiques sur la même carte se neutralisent. */
       const _raisonLock=(typeof techLockReason==='function')?techLockReason(card,G.player):null;
-      const _cornee=!!(_raisonLock&&!G.player.cards.find(c=>c.id===card.id));
+      const _cornee=!!(_raisonLock&&!possedeCarte(G.player,card.id));
       const exclusive=isTechExclusive(card);
-      const playerOwned=!!G.player.cards.find(c=>c.id===card.id);
-      const aiOwned=G.ais.some(ai=>ai.cards.find(c=>c.id===card.id));
-      const aiOwnedFirst=G.ais.find(ai=>ai.cards.find(c=>c.id===card.id));
+      const playerOwned=possedeCarte(G.player,card.id);   // voir `possedeCarte` : une copie d'espionnage compte
+      const aiOwned=G.ais.some(ai=>possedeCarte(ai,card.id));
+      const aiOwnedFirst=G.ais.find(ai=>possedeCarte(ai,card.id));
       const _aiEmoji=aiOwnedFirst?aiOwnedFirst.civ.emoji:(G.ais[0]?G.ais[0].civ.emoji:'🤖');
       const exclusiveTaken=exclusive&&G.techTaken.has(card.id);
       const unavailForPlayer=playerOwned||exclusiveTaken;
@@ -11892,8 +11945,8 @@ function showTechDetail(cardId){
   _techDetailId=cardId;
   const branch=card.branch?TECH_BRANCHES[card.branch]:null;
   const exclusive=isTechExclusive(card);
-  const playerOwned=!!G.player.cards.find(c=>c.id===cardId);
-  const aiOwned=G.ais.some(ai=>!!ai.cards.find(c=>c.id===cardId));const aiOwnedCiv=G.ais.find(ai=>ai.cards.find(c=>c.id===cardId));
+  const playerOwned=possedeCarte(G.player,cardId);   // idem : volée = possédée
+  const aiOwned=G.ais.some(ai=>possedeCarte(ai,cardId));const aiOwnedCiv=G.ais.find(ai=>possedeCarte(ai,cardId));
   const exclusiveTaken=exclusive&&G.techTaken.has(cardId);
   const avail=isTechAvailable(card,G.player)&&!playerOwned&&!exclusiveTaken;
   const cost=getEffCost(card,G.player);
