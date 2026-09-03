@@ -1,7 +1,13 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-08-29 · v10.02';   // ⚠️ À BOUGER EN MÊME TEMPS QUE index.html : resté à v8.1 pendant huit versions, l'écran de connexion signalait donc une incohérence qui n'existait pas.
+const SOLAR_BUILD_JS = '2026-09-03 · v10.08';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+   `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
+   compare les trois et crie « Versions incohérentes » dès que l'une diverge.
+   ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
+   fois pendant huit versions (resté à v8.1), puis de nouveau du 03/09 (v10.03 à v10.07) — je ne
+   bougeais que `moteur.js`, et Marc a vu le message rouge après une partie. Un commentaire n'est
+   pas un garde-fou : c'est `test_versions.js` qui l'est désormais. */
 /* VERSION DU PROTOCOLE client/serveur — à INCRÉMENTER dès qu'un message change de forme
    (nouveau champ obligatoire, sens modifié, message retiré). Le build ci-dessus identifie le
    FICHIER ; celui-ci identifie le LANGAGE parlé avec le serveur. Les deux sont indépendants :

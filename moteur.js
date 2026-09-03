@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-03 · v10.07';
+const SOLAR_BUILD_MOTEUR = '2026-09-03 · v10.08';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -6177,6 +6177,20 @@ function doRaidTarget(aiId,nodeId,pillard){
     if(!target){addLog('⚠️ Cible de raid introuvable.','red');return;}
     /* Un raid est une agression : le pacte l'interdit comme il interdit l'assaut. */
     if(typeof agressionInterditeEntre==='function'&&agressionInterditeEntre(p,target,true))return;
+    /* ⚠️ « IMMUNITÉ RAIDS » — ELLE ÉTAIT ÉCRITE SUR LA CARTE ET NULLE PART DANS LA RÈGLE.
+       Marc, partie 0768 : « les raids continuent contre moi alors que j'ai IA Défensive ». Vérifié :
+       technologie prise au tour 7, Cérès pillée aux tours 9 et 10.
+       Le contrôle existait — dans l'ANCIENNE enveloppe de raid de l'IA, celle que le cerveau
+       `tacticien` n'emprunte plus. C'est la CINQUIÈME fois que ce motif mord (§64), et la première
+       qui retire au joueur une règle qu'il a payée : 5🔬 2⚡ 2🪨 et deux actions pour une protection
+       qui n'existait pas.
+       Elle est désormais DANS la règle, donc elle vaut pour tout le monde — IA comme joueur qui
+       cliquerait sur une nation protégée. Surveillé par `test_ia_defensive_raids.js`. */
+    if(typeof hasSpec==='function'&&hasSpec(target,'ia_immune')){
+      addLog('🛡️ '+target.civ.emoji+' '+target.civ.name+' (IA Défensive) bloque le raid'
+        +((p&&p.civ)?' de '+p.civ.name:'')+'.','dim');
+      return;
+    }
     if(p.acLeft<1){addLog('⚠️ Raid : besoin 1 AC.','red');return;}
     if(p.forceTokens<tc){addLog('⚠️ Raid : besoin '+tc+' jeton(s) Force.','red');return;}
     if(enCost>0&&(p.res.energy||0)<enCost){addLog('⚠️ Raid : besoin '+enCost+'<i class=ri-energy></i> (carburant).','red');return;}
@@ -8490,7 +8504,12 @@ function coupsPossibles(nat){
       if(o===nat||!o.civ)continue;
       for(const col of (o.colonies||[])){
         const nom=(NODES[col.nodeId]||{}).name||col.nodeId;
-        if((nat.forceTokens||0)>=jetons)
+        /* ⚠️ ON NE PROPOSE PAS UN COUP QU'ON N'A PAS LE DROIT DE JOUER. Une nation protégée par
+           l'IA Défensive ne peut pas être pillée (la règle est dans `doRaidTarget`) : l'y proposer
+           quand même ferait évaluer, comparer et parfois RETENIR ce raid comme meilleur coup — et
+           l'IA perdrait une action par tour à ne rien faire, sans qu'une ligne ne le dise. */
+        const _protege=(typeof hasSpec==='function')&&hasSpec(o,'ia_immune');
+        if((nat.forceTokens||0)>=jetons&&!_protege)
           coups.push({type:'raid',cible:o.civ.id,node:col.nodeId,libelle:'raid sur '+nom+' ('+o.civ.name+')'});
         if((nat.forceTokens||0)>=jetons&&(nat.res.materials||0)>=1&&(nat.res.energy||0)>=1)
           coups.push({type:'assaut',node:col.nodeId,libelle:'assaillir '+nom+' ('+o.civ.name+')'});

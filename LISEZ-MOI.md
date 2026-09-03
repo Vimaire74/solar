@@ -344,3 +344,12 @@ idée : c'est le classement qui était fautif, pas le nom. Une prise de colonie 
 elle-même qu'elle est un fait de guerre, au lieu qu'on le devine d'après le texte.
 
 Aucun autre changement de jeu. 56 bancs moteur verts + les 5 bancs serveur.
+
+## v10.08 / sw v129 — 03/09/2026
+
+**🛡️ IA Défensive protège enfin contre les raids.** La carte annonce « Immunité raids/pirates »
+depuis toujours, mais la protection n'était plus appliquée : les ordinateurs pouvaient continuer à
+piller tes colonies. Corrigé — et la règle vaut pour tout le monde, personne ne peut plus piller une
+nation qui possède cette technologie.
+
+Un nouveau banc de contrôle. Aucun autre changement de règle.
