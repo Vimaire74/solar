@@ -272,3 +272,75 @@ Dossier prêt à envoyer. Version **v10.02** (`sw.js` **v123**).
 
 Vider le cache du navigateur ou attendre que le service worker bascule (**v123**). L'écran de
 connexion affiche les trois versions (`HTML`, `JS`, `moteur`) : elles doivent toutes dire **v10.02**.
+
+## v10.03 / sw v124 — 03/09/2026
+
+**Le carnet des IA doublait chaque carte civique.** Sur la partie C04C, six achats civiques d'IA
+étaient enregistrés deux fois (Capture d'astéroïdes, Propagande, Extraction d'He3, Campagne
+Culturelle, Programmes Sociaux). L'action n'avait lieu qu'une fois — seule l'écriture doublait, dans
+le journal comme dans la trace d'actions du serveur. Les technologies, colonies, routes et raids
+n'étaient pas touchés, ni les civiques du joueur humain.
+
+`aiBuyCivic` inscrivait son entrée et `appliquerCoup` la sienne ; le garde-fou anti-doublon compare
+les libellés, et les deux différaient. `appliquerCoup` n'écrit plus rien pour les civiques — la
+fonction de règle est seule propriétaire du carnet.
+
+⚠️ On n'a **pas** dédupliqué par nom : Capture d'astéroïdes, Extraction d'He3 et Investissement dans
+la Recherche se reprennent plusieurs fois dans un même tour, et une déduplication aurait effacé le
+deuxième achat. Nouveau banc `test_carnet_civique.js` (4 points), dont un point de contre-épreuve
+dédié à cette fausse correction.
+
+Aucun changement de règle. 52 bancs moteur verts + les 5 bancs serveur.
+
+## v10.04 / sw v125 — 03/09/2026
+
+**Les guerres entre ordinateurs se mènent enfin.** Une nation en guerre jugeait son conflit contre
+la mauvaise nation : elle comparait ses forces à celles de la nation la plus riche de la partie
+(souvent toi) au lieu de celles de son véritable adversaire. Résultat, deux ordinateurs en guerre
+l'un contre l'autre se croyaient chacun face à toi, concluaient que c'était perdu d'avance,
+demandaient la paix et ne se battaient jamais — tout en perdant du moral d'usure à chaque tour.
+
+**Le journal reprend le bon nom.** Après une guerre entre deux ordinateurs, tout ce qui suivait
+était écrit au nom de l'un d'eux — tes revenus, ton investissement, ta carte Stratégie du tour
+suivant. Et les demandes de paix nommaient la mauvaise nation.
+
+**Le pouvoir national martien** n'est plus coupé à partir du tour 8 pour les ordinateurs.
+
+Deux nouveaux bancs. 54 bancs moteur verts + les 5 bancs serveur. Aucune règle du jeu modifiée.
+
+## v10.05 / sw v126 — 03/09/2026
+
+**Les ordinateurs peuvent attaquer une capitale.** Ils s'en tenaient encore à l'ancienne règle, que
+tu avais supprimée pour toi : une nation réduite à sa seule planète mère leur était intouchable, et
+faute de cible ils renonçaient à la guerre. Ils la visent maintenant — mais en dernier, car une
+capitale est lourdement défendue : les colonies ordinaires passent toujours d'abord.
+
+**Le pouvoir national d'un ordinateur n'ouvre plus de fenêtre chez toi.** La Forge Orbitale
+jupitérienne te demandait de choisir la lune à améliorer quand c'était l'ordinateur qui jouait son
+pouvoir — et le pouvoir n'était même pas utilisé, faute de clic. L'ordinateur choisit désormais
+lui-même ; toi, tu gardes ta fenêtre.
+
+Un nouveau banc. 55 bancs moteur verts + les 5 bancs serveur. Aucune règle du jeu modifiée.
+
+## v10.06 / sw v127 — 03/09/2026
+
+**La carte Diplomatie te demande enfin qui apaiser.** Elle annonçait « améliore les rapports avec
+les autres nations » sans dire ni qui ni de combien — et pour cause : elle ne touchait qu'une jauge
+d'ambiance générale, sans destinataire. Elle ouvre maintenant la même fenêtre que « Calmer les
+tensions » : tu choisis une nation, et c'est SA tension envers toi qui baisse de 3 — celle qui peut
+pousser son peuple à te déclarer la guerre. Un ordinateur qui pioche cette carte apaise la nation
+qui lui en veut le plus.
+
+**« Capture d'astéroïdes » garde son nom.** Elle était classée à tort comme un fait de guerre dans
+la trace de partie, à cause du mot « capture ». C'est le classement qui a été corrigé, pas la carte.
+
+Un nouveau banc. 56 bancs moteur verts + les 5 bancs serveur.
+
+## v10.07 / sw v128 — 03/09/2026
+
+**« Capture d'astéroïdes » garde son nom.** La carte était classée à tort comme un fait de guerre
+dans la trace de partie, à cause du mot « capture ». J'avais d'abord renommé la carte — mauvaise
+idée : c'est le classement qui était fautif, pas le nom. Une prise de colonie annonce désormais
+elle-même qu'elle est un fait de guerre, au lieu qu'on le devine d'après le texte.
+
+Aucun autre changement de jeu. 56 bancs moteur verts + les 5 bancs serveur.

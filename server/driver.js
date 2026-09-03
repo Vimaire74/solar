@@ -269,6 +269,15 @@ class GameDriver {
       return {peace:true};
     }
     if(k==='raid_target') return {targetId: opts.length?opts[0].id:null};
+    /* ⚠️ SOUS-DÉCISION « CALMER UNE TENSION » (cartes st9 « Calmer les tensions » et st5
+       « Diplomatie »). Elle attend `targetId`, et le repli générique en bas de cette fonction
+       aurait répondu `{value:…}` : la réponse était acceptée, la nation jamais apaisée, et rien ne
+       le disait. Le payload envoie la tension qui va bouger — on choisit la plus forte, c'est-à-dire
+       celle qui menace le plus. */
+    if(k==='strategy_calm'){
+      const l=(o.options||[]).slice().sort((a,b)=>(b.tension||0)-(a.tension||0));
+      return {targetId: l.length?l[0].id:null};
+    }
     if(k==='ai_dyson'||k==='human_dyson') return {war:false};
     if(k==='dyson_build') return {force:false};
     if(k==='event_comm'){ const c=o.cands||[]; return {aiId: c.length?c[0].id:null}; }

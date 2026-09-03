@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-08-29 · v10.02';
+const SOLAR_BUILD_MOTEUR = '2026-09-03 · v10.07';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -265,7 +265,16 @@ const STRATEGY_CARDS=[
   {id:'st2',name:'Surge Militaire',emoji:'⚔️',desc:'+2 jetons Force (perdus en fin de tour)',force:2},
   {id:'st3',name:'Sprint du Savoir',emoji:'🔬',desc:'Ce tour : +3<i class=ri-science></i>',res:{science:3}},
   {id:'st4',name:'Récolte Urgente',emoji:'🌾',desc:'Ce tour : +2<i class=ri-materials></i> +2<i class=ri-energy></i>',res:{materials:2,energy:2}},
-  {id:'st5',name:'Diplomatie',emoji:'🕊️',desc:'Risque guerre −3',warRisk:-3},
+  /* ⚠️ ELLE NE DISAIT NI QUI NI DE COMBIEN — Marc, 03/09 : « ça dit que ça améliore les rapports
+     avec les autres nations mais on sait pas qui ni de combien de point ». C'était exact, et pour
+     une raison de fond : son effet était `warRisk:-3`, une jauge d'AMBIANCE GLOBALE (`G.warRisk`)
+     qui ne concerne aucune nation en particulier. Rien à montrer, donc, parce qu'il n'y avait
+     personne à nommer.
+     Elle devient le MIROIR de « Calmer les tensions » (st9), qui baisse de 3 TA tension envers une
+     nation choisie : Diplomatie baisse de 3 la tension de cette nation ENVERS TOI. Même fenêtre,
+     même mécanique par couple, sens inverse — et le `warRisk` global disparaît de cette carte,
+     sinon elle serait strictement meilleure que st9, qui n'aurait plus de raison d'être choisie. */
+  {id:'st5',name:'Diplomatie',emoji:'🕊️',desc:'−3 à la tension d\'une nation choisie ENVERS TOI',calmTheirs:3},
   {id:'st6',name:'Mobilisation',emoji:'📣',desc:'+1 AC ce tour',acBonus:1},
   {id:'st7',name:'Effort de Guerre',emoji:'🗡️',desc:'+1 jeton Force immédiat (conservable)',forceKeep:1},
   {id:'st9',name:'Calmer les tensions',emoji:'🕊️',desc:'−3 tension vers une nation choisie',calmTension:3},
@@ -422,6 +431,14 @@ const CIVIC_MARKET=[
   {id:'cm_explore', name:'Extraction d\'He3', emoji:'⚛️', type:'social',
    effect:'+2<i class=ri-energy></i> immédiat', desc:'Récolte d\'hélium-3 — carburant de fusion, énergie abondante.',
    resGain:{energy:2}, cost:{materials:1,science:1}, repeatable:true},
+  /* ⚠️ NE PAS LA RENOMMER — Marc, 03/09 : « moi je préfère le nom capture d'astéroïdes ».
+     Son libellé entrait en collision avec `_isWarAct`, qui devinait les faits de guerre à partir du
+     texte et dont le motif contient `capture` (pour l'entrée de carnet « Capture <colonie> », posée
+     quand une IA prend une colonie). Cette carte civique ressortait donc en `guerre: true` dans la
+     trace d'actions du serveur. J'avais d'abord renommé la CARTE — c'était corriger le mauvais bout.
+     Le vrai défaut était la devinette : c'est le producteur de l'entrée qui sait s'il s'agit d'un
+     fait de guerre, pas une expression régulière lue après coup. La capture de colonie déclare
+     désormais `war:true` elle-même, et `_isWarAct` n'a plus besoin du mot « capture ». */
   {id:'cm_forages', name:'Capture d\'astéroïdes', emoji:'☄️', type:'social', repeatable:true,
    effect:'+2<i class=ri-materials></i> immédiat', desc:'Capture et exploitation d\'astéroïdes — matériaux bruts.',
    resGain:{materials:2}, cost:{energy:1,science:1}},
@@ -1091,6 +1108,23 @@ function aiEnnemi(ai){
   if(!id) return null;
   const tous = (typeof allPlayers==='function') ? allPlayers() : [G.player].concat(G.ais||[]);
   return tous.find(n=>n && n.civ && n.civ.id===id) || null;
+}
+/* ═══════════ L'ADVERSAIRE D'UNE GUERRE, LU DANS LA GUERRE ELLE-MÊME ═══════════
+   `aiEnnemi(ai)` rend la CIBLE que l'IA s'est choisie pour le tour (`ai._enemyId`, écrit par
+   `_aiResolveTarget` : typiquement la nation la plus riche, donc souvent le joueur humain). C'est
+   la bonne notion pour un raid ; c'est la mauvaise pour une guerre. `aiWarPolicy` s'en servait
+   pourtant pour juger SA guerre — d'où, dans la partie C04C de Marc, « ☠️ Ceinturiens cherche la
+   paix avec 🌍 Terriens » alors que la guerre était Martiens ↔ Ceinturiens, et surtout des
+   Jupitériens qui, en guerre contre des Martiens à zéro jeton, renonçaient d'avance parce qu'ils
+   comparaient leurs forces à celles de Marc.
+   Cette fonction-ci ne lit ni `G.player` ni aucun champ mémorisé : seulement les deux camps de la
+   guerre qu'on lui donne. */
+function adversaireDeGuerre(nat,w){
+  if(!nat||!nat.civ||!w)return null;
+  const moi=nat.civ.id, autre=(w.a===moi)?w.b:((w.b===moi)?w.a:null);
+  if(!autre)return null;
+  const tous=(typeof allPlayers==='function')?allPlayers():[G.player].concat(G.ais||[]);
+  return tous.find(n=>n&&n.civ&&n.civ.id===autre)||null;
 }
 function _tk(x){return x==='player'?((G.player&&G.player.civ&&G.player.civ.id)||'player'):x;}
 function getTens(from,to){from=_tk(from);to=_tk(to);return((G.tensions[from]||{})[to])||0;}
@@ -3359,11 +3393,23 @@ function _resolveStratChoice(nat, cardId){
   if(card){const i=pool.findIndex(c=>c.id===card.id);if(i>=0)pool.splice(i,1);}
   const needCalm=_applyStratTo(nat,card);
   if(needCalm){ // sous-décision : choisir une nation à calmer
+    /* Deux sens possibles, une seule question. `calmTension` (st9) baisse MA tension envers la
+       nation choisie ; `calmTheirs` (Diplomatie) baisse SA tension envers moi. On envoie donc au
+       client la tension qui va effectivement bouger, et `sens` pour qu'il puisse le dire. */
+    const _leur=!!card.calmTheirs, _amt=(_leur?card.calmTheirs:card.calmTension)||0;
     const rivals=allPlayers().filter(p=>p!==nat);
     (_isRemote(nat)?_emitRemote:_emitDecision)('strategy_calm', nat,
-      {amount:card.calmTension, options:rivals.map(r=>({id:r.civ.id,name:r.civ.name,emoji:r.civ.emoji,tension:getTens(nat.civ.id,r.civ.id)}))},
+      {amount:_amt, sens:(_leur?'eux':'moi'), options:rivals.map(r=>({id:r.civ.id,name:r.civ.name,emoji:r.civ.emoji,
+        tension:(_leur?getTens(r.civ.id,nat.civ.id):getTens(nat.civ.id,r.civ.id))}))},
       null,
-      (ans)=>{ const tid=ans&&ans.targetId; if(tid){const prev=getTens(nat.civ.id,tid);setTens(nat.civ.id,tid,Math.max(0,prev-(card.calmTension||0)));addLog('🕊️ '+nat.civ.emoji+' '+nat.civ.name+' calme vs '+tid+' −'+(card.calmTension||0),'dim');} nat.stratBonus=null; _afterStratFor(nat); });
+      (ans)=>{ const tid=ans&&ans.targetId;
+        if(tid){
+          const de=_leur?tid:nat.civ.id, vers=_leur?nat.civ.id:tid;
+          const prev=getTens(de,vers); setTens(de,vers,Math.max(0,prev-_amt));
+          addLog('🕊️ '+nat.civ.emoji+' '+nat.civ.name+(_leur?' apaise '+tid+' — sa tension envers elle : ':' calme sa tension vs '+tid+' : ')
+            +prev+' → '+getTens(de,vers)+'/10 (−'+_amt+')','dim');
+        }
+        nat.stratBonus=null; _afterStratFor(nat); });
     return;
   }
   _afterStratFor(nat);
@@ -3429,7 +3475,9 @@ function showStrategyModal(){
 // Retourne true si une sous-décision « calmer une tension » reste à résoudre.
 function _applyStratTo(nat,card){
   if(!card){nat.stratBonus=null;return false;}
-  if(card.calmTension)return true; // calm = sous-décision (choix de la nation cible)
+  // calm = sous-décision (choix de la nation cible). `calmTension` = MA tension envers elle ;
+  // `calmTheirs` = SA tension envers moi (Diplomatie). Les deux ouvrent la même fenêtre.
+  if(card.calmTension||card.calmTheirs)return true;
   if(card.res)for(const[r,a]of Object.entries(card.res)){nat.res[r]=(nat.res[r]||0)+a;}
   if(card.force){nat.forceTokens+=card.force;nat.stratForceBonus=(nat.stratForceBonus||0)+card.force;}
   if(card.forceKeep){nat.forceTokens+=card.forceKeep;} // conservable (non temporaire)
@@ -3468,6 +3516,7 @@ function applyStrategy(id){
   if(!card){G._playerDraftCard=null;_playerStratDone();return;}
   G._playerDraftCard=card;
   if(card.calmTension){showCalmPopup('strategy',card.calmTension,card);return;} // solo : popup de choix
+  if(card.calmTheirs){showCalmPopup('diplomatie',card.calmTheirs,card);return;} // Diplomatie : on apaise l'AUTRE
   _applyStratTo(G.player,card);
   _playerStratDone();
 }
@@ -3475,29 +3524,54 @@ function showCalmPopup(mode,amount,stratCard){
   // Popup commun pour "Calmer les tensions" (stratégie) et "Calmer la Population" (civique)
   const amount_=amount||2;
   const btnStyle='display:block;width:100%;text-align:left;margin-bottom:6px;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:.85em;border:1px solid #2a4a6a;background:#0d1a2a;color:#c8d8f8';
+  /* ⚠️ ON MET EN AVANT LA TENSION QUI VA BOUGER. Les deux chiffres restent affichés — savoir où en
+     est l'autre fait partie de la décision — mais c'est celui que la carte modifie qui est coloré
+     et annoncé « −N ». Sans cela, la Diplomatie afficherait en gros une tension qu'elle ne touche
+     pas, et l'on retomberait dans le reproche de Marc : on ne sait ni qui ni de combien. */
+  const _leur=(mode==='diplomatie');
   const rows=G.ais.map(ai=>{
     const pt=getTens('player',ai.civ.id);
     const at=getTens(ai.civ.id,'player');
-    const col=pt>=8?'#ff6644':pt>=5?'#ffaa44':pt>=3?'#ffcc66':'#66cc88';
+    const vise=_leur?at:pt, autre=_leur?pt:at;
+    const col=vise>=8?'#ff6644':vise>=5?'#ffaa44':vise>=3?'#ffcc66':'#66cc88';
+    const apres=Math.max(0,vise-amount_);
     return`<button style="${btnStyle}" onclick="applyCalmTension('${ai.civ.id}','${mode}',${amount_})">`+
       `${ai.civ.emoji} <strong>${ai.civ.name}</strong> &nbsp;`+
-      `<span style="color:${col}">Ta tension : ${pt}/10</span>`+
-      `<span style="color:#5a6a8a;font-size:.85em"> | Leur tension : ${at}/10</span>`+
+      `<span style="color:${col}">${_leur?'Sa tension envers toi':'Ta tension'} : ${vise}/10 → ${apres}/10</span>`+
+      `<span style="color:#5a6a8a;font-size:.85em"> | ${_leur?'la tienne':'la leur'} : ${autre}/10</span>`+
       `</button>`;
   }).join('');
-  const label=mode==='strategy'?'🕊️ Calmer les tensions intérieures':'🕊️ Calmer la Population';
-  const desc=mode==='strategy'?`Réduit ta tension vers une nation de <strong>${amount_}</strong> points`:`+1<i class=ri-morale></i> et réduit ta tension vers une nation de <strong>${amount_}</strong> points<br><small style="color:#7880a0">Coût : −1<i class=ri-materials></i> −1<i class=ri-energy></i></small>`;
+  const label=mode==='strategy'?'🕊️ Calmer les tensions intérieures'
+             :(_leur?'🕊️ Diplomatie — apaiser une nation':'🕊️ Calmer la Population');
+  const desc=mode==='strategy'?`Réduit ta tension vers une nation de <strong>${amount_}</strong> points`
+            :(_leur?`Une mission diplomatique apaise la nation de ton choix : <strong>sa</strong> tension envers toi baisse de <strong>${amount_}</strong> points.<br><small style="color:#7880a0">Moins elle t'en veut, moins son peuple peut la pousser à te déclarer la guerre.</small>`
+                   :`+1<i class=ri-morale></i> et réduit ta tension vers une nation de <strong>${amount_}</strong> points<br><small style="color:#7880a0">Coût : −1<i class=ri-materials></i> −1<i class=ri-energy></i></small>`);
   // Réutiliser le modal de détail tech (ou créer un overlay inline)
   document.body.insertAdjacentHTML('beforeend',`<div id="calm-overlay" style="position:fixed;inset:0;background:rgba(4,4,18,.85);z-index:600;display:flex;align-items:center;justify-content:center">
     <div style="background:#0f0f2a;border:1px solid #4a9eff;border-radius:10px;padding:20px;min-width:300px;max-width:380px">
       <div style="font-size:1em;font-weight:700;color:#c8d8f8;margin-bottom:6px">${label}</div>
       <div style="font-size:.82em;color:#7880a0;margin-bottom:14px">${desc}</div>
       ${rows}
-      <button onclick="document.getElementById('calm-overlay').remove();${mode==='strategy'?'G._playerDraftCard=null;_playerStratDone();':''}" style="margin-top:8px;padding:5px 14px;background:#1a1a3a;border:1px solid #3a3a6a;border-radius:5px;color:#9898b8;cursor:pointer;font-size:.82em">Annuler</button>
+      <button onclick="document.getElementById('calm-overlay').remove();${(mode==='strategy'||mode==='diplomatie')?'G._playerDraftCard=null;_playerStratDone();':''}" style="margin-top:8px;padding:5px 14px;background:#1a1a3a;border:1px solid #3a3a6a;border-radius:5px;color:#9898b8;cursor:pointer;font-size:.82em">Annuler</button>
     </div></div>`);
 }
 function applyCalmTension(aiId,mode,amount){
   const overlay=document.getElementById('calm-overlay');if(overlay)overlay.remove();
+  /* ⚠️ DIPLOMATIE VA DANS L'AUTRE SENS, ET C'EST TOUTE LA CARTE. `setTens(de,vers)` n'est pas
+     symétrique : la tension est rangée par COUPLE ORIENTÉ. « Calmer la Population » et « Calmer les
+     tensions » baissent `player → eux` ; Diplomatie baisse `eux → player`. Se tromper de sens
+     donnerait une carte qui a l'air de fonctionner et ne protège de rien. */
+  if(mode==='diplomatie'){
+    const prevD=getTens(aiId,'player');
+    setTens(aiId,'player',Math.max(0,prevD-amount));
+    const _n=(G.ais.find(a=>a.civ.id===aiId)||{civ:{name:aiId,emoji:''}});
+    addLog('🕊️ Mission diplomatique chez '+_n.civ.emoji+' '+_n.civ.name+' : sa tension envers toi '
+      +prevD+' → '+getTens(aiId,'player')+'/10 (−'+amount+')','gold');
+    addAction('🕊️','Diplomatie',0,{},_n.civ.name+' : sa tension −'+amount);
+    G.player.stratBonus=null;
+    _playerStratDone();
+    return;
+  }
   const prev=getTens('player',aiId);
   setTens('player',aiId,Math.max(0,prev-amount));
   addLog('🕊️ Calme vers '+aiId+' : tension −'+amount+' ('+prev+' → '+getTens('player',aiId)+'/10)','gold');
@@ -3691,6 +3765,31 @@ function _focusWar(w){
   const cible=(s.A&&!s.A._isAI)?s.A:(humains[0]||s.A);
   _activateNation(cible);
 }
+/* ══════════════ ON EMPRUNTE LA PERSPECTIVE, DONC ON LA REND ══════════════
+   `_focusWar` déplace la nation active pour traiter une guerre du point de vue d'un de ses
+   belligérants. C'est nécessaire — sinon, à quatre joueurs, les fenêtres de guerre s'ouvrent chez
+   la mauvaise personne (§62). Mais RIEN ne la remettait en place, et l'emprunt devenait définitif :
+   partie C04C de Marc, une guerre Jupitériens ↔ Martiens au tour 6, et à partir de là tout le bloc
+   de fin de tour — SES revenus, SON investissement, SA carte Stratégie du tour 7 — est écrit au nom
+   des Jupitériens. La perspective survivait même au changement de tour.
+   Et ce n'est pas cosmétique : au tour 10, « ☠️ Ceinturiens cherche la paix avec 🌍 Terriens »
+   alors que la guerre est Martiens ↔ Ceinturiens. La phrase lit `G.player` au lieu du belligérant.
+
+   ⚠️ ON RANGE UN IDENTIFIANT, PAS UNE RÉFÉRENCE. `fluxDonnees()` se sérialise avec la partie : une
+   référence d'objet ne survivrait pas à une sauvegarde en pleine phase de guerre — exactement le
+   défaut qui avait coûté `_warModalCb`. Un identifiant de civilisation, lui, se relit toujours. */
+function _perspectiveEmprunter(){
+  const d=fluxDonnees();
+  d.perspectiveAvant=(G&&G.player&&G.player.civ&&G.player.civ.id)||null;
+}
+function _perspectiveRendre(){
+  const d=fluxDonnees(), id=d.perspectiveAvant;
+  d.perspectiveAvant=null;
+  if(!id||!G)return false;
+  const all=(typeof allPlayers==='function')?allPlayers():[G.player].concat(G.ais||[]);
+  const nat=all.find(p=>p&&p.civ&&p.civ.id===id);
+  return nat?_activateNation(nat):false;
+}
 /* ----------------------------------------------------------------------------
    LA SUITE D'UNE FENÊTRE DE GUERRE — un NOM, plus une fonction
    ----------------------------------------------------------------------------
@@ -3861,7 +3960,16 @@ function iaChoixDeCombat(nat){
   /* Assez forte pour frapper : elle vise la colonie ennemie la plus faible, jamais la capitale
      (mêmes cibles que la posture d'IA existante). */
   if(plafond>=2&&plafond>=menace){
-    const cibles=ennemi?ennemi.colonies.filter(c=>c.nodeId!==ennemi.civ.home):[];
+    /* ⚠️ LA CAPITALE EST UNE CIBLE — MAIS EN DERNIER (Marc, 03/09 : « oui les IA peuvent attaquer
+       une capitale »). La tâche #6 a supprimé la règle qui l'interdisait, et le joueur l'a bien
+       récupérée ; ce chemin de décision, lui, était resté à l'ancienne règle. Une nation réduite à
+       sa seule planète mère devenait donc intouchable par les ordinateurs : faute de cible, ils
+       concluaient « je ne peux pas gagner » et demandaient la paix.
+       On garde la préférence, parce qu'une capitale porte 10 jetons de garnison : les colonies
+       ordinaires d'abord, la planète mère seulement s'il n'y a rien d'autre. C'est exactement
+       l'idiome déjà employé pour la guerre populaire du joueur (`_fwCols`). */
+    const _ord=ennemi?ennemi.colonies.filter(c=>c.nodeId!==ennemi.civ.home):[];
+    const cibles=_ord.length?_ord:(ennemi?ennemi.colonies.slice():[]);
     if(cibles.length){
       const cible=cibles.reduce((b,c)=>(!b||(c.level||1)<(b.level||1))?c:b,null);
       return {action:'attack', node:cible.nodeId, tokens:plafond,
@@ -4015,6 +4123,9 @@ function guerresPreparer(apres){
   d.guerres=enCours.map(k=>({a:k.a,b:k.b,fraiche:false})).concat(fraiches.map(k=>({a:k.a,b:k.b,fraiche:true})));
   d.guerreIdx=0;
   d.apresGuerres=apres||'stFinDeTour';   // un NOM, pas une fonction : un nom se sérialise
+  /* On note QUI entre dans la file, pour pouvoir le remettre en place à la sortie (voir
+     `_perspectiveRendre`, appelée quand la file est épuisée dans `guerreEtape`). */
+  _perspectiveEmprunter();
 }
 function guerreCourante(){ const d=fluxDonnees(); return (d.guerres||[])[d.guerreIdx||0]||null; }
 /* Les « arguments » de l'étape courante, RECALCULÉS à chaque fois. */
@@ -4038,7 +4149,10 @@ function guerreSuivante(){ const d=fluxDonnees(); d.guerreIdx=(d.guerreIdx||0)+1
    que par leur file : la distinction est maintenant portée par `fraiche` dans la file. */
 function guerreEtape(){
   const d=fluxDonnees(), c=guerreCourante();
-  if(!c){ fluxAppeler(d.apresGuerres||'stFinDeTour'); return; }   // file épuisée
+  /* ⚠️ LA SORTIE DE LA FILE EST LE SEUL ENDROIT OÙ RENDRE LA PERSPECTIVE, et il faut le faire AVANT
+     d'appeler l'étape suivante : `stFinDeTour` écrit les revenus, l'investissement et le bilan du
+     joueur, et les écrivait au nom du dernier belligérant emprunté (partie C04C, tour 6). */
+  if(!c){ _perspectiveRendre(); fluxAppeler(d.apresGuerres||'stFinDeTour'); return; }   // file épuisée
   const war=guerreObjet();
   if(!war){ guerreSuivante(); return; }                            // guerre déjà terminée entre-temps
   _focusWar(war); // ← adopter le point de vue d'un belligérant AVANT toute lecture de G.player/aiId
@@ -5957,7 +6071,15 @@ function useAbility(nat){
   // Jupitérien — Forge Orbitale : le joueur CHOISIT la lune joviène à améliorer (modale). Pas d'auto-sélection ni de coût dans le vide.
   if(p.civ.id==='jupiteriens'){
     const eligible=p.colonies.filter(c=>['io','europe','ganymede','callisto'].includes(c.nodeId)&&c.level===1&&c.connected);
-    if(!eligible.length){addLog('⚠️ Aucune lune joviène de niveau 1 connectée à améliorer — elles sont déjà au niveau max (ou non reliées) : Io, Europe, Ganymède, Callisto.','red');return;}
+    if(!eligible.length){if(_n===G.player)addLog('⚠️ Aucune lune joviène de niveau 1 connectée à améliorer — elles sont déjà au niveau max (ou non reliées) : Io, Europe, Ganymède, Callisto.','red');return;}
+    /* ⚠️ UNE NATION TENUE PAR L'ORDINATEUR NE CLIQUE PAS. C'est le motif §64, quatrième fois : la
+       fenêtre appartenait à l'ANCIENNE enveloppe du joueur, et depuis que le cerveau `tacticien`
+       passe par `appliquerCoup` (`case 'pouvoir'`), elle s'ouvrait chez Marc pour le pouvoir d'une
+       autre nation — et le pouvoir n'était même pas consommé, puisque `useAbility` sortait ici sans
+       marquer `abilityUsed` (le coût se prend dans `_forgeUpgrade`, au clic qui ne venait jamais).
+       L'IA tranche donc elle-même, par la MÊME fonction de règle, avec la même préférence que son
+       chemin historique dans `doAITurn` : la première lune éligible. */
+    if(_n!==G.player){ _forgeUpgrade(eligible[0].nodeId,_n); return; }
     showForgeChoiceModal(eligible); return; // le coût est prélevé au moment du choix (_forgeUpgrade)
   }
   saveUndo();p.acLeft-=ab.ac;for(const[r,a]of Object.entries(ab.cost))p.res[r]-=a;p.abilityUsed=true;
@@ -5971,8 +6093,10 @@ function useAbility(nat){
       gainToast(p.civ.name+' — gagne '+got.map(r=>'1'+rEmoji(r)).join(' '));addAction('💫','Commerce avec les pirates',0,{},'+'+em);}
     else{addLog('💫 Commerce avec les pirates : les pirates n\'ont rien pu piller ce tour (rien reçu).','dim');addAction('💫','Commerce avec les pirates',0,{},'Rien');}
   }
-  scArmConfirm('💫 Pouvoir',[]);
-  render();
+  /* ⚠️ LA QUEUE D'AFFICHAGE EST AU JOUEUR LOCAL, comme dans `buyTech` depuis la v10.02.
+     `scArmConfirm` est une confirmation à l'écran : déclenchée pour le pouvoir d'une IA, elle
+     s'affichait chez Marc. */
+  if(_n===G.player){ scArmConfirm('💫 Pouvoir',[]); render(); }
 }
 // Forge Orbitale (Jupitérien) : modale de choix de la lune à améliorer
 function showForgeChoiceModal(eligible){
@@ -5981,20 +6105,29 @@ function showForgeChoiceModal(eligible){
   document.getElementById('forge-modal').classList.remove('hidden');
 }
 function forgeCancel(){const m=document.getElementById('forge-modal'); if(m)m.classList.add('hidden');}
-function _forgeUpgrade(nodeId){
-  const p=G.player,ab=p.civ.active;
-  const m=document.getElementById('forge-modal'); if(m)m.classList.add('hidden');
-  if(p.abilityUsed){render();return;}
+/* ⚠️ ELLE APPLIQUE UNE RÈGLE : ELLE REÇOIT DONC SA NATION (règle §39.3 du carnet de bord).
+   Elle lisait `G.player` en dur. Tant que seule la modale du joueur l'appelait, c'était juste ;
+   depuis que `useAbility` peut être appelée pour n'importe quelle nation (`appliquerCoup`, cerveau
+   `tacticien`), c'était le trou par lequel une IA jupitérienne améliorait la lune du JOUEUR — ou,
+   plus exactement, ouvrait chez lui une fenêtre de choix qui ne le concernait pas.
+   `nat` absent ⇒ `G.player` : tous les appels existants (clic dans la modale) sont inchangés. */
+function _forgeUpgrade(nodeId,nat){
+  const p=nat||G.player,ab=p.civ.active;
+  const _local=(p===G.player);   // seul le joueur local a un écran à rafraîchir
+  if(_local){const m=document.getElementById('forge-modal'); if(m)m.classList.add('hidden');}
+  if(p.abilityUsed){if(_local)render();return;}
   const col=p.colonies.find(c=>c.nodeId===nodeId&&c.level===1&&['io','europe','ganymede','callisto'].includes(c.nodeId)&&c.connected);
-  if(!col){addLog('⚠️ Cette lune n\'est plus améliorable.','red');render();return;}
-  saveUndo();
+  if(!col){if(_local){addLog('⚠️ Cette lune n\'est plus améliorable.','red');render();}return;}
+  if(_local)saveUndo();
   p.acLeft-=ab.ac;for(const[r,a]of Object.entries(ab.cost))p.res[r]-=a;p.abilityUsed=true;
   col.level++;updateConnections(p);
   addLog('💫 Forge Orbitale : '+NODES[nodeId].name+' → Nv.'+col.level,'gold');
-  gainToast(p.civ.name+' — améliore '+NODES[nodeId].name+' Nv.'+col.level);
   addAction('💫','Forge Orbitale',0,{materials:1,energy:1},NODES[nodeId].name+' Nv.'+col.level);
-  scArmConfirm('💫 Forge '+NODES[nodeId].name,[{kind:'pt',icon:rEmoji('science'),val:1}]);
-  render();
+  if(_local){
+    gainToast(p.civ.name+' — améliore '+NODES[nodeId].name+' Nv.'+col.level);
+    scArmConfirm('💫 Forge '+NODES[nodeId].name,[{kind:'pt',icon:rEmoji('science'),val:1}]);
+    render();
+  }
 }
 /* ⚠️ LE RAID DOIT AVOIR UNE CIBLE CHOISIE. Le bouton « 💰 Raid » de la barre d'action appelait un
    raid SANS cible, qui frappait `G.ais[0]` — la première nation de la liste, c'est-à-dire une nation
@@ -8450,10 +8583,19 @@ function appliquerCoup(nat,coup){
         const c=CARDS_POOL.find(x=>x.id===coup.card);
         e={emoji:(c&&c.emoji)||'✅',name:'Achète '+((c&&c.name)||coup.card),desc:(c&&c.effect)||''}; break;
       }
-      case 'civique': {
-        const c=(typeof CIVIC_MARKET!=='undefined'?CIVIC_MARKET:[]).find(x=>x.id===coup.card);
-        e={emoji:(c&&c.emoji)||'📜',name:'Achète '+((c&&c.name)||coup.card),desc:(c&&c.effect)||''}; break;
-      }
+      /* ⚠️ PAS DE CAS `civique` ICI, ET C'EST VOULU. `aiBuyCivic` inscrit DÉJÀ son entrée, comme le
+         font le raid et l'assaut. En ajouter une seconde donnait deux lignes par achat — constaté
+         dans la partie C04C de Marc : six civiques d'IA écrites en double (Capture d'astéroïdes,
+         Propagande, Extraction d'He3, Campagne Culturelle, Programmes Sociaux), une seule ligne
+         « ↳ paie » en face. Le garde-fou ci-dessous ne les rattrapait pas : il compare les NOMS, et
+         `aiBuyCivic` écrit « Capture d'astéroïdes » là où l'on écrivait « Achète Capture
+         d'astéroïdes ».
+         ⚠️ ET ON N'ALIGNE PAS LES LIBELLÉS POUR AUTANT. Ce serait la correction évidente et elle
+         serait fausse : Capture d'astéroïdes, Extraction d'He3 et Investissement dans la Recherche
+         se reprennent PLUSIEURS FOIS dans un même tour (règle de Marc, 03/09). Une déduplication
+         par nom effacerait le deuxième achat, pourtant payé et appliqué. Un seul propriétaire du
+         carnet — la fonction de règle — et le problème ne se pose plus.
+         Surveillé par `test_carnet_civique.js`, §1 et §2. */
       case 'raid':      e={emoji:'💰',name:'Raid sur '+nom(coup.node),desc:coup.cible||''}; break;
       case 'assaut':    e={emoji:'⚔️',name:'Assaut sur '+nom(coup.node),desc:''}; break;
       case 'accord':    e={emoji:'🤝',name:'Accord '+nom(coup.node),desc:''}; break;
@@ -8476,8 +8618,9 @@ function appliquerCoup(nat,coup){
                              return 'améliore '+nom(coup.node)+' Nv.'+((c&&c.level)||''); },
       route:     function(){ return 'route → '+nom(coup.to); },
       tech:      function(){ const c=CARDS_POOL.find(x=>x.id===coup.card); return 'achète '+((c&&c.name)||coup.card); },
-      civique:   function(){ const c=(typeof CIVIC_MARKET!=='undefined'?CIVIC_MARKET:[]).find(x=>x.id===coup.card);
-                             return 'achète '+((c&&c.name)||coup.card); },
+      /* ⚠️ PAS DE `civique` NON PLUS. Même raison qu'au carnet ci-dessus : `aiBuyCivic` écrit déjà
+         sa ligne — et mieux que celle-ci, puisqu'elle porte l'emoji de la carte (« 🤖 Jupitériens
+         achète ☄️ Capture d'astéroïdes »). C'est le second des deux doublons de la partie C04C. */
       pouvoir:   function(){ return 'utilise son pouvoir national'; }
     }[coup.type];
     if(phrase)addLog('🤖 '+nat.civ.name+' '+phrase(),'dim');
@@ -8654,7 +8797,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
        s'était rien passé. On relève les deux sens. */
     for(const r of['energy','materials','science']){const d=(bRes[r]||0)-(ai.res[r]||0);if(d>0)cost[r]=d;else if(d<0)gain[r]=-d;}
     const df=(bRes.force||0)-(ai.forceTokens||0);if(df>0)cost.force=df;
-    for(let i=fromIdx;i<G.aiActions.length;i++){const e=G.aiActions[i];if(e&&!e._rec){e._rec=true;_journalAdd(ai,e.name,acP,cost,e.desc,{war:_isWarAct(e.name)});}}
+    for(let i=fromIdx;i<G.aiActions.length;i++){const e=G.aiActions[i];if(e&&!e._rec){e._rec=true;/* Une entrée qui DÉCLARE `war` fait foi ; sinon seulement, on devine d'après le libellé. */_journalAdd(ai,e.name,acP,cost,e.desc,{war:(e.war!==undefined)?!!e.war:_isWarAct(e.name)});}}
     // TRANSPARENCE (demande de Marc) : le journal affichait les actions des IA SANS leur coût — impossible de
     // vérifier qu'elles paient. On journalise donc ce qu'elles dépensent réellement, comme pour le joueur.
     if(G.aiActions.length>fromIdx){
@@ -8682,8 +8825,15 @@ function _doAITurnInterne(aiPlayer,oneShot){
          manquait seulement ici. */
       if((ai.res.materials||0)>=5&&(ai.gov_pts||0)<15){ai.res.materials-=3;addGovPts(ai,3);ai.abilityUsed=true;
         G.aiActions.push({emoji:'💫',name:'Diplomatie Verte',desc:'+3 pts Gouvernement'});}
-    }else if(ai.civ.id==='martiens'){ // Surtension : +1 AC pour 2⚡ (si l'AC supplémentaire est finançable et hors fin de partie)
-      if((ai.res.energy||0)>=3&&(ai.res.materials||0)>=2&&G.turn<=7){ai.res.energy-=2;ai.acLeft+=1;ai.acMax=(ai.acMax||ai.acLeft)+1;ai.abilityUsed=true;
+    }else if(ai.civ.id==='martiens'){ // Surtension : +1 AC pour 2⚡ (si l'AC supplémentaire est finançable)
+      /* ⚠️ `G.turn<=7` A ÉTÉ RETIRÉ (Marc, 03/09). Ce garde-fou faisait partie du lot destiné à
+         éviter que les IA ne gaspillent des actions inutiles — mais il ne mesurait pas l'utilité,
+         il coupait sur le calendrier. Effet constaté dans la partie C04C : la martienne prend la
+         Surtension aux tours 1 à 6, puis PLUS JAMAIS, alors qu'un joueur humain garde son pouvoir
+         jusqu'au tour 10. Une action de plus au tour 9 ou 10 achète une technologie de fin de
+         partie : elle est tout sauf inutile. L'utilité reste gardée par ce qui la mesure vraiment —
+         il faut pouvoir payer les 2⚡ ET avoir de quoi dépenser l'AC gagné derrière. */
+      if((ai.res.energy||0)>=3&&(ai.res.materials||0)>=2){ai.res.energy-=2;ai.acLeft+=1;ai.acMax=(ai.acMax||ai.acLeft)+1;ai.abilityUsed=true;
         G.aiActions.push({emoji:'💫',name:'Surtension',desc:'+1 AC'});}
     }else if(ai.civ.id==='jupiteriens'){ // Forge Orbitale : améliore une lune joviène 1→2 gratuitement (sans AC ni science)
       const _col=ai.colonies.find(c=>['io','europe','ganymede','callisto'].includes(c.nodeId)&&c.level===1&&c.connected);
@@ -9087,7 +9237,27 @@ function _doAITurnInterne(aiPlayer,oneShot){
     if(oneShot&&ai._aiSetupDone)return;
     // Carte déjà choisie au draft de début de tour (mémo #12) — on applique son effet.
     const card=ai._draftedStrat;ai._draftedStrat=null;if(!card)return;
-    if(card.calmTension){const _eid=aiEnnemi(ai).civ.id;const cur=getTens(ai.civ.id,_eid);setTens(ai.civ.id,_eid,Math.max(0,cur-card.calmTension));}
+    if(card.calmTension){const _e2=aiEnnemi(ai);if(_e2){const _eid=_e2.civ.id;const cur=getTens(ai.civ.id,_eid);setTens(ai.civ.id,_eid,Math.max(0,cur-card.calmTension));}}
+    /* DIPLOMATIE JOUÉE PAR UN ORDINATEUR (choix de Marc, 03/09) : elle apaise LA NATION QUI LUI EN
+       VEUT LE PLUS — c'est ce qu'un joueur ferait, et c'est ce qui la protège des guerres
+       populaires qu'elle subit sans les avoir voulues.
+       ⚠️ On ne passe PAS par `aiEnnemi(ai)` : ce champ est la cible de raid du tour, et l'on vient
+       de voir (§67) qu'il désigne le plus souvent le joueur, pas la nation concernée. On lit les
+       tensions, qui ne mentent pas. */
+    if(card.calmTheirs){
+      let pire=null,max=-1;
+      for(const r of allPlayers()){
+        if(!r||r===ai||!r.civ)continue;
+        const t=getTens(r.civ.id,ai.civ.id);
+        if(t>max){max=t;pire=r;}
+      }
+      if(pire&&max>0){
+        const cur=getTens(pire.civ.id,ai.civ.id);
+        setTens(pire.civ.id,ai.civ.id,Math.max(0,cur-card.calmTheirs));
+        addLog('🕊️ '+ai.civ.emoji+' '+ai.civ.name+' envoie une mission diplomatique chez '+pire.civ.emoji+' '
+          +pire.civ.name+' : sa tension '+cur+' → '+getTens(pire.civ.id,ai.civ.id)+'/10','dim');
+      }
+    }
     ai.stratBonus={acBonus:card.acBonus||0,spec:card.spec||null,combatBonus:card.combatBonus||0,upkeepDiscount:card.upkeepDiscount||0};
     if(card.acBonus)ai.acLeft+=card.acBonus;
     if(card.force)ai.forceTokens+=card.force;
@@ -9101,8 +9271,20 @@ function _doAITurnInterne(aiPlayer,oneShot){
     if(oneShot&&ai._aiSetupDone)return;
     const myWar=_warOf(ai.civ.id);
     if(!myWar)return;
-    const _e=aiEnnemi(ai);
-    const pForce=(ai._pForceEst!==undefined)?ai._pForceEst:(_e.forceTokens||0);
+    /* ⚠️ L'ADVERSAIRE DE LA GUERRE, PAS LA CIBLE DU TOUR (voir `adversaireDeGuerre`). Tout ce bloc
+       — force comparée, colonies visées, colonie à reprendre, conclusion « winnable » — se
+       calculait contre `ai._enemyId`, la proie choisie pour les raids. Une IA en guerre contre une
+       voisine exsangue se croyait donc en guerre contre le joueur et ses vingt jetons : elle
+       concluait « perdu d'avance », demandait la paix et tenait sa position, tour après tour, en
+       perdant 4🙂 d'usure. C'est la cause des guerres entre IA qui ne se mènent jamais. */
+    const _e=adversaireDeGuerre(ai,myWar)||aiEnnemi(ai);
+    if(!_e)return;
+    /* ⚠️ ET ON GARDE LE BROUILLARD. `ai._pForceEst` était l'estimation FLOUE de la force de la
+       cible ; en changeant d'adversaire, on doit refaire la même estimation floue sur le nouveau —
+       surtout pas lire `_e.forceTokens` en clair, ce qui rendrait la triche que `test_brouillard_ia`
+       interdit. `perceivedForce` mémorise son tirage par couple et par tour : la rappeler ici ne
+       consomme rien de plus et rend la même valeur tout au long du tour. */
+    const pForce=(typeof perceivedForce==='function')?perceivedForce(ai,_e).val:(_e.forceTokens||0);
     const myForce=ai.forceTokens||0;
     const morale=ai.res.morale||0;
     const affordTok=Math.min(ai.res.materials||0,ai.res.energy||0);
@@ -9114,7 +9296,10 @@ function _doAITurnInterne(aiPlayer,oneShot){
     const _domFactor=myWar.playerProvoked?1:1.3; // provoquée par ton attaque → riposte dès la PARITÉ ; sinon agression seulement si nettement dominante (2×)
     if(!target&&(aggressor||myForce>=_domFactor*Math.max(1,pForce))){
       // Pas de colonie à reprendre → contre-attaque si elle peut tenir (parité si provoquée, sinon 2× la force estimée du joueur).
-      const cand=_e.colonies.filter(c=>c.nodeId!==_e.civ.home&&c.connected);
+      /* Même règle qu'en `iaChoixDeCombat` : la capitale est attaquable, mais on ne la retient que
+         s'il n'existe aucune colonie ordinaire reliée. */
+      const _ord=_e.colonies.filter(c=>c.nodeId!==_e.civ.home&&c.connected);
+      const cand=_ord.length?_ord:_e.colonies.filter(c=>c.connected);
       if(cand.length){cand.sort((a,b)=>(a.level||1)-(b.level||1));target=cand[0].nodeId;opportunistic=true;}
     }
     // Chance de l'emporter : reprise → force projetée ≥ joueur ; opportuniste → déjà filtré par le 2×.
@@ -9492,7 +9677,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
          tout le monde, désormais. */
       const newLvl=capturerNoeud(ai,bestCol.nodeId);
       addLog('🏴 '+ai.civ.emoji+' '+ai.civ.name+' capture '+(node?node.name:bestCol.nodeId)+' sur '+best.civ.emoji+' '+best.civ.name+' ('+aPow+'⚔️ vs '+dPow+'🛡️, Nv.'+newLvl+')','red');
-      G.aiActions.push({emoji:'🏴',name:'Capture '+(node?node.name:bestCol.nodeId),desc:'sur '+best.civ.name+' — '+aPow+'⚔️ vs '+dPow+'🛡️'});
+      G.aiActions.push({emoji:'🏴',name:'Capture '+(node?node.name:bestCol.nodeId),desc:'sur '+best.civ.name+' — '+aPow+'⚔️ vs '+dPow+'🛡️',war:true}); // ← DÉCLARE son fait de guerre (voir `_isWarAct`)
     }else{
       ai.res.morale=Math.max(0,(ai.res.morale||0)-1);
       addLog('🛡️ '+best.civ.emoji+' '+best.civ.name+' repousse l\'assaut de '+ai.civ.emoji+' '+ai.civ.name+' ('+aPow+'⚔️ vs '+dPow+'🛡️)','gold');
@@ -11065,7 +11250,16 @@ function _normCost(cost){
   for(const r of['energy','materials','science','morale','force']){const a=cost[r]||0;if(a>0)out[r]=a;}
   return out;
 }
-function _isWarAct(name){return /guerre|assaut|capture|pill|raid|repouss|attaque|reprend|combat|paix|cessez/i.test(String(name||''));}
+/* ⚠️ DEVINER UN FAIT DE GUERRE À PARTIR D'UN LIBELLÉ EST UN PIS-ALLER, ET IL A MORDU.
+   Le mot « capture » figurait ici pour l'entrée « Capture <colonie> » — une IA qui prend une
+   colonie. Mais la carte civique « Capture d'astéroïdes » porte le même mot, et ressortait donc en
+   `guerre: true` dans la trace de partie (repéré par Marc, débug C04C).
+   Ma première correction renommait la CARTE. Marc a refusé le nouveau nom, et il avait raison sur
+   le fond : on corrigeait le mauvais bout. Celui qui SAIT si une action est un fait de guerre,
+   c'est celui qui l'enregistre. La capture de colonie pose maintenant `war:true` sur son entrée
+   (voir le `G.aiActions.push` de l'assaut d'IA), et le mot « capture » disparaît d'ici.
+   Cette fonction reste le repli pour les libellés qui ne déclarent rien — d'où les autres mots. */
+function _isWarAct(name){return /guerre|assaut|pill|raid|repouss|attaque|reprend|combat|paix|cessez/i.test(String(name||''));}
 /* ⚠️ `addAction` EST LE CARNET DE BORD DU JOUEUR LOCAL — voir le bandeau de `acteurAction`.
    Quand c'est une AUTRE nation qui agit (une IA passée par `appliquerCoup`), elle ne s'en mêle pas :
    son coup est déjà enregistré par `appliquerCoup` dans `G.aiActions`, avec les libellés que lisent
@@ -11363,7 +11557,10 @@ function rejectPeace(){
   document.getElementById('peace-modal').classList.add('hidden');
   // Refuser la paix = POURSUIVRE la guerre → on propose tout de suite un assaut ce tour (sinon la guerre ne « se réalise » pas).
   const ai=G.warWith?G.ais.find(a=>a.civ.id===G.warWith):null;
-  const cols=ai?ai.colonies.filter(c=>c.nodeId!==ai.civ.home):[]; // jamais la planète mère
+  /* La planète mère reste proposée en dernier, jamais retirée : sans cela, refuser la paix contre
+     une nation réduite à sa capitale n'offrait aucune cible (même correctif que `_fwCols`). */
+  const _colsOrd=ai?ai.colonies.filter(c=>c.nodeId!==ai.civ.home):[];
+  const cols=_colsOrd.length?_colsOrd:(ai?ai.colonies.slice():[]);
   // La suite de la paix est un NOM : on la met de côté au lieu de la « garder sous le coude » dans
   // une fermeture — le bouton « Annuler » doit pouvoir y revenir même après un rechargement.
   const suite=fluxDonnees().suitePaix; fluxDonnees().suitePaix=null;

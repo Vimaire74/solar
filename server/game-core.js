@@ -87,7 +87,7 @@ function buildSandbox() {
    Une fonction récente s'appelle avec `typeof x === 'function'`, pas en l'exigeant ici. */
 const FONCTIONS_MOTEUR_REQUISES = [
   'initGame', 'startTurn', 'endTurn', 'runEndOfRound', 'doMaintenance', 'doRevenues', 'advancePirates',
-  'doColonize', 'doEstablishRoute', 'doUpgrade', 'buyTech', 'useAbility', 'doRaid', 'doRaidTarget',
+  'doColonize', 'doEstablishRoute', 'doUpgrade', 'buyTech', 'useAbility', 'doRaid', 'doRaidTarget', 'espPiller',
   'resolveWarCombat', 'declareWar', 'showWarModal', 'getNodeOwnerAI', 'doAITurn',
   /* ⚠️ AJOUTÉES LE 2026-08-23 avec la réparation des conquêtes. `ACTIONS.attack` délègue désormais
      à `playerAssaultColony` et désigne le défenseur avec `defenseurPrincipal` — les deux seules
