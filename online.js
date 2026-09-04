@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-04 · v10.16';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-04 · v10.22';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -119,6 +119,10 @@ function handle(m){
     /* ═══ LA LISTE DES PARTIES REPRENABLES (lot 17, étape 5) ═══
        Elle arrive SANS être demandée juste après la connexion. On la garde de côté et on
        rafraîchit l'écran d'accueil s'il est affiché — le joueur ne doit pas avoir à recliquer. */
+    case 'partie_supprimee':
+      /* Le serveur renvoie la liste à jour juste après : rien à faire ici, sinon rester au lobby. */
+      STATE._surLobby=true; STATE.game=null;
+      break;
     case 'mes_parties':
       STATE.parties = Array.isArray(m.parties) ? m.parties : [];
       if (STATE._surLobby) screenLobby();
@@ -1655,12 +1659,18 @@ function _ligneReprise(p){
   }).join(' · ');
   const tour = p.tour ? ('tour '+p.tour+(p.maxTours?('/'+p.maxTours):'')) : (p.statut==='lobby'?'pas encore commencée':'—');
   const urgent = p.aMoiDeJouer;
-  return '<button class="'+(urgent?'pri':'sec')+' sc-reprise" data-code="'+esc(p.code)+'"'
-    +' style="display:block;width:100%;text-align:left;white-space:normal;margin:6px 0;padding:10px 12px">'
+  /* La corbeille est À CÔTÉ du bouton, jamais DEDANS : un bouton dans un bouton n'est pas du HTML
+     valide et le clic partirait au mauvais endroit. (Marc, 04/09 : « supprimer les parties test ».) */
+  return '<div style="display:flex;gap:6px;align-items:stretch;margin:6px 0">'
+    +'<button class="'+(urgent?'pri':'sec')+' sc-reprise" data-code="'+esc(p.code)+'"'
+    +' style="flex:1;text-align:left;white-space:normal;margin:0;padding:10px 12px">'
     +'<div style="font-weight:700">'+(urgent?'▶ À TOI DE JOUER — ':'')+'Partie '+esc(p.code)+' · '+tour+'</div>'
     +'<div style="font-size:.85em;opacity:.9;margin-top:3px">'+joueurs+'</div>'
     +'<div style="font-size:.78em;opacity:.65;margin-top:3px">dernière activité : '+_dateFr(p.maj)+'</div>'
-    +'</button>';
+    +'</button>'
+    +'<button class="sec sc-suppr" data-code="'+esc(p.code)+'" title="Supprimer cette partie"'
+    +' style="margin:0;padding:0 12px;flex:0 0 auto;border-color:#7a2a2a;color:#ff9999">🗑</button>'
+    +'</div>';
 }
 function screenLobby(){
   STATE.game=null; STATE.myCiv=null; STATE.started=false;
@@ -1700,6 +1710,14 @@ function screenLobby(){
   _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
   [...document.querySelectorAll('.sc-reprise')].forEach(b=>{
     b.onclick = ()=>{ STATE._surLobby=false; send({t:'join', code:b.getAttribute('data-code')}); };
+  });
+  /* Supprimer est définitif : on demande confirmation, et on reste sur le lobby. */
+  [...document.querySelectorAll('.sc-suppr')].forEach(b=>{
+    b.onclick = ()=>{
+      const code=b.getAttribute('data-code');
+      if(!confirm('Supprimer définitivement la partie '+code+' ?')) return;
+      send({t:'supprimer_partie', code});
+    };
   });
   document.getElementById('sc-refresh').onclick = ()=> send({t:'mes_parties'});
   document.getElementById('sc-create').onclick = ()=>{ STATE._surLobby=false; screenCreate(); };

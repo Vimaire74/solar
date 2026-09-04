@@ -433,3 +433,51 @@ ni le gain ni le coût. Maintenant une action de plus par tour compte (jusqu'au 
 nation déjà à 5 n'y gagne rien), et un plafond de moral bas coûte, le double en guerre. La Tyrannie
 devient bonne pour un bâtisseur en paix à 2 actions, mauvaise pour un belliqueux ou une nation déjà
 à 5 actions. Mesuré sur 5 parties tête-à-tête : 3 victoires contre 2, +19 VP en moyenne.
+
+## v10.17 / sw v138 — 04/09/2026
+
+**Le revenu de moral n'est plus puni par le moral bas.** À moral 1, l'énergie, les matériaux et le
+savoir restent divisés par deux, mais le moral remonte à plein (avant : +2 de moral devenaient +1,
+et on restait coincé). À moral 0 (guerre civile), aucune ressource… sauf le moral, qui remonte :
+il y a une sortie. Règles mises à jour.
+
+**Une fenêtre te prévient quand ton moral reste critique** (0 ou 1) après les revenus, avec ce que
+ça coûte et comment remonter. Avant, l'information n'était que dans le journal — et le bandeau
+montrait des revenus divisés par deux sans le dire.
+
+## v10.18 / sw v139 — 04/09/2026
+
+**Le moral se juge en fin de tour, APRÈS le revenu de moral.** Ordre exact : ton revenu de moral
+est versé (jamais réduit), puis on regarde ton moral : à 0 → guerre civile (aucune énergie,
+matériaux ni savoir ce tour, actions ÷2 au tour suivant) ; à 1 → ces trois revenus ÷2. Une nation
+à 2 qui subit −3 de guerre et touche +3 de moral finit à 3 : rien ne lui arrive. Règles à jour.
+
+**La Sphère de Dyson d'un ordinateur te demande ton avis à l'instant de l'achat**, plus en fin de
+tour. Si tu acceptes, le +3⚡/tour compte dès le revenu de ce tour.
+
+## v10.19 / sw v140 — 04/09/2026
+
+**Le bandeau du haut ne compte plus +1🪨 pour une route qu'on ne peut pas alimenter.** Une route
+rapporte 1 matériau seulement si son énergie d'entretien est payée ; à 0⚡, le bandeau annonçait
+quand même « +2🪨 » pour trois routes (partie 3CF5). Il estime maintenant les routes payables.
+
+## v10.20 / sw v141 — 04/09/2026
+
+**Le raid ne fait plus perdre de moral.** Il fait monter la tension de +3 chez la victime (au lieu
+de +5) et +1 chez le pillard ; deux raids dans le tour font +6, sous le seuil de la guerre
+populaire. **Une colonie ne se pille qu'une fois par tour.** **🔍 Drones Surveillance** retire
+maintenant 1 unité à chaque ressource volée (énergie, matériaux, savoir), jamais sous zéro.
+**Les ordinateurs ne détruisent plus de route pendant leur tour** : attaquer une route reste un
+choix de la fenêtre de guerre de fin de tour, pour tout le monde.
+
+## v10.21 / sw v142 — 04/09/2026
+
+**Une colonie déjà pillée ce tour le dit sur son bouton** : « Raid impossible — déjà pillée ce
+tour », par qui que ce soit. Règles écrites mises à jour (raid, Drones, routes en fin de tour,
+Sphère de Dyson demandée à l'achat, moral jugé après son revenu).
+
+## v10.22 / sw v143 — 04/09/2026
+
+**Tu peux supprimer une partie depuis l'écran d'accueil** : une corbeille 🗑 à côté de chaque
+partie, avec confirmation. Tu peux supprimer tes parties contre des ordinateurs ; quand d'autres
+humains y jouent, seul l'hôte le peut, et ils sont prévenus que la partie est terminée.

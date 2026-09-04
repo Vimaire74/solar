@@ -1786,6 +1786,40 @@ wss.on('connection', (ws) => {
           break;
         }
 
+        /* {t:'supprimer_partie', code} — effacer une partie de la liste (Marc, 04/09 : « supprimer
+           les parties test que j'ai faites »). Trois garde-fous, parce qu'effacer est définitif :
+             · il faut Y AVOIR UN SIÈGE — on n'efface pas la partie des autres ;
+             · il faut en être l'HÔTE, ou être le SEUL humain — sinon on détruirait la partie en
+               cours de quelqu'un d'autre ;
+             · les joueurs encore connectés reçoivent `game_ended` : personne ne reste devant un
+               plateau qui n'existe plus.
+           La partie est retirée de la mémoire ET du disque (`oublierPartie`). */
+        case 'supprimer_partie': {
+          if (!requireAuth()) break;
+          const code = String(m.code || '').trim().toUpperCase();
+          const g = games.get(code);
+          if (!g) { sendTo(ws, { t: 'err', msg: 'partie introuvable' }); break; }
+          const moi = g.seats.find(x => x.user && String(x.user).toLowerCase() === String(sess.user).toLowerCase());
+          if (!moi) { sendTo(ws, { t: 'err', msg: 'tu n\'es pas dans cette partie' }); break; }
+          const autresHumains = g.seats.filter(x => !x.ai && x.user
+            && String(x.user).toLowerCase() !== String(sess.user).toLowerCase()).length;
+          const estHote = g.host && String(g.host).toLowerCase() === String(sess.user).toLowerCase();
+          if (autresHumains > 0 && !estHote) {
+            sendTo(ws, { t: 'err', msg: 'seul l\'hôte peut supprimer une partie où jouent d\'autres humains' });
+            break;
+          }
+          clearTimer(g);
+          broadcast(g, { t: 'game_ended', by: sess.user });
+          oublierPartie(code);
+          games.delete(code);
+          /* Les AUTRES sessions ne sont pas dans un registre : elles apprennent la suppression par
+             `game_ended` ci-dessus, exactement comme quand l'hôte quitte (`case 'leave'`). */
+          if (sess.game === code) sess.game = null;
+          sendTo(ws, { t: 'partie_supprimee', code });
+          sendTo(ws, { t: 'mes_parties', parties: mesParties(sess.user) });
+          break;
+        }
+
         case 'hello': {
           const proto = parseInt(m.proto, 10) || 0;
           sess.proto = proto; sess.build = String(m.build || '?').slice(0, 40);

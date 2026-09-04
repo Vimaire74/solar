@@ -96,8 +96,9 @@
 <p><strong>Plafonds</strong> : 12⚡, 20🪨, 10🔬, 10❤️. L'excédent est perdu en fin de tour ; certaines technologies relèvent ces plafonds.</p>
 <table>
 <tr><th>Moral</th><th>Effet</th></tr>
-<tr><td>0</td><td>Guerre civile : aucun revenu, et AC réduits de moitié au tour suivant</td></tr>
-<tr><td>1</td><td>Revenus divisés par deux</td></tr>
+<tr><td>0</td><td>Guerre civile : aucun revenu d'énergie, de matériaux ni de savoir ce tour, et AC réduits de moitié au tour suivant</td></tr>
+<tr><td>1</td><td>Revenus d'énergie, de matériaux et de savoir divisés par deux</td></tr>
+<tr><td colspan="2"><em>Le moral se juge en fin de tour, APRÈS le versement du revenu de moral (qui n'est jamais réduit). Une nation qui a préparé sa remontée s'en sort ; celle qui n'a rien prévu se paie.</em></td></tr>
 </table>
 <p class="cle">Ces pénalités se calculent sur le moral que tu as <strong>au moment où tu termines ton tour</strong>, pas sur celui qui reste une fois les guerres résolues. Une chute due à une ou plusieurs guerres ne te pénalise donc qu'à la fin du tour suivant : tu as un tour entier pour la corriger.</p>
 
@@ -152,8 +153,8 @@
 <p>Entretien 1⚡/tour, compensé par 1🪨 de revenu commercial. Une route reste connectée tant qu'elle existe ; le jeton posé dessus sert <strong>uniquement</strong> à la protéger des pirates.</p>
 
 <h3>6.3 Raid</h3>
-<p>Tu prends la <strong>production d'une colonie</strong> — son revenu du tour en ⚡, 🪨 et 🔬, jamais son ❤️ — dans la limite de ce que la nation possède. Sans cible désignée, c'est la plus productive. Tes jetons partent 2 tours en récupération (1 avec Stratégie Guerrière). Tension : <strong>+5</strong> victime, <strong>+1</strong> pillard.</p>
-<p>🔍 IA Défensive annule le vol, 🛰️ Drones de Surveillance le réduit de moitié. Un raid bloqué coûte quand même AC et jetons, donne +1 de tension, et le pillard en est averti.</p>
+<p>Tu prends la <strong>production d'une colonie</strong> — son revenu du tour en ⚡, 🪨 et 🔬, jamais son ❤️ — dans la limite de ce que la nation possède. Sans cible désignée, c'est la plus productive. Une colonie ne se pille qu'<strong>une fois par tour</strong>, par qui que ce soit : le bouton Raid l'indique (« déjà pillée ce tour »). Tes jetons partent 2 tours en récupération (1 avec Stratégie Guerrière). Tension : <strong>+3</strong> victime, <strong>+1</strong> pillard. Le raid ne touche pas au moral de la victime — c'est la tension (manifestations, guerre populaire) qui fait le reste.</p>
+<p>🔍 IA Défensive annule le vol, 🛰️ Drones de Surveillance retire <strong>1 unité à chaque ressource volée</strong>. Un raid bloqué coûte quand même AC et jetons, donne +1 de tension, et le pillard en est averti.</p>
 
 <h3>6.4 Accord commercial</h3>
 <ul>
@@ -183,7 +184,7 @@
 <tr><td>T1</td><td>⚗️ Propulsion Ionique</td><td>Route : 0🪨 au lieu de 1 (l'entretien ⚡ reste dû)</td><td>2🔬 1⚡</td><td>1</td></tr>
 <tr><td>T2</td><td>⚗️ IA de Navigation</td><td>+2 jetons Force ; coût de guerre divisé par deux</td><td>4🔬 1⚡</td><td>3</td></tr>
 <tr><td>T3</td><td>⚗️ Hyperpropulsion</td><td>+5 pts Gouvernement, routes gratuites, +3 jetons, et <strong>tu choisis l'ordre des combats</strong> (§14.3)</td><td>6🔬 2⚡ 2🪨</td><td>5</td></tr>
-<tr><td>T1</td><td>🔍 Drones Surveillance</td><td>+1🔬/tour ; raids subis réduits de moitié</td><td>2🔬 1⚡ 1🪨</td><td>1</td></tr>
+<tr><td>T1</td><td>🔍 Drones Surveillance</td><td>+1🔬/tour ; raids subis : −1 sur chaque ressource volée</td><td>2🔬 1⚡ 1🪨</td><td>1</td></tr>
 <tr><td>T2</td><td>🔍 Réseau Orbital</td><td>+1🔬/tour ; informations complètes sur les rivaux ; immunité pirates</td><td>3🔬 2⚡ 2🪨</td><td>3</td></tr>
 <tr><td>T3</td><td>🔍 IA Défensive</td><td>+4 jetons Force ; immunité raids et pirates</td><td>5🔬 2⚡ 2🪨</td><td>5</td></tr>
 <tr><td>T1</td><td>🧪 Ordinateur Quantique</td><td>+3🔬/tour, −1⚡/tour</td><td>2🔬 2🪨</td><td>1</td></tr>
@@ -194,7 +195,7 @@
 <tr><td>T3</td><td>🕊️ Éveil Collectif</td><td>+2🔬/tour ; +1 VP par colonie connectée au score final</td><td>5🔬 2🪨</td><td>5</td></tr>
 <tr><td>T1</td><td>⛏️ Exploitations d'Astéroïdes</td><td>+3🪨/tour</td><td>1🪨 2⚡ 1🔬</td><td>1</td></tr>
 <tr><td>T2</td><td>⛏️ Extracteurs Solaires</td><td>+3⚡/tour</td><td>4🪨 1⚡ 2🔬</td><td>3</td></tr>
-<tr><td>T3</td><td>⛏️ Sphère de Dyson</td><td>+5⚡/tour ; qui accepte ton monopole reçoit +3⚡/tour, qui refuse te déclare la guerre</td><td>6🪨 3⚡ 6🔬</td><td>5</td></tr>
+<tr><td>T3</td><td>⛏️ Sphère de Dyson</td><td>+5⚡/tour ; la question est posée aux autres nations à l'instant de l'achat : qui accepte ton monopole reçoit +3⚡/tour dès ce tour, qui refuse te déclare la guerre</td><td>6🪨 3⚡ 6🔬</td><td>5</td></tr>
 <tr><td>T1</td><td>🔮 Liens Empathes</td><td>Routes sans jeton, +1⚡ par 2 routes, +2 jetons de combat permanents</td><td>4🔬</td><td>1</td></tr>
 <tr><td>T2</td><td>🔮 Communications Instantanées</td><td>+2❤️/tour, +1🔬/tour, +5 pts Gouvernement</td><td>5🔬</td><td>3</td></tr>
 <tr><td>T3</td><td>🔮 Télépathie</td><td>Copie une technologie adverse, +2 jetons de combat, +3🔬/tour, −2❤️/tour en guerre</td><td>6🔬</td><td>5</td></tr>
@@ -299,7 +300,7 @@
 <tr><td>Nation possédant 2 technologies de niveau 3</td><td>+4</td><td>chaque tour</td></tr>
 <tr><td><strong>Blocage de chemin</strong> — elle tient une de tes sorties et il t'en reste au plus une de libre</td><td>+4</td><td>une seule fois</td></tr>
 <tr><td><strong>Étouffement</strong> — 2 colonies quand <em>toutes</em> les autres en ont 3 ou plus (dès le tour 2). Vise uniquement celle qui occupe le plus de tes sorties.</td><td>+6 puis +1</td><td>+6 à l'installation, +1 par tour ensuite</td></tr>
-<tr><td>Raid subi</td><td>+5 victime, +1 pillard</td><td>à chaque raid</td></tr>
+<tr><td>Raid subi</td><td>+3 victime, +1 pillard</td><td>à chaque raid</td></tr>
 <tr><td>Raid bloqué par 🔍 IA Défensive</td><td>+1 victime</td><td>à chaque tentative</td></tr>
 <tr><td>Espionnage détecté</td><td>+6, +8 ou +10 chez la victime</td><td>à la détection</td></tr>
 <tr><td>Assaut d'une colonie</td><td>+3 assailli, +1 assaillant</td><td>à chaque assaut</td></tr>
@@ -377,7 +378,7 @@
 <p>Une guerre dure tant que les deux camps ne font pas la paix. À la fin, le vainqueur gagne +1❤️, sa tension retombe à 0 et celle du perdant à 5. Une guerre encore ouverte au tour 10 est conclue au journal, décompte des combats à l'appui.</p>
 
 <h3>14.6 Attaquer une route</h3>
-<p>Un seul assaut suffit, et une route ne se défend pas. 1 jeton si elle est non protégée, 2 si elle l'est — le jeton défenseur est alors détruit. Puis tu la <strong>récupères</strong> (elle devient tienne, entretien compris) ou tu la <strong>détruis</strong> ; dans les deux cas l'adversaire perd son revenu.</p>
+<p>Attaquer une route est un choix de la <strong>fenêtre de guerre de fin de tour</strong> — pour tout le monde, ordinateurs compris : personne ne détruit une route pendant sa phase d'actions. Un seul assaut suffit, et une route ne se défend pas. 1 jeton si elle est non protégée, 2 si elle l'est — le jeton défenseur est alors détruit. Puis tu la <strong>récupères</strong> (elle devient tienne, entretien compris) ou tu la <strong>détruis</strong> ; dans les deux cas l'adversaire perd son revenu.</p>
 
 <h3>14.7 Supercroiseur</h3>
 <p>+5 de puissance en guerre — rien contre les raids ni les pirates. Le jeu demande à chaque combat si tu le déploies ; le déploiement coûte <strong>5🪨 + 5⚡</strong>. Jamais perdu : en cas de défaite, 2 tours de réparation (1 avec Stratégie Guerrière). Utilisable une fois en attaque et une fois en défense le même tour, si tu peux payer deux fois.</p>

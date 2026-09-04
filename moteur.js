@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-04 · v10.16';
+const SOLAR_BUILD_MOTEUR = '2026-09-04 · v10.22';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -197,7 +197,7 @@ const CARDS_POOL=[
    cost:{science:6,energy:2,materials:2},vp:5},
   // ── IA & RENSEIGNEMENT ───────────────────────────────────────────────────────
   {id:'drones1',branch:'ia_renseignement',tier:1,type:'ia_renseignement',name:'Drones Surveillance',emoji:'🔍',
-   effect:'+1<i class=ri-science></i>/tour. Raids subis : −1 ressource volée.',spec:'intel_1',rGain:{science:1},
+   effect:'+1<i class=ri-science></i>/tour. Raids subis : −1 sur chaque ressource volée.',spec:'intel_1',rGain:{science:1},
    cost:{science:2,energy:1,materials:1},vp:1},
   {id:'reseau2',branch:'ia_renseignement',tier:2,type:'ia_renseignement',name:'Réseau Orbital',emoji:'📡',
    effect:'+1<i class=ri-science></i>/tour. Infos complètes des nations. Immunité pirates.',spec:'intel_2',rGain:{science:1},
@@ -3070,6 +3070,38 @@ function showMoraleWarning(){
   document.getElementById('dyson-actions').innerHTML='<button class="eot-btn" style="background:linear-gradient(135deg,#8a2222,#5a0a0a);border-color:#cc4444;color:#ffcccc" onclick="document.getElementById(\'dyson-modal\').classList.add(\'hidden\')">Compris</button>';
   document.getElementById('dyson-modal').classList.remove('hidden');
 }
+/* Une nation répond au monopole d'un bâtisseur : accepter (+3⚡/tour) ou refuser (guerre). */
+function dysonReponseNation(o,builderId,guerre){
+  const bat=allPlayers().find(n=>n&&n.civ&&n.civ.id===builderId);
+  if(!o||!bat||o===bat)return;
+  if(!guerre){
+    dysonPartage(o);
+    addLog('🤝 '+o.civ.emoji+' '+o.civ.name+' accepte le monopole énergétique de '+bat.civ.emoji+' '+bat.civ.name+'.','dim');
+    return;
+  }
+  if(!_warBetween(o.civ.id,builderId)){
+    declarerGuerre(o,bat,'Sphère de Dyson — refus du monopole énergétique',o._isAI?'ai':'player');
+    const w=_warBetween(o.civ.id,builderId); if(w)w.aiAggressor=!!o._isAI;
+  }
+  addLog('⚔️ '+o.civ.emoji+' '+o.civ.name+' REFUSE le monopole de '+bat.civ.emoji+' '+bat.civ.name+' — guerre déclarée au bâtisseur (tension 10).','red');
+}
+/* Un ORDINATEUR vient de bâtir la Sphère : chaque autre nation se prononce MAINTENANT.
+   En ligne : une question par humain (routée à lui), décision automatique pour les IA.
+   En solo : la fenêtre du joueur (`showAiDysonModal`), dont la réponse traite aussi les IA. */
+function dysonDemanderAuxAutres(builderId){
+  const bat=allPlayers().find(n=>n&&n.civ&&n.civ.id===builderId);
+  if(!bat)return;
+  if(_decisionActive()){
+    for(const o of allPlayers()){
+      if(!o||!o.civ||o===bat)continue;
+      if(o._isAI){ dysonReponseNation(o,builderId,!dysonAccepte(o,builderId)); continue; }
+      _emitDecision('ai_dyson', o, {builder:builderId, builderName:bat.civ.name}, null,
+        (function(nat){ return function(ans){ dysonReponseNation(nat,builderId,!!(ans&&ans.war)); }; })(o));
+    }
+    return;
+  }
+  showAiDysonModal(builderId, null);
+}
 function showAiDysonModal(aiId,cb){
   const ai=G.ais.find(a=>a.civ.id===aiId)||G.ais[0];
   if(_decisionActive()){ // mode serveur : router accepter/refuser le monopole Dyson d'une IA
@@ -4803,7 +4835,6 @@ function guerreFraichePaixRepondue(peaceResult){
    fermeture ne permettait pas.
    ========================================================================== */
 function stFinDeTour(){
-  _applyMoraleFlags();
   const revs=doRevenues(); const maint=doMaintenance(); _emitNetRevenueLog(maint);
   _photographierTour();   // l'état de chaque nation, une fois le tour soldé — voir la note plus haut
   refillGeneralRiver();
@@ -5030,20 +5061,8 @@ function _runEndOfRound(){
   }
   G._eotDoneTurn=G.turn;
   plafonnerMoral();
-  /* ═══ LE MORAL QUI DÉCIDE DE LA GUERRE CIVILE EST CELUI DE LA FIN DES ACTIONS ═══
-     Règle (v18, table 17) : les pénalités « moral 0 = aucun revenu » et « moral 1 = revenus ÷2 » se
-     lisent sur le moral FIGÉ à la fin de la phase d'actions — pas sur l'effondrement causé par les
-     guerres de fin de tour (usure, guerre populaire). Sinon une nation à 2 de moral perd 3 par une
-     guerre déclarée contre elle et se retrouve en guerre civile SANS AVOIR EU UN TOUR POUR REMONTER.
-     ⚠️ CETTE RÈGLE EXISTAIT (`_moraleRev`, posé dans `endTurn`) ET N'ÉTAIT PLUS JAMAIS APPLIQUÉE :
-     `endTurn` sort sur `passTurnIL()` dès que la partie est entrelacée — c'est-à-dire toujours, en
-     solo comme en ligne — et le chemin réel (`_runEndOfRound`) ne posait rien. `_moraleRev` restait
-     `undefined`, et chaque lecture retombait sur le moral courant, déjà entamé par la guerre.
-     Marc, partie FD5F (04/09), tour 7 : usure −1, guerre populaire −2, « GUERRE CIVILE ! Moral 0 »
-     — alors qu'il avait +4 (Confort) et +1 (Démocratie) de revenu de moral en attente. « On avait
-     déjà corrigé ça, je sais pas pourquoi c'est revenu » : parce que la correction vivait dans un
-     chemin mort. On fige ICI, au point de passage obligé, avant tout effet de guerre. */
-  for(const p of allPlayers()){ if(p&&p.res)p._moraleRev=p.res.morale||0; }
+  /* Le moral qui décide de la guerre civile est jugé dans `doRevenues`, APRÈS le revenu de moral
+     (règle de Marc, 04/09) — plus de figeage ici. */
   advancePirates(); updateWarRisk(); updateTension();
   stDysonPuisGuerres();   // → guerres → stFinDeTour : chaque étape est NOMMÉE, aucune n'est capturée
 }
@@ -5056,10 +5075,9 @@ function endTurn(){
   const pSpent=G.player.acMax-G.player.acLeft;const aSpent=G.ais[0]?G.ais[0].acMax:0;
   if(pSpent<aSpent)G.player.bonusMat=true;
   addLog('— Fin du tour '+G.turn+' —','dim');
-  G.player._moraleRev=G.player.res.morale; // figer le moral de fin de phase d'actions : les pénalités ignorent les baisses dues aux guerres de fin de tour
   G.phase='ai';render();
   setTimeout(()=>{
-    for(const aiPlayer of G.ais){doAITurn(aiPlayer);aiPlayer._turnActions=[...(G.aiActions||[])];aiPlayer._moraleRev=aiPlayer.res.morale;}
+    for(const aiPlayer of G.ais){doAITurn(aiPlayer);aiPlayer._turnActions=[...(G.aiActions||[])];}
     advancePirates();
     updateWarRisk();
     updateTension();
@@ -5339,19 +5357,8 @@ function advancePirates(){
   }
 }
 /* ============================================================ MAINTENANCE ============================================================ */
-function _applyMoraleFlags(){
-  // v18 Table 17 : les pénalités de moral (guerre civile / ÷2) se calculent sur le moral figé
-  // en fin de phase d'actions, AVANT les revenus (étape 7) et l'entretien (étape 8).
-  for(const p of allPlayers()){
-    const _m=(p._moraleRev!==undefined?p._moraleRev:(p.res.morale||0));
-    if(_m===0){p._civilWar=true;addLog(p===G.player?'💥 GUERRE CIVILE ! Moral 0 — aucune ressource ce tour.':('💥 Guerre civile chez '+p.civ.emoji+' '+p.civ.name+' — moral 0, aucune ressource ce tour.'),'red');}
-    /* ⚠️ CES DEUX MESSAGES ÉTAIENT RÉSERVÉS AU JOUEUR, et leur jumeau IA ne nommait personne.
-       Partie 8B47, tour 8 : Marc lisait coup sur coup « Moral critique (1) — ressources ÷2 » et
-       « Guerre civile IA (moral 0) » — deux états contradictoires, en réalité deux nations
-       différentes, dont aucune n'était nommée. Un journal à quatre nations doit dire QUI. */
-    else if(_m===1){p._halfResources=true;addLog(p===G.player?'⚠️ Moral critique (1) — ressources ÷2 ce tour.':('⚠️ Moral critique chez '+p.civ.emoji+' '+p.civ.name+' (1) — ses ressources sont divisées par deux.'),'red');}
-  }
-}
+/* `_applyMoraleFlags` (pénalités lues AVANT les revenus sur un moral figé) est supprimée le 04/09 :
+   la règle se juge désormais APRÈS le revenu de moral, dans `doRevenues`. */
 function doMaintenance(){
   const result={energyCost:0,matCost:0,routeEnergyCost:0,routeMatGain:0,moraleLostCols:0,moraleLostRoutes:0};
   for(const p of allPlayers()){
@@ -5402,18 +5409,6 @@ function doMaintenance(){
     }
     if(freeUpk){totalEnergy=0;totalMat=0;p.investBonus2.freeUpkeep--;}
     totalEnergy=Math.max(0,totalEnergy-disc);
-    // Appliquer moral rules (0=guerre civile, 1=ressources/2)
-    const applyMoralPenalty=(p)=>{
-      const _m=(p._moraleRev!==undefined?p._moraleRev:(p.res.morale||0)); // moral figé en fin de phase d'actions (pas l'effondrement dû aux guerres)
-      if(_m===0){
-        // Guerre civile : aucune ressource ce tour (reset gains à 0)
-        p._civilWar=true;
-        addLog(p===G.player?'💥 GUERRE CIVILE ! Moral 0 — aucune ressource ce tour.':('💥 Guerre civile chez '+p.civ.emoji+' '+p.civ.name+' — moral 0, aucune ressource ce tour.'),'red');
-      }else if(_m===1){
-        p._halfResources=true;
-        addLog(p===G.player?'⚠️ Moral critique (1) — ressources ÷2 ce tour.':('⚠️ Moral critique chez '+p.civ.emoji+' '+p.civ.name+' (1) — ses ressources sont divisées par deux.'),'red');
-      }
-    };
     // Payer énergie colonies
     const payE=Math.min(totalEnergy,p.res.energy||0);p.res.energy-=payE;
     const missE=totalEnergy-payE;if(missE>0){p.res.morale=Math.max(0,(p.res.morale||0)-missE);}
@@ -5554,8 +5549,9 @@ function _netIncome(p){
   for(const _r of ['energy','materials','science','morale']) if(g[_r]===undefined) g[_r]=0;
   // Règles de moral (appliquées aux REVENUS) : 0 = guerre civile (rien), 1 = ÷2.
   const m=(p.res.morale||0);
-  if(m===0){ g.energy=0;g.materials=0;g.science=0;g.morale=0; }
-  else if(m===1){ for(const r of ['energy','materials','science','morale']) g[r]=Math.floor((g[r]||0)/2); }
+  /* Le revenu de MORAL n'est ni annulé ni divisé (Marc, 04/09 — voir `doRevenues`). */
+  if(m===0){ g.energy=0;g.materials=0;g.science=0; }
+  else if(m===1){ for(const r of ['energy','materials','science']) g[r]=Math.floor((g[r]||0)/2); }
   // ENTRETIEN (déduit après) — colonies hors base
   /* Ces deux drapeaux étaient déclarés en tête de la partie « revenus », qui a migré dans
      `revenusBruts`. Le barème d'entretien, lui, est resté ici : il faut donc les redéclarer.
@@ -5573,7 +5569,14 @@ function _netIncome(p){
   upE=Math.max(0,upE-((p.stratBonus&&p.stratBonus.upkeepDiscount)||0));
   if(p.investBonus2&&(p.investBonus2.freeUpkeep||0)>0){upE=0;upM=0;}
   g.energy-=upE; g.materials-=upM;
-  const nr=p.routes.length; if(!hasSpec(p,'route_force_free')) g.energy-=nr; g.materials+=nr; // route : −1⚡ +1🪨
+  /* Routes : −1⚡ chacune, et +1🪨 SEULEMENT pour celles dont l'énergie est payée (`doMaintenance` :
+     `payRE = min(routes, énergie)`). Le bandeau comptait +1🪨 par route quoi qu'il arrive : à 0⚡,
+     Marc lisait « +2🪨 » pour trois routes qu'il ne pouvait pas alimenter (partie 3CF5, tour 8).
+     On estime l'énergie disponible au moment de l'entretien : stock + revenu − entretien des colonies. */
+  const nr=p.routes.length; const _gratuit=hasSpec(p,'route_force_free');
+  const _dispoE=(p.res.energy||0)+(g.energy||0);
+  const _payables=_gratuit?nr:Math.max(0,Math.min(nr,_dispoE));
+  if(!_gratuit) g.energy-=nr; g.materials+=_payables;
   if(p.govFormUpkeep) for(const r in p.govFormUpkeep) g[r]=(g[r]||0)-(p.govFormUpkeep[r]||0);
   return g;
 }
@@ -5638,8 +5641,11 @@ function _wireRevTip(){const el=document.getElementById('top-res');if(!el)return
    prépare au lieu d'un réflexe.
    Le moral n'est pas pillable : on ne vole pas la bonne humeur d'un peuple.
    Rend {col, butin} — `col` peut être nulle si la nation n'a aucune colonie connectée. */
+/* Une colonie ne se pille qu'UNE fois par tour (Marc, 04/09 : « raider deux fois la même colonie
+   est impossible, ce serait pas logique ») — sa production du tour est déjà partie. */
+function coloniePilleeCeTour(col){ return !!(col&&col._raidTour===(G&&G.turn)); }
 function butinDeRaid(cible,nodeId){
-  const cols=(cible.colonies||[]).filter(c=>c.connected&&!(NODES[c.nodeId]&&NODES[c.nodeId].decorative));
+  const cols=(cible.colonies||[]).filter(c=>c.connected&&!(NODES[c.nodeId]&&NODES[c.nodeId].decorative)&&!coloniePilleeCeTour(c));
   if(!cols.length) return {col:null,butin:{}};
   let col=nodeId?cols.find(c=>c.nodeId===nodeId):null;
   if(!col){
@@ -5653,8 +5659,13 @@ function butinDeRaid(cible,nodeId){
     }
   }
   const brut=revenuDuneColonie(cible,col), butin={};
+  /* 🔍 Drones Surveillance (Marc, 04/09) : −1 sur CHAQUE ressource volée — pas en dessous de zéro,
+     et rien n'est « rendu » sur une ressource que la colonie ne produit pas. La carte le promettait
+     (« Raids subis : −1 ressource volée ») et ne l'appliquait que dans l'ancien chemin de raid. */
+  const _drones=(typeof hasSpec==='function')&&hasSpec(cible,'intel_1');
   for(const k of ['energy','materials','science']){
-    const dispo=Math.min(brut[k]||0, cible.res[k]||0);   // on ne vole que ce qu'elle a vraiment
+    let dispo=Math.min(brut[k]||0, cible.res[k]||0);   // on ne vole que ce qu'elle a vraiment
+    if(_drones&&dispo>0)dispo-=1;
     if(dispo>0) butin[k]=dispo;
   }
   return {col:col,butin:butin};
@@ -5782,7 +5793,16 @@ function revenusBruts(p, opts){
 function doRevenues(){
   let playerGains={};
   for(const p of allPlayers()){
-    if(p._civilWar){p._civilWar=false;continue;}
+    /* ═══ LA RÈGLE DU MORAL, TELLE QUE MARC L'A FIXÉE (04/09) ═══
+       « Si tu es à la fin du tour, APRÈS le revenu y compris de moral, alors tu divises par deux. »
+       Donc, dans cet ordre : 1) le revenu de MORAL est versé (jamais puni : « faut pas diviser le
+       revenu de moral, c'est déjà bien assez violent ») ; 2) on regarde le moral OBTENU — après les
+       pertes de guerre de fin de tour ET après ce revenu ; 3) à 0 : guerre civile, aucune énergie,
+       matériaux ni savoir ce tour, et AC réduits de moitié au tour suivant ; à 1 : ces trois revenus
+       divisés par deux. Une nation à 2 qui prend −3 de guerre et touche +2 de moral finit à 1 → ÷2 ;
+       avec +3 elle finit à 2 → rien. Le moral qu'on a su remonter compte, celui qu'on n'a pas su
+       remonter se paie. `_moraleRev` garde ce moral jugé pour la règle des AC du tour suivant.
+       (Remplace le « moral figé en fin d'actions » de v10.15, qui ignorait le revenu de moral.) */
     const caps=getResCapFor(p);
     /* LE CALCUL EST DANS `revenusBruts` — c'est CE code-ci qui y a été déplacé, sans modification.
        `doRevenues` garde ce qui est de son ressort : plafonds, moral, jetons, conquête, journal. */
@@ -5796,11 +5816,21 @@ function doRevenues(){
        que la condition est ici et non dans le calcul. */
     const _pourMoi = (p===G.player);
     const gains=revenusBruts(p, _pourMoi?{journal:(m,c)=>addLog(m,c)}:{});
-    if(p._halfResources){
-      p._halfResources=false;
+    /* 1) le moral d'abord, à plein */
+    const _gm=gains.morale||0;
+    if(_gm)p.res.morale=Math.min(caps.morale||10,(p.res.morale||0)+_gm);
+    delete gains.morale;
+    /* 2) le jugement, sur le moral obtenu */
+    const _mj=p.res.morale||0;
+    p._moraleRev=_mj;
+    if(_mj===0){
+      addLog(p===G.player?'💥 GUERRE CIVILE ! Moral 0 après revenus — aucune ressource ce tour (le moral perçu est gardé).':('💥 Guerre civile chez '+p.civ.emoji+' '+p.civ.name+' — moral 0, aucune ressource ce tour.'),'red');
+      for(const r of Object.keys(gains))gains[r]=0;
+    }else if(_mj===1){
+      addLog(p===G.player?'⚠️ Moral 1 après revenus — énergie, matériaux et savoir ÷2 ce tour.':('⚠️ Moral critique chez '+p.civ.emoji+' '+p.civ.name+' (1) — ses ressources sont divisées par deux.'),'red');
       for(const r of Object.keys(gains))gains[r]=Math.floor((gains[r]||0)/2);
-      if(p===G.player)addLog('⚠️ Moral 1 — revenus ÷2','red');
     }
+    /* 3) le reste */
     for(const[r,a]of Object.entries(gains))p.res[r]=Math.min(caps[r]||10,(p.res[r]||0)+a);
     // +1 jeton Force par colonie NOUVELLEMENT acquise ce tour (vaisseaux de protection) — une seule fois par colonie
     const _prevCol=(p._colCountLastTurn===undefined)?p.colonies.length:p._colCountLastTurn;
@@ -5826,6 +5856,20 @@ function doRevenues(){
       // et la ligne « 💰 Revenus nets » est émise après doMaintenance (voir _emitNetRevenueLog).
       G._revLogData={gross:{energy:gains.energy||0,materials:gains.materials||0,science:gains.science||0},
         grossM:gains.morale||0,conquestPen:_conquestPen,manif:(p._manifLoss||0)};
+    }
+  }
+  /* ═══ AVERTIR UN HUMAIN DONT LE MORAL EST CRITIQUE (Marc, 04/09) ═══
+     « On voit pas qu'on a pas de moral si on regarde pas, il faudrait un message pop-up. » Partie
+     3CF5 : moral à 1 depuis le tour 3, revenus ÷2 sans que rien ne le dise en face — Marc a conclu
+     à des cartes cassées. La fenêtre passe par `notifyNationHit`, le même canal que les raids
+     subis : en solo elle s'ouvre à son prochain tour, en ligne elle est routée au bon joueur. */
+  for(const p of allPlayers()){
+    if(!p||p._isAI||!p.res)continue;
+    const _m=p.res.morale||0;
+    if(_m<=1&&typeof notifyNationHit==='function'){
+      notifyNationHit(p,'😞 Moral critique : '+_m,
+        _m===0?'Guerre civile : tes revenus d\'énergie, de matériaux et de savoir sont à ZÉRO tant que ton moral reste à 0 (le moral, lui, remonte). Remonte-le ce tour : Propagande, Végétalisation, Calmer la Population, une colonie améliorée…'
+              :'Tes revenus d\'énergie, de matériaux et de savoir sont DIVISÉS PAR DEUX tant que ton moral reste à 1 (le moral, lui, remonte à plein). Remonte-le ce tour : Propagande, Végétalisation, Calmer la Population…');
     }
   }
   return playerGains;
@@ -5902,7 +5946,17 @@ function buyTech(cardId, nation){
      ⚠️ Seulement pour une nation NON LOCALE : le joueur, lui, a déjà sa propre fenêtre
      (`showDysonModal`, ouverte avant l'achat) — la poser deux fois lui redemanderait son avis à
      lui-même. */
-  if(card.id==='dyson3'&&_n!==G.player)G._aiDysonBuilt=_n.civ.id;
+  /* ═══ LA SPHÈRE D'UN ORDINATEUR SE DEMANDE TOUT DE SUITE, PAS EN FIN DE TOUR (Marc, 04/09) ═══
+     « Pourquoi ça demande pas TOUT de suite au joueur s'il est d'accord ? C'est ça qui fausse
+     tout. » Avant : drapeau `_aiDysonBuilt`, question posée à la fin du tour avec les guerres, et
+     le +3⚡ de l'acceptation n'arrivait qu'au revenu SUIVANT — le joueur jouait tout un tour sans
+     savoir. Maintenant la question part au moment de l'achat ; le +3⚡ compte dès le revenu du
+     tour même. Le drapeau reste pour l'ancien cerveau (`tryTech`) et pour les simulations, où l'on
+     ne pose aucune vraie question (le plateau est remis en place juste après). */
+  if(card.id==='dyson3'&&_n._isAI){
+    if(G._simulationIA)G._aiDysonBuilt=_n.civ.id;
+    else dysonDemanderAuxAutres(_n.civ.id);
+  }
   /* TÉLÉPATHIE ACHETÉE PAR UN ORDINATEUR : la copie se fait ICI, dans la règle — voir
      `copieEmpathe`. Un humain, lui, choisit dans sa fenêtre (bloc d'affichage ci-dessous). */
   if(card.id==='tele3'&&_n._isAI){ const _cid=iaChoixCopieEmpathe(_n); if(_cid)copieEmpathe(_n,_cid); }
@@ -6532,6 +6586,10 @@ function doRaidTarget(aiId,nodeId,pillard){
         +((p&&p.civ)?' de '+p.civ.name:'')+'.','dim');
       return;
     }
+    if(nodeId){
+      const _cc=(target.colonies||[]).find(function(c){return c.nodeId===nodeId;});
+      if(_cc&&coloniePilleeCeTour(_cc)){addLog('⚠️ '+((NODES[nodeId]&&NODES[nodeId].name)||nodeId)+' a déjà été pillée ce tour — sa production est partie.','red');return;}
+    }
     if(p.acLeft<1){addLog('⚠️ Raid : besoin 1 AC.','red');return;}
     if(p.forceTokens<tc){addLog('⚠️ Raid : besoin '+tc+' jeton(s) Force.','red');return;}
     if(enCost>0&&(p.res.energy||0)<enCost){addLog('⚠️ Raid : besoin '+enCost+'<i class=ri-energy></i> (carburant).','red');return;}
@@ -6548,15 +6606,17 @@ function doRaidTarget(aiId,nodeId,pillard){
       stolen.push('+'+_q+rEmoji(_k));
     }
     var _nomCol=_col?((NODES[_col.nodeId]&&NODES[_col.nodeId].name)||_col.nodeId):null;
-    /* Moral : −1 chez la victime (Marc, 27/08). Se faire piller une colonie humilie la population ;
-       jusqu'ici le raid ne coûtait que des ressources et de la tension, jamais de moral. */
-    target.res.morale=Math.max(0,(target.res.morale||0)-1);
-    /* Tension : +5 chez la victime (Marc, 24/08 — « le raid doit faire mal »). Le pillard, lui,
-       gagne +1 envers celle qu'il vient de voler : on se méfie de qui l'on a dépouillé. */
-    addTens(target.civ.id,p.civ.id,5);
+    if(_col)_col._raidTour=G.turn;   // pillée ce tour : plus personne ne la repille avant le suivant
+    /* ⚠️ PLUS DE MORAL PERDU AU RAID (Marc, 04/09). Le −1 du 27/08 s'ajoutait à la tension +5, aux
+       manifestations (−1/tour dès 6) et à la guerre populaire forcée à 10 (−2 chaque camp, puis
+       l'usure) : « quand les IA jouent mieux, c'est la cata des règles ». Un Conquérant qui raidait
+       chaque tour envoyait sa victime en guerre civile en trois tours. La tension fait déjà tout le
+       travail : elle seule monte, et de +3 (retour au réglage d'origine, « moins violent ») — deux
+       raids dans le tour font +6, sous le seuil de la guerre populaire. */
+    addTens(target.civ.id,p.civ.id,3);
     addTens(p.civ.id,target.civ.id,1);
     addLog('⚔️ Raid sur '+target.civ.emoji+' '+target.civ.name+(_nomCol?' — production de '+_nomCol+' pillée':'')
-      +' ! '+(stolen.join(' ')||'rien à prendre')+(enCost>0?' (−1<i class=ri-energy></i>)':'')+' ('+tc+' jeton en récupération, tension +5)','green');
+      +' ! '+(stolen.join(' ')||'rien à prendre')+(enCost>0?' (−1<i class=ri-energy></i>)':'')+' ('+tc+' jeton en récupération, tension +3)','green');
     addAction('💰','Raid '+target.civ.emoji,1,{},'Volé : '+(stolen.join('')||'rien'));
     /* LE BUTIN DOIT SE VOIR AU MOMENT DU RAID, PAS SEULEMENT DANS LE JOURNAL.
        ⚠️ `gainToast` ne suffisait qu'en SOLO. En multijoueur, cette fonction s'exécute sur le
@@ -6571,7 +6631,7 @@ function doRaidTarget(aiId,nodeId,pillard){
         {title:'💰 Raid sur '+target.civ.emoji+' '+target.civ.name,
          butin:_butin,
          body:(stolen.length?('Butin : <b>+'+stolen.join(' +')+'</b>'):'<b>Aucun butin</b> — ses coffres étaient vides.')
-              +' · '+tc+' jeton(s) en récupération · tension +2 chez '+target.civ.name+'.'}, 'stRien');
+              +' · '+tc+' jeton(s) en récupération · tension +3 chez '+target.civ.name+'.'}, 'stRien');
       /* La VICTIME aussi doit l'apprendre autrement que par le journal : on lui doit la même
          courtoisie qu'aux propositions d'accord. */
       /* ⚠️ LES ICÔNES DOIVENT ÊTRE DES MOTS POUR LA VICTIME. Son bandeau (`showLogToast`) retire
@@ -8914,7 +8974,7 @@ function coupsPossibles(nat){
            quand même ferait évaluer, comparer et parfois RETENIR ce raid comme meilleur coup — et
            l'IA perdrait une action par tour à ne rien faire, sans qu'une ligne ne le dise. */
         const _protege=(typeof hasSpec==='function')&&hasSpec(o,'ia_immune');
-        if((nat.forceTokens||0)>=jetons&&!_protege)
+        if((nat.forceTokens||0)>=jetons&&!_protege&&!coloniePilleeCeTour(col))
           coups.push({type:'raid',cible:o.civ.id,node:col.nodeId,libelle:'raid sur '+nom+' ('+o.civ.name+')'});
         if((nat.forceTokens||0)>=jetons&&(nat.res.materials||0)>=1&&(nat.res.energy||0)>=1)
           coups.push({type:'assaut',node:col.nodeId,libelle:'assaillir '+nom+' ('+o.civ.name+')'});
@@ -9795,22 +9855,12 @@ function _doAITurnInterne(aiPlayer,oneShot){
     }catch(e){}
     ai._warConserve=true;ai._warRecapture=_cible;ai._warAggressor=aggressor;
   })();
-  // ── L'IA peut DÉTRUIRE une de tes routes non protégées (tactique de guerre, cap 2 attaques/tour) ──
-  (function aiRouteRaid(){
-    if(oneShot&&ai._aiSetupDone)return;
-    const myWar=_warOf(ai.civ.id);
-    if(!myWar)return;
-    if((ai._attacksThisTurn||0)>=1||(ai.forceTokens||0)<1)return;
-    const _e=aiEnnemi(ai);
-    if(routesProtegeesParTech(_e))return; // routes tech-protégées — même règle que partout (2026-08-09 : `intel_2` manquait)
-    const targets=_e.routes.filter(r=>(r.tokens||0)===0);
-    if(!targets.length)return;
-    if(Math.random()<0.5){
-      const r=targets[Math.floor(Math.random()*targets.length)];
-      ai._attacksThisTurn=(ai._attacksThisTurn||0)+1;
-      resolveRouteAttack(ai,_e,r,1);
-    }
-  })();
+  /* ── PLUS DE DESTRUCTION DE ROUTE PENDANT LE TOUR D'UNE IA (Marc, 04/09) ──
+     « Le Terrien détruit ma route Éris–Pluton avant la fin de mon tour, c'est une action de guerre
+     de fin de tour ça, on ne peut pas attaquer les routes normalement ! » Exact : attaquer une
+     route est un choix de la fenêtre de guerre de FIN DE TOUR (`war_combat`), pour tout le monde.
+     Ce bloc (`aiRouteRaid`) donnait aux ordinateurs, à 50 % et sans AC, une attaque de route
+     gratuite pendant leur phase d'actions — une règle que le joueur n'avait pas. Supprimé. */
 
 
   // ── Cartes civiques (forme de gouvernement / social) ──
@@ -11534,7 +11584,7 @@ function renderRight(){
     +'<div style="margin-top:8px;padding-top:7px;border-top:1px solid #2a3a5a;font-size:.72em;color:#9fb0d0;line-height:1.5">'
     +'<div style="font-weight:700;color:#ffd0a0;margin-bottom:3px">⚠️ En cas de manque en fin de tour</div>'
     +'• <b>Entretien colonies impayé</b> (⚡ Nv.2-3, 🪨 Nv.3) → perte de <b>moral</b> (−1 par ressource manquante).<br>'
-    +'• <b>Moral 0</b> → GUERRE CIVILE : aucun revenu ce tour. <b>Moral 1</b> → revenus ÷2.<br>'
+    +'• Le moral se juge en fin de tour, APRÈS le revenu de moral (jamais réduit). <b>Moral 0</b> → GUERRE CIVILE : aucun revenu d\'énergie, matériaux, savoir. <b>Moral 1</b> → ces revenus ÷2.<br>'
     +'• <b>Route sans ⚡</b> (entretien impayé) → route <b>non alimentée</b> : pas de revenu commercial ce tour, cargos vulnérables.<br>'
     +'• <b>Route non protégée</b> (sans jeton Force) → risque d\'être <b>pillée et DÉTRUITE</b> par les pirates. Protège tes routes avec un jeton.'
     +'</div>';
@@ -11677,6 +11727,11 @@ function showNodePopup(nodeId){
     const _rtc=G.player.civ.id==='ceinturiens'?1:2;
     const _renC=0; // v18 : raids sans coût énergie
     const _rok=G.player.acLeft>=1&&G.player.forceTokens>=_rtc;
+    /* Une colonie ne se pille qu'une fois par tour, par qui que ce soit (Marc, 04/09) : le bouton
+       le DIT à la place de l'action, plutôt que de laisser cliquer dans le vide. */
+    if(typeof coloniePilleeCeTour==='function'&&coloniePilleeCeTour(aCol)){
+      acts.innerHTML+=`<button class="npop-btn" style="border-color:#664422;color:#a08060" disabled>💰 Déjà pillée</button>`;
+    } else
     acts.innerHTML+=`<button class="npop-btn" style="border-color:#cc7a22;color:#ffbb66" ${_rok?'':'disabled'} onclick="doRaidTarget('${aColAI.civ.id}','${nodeId}');closePopup();render()">💰 Raid<br><small>−1 AC −${_rtc} jeton(s)${_renC?' −'+_renC+'<i class=ri-energy></i>':''} — vole des ressources à ${aColAI.civ.emoji} ${aColAI.civ.name}</small></button>`;
   }
   if(!acts.innerHTML)acts.innerHTML='<div style="color:#5a6a8a;font-size:.85em">Aucune action disponible.</div>';
