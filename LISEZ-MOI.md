@@ -409,3 +409,27 @@ avait fait thésauriser les ordinateurs (0 victoire sur 6), il a été écarté.
 
 **Le moral ne dépasse plus jamais son plafond**, même en cours de tour : à 10 (ou 6 sous
 Tyrannie, 7 sous Domination des Corporations), un bonus de moral est perdu, pas mis de côté.
+
+## v10.14 / sw v135 — 04/09/2026
+
+**La carte du système solaire est plus grande sur ordinateur.** L'image est en hauteur ; sur un
+écran large, la vue se cadre maintenant sur la bande des planètes (de Kuiper à Neptune) au lieu
+de montrer toute la hauteur avec du vide sur les côtés : tout paraît 1,6 fois plus grand, tous les
+noms restent visibles, et rien ne change sur téléphone tenu en portrait.
+
+## v10.15 / sw v136 — 04/09/2026
+
+**La guerre civile se juge sur le moral de la FIN DE TES ACTIONS, plus sur l'effondrement de fin
+de tour.** Une nation à 2 de moral qui subit une guerre populaire (−2) et l'usure (−1) en fin de
+tour n'est plus envoyée en guerre civile avant d'avoir touché ses revenus : elle garde un tour pour
+remonter. Cette règle existait mais n'était plus appliquée depuis le passage au jeu entrelacé.
+(Partie FD5F de Marc, tour 7.)
+
+## v10.16 / sw v137 — 04/09/2026
+
+**Les ordinateurs comptent leurs actions et le prix d'un plafond de moral.** Avant, adopter la
+Tyrannie (+1 action, moral plafonné à 6) était noté exactement comme ne rien faire : l'IA ne voyait
+ni le gain ni le coût. Maintenant une action de plus par tour compte (jusqu'au maximum de 5 — une
+nation déjà à 5 n'y gagne rien), et un plafond de moral bas coûte, le double en guerre. La Tyrannie
+devient bonne pour un bâtisseur en paix à 2 actions, mauvaise pour un belliqueux ou une nation déjà
+à 5 actions. Mesuré sur 5 parties tête-à-tête : 3 victoires contre 2, +19 VP en moyenne.

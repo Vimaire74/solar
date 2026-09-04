@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-09-04 · v10.13';</script><!-- ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE : celle-ci, `SOLAR_BUILD_JS` (online.js) et `SOLAR_BUILD_MOTEUR` (moteur.js). Surveillé par test_versions.js. -->
+<script>window.SOLAR_BUILD_HTML='2026-09-04 · v10.16';</script><!-- ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE : celle-ci, `SOLAR_BUILD_JS` (online.js) et `SOLAR_BUILD_MOTEUR` (moteur.js). Surveillé par test_versions.js. -->
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -1618,6 +1618,7 @@ function uiMapFit(){
     if(dispo>80){ wrap.style.maxHeight=dispo+'px'; wrap.style.height=dispo+'px'; }
     var w=wrap.clientWidth||0, h=wrap.clientHeight||0;
     if(w>40&&h>40){ svg.style.width=Math.round(w*uiMZ)+'px'; svg.style.height=Math.round(h*uiMZ)+'px'; }
+    if(typeof cadrerVueGlobale==='function')cadrerVueGlobale();   // paysage ↔ portrait : le cadrage suit
   }catch(e){}
 }
 function uiApplyMZ(){

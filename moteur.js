@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-04 · v10.13';
+const SOLAR_BUILD_MOTEUR = '2026-09-04 · v10.16';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -5030,6 +5030,20 @@ function _runEndOfRound(){
   }
   G._eotDoneTurn=G.turn;
   plafonnerMoral();
+  /* ═══ LE MORAL QUI DÉCIDE DE LA GUERRE CIVILE EST CELUI DE LA FIN DES ACTIONS ═══
+     Règle (v18, table 17) : les pénalités « moral 0 = aucun revenu » et « moral 1 = revenus ÷2 » se
+     lisent sur le moral FIGÉ à la fin de la phase d'actions — pas sur l'effondrement causé par les
+     guerres de fin de tour (usure, guerre populaire). Sinon une nation à 2 de moral perd 3 par une
+     guerre déclarée contre elle et se retrouve en guerre civile SANS AVOIR EU UN TOUR POUR REMONTER.
+     ⚠️ CETTE RÈGLE EXISTAIT (`_moraleRev`, posé dans `endTurn`) ET N'ÉTAIT PLUS JAMAIS APPLIQUÉE :
+     `endTurn` sort sur `passTurnIL()` dès que la partie est entrelacée — c'est-à-dire toujours, en
+     solo comme en ligne — et le chemin réel (`_runEndOfRound`) ne posait rien. `_moraleRev` restait
+     `undefined`, et chaque lecture retombait sur le moral courant, déjà entamé par la guerre.
+     Marc, partie FD5F (04/09), tour 7 : usure −1, guerre populaire −2, « GUERRE CIVILE ! Moral 0 »
+     — alors qu'il avait +4 (Confort) et +1 (Démocratie) de revenu de moral en attente. « On avait
+     déjà corrigé ça, je sais pas pourquoi c'est revenu » : parce que la correction vivait dans un
+     chemin mort. On fige ICI, au point de passage obligé, avant tout effet de guerre. */
+  for(const p of allPlayers()){ if(p&&p.res)p._moraleRev=p.res.morale||0; }
   advancePirates(); updateWarRisk(); updateTension();
   stDysonPuisGuerres();   // → guerres → stFinDeTour : chaque étape est NOMMÉE, aucune n'est capturée
 }
@@ -8436,7 +8450,9 @@ const POIDS_EVAL={
   tresorerie:{energy:0.12,science:0.22,materials:0.14,morale:0},
   doublerManque:true,     // une ressource sous son seuil de danger : sa PRODUCTION vaut le double
   plafondProduction:10,   // au-delà de +10 par tour, une unité de plus ne vaut plus qu'un quart
-  auDela:0.25
+  auDela:0.25,
+  action:0.45,            // VP par action et par tour restant (une action ≈ un coup moyen)
+  plafondMoral:0.08       // VP perdus par point de plafond sous 10, par tour restant (×2 en guerre)
 };
 function evaluerPosition(nat,observateur){
   if(!nat||!nat.civ)return 0;
@@ -8556,7 +8572,30 @@ function evaluerPosition(nat,observateur){
      n'anticipe qu'UN coup. Refuser une T3 à un rival suppose de voir ce qu'il jouera ENSUITE. */
   const force=aveugle?0:Math.min(12,nat.forceTokens||0)*0.45*horizon;   // force exacte : réservée au Réseau Orbital
 
-  return acquis+production+tresorerie+potentiel+perilMoral+perilRessources+force;
+  /* ═══════ LES ACTIONS PAR TOUR SE COMPTENT, ET LE PLAFOND DE MORAL SE PAIE (04/09) ═══════
+     Marc, partie FD5F : les Terriens (IA) adoptent la Tyrannie au tour 3 — +1 AC, −2 moral, plafond
+     6 — puis passent la partie en guerre civile (Conquérant, raids chaque tour, usure −4). MESURÉ :
+     la note d'« adopter la Tyrannie » était EXACTEMENT celle de ne rien faire (8,86 = 8,86). L'IA ne
+     voyait ni le +1 action (les actions n'étaient pas comptées) ni le plafond (seul le moral
+     présent comptait). Elle ne l'a pas choisie parce que c'était bon : parce que c'était « neutre ».
+     · ACTIONS : `calcAC` (le vrai calcul, gouvernement + forme + cartes), PLAFONNÉ À 5 comme en jeu
+       — pour des Terriens qui montent leur gouvernement chaque tour avec Diplomatie Verte, le +1 de
+       la Tyrannie ne vaut bientôt plus rien (remarque de Marc). Une action par tour d'ici la fin
+       vaut à peu près un coup moyen : `POIDS_EVAL.action` VP par action et par tour.
+     · PLAFOND DE MORAL : le moral produit au-dessus du plafond est jeté (comme l'énergie au-dessus
+       de 12), et un plafond bas rapproche de la falaise — à 6, une seule usure de guerre (−4) laisse
+       2. Coût = (10 − plafond) × `POIDS_EVAL.plafondMoral` par tour restant, doublé en guerre.
+     Deux termes que le témoin `historique` ne lit pas (il n'évalue rien) : le témoin reste intact. */
+  let actions=0, plafondMoral=0;
+  if(!aveugle){
+    let ac=0; try{ ac=Math.min(5,calcAC(nat)); }catch(e){ ac=nat.acMax||2; }
+    actions=ac*POIDS_EVAL.action*restants;
+    const capM=(typeof realResCap==='function')?realResCap(nat).morale:10;
+    const enGuerre=(typeof estEnGuerre==='function')&&estEnGuerre(nat);
+    plafondMoral=-Math.max(0,10-capM)*POIDS_EVAL.plafondMoral*restants*(enGuerre?2:1);
+  }
+
+  return acquis+production+tresorerie+potentiel+perilMoral+perilRessources+force+actions+plafondMoral;
 }
 /* ══════════════════════════════════════════════════════════════════════════════════════════════
    ÉTAPE 3b — CE QU'UN COUP RETIRE À L'ADVERSAIRE COMPTE AUTANT QUE CE QU'IL ME RAPPORTE
@@ -11091,10 +11130,11 @@ function renderMap(){
   if(view!=='zoom'){
     // Carte de départ : image peinte global.png + zones cliquables invisibles
     if(wrap)wrap.classList.remove('mapzoom');
-    if(svg)svg.setAttribute('viewBox','0 0 400 600');
+    cadrerVueGlobale();
     for(const gid of ['stars','connections','routes-ai','routes-p','pirates-g']){const g=document.getElementById(gid);if(g)g.innerHTML='';}
     if(bg)bg.style.display='';
     if(ng)ng.innerHTML=mapGlobalSVG();
+    cadrerVueGlobale();   // le bandeau vient d'être (re)dessiné : le placer selon l'orientation
     try{ if(typeof uiMapFit==='function') setTimeout(uiMapFit,0); }catch(e){}   // vue globale : ajuster aussi
     // On remesure APRÈS le rendu : la vue vient peut-être de changer de largeur.
       return;
@@ -11106,6 +11146,26 @@ function renderMap(){
   drawConnections();
   renderSystemMap();
 }
+/* ═══ LE CADRAGE DE LA VUE GLOBALE SUIT L'ÉCRAN ═══
+   Marc, 04/09 : « tu arrives à rendre l'image du système solaire grande comme l'écran ? » L'image
+   est en PORTRAIT (400×600) ; sur un écran PAYSAGE elle tient en hauteur et laisse du vide sur les
+   côtés — on ne peut pas remplir un écran large avec une image haute sans la couper. Mais les
+   planètes n'occupent que la bande centrale (Kuiper y≈95 … Neptune y≈408) : en paysage on cadre
+   la vue sur cette bande, et tout paraît 1,6× plus grand, sans perdre un nom. En portrait
+   (téléphone), rien ne change. Les zones cliquables vivent dans les mêmes coordonnées : elles
+   suivent d'elles-mêmes. Rappelé au redimensionnement (`uiMapFit`). */
+const CADRAGE_GLOBAL_PORTRAIT='0 0 400 600', CADRAGE_GLOBAL_PAYSAGE='0 65 400 380';
+function cadrerVueGlobale(){
+  const svg=document.getElementById('solar-svg'), wrap=document.getElementById('map-wrap');
+  if(!svg)return;
+  if(G&&G.mapView&&G.mapView!=='global')return;
+  const paysage=!!(wrap&&wrap.clientWidth>wrap.clientHeight*1.05);
+  const vb=paysage?CADRAGE_GLOBAL_PAYSAGE:CADRAGE_GLOBAL_PORTRAIT;
+  if(svg.getAttribute('viewBox')!==vb)svg.setAttribute('viewBox',vb);
+  /* Le bandeau « Touche une planète » reste au bas de ce qui est VISIBLE. */
+  const b=document.getElementById('map-bandeau');
+  if(b){ const y=paysage?405:560; b.setAttribute('transform','translate(0 '+(y-560)+')'); }
+}
 function mapGlobalSVG(){
   let s='';
   // Les noms des planètes sont dans l'image ; ici uniquement les zones cliquables invisibles.
@@ -11114,7 +11174,7 @@ function mapGlobalSVG(){
     s+=`<circle cx="${h.x}" cy="${h.y}" r="${h.r}" fill="#000" opacity="0" pointer-events="all"/>`;
     s+=`</g>`;
   }
-  s+=`<rect x="40" y="560" width="320" height="30" rx="12" fill="#0a1326cc" stroke="#2a3a6a"/><text x="200" y="580" text-anchor="middle" font-size="11" fill="#cfe0ff">Touche une planète → carte détaillée</text>`;
+  s+=`<g id="map-bandeau"><rect x="40" y="560" width="320" height="30" rx="12" fill="#0a1326cc" stroke="#2a3a6a"/><text x="200" y="580" text-anchor="middle" font-size="11" fill="#cfe0ff">Touche une planète → carte détaillée</text></g>`;
   return s;
 }
 function mapSectorSVG(key){
