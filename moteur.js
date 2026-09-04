@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-03 · v10.08';
+const SOLAR_BUILD_MOTEUR = '2026-09-04 · v10.13';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -1271,6 +1271,7 @@ function resolveDecision(id, answer){
   const reg=_decisionsRegistre(), d=reg[id];
   if(!d)return false;
   delete reg[id];
+  plafonnerMoral();
   const vol=_suitesVolatiles[id]; delete _suitesVolatiles[id];
   _questionsRetirer(id);
   if(d.volatile&&!vol){
@@ -1864,7 +1865,18 @@ function getEffCost(card,p){
    l'adoption, pour que TOUTES les sources de moral — revenus, techs, accords, événements — se
    heurtent au même mur, sans qu'aucune ait à connaître la forme de gouvernement. */
 function realResCap(p){return{energy:12,materials:20,science:10+(p._resCap||0),morale:(p&&p.govFormMoraleCap)||10};}
-function getResCapFor(p){return{energy:9999,materials:9999,science:9999,morale:9999};} // v18 : plafonds NON appliqués en cours de tour (on peut créer au-delà) ; l'écrêtage se fait via enforceCaps à la frontière de tour, APRÈS l'entretien.
+/* v18 : les plafonds de RESSOURCES ne s'appliquent pas en cours de tour (on peut créer au-delà) ;
+   l'écrêtage se fait via `enforceCaps` à la frontière de tour, APRÈS l'entretien.
+   ⚠️ SAUF LE MORAL — règle de Marc, 04/09 : « la valeur thésaurisée de moral ne peut jamais dépasser
+   10, même pendant le tour » (ou le plafond de la forme de gouvernement, plus bas). Un +2 reçu à 10
+   est perdu, pas mis de côté pour absorber le −1 suivant. `plafonnerMoral` l'applique aux points
+   de passage : après chaque action (joueur : `addAction` ; ordinateur : `_aiRec`), après chaque
+   question résolue (`resolveDecision`) et à l'entrée de la fin de tour. */
+function getResCapFor(p){return{energy:9999,materials:9999,science:9999,morale:realResCap(p).morale};}
+function plafonnerMoral(){
+  if(!G||typeof allPlayers!=='function')return;
+  for(const p of allPlayers()){ if(!p||!p.res)continue; const cap=realResCap(p).morale; if((p.res.morale||0)>cap)p.res.morale=cap; }
+}
 function enforceCaps(){for(const p of allPlayers()){const cap=realResCap(p);for(const r in cap){if((p.res[r]||0)>cap[r])p.res[r]=cap[r];}}}
 function rEmoji(r){return{energy:'<i class=ri-energy></i>',materials:'<i class=ri-materials></i>',science:'<i class=ri-science></i>',morale:'<i class=ri-morale></i>',force:'⚔️'}[r]||r;}
 function rLabel(r){return{energy:'Énergie',materials:'Matériaux',science:'Savoir',morale:'Moral'}[r]||r;}
@@ -2042,6 +2054,49 @@ function lireArbreTechnologique(){
 }
 /* Ce qu'ACHETER cette carte rend atteignable — décoté par l'horizon : débloquer une suite au tour 9
    ne sert plus à rien, il ne reste pas de tours pour l'emprunter. */
+/* ═══════════════ LE DÉNI — PRENDRE POUR RETIRER À L'AUTRE ═══════════════
+   Doctrine de Marc (28/08) : « on essaie d'empêcher l'autre de prendre la tech 3, on la prend avant
+   lui si possible ». C'est aussi le principe défensif universel des IA de jeu — si je ne peux pas
+   gagner un coup, je bloque celui de l'adversaire — que les joueurs de draft appellent hate draft.
+
+   ⚠️ SEULEMENT SUR L'EXCLUSIF, ET C'EST UNE QUESTION DE FAIT, PAS DE GOÛT. Une seule famille de
+   cartes se retire vraiment : les technologies de branche de rang 3 (`isTechExclusive` →
+   `G.techTaken`). Partout ailleurs, prendre « avant » l'autre ne lui enlève rien, il achètera la
+   même carte au tour suivant. Une prime de déni sur le reste du jeu serait une superstition payante.
+
+   ⚠️ ET SUR LE COUP, JAMAIS SUR L'ÉTAT. C'est la correction de mon erreur du 28/08 (§63) : j'avais
+   posé cette valeur dans l'évaluation de POSITION — « ma situation vaut plus quand une T3 m'est
+   accessible ». L'IA était alors PAYÉE À NE PAS L'ACHETER, puisque l'acheter faisait disparaître la
+   prime. Mesuré à 8 victoires sur 16, sous la référence, et retiré.
+   Cette fonction n'est donc appelée QUE depuis le cerveau, sur la valeur simulée d'un ACHAT.
+   Surveillé par `test_deni_tech.js` §5.
+
+   ⚠️ AUCUNE INFORMATION CACHÉE. On lit les CARTES du rival et les paliers de branche — publics,
+   l'écran de score les affiche et la Télépathie les propose. On ne regarde JAMAIS s'il a de quoi
+   payer : son économie est invisible sans 📡 Réseau Orbital (§14.7), et la lire serait la triche que
+   `test_brouillard_ia` interdit. */
+function valeurDeni(cardId,nat){
+  try{
+    if(!G||!cardId||!nat)return 0;
+    const card=CARDS_POOL.find(c=>c&&c.id===cardId);
+    if(!card)return 0;
+    if(typeof isTechExclusive!=='function'||!isTechExclusive(card))return 0;
+    if(G.techTaken&&G.techTaken.has(cardId))return 0;   // déjà prise : plus rien à retirer à personne
+    const total=G.maxTurns||10;
+    const horizon=Math.max(0,total-(G.turn||1)+1)/total;
+    const tous=(typeof allPlayers==='function')?allPlayers():[G.player].concat(G.ais||[]);
+    let menace=0;
+    for(const r of tous){
+      if(!r||r===nat||!r.civ)continue;
+      /* PRÊT : il a déjà le rang 2 de la branche, il ne lui manque que de payer. Menace immédiate. */
+      if(typeof isTechAvailable==='function'&&isTechAvailable(card,r)){ menace=Math.max(menace,2.5); continue; }
+      /* À UN PAS : il est engagé dans la branche et peut y monter. Menace réelle mais plus lointaine. */
+      if(card.branch&&(r.cards||[]).some(c=>c&&c.branch===card.branch))menace=Math.max(menace,1);
+    }
+    /* On prend le MAXIMUM et non la somme : une seule nation peut la prendre. */
+    return menace*horizon;
+  }catch(e){ return 0; }
+}
 function valeurDeblocage(cardId){
   try{
     const c=(G&&G._chainesTech)?(G._chainesTech[cardId]||0):0;
@@ -2050,6 +2105,243 @@ function valeurDeblocage(cardId){
     const horizon=Math.max(0,total-(G.turn||1)+1)/total;
     return c*0.35*horizon;
   }catch(e){ return 0; }
+}
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   LE PROJET EN CHAÎNE — CE QUE LE TACTICIEN NE POUVAIT PAS VOIR À UN COUP DE PROFONDEUR
+   ----------------------------------------------------------------------------------------------
+   Marc, 04/09, racontant sa partie gagnée contre une IA qui menait : Empathe au tour 7 → Télépathie
+   → copie de la meilleure tech du meneur → croiseur → assaut au dernier tour sur deux colonies de
+   niveau 3. TROIS TOURS SANS UN SEUL POINT, puis la victoire.
+   Un cerveau qui juge coup par coup ne peut pas faire cela : « Liens Empathes » vaut moins qu'une
+   colonie AUJOURD'HUI, et « assaillir Ganymède » est perdu AUJOURD'HUI. Il faut juger la FIN de la
+   chaîne, pas le présent — et c'est tout ce que fait ce bloc.
+
+   CE QUE C'EST. Un projet est une CHAÎNE de coups concrets (`etapes`) menant à une cible : le rang 3
+   d'une branche, ou la conquête d'une colonie précise après tel ou tel préparatif militaire. Il
+   s'ajoute au style de jeu, il ne le remplace pas ; il ne dicte pas les coups, il PRIME ceux qui
+   font avancer la chaîne (`valeurProjet`, ajoutée sur le COUP dans le tacticien — jamais sur l'état,
+   la leçon de §63 vaut ici aussi).
+
+   COMMENT ON LE JUGE (`evaluerProjet`). On joue toute la chaîne POUR DE FAUX, gratuitement (les
+   ressources sont prêtées le temps de la simulation), puis on note la position obtenue AU TOUR OÙ LA
+   CHAÎNE SE TERMINE — contre la position qu'on aurait sans rien faire, au même tour futur. C'est
+   `simulerCoup` qui joue et remet le plateau : pas de seconde vérité, les règles restent où elles
+   sont (`buyTech`, `attackColony`, le combat lui-même). Le coût réel de la chaîne se traduit en
+   TOURS (ce qu'il faut pour réunir ressources et actions) ; un projet qui ne tient pas dans les
+   tours restants n'existe pas.
+
+   PERSISTANCE ET ABANDON (`reviserProjet`, une fois par tour). Les étapes déjà faites sortent de la
+   chaîne. Le projet courant est réévalué avec les autres : on le garde tant qu'il reste faisable et
+   qu'aucun autre ne le dépasse de plus de `PROJET_SEUIL_CHANGEMENT` — sans ce seuil, l'IA changerait
+   d'avis chaque tour et on perdrait tout le bénéfice. Ce qu'elle a déjà dépensé ne compte pas : c'est
+   parti. Un maillon devenu impossible (rang 3 pris par un autre, colonie disparue) tue le projet.
+
+   FRAPPER À LA FIN. L'assaut qui termine une chaîne n'est primé qu'aux deux derniers tours — c'est
+   le « quand » du plan de Marc : au dernier tour, pas de riposte. Avant cela, il se bat sur ses
+   seuls mérites comme n'importe quel coup.
+
+   ⚠️ PAS DE PROJET FIXÉ EN DÉBUT DE PARTIE : au tour 1 il n'y a rien à raisonner. Et rien pour le
+   témoin `historique`, qui doit rester byte-identique.
+   ⚠️ MESURE OBLIGATOIRE (`mesure_projet.js`, tête-à-tête avec/sans) : le déni était juste et ne
+   changeait rien. Si ce bloc est neutre, il sort.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+const PROJET_SEUIL_CHANGEMENT=1.3;   // un autre projet doit valoir 30 % de plus pour qu'on lâche le courant
+const PROJET_POIDS=1.0;              // prime = poids × gain / étapes restantes
+const PROJET_GAIN_MIN=0.5;           // en dessous, ce n'est pas un projet, c'est du bruit
+const PROJET_MAX_CIBLES=8;
+
+function _cartesBranche(branche){ return CARDS_POOL.filter(c=>c&&c.branch===branche&&c.tier<=3).sort((a,b)=>a.tier-b.tier); }
+/* Les achats manquants pour atteindre le rang 3 de `branche` ; null si la branche est fermée à `nat`. */
+function _chaineBranche(nat,branche){
+  const cartes=_cartesBranche(branche);
+  const t3=cartes.find(c=>c.tier===3);
+  if(!t3)return null;
+  if(isTechExclusive(t3)&&G.techTaken&&G.techTaken.has(t3.id))return null;
+  if(branche==='empathes'){
+    const f=G.empathesFounder;
+    if(!f)return null;
+    if(!f.civIds.has(nat.civ.id)&&f.openAtTurn>(G.maxTurns||10)-1)return null;
+  }
+  const etapes=[];
+  for(const c of cartes){
+    if(possedeCarte(nat,c.id)||(nat.cards||[]).some(x=>x&&x._empathCopy&&x.id==='empath_copy_'+c.id))continue;
+    etapes.push({type:'tech',card:c.id,libelle:'acheter '+c.name});
+  }
+  return etapes;
+}
+/* Les préparatifs militaires qu'on sait décrire. Chaque « pack » est une liste d'achats, sous un nom
+   STABLE d'un tour à l'autre (l'identité du projet en dépend, même quand ses étapes s'épuisent). */
+function _packsMilitaires(nat){
+  const packs=[];
+  const cru=possedeCarte(nat,'mil3')?[]:[{type:'tech',card:'mil3',libelle:'acheter Supercroiseur'}];
+  packs.push({id:'cru',libelle:'Supercroiseur',etapes:cru});
+  const iadef=_chaineBranche(nat,'ia_renseignement');
+  if(iadef)packs.push({id:'iadef',libelle:'IA Défensive',etapes:iadef});
+  const emp=_chaineBranche(nat,'empathes');
+  if(emp){
+    packs.push({id:'emp',libelle:'Télépathie',etapes:emp});
+    packs.push({id:'emp+cru',libelle:'Télépathie + Supercroiseur',etapes:emp.concat(cru)});
+  }
+  return packs;
+}
+/* Les colonies qu'on peut envisager de prendre : celles du meneur d'abord, puis les plus grosses.
+   Jamais une capitale (10 de garnison — ce n'est pas un projet, c'est un siège), jamais sous pacte. */
+function _ciblesDeConquete(nat){
+  const rivaux=allPlayers().filter(o=>o&&o!==nat&&o.civ);
+  const vp=o=>{ try{ return calcVP(o).total; }catch(e){ return 0; } };
+  rivaux.sort((a,b)=>vp(b)-vp(a));
+  const meneur=rivaux[0]||null;
+  const out=[];
+  for(const o of rivaux){
+    if(typeof agressionInterditeEntre==='function'&&agressionInterditeEntre(nat,o,false))continue;
+    for(const col of (o.colonies||[])){
+      if(col.nodeId===o.civ.home)continue;
+      const n=NODES[col.nodeId]; if(!n||n.decorative)continue;
+      out.push({nat:o,node:col.nodeId,niveau:col.level||1,meneur:o===meneur});
+    }
+  }
+  out.sort((a,b)=>(b.meneur-a.meneur)||(b.niveau-a.niveau));
+  return out.slice(0,PROJET_MAX_CIBLES);
+}
+function projetsCandidats(nat){
+  const out=[];
+  if(!nat||!nat.civ)return out;
+  const branches=[]; for(const c of CARDS_POOL){ if(c&&c.branch&&branches.indexOf(c.branch)<0)branches.push(c.branch); }
+  for(const b of branches){
+    const et=_chaineBranche(nat,b);
+    if(et&&et.length)out.push({id:'t3:'+b,libelle:'rang 3 de '+b,etapes:et,cible:{type:'tech',branche:b}});
+  }
+  const packs=_packsMilitaires(nat);
+  for(const c of _ciblesDeConquete(nat)){
+    const nom=(NODES[c.node]||{}).name||c.node;
+    for(const p of packs){
+      out.push({id:'conq:'+c.node+':'+p.id,libelle:'prendre '+nom+' ('+c.nat.civ.name+') via '+p.libelle,
+                etapes:p.etapes.concat([{type:'assaut',node:c.node,libelle:'assaillir '+nom}]),
+                cible:{type:'colonie',node:c.node,civ:c.nat.civ.id}});
+    }
+  }
+  return out;
+}
+function _memeCoup(a,b){
+  if(!a||!b||a.type!==b.type)return false;
+  if(a.type==='tech')return a.card===b.card;
+  if(a.type==='assaut')return a.node===b.node;
+  return false;
+}
+function _etapeFaite(nat,e){
+  if(e.type==='tech')return possedeCarte(nat,e.card)||(nat.cards||[]).some(x=>x&&x._empathCopy&&x.id==='empath_copy_'+e.card);
+  if(e.type==='assaut')return (nat.colonies||[]).some(c=>c.nodeId===e.node);
+  return false;
+}
+/* Rend { gain, tours } ou null si le projet n'est pas faisable dans les tours restants. */
+function evaluerProjet(nat,projet){
+  if(!nat||!projet||!projet.etapes||!projet.etapes.length)return null;
+  const total=G.maxTurns||10, tour=G.turn||1;
+  const restants=Math.max(0,total-tour+1);
+  /* Le coût cumulé, traduit en tours : ressources qui manquent / revenus, et actions / actions par tour. */
+  const cout={materials:0,energy:0,science:0}; let ac=0;
+  for(const e of projet.etapes){
+    if(e.type==='tech'){
+      const c=CARDS_POOL.find(x=>x&&x.id===e.card); if(!c)return null;
+      const k=getEffCost(c,nat); for(const r in k)cout[r]=(cout[r]||0)+(k[r]||0);
+      ac+=(c.tier===3?2:(c.ac||1));
+    }else if(e.type==='assaut'){
+      ac+=1; const j=Math.min(6,nat.forceTokens||2); cout.materials+=j; cout.energy+=j;
+    }else return null;
+  }
+  let rev={}; try{ rev=revenusBruts(nat)||{}; }catch(e){ rev={}; }
+  /* ⚠️ PRUDENT, PAS OPTIMISTE : la nation continue de vivre pendant la chaîne (colonies, défense,
+     entretien) — on ne compte que 70 % de ses revenus et deux tiers de ses actions pour le projet.
+     Mesuré sans cette marge : des conquêtes adoptées au tour 7 en quatre étapes, abandonnées au
+     tour 9 faute de temps — l'IA avait payé les préparatifs pour rien. */
+  let tours=Math.ceil(ac/Math.max(1,(nat.acMax||2)*0.67));
+  for(const r of ['materials','energy','science']){
+    const manque=Math.max(0,(cout[r]||0)-(nat.res[r]||0));
+    if(manque>0)tours=Math.max(tours,Math.ceil(manque/Math.max(0.5,(rev[r]||0)*0.7)));
+  }
+  tours=Math.max(1,tours);
+  if(tours>restants)return null;
+  const tourFutur=Math.min(total,tour+tours-1);
+  /* Quand il ne reste que l'assaut ET qu'on est aux deux derniers tours, on le juge avec ce qu'on
+     A — plus de prêt : c'est maintenant ou jamais, et une prime sur un assaut perdu serait une
+     prime à la défaite. Avant cela, l'assaut ATTEND (voir `valeurProjet`) et la nation est censée
+     mettre de côté : on continue de le juger avec le prêt. */
+  const seulAssaut=projet.etapes.length===1&&projet.etapes[0].type==='assaut'&&restants<=2;
+  const res0={materials:nat.res.materials||0,energy:nat.res.energy||0,science:nat.res.science||0};
+  const r=simulerCoup(nat,function(){
+    if(!seulAssaut){ nat.res.materials+=100; nat.res.energy+=100; nat.res.science+=100; }
+    nat.acLeft=Math.max(nat.acLeft||0,12);
+    for(const e of projet.etapes){ if(!appliquerCoup(nat,e))return false; }
+    return true;
+  },function(){
+    /* Les questions du combat sont vidées : on juge l'état FINAL, au tour futur. La trésorerie est
+       REMISE À CE QU'ELLE ÉTAIT : le coût de la chaîne est déjà traduit en tours, et le compter ici
+       en plus ferait tomber la nation sous la falaise `perilRessources` — mesuré : −24 sur toutes
+       les conquêtes, ce qui les rendait toutes « perdantes » avant d'avoir été jugées. */
+    if(!seulAssaut){ for(const k in res0)nat.res[k]=res0[k]; }
+    G.turn=tourFutur;
+    return evaluerPositionRelative(nat);
+  });
+  if(!r.ok||r.valeur===-Infinity)return null;
+  /* La référence : ma position au même tour futur, sans avoir rien fait. */
+  let ref=0;
+  { const t0=G.turn; G.turn=tourFutur; try{ ref=evaluerPositionRelative(nat); }finally{ G.turn=t0; } }
+  return {gain:r.valeur-ref,tours:tours};
+}
+function _tracerProjet(nat,acte,projet,gain){
+  if(!G||!nat||!nat.civ)return;
+  if(!Array.isArray(G._traceProjet))G._traceProjet=[];
+  G._traceProjet.push({t:G.turn||0,nat:nat.civ.id,acte:acte,projet:projet?projet.libelle:null,
+                       gain:(gain===undefined||gain===null)?null:Math.round(gain*10)/10,
+                       reste:projet?projet.etapes.length:0});
+  if(G._traceProjet.length>120)G._traceProjet.splice(0,G._traceProjet.length-120);
+}
+/* Une fois par tour, pour une nation jouée par le tacticien. */
+function reviserProjet(nat){
+  if(!nat||!nat.civ||!G||G._simulationIA)return;
+  let courant=nat._projet||null;
+  if(courant){
+    courant.etapes=(courant.etapes||[]).filter(e=>!_etapeFaite(nat,e));
+    /* Une conquête est accomplie dès que la colonie est à moi — même prise autrement que prévu. */
+    const cibleAcquise=courant.cible&&courant.cible.type==='colonie'&&(nat.colonies||[]).some(c=>c.nodeId===courant.cible.node);
+    if(!courant.etapes.length||cibleAcquise){ _tracerProjet(nat,'accompli',courant,courant.gain); nat._projet=null; courant=null; }
+  }
+  const cands=projetsCandidats(nat);
+  const restants=Math.max(1,(G.maxTurns||10)-(G.turn||1)+1);
+  /* Pour COMPARER des projets, un gain obtenu tôt vaut plus qu'un gain obtenu au dernier tour :
+     il reste des tours pour en profiter, et le plan a moins d'occasions de dérailler. */
+  const score=ev=>ev.gain*(restants-ev.tours+1)/restants;
+  let meilleur=null, mv=-Infinity, valCourant=null, gainCourant=null;
+  for(const p of cands){
+    const nouveau=!courant||p.id!==courant.id;
+    if(nouveau&&p.etapes.length<2)continue;          // un seul coup n'est pas un projet : le tacticien le voit déjà
+    const ev=evaluerProjet(nat,p);
+    if(!ev)continue;
+    p.gain=ev.gain; p.tours=ev.tours;
+    if(!nouveau){ valCourant=score(ev); gainCourant=ev.gain; }
+    if(nouveau&&score(ev)>mv){ mv=score(ev); meilleur=p; }
+  }
+  if(courant){
+    /* Infaisable (maillon pris, cible disparue, plus assez de tours) ou devenu inutile : on lâche. */
+    if(valCourant===null||valCourant<=0){ _tracerProjet(nat,'abandon',courant,valCourant); nat._projet=null; courant=null; }
+    else if(meilleur&&mv>Math.max(PROJET_GAIN_MIN,valCourant)*PROJET_SEUIL_CHANGEMENT){
+      _tracerProjet(nat,'change',meilleur,mv); nat._projet=meilleur; return;
+    }else{ courant.gain=gainCourant; _tracerProjet(nat,'garde',courant,gainCourant); return; }
+  }
+  if(meilleur&&mv>PROJET_GAIN_MIN){ nat._projet=meilleur; _tracerProjet(nat,'adopte',meilleur,mv); }
+}
+/* La prime d'un coup qui fait avancer le projet courant — sur le COUP, jamais sur l'état. */
+function valeurProjet(coup,nat){
+  try{
+    const p=nat&&nat._projet; if(!p||!p.etapes||!p.etapes.length||!coup)return 0;
+    const e=p.etapes.find(x=>_memeCoup(x,coup)); if(!e)return 0;
+    const restants=Math.max(0,(G.maxTurns||10)-(G.turn||1)+1);
+    /* On frappe à la FIN, et seulement quand les préparatifs sont FAITS. Mesuré sans la seconde
+       condition : au tour 9, l'IA assaillait Titan deux fois sans avoir acheté l'IA Défensive qui
+       faisait tout l'intérêt du plan — et perdait les deux fois. */
+    if(e.type==='assaut'&&(restants>2||p.etapes.length>1))return 0;
+    return PROJET_POIDS*Math.max(0,p.gain||0)/p.etapes.length;
+  }catch(err){ return 0; }
 }
 function initGame(civId,aiCivIds){
   const others=Object.keys(CIVS).filter(id=>id!==civId);
@@ -2596,10 +2888,47 @@ function isEmpathesAvailableFor(p){
   if(G.empathesFounder.civIds.has(p.civ.id))return true;
   return G.turn>=G.empathesFounder.openAtTurn;
 }
+/* ═══ TÉLÉPATHIE — LA COPIE EST UNE RÈGLE, POUR N'IMPORTE QUELLE NATION ═══
+   ⚠️ Jusqu'au 04/09, la copie n'existait QUE dans la fenêtre du joueur (`applyEmpathCopy`, écrite
+   sur `G.player`) : une IA qui achetait Télépathie payait 6 savoir et 2 AC pour… rien. Aucune
+   copie, jamais. Septième occurrence du motif §64 — la règle vivait dans l'affichage.
+   Et la liste proposée était `G.ais` : un humain ne pouvait copier que les cartes des ordinateurs,
+   jamais celles d'un autre humain. On lit désormais TOUS les rivaux. */
+function cartesCopiablesEmpathe(nat){
+  const vus=new Set();
+  return allPlayers().filter(o=>o&&o!==nat&&o.cards).flatMap(o=>o.cards)
+    .filter(c=>c&&c.id&&!c._empathCopy&&!c.espCopy&&!possedeCarte(nat,c.id)&&!vus.has(c.id)&&vus.add(c.id));
+}
+/* Copie les effets PASSIFS (rGain, spec) d'une carte adverse dans `nat`. Rend la copie, ou null. */
+function copieEmpathe(nat,cardId){
+  if(!nat||!cardId)return null;
+  const original=cartesCopiablesEmpathe(nat).find(c=>c.id===cardId);
+  if(!original)return null;
+  const copy={...original,id:'empath_copy_'+cardId,_empathCopy:true};
+  nat.cards.push(copy);
+  // Copie uniquement les effets passifs (rGain, spec), pas les bonus one-shot
+  if(copy.rGain)for(const[r,a]of Object.entries(copy.rGain))nat.rpt[r]=(nat.rpt[r]||0)+a;
+  addLog('🧬 '+nat.civ.emoji+' '+nat.civ.name+' — Télépathie : effets de '+original.emoji+' '+original.name+' copiés (passifs uniquement)','gold');
+  return copy;
+}
+/* Quelle carte un ordinateur copie-t-il ? Celle qui laisse la meilleure position — essayée pour de
+   faux, carte par carte (pousser, noter, retirer : pas besoin de sérialiser). */
+function iaChoixCopieEmpathe(nat){
+  const options=cartesCopiablesEmpathe(nat);
+  let meilleure=null, mv=-Infinity;
+  for(const c of options){
+    const copy={...c,id:'empath_copy_'+c.id,_empathCopy:true};
+    nat.cards.push(copy);
+    if(copy.rGain)for(const[r,a]of Object.entries(copy.rGain))nat.rpt[r]=(nat.rpt[r]||0)+a;
+    let v=-Infinity; try{ v=evaluerPositionRelative(nat); }catch(e){}
+    if(copy.rGain)for(const[r,a]of Object.entries(copy.rGain))nat.rpt[r]=(nat.rpt[r]||0)-a;
+    nat.cards.pop();
+    if(v>mv){ mv=v; meilleure=c; }
+  }
+  return meilleure?meilleure.id:null;
+}
 function showEmpathCopyModal(){
-  // Prend le pool de cartes de tous les IA, dédupliqué
-  const seenIds=new Set();
-  const allAiCards=G.ais.flatMap(ai=>ai.cards).filter(c=>!c._empathCopy&&!c.espCopy&&c.id&&!seenIds.has(c.id)&&seenIds.add(c.id));
+  const allAiCards=cartesCopiablesEmpathe(G.player);
   if(_decisionActive()){ // mode serveur : router le choix de carte à copier (Télépathie)
     _emitDecision('empath_copy', G.player,
       {options:allAiCards.map(c=>({id:c.id,name:c.name,emoji:c.emoji,effect:c.effect}))},
@@ -2618,13 +2947,7 @@ function showEmpathCopyModal(){
 function applyEmpathCopy(cardId){
   document.getElementById('empath-copy-modal').classList.add('hidden');
   if(!cardId){render();return;}
-  const original=G.ais.flatMap(a=>a.cards).find(c=>c.id===cardId);
-  if(!original){render();return;}
-  const copy={...original,id:'empath_copy_'+cardId,_empathCopy:true};
-  G.player.cards.push(copy);
-  // Copie uniquement les effets passifs (rGain, spec), pas les bonus one-shot
-  if(copy.rGain)for(const[r,a]of Object.entries(copy.rGain))G.player.rpt[r]=(G.player.rpt[r]||0)+a;
-  addLog('🧬 Télépathie : effets de '+original.emoji+' '+original.name+' copiés (passifs uniquement)','gold');
+  if(!copieEmpathe(G.player,cardId)){render();return;}   // la règle est dans `copieEmpathe`
   closePopup();render();
 }
 /* ═══ UNE NATION ACCEPTE-T-ELLE LE MONOPOLE DE LA SPHÈRE DE DYSON ? ═══
@@ -4706,6 +5029,7 @@ function _runEndOfRound(){
     return;
   }
   G._eotDoneTurn=G.turn;
+  plafonnerMoral();
   advancePirates(); updateWarRisk(); updateTension();
   stDysonPuisGuerres();   // → guerres → stFinDeTour : chaque étape est NOMMÉE, aucune n'est capturée
 }
@@ -5565,6 +5889,9 @@ function buyTech(cardId, nation){
      (`showDysonModal`, ouverte avant l'achat) — la poser deux fois lui redemanderait son avis à
      lui-même. */
   if(card.id==='dyson3'&&_n!==G.player)G._aiDysonBuilt=_n.civ.id;
+  /* TÉLÉPATHIE ACHETÉE PAR UN ORDINATEUR : la copie se fait ICI, dans la règle — voir
+     `copieEmpathe`. Un humain, lui, choisit dans sa fenêtre (bloc d'affichage ci-dessous). */
+  if(card.id==='tele3'&&_n._isAI){ const _cid=iaChoixCopieEmpathe(_n); if(_cid)copieEmpathe(_n,_cid); }
   if(isTechExclusive(card))G.techTaken.add(cardId);
   if(card.branch)G.branchTiers[card.branch]=Math.max(G.branchTiers[card.branch]||0,card.tier);
   const costStr=Object.entries(cost).map(([r,a])=>'-'+a+rEmoji(r)).join(' ');
@@ -5584,7 +5911,7 @@ function buyTech(cardId, nation){
      nation ; si elle AFFICHE elle peut lire `G.player`* — à condition de vérifier d'abord que c'est
      bien de lui qu'il s'agit. C'est cette vérification qui manquait. */
   if(_n===G.player){
-    if(card.id==='tele3'){const ais=G.ais.filter(a=>a.cards.length>0);if(ais.length>0){closePopup();showEmpathCopyModal();return;}}
+    if(card.id==='tele3'&&!_n._isAI&&cartesCopiablesEmpathe(_n).length){closePopup();showEmpathCopyModal();return;}
     if(card.id==='extra3'&&G._pendingExtraSolar&&G._pendingExtraSolar.length){closePopup();showExtraSolarChoice();return;}
     if(card.id==='dyson3'){closePopup();showDysonModal();return;}
     scArmConfirm(card.emoji+' '+card.name,_scCardGains(card));
@@ -8102,6 +8429,15 @@ function nomProfilDe(nat){ const p=profilActifDe(nat); return p?(p.emoji+' '+p.n
    ⚠️ ON N'APPELLE PAS `perceivedForce` pour estimer la force à ±3 : elle ÉCRIT dans `G._fog` et
    consomme du hasard. Une fonction qui évalue ne doit rien écrire (§52.3). Sans renseignement, la
    force d'un rival est donc simplement IGNORÉE — l'ignorance est neutre, l'invention ne l'est pas. */
+/* Énergie > savoir > matériaux > moral (Marc, 04/09). Production : VP par unité et par tour ;
+   trésorerie : VP par unité en stock. Objet MUTABLE, lu à chaque appel — voir `evaluerPosition`. */
+const POIDS_EVAL={
+  production:{energy:0.85,science:0.70,materials:0.55,morale:0.20},
+  tresorerie:{energy:0.12,science:0.22,materials:0.14,morale:0},
+  doublerManque:true,     // une ressource sous son seuil de danger : sa PRODUCTION vaut le double
+  plafondProduction:10,   // au-delà de +10 par tour, une unité de plus ne vaut plus qu'un quart
+  auDela:0.25
+};
 function evaluerPosition(nat,observateur){
   if(!nat||!nat.civ)return 0;
   /* Ce que je vois d'un rival sans le Réseau Orbital : son SCORE et sa CARTE. Rien d'autre. */
@@ -8126,12 +8462,37 @@ function evaluerPosition(nat,observateur){
   const restants=Math.max(0,total-(G.turn||1)+1);
   const horizon=restants/total;                      // 1 au premier tour, ~0 au dernier
 
-  /* PRODUCTION — ce que la position rapportera d'ici la fin. Les coefficients disent combien de VP
-     vaut UNE unité par tour : le savoir mène aux technologies (les mieux notées au score), les
-     matériaux aux colonies et aux routes, l'énergie ne fait qu'accompagner. */
+  /* ═══════ CE QUE VAUT UNE UNITÉ DE CHAQUE RESSOURCE — ORDRE FIXÉ PAR MARC (04/09) ═══════
+     « Énergie première, science deuxième, matériaux troisième, moral dernier. »
+     ⚠️ MON RÉGLAGE DU 28/08 DISAIT L'INVERSE : savoir 0,85 · matériaux 0,55 · énergie 0,40, avec le
+     commentaire « l'énergie ne fait qu'accompagner ». C'était faux, et c'est moi qui l'avais écrit.
+     Sans énergie on n'engage plus un jeton, on ne colonise plus, on n'améliore plus : c'est LA
+     ressource du jeu, et l'IA la comptait pour la moins chère des trois. Une colonie riche en
+     énergie passait donc APRÈS une colonie riche en matériaux, à la colonisation comme à l'assaut.
+     ⚠️ ET LE MANQUE DOUBLE LE POIDS. Règle de Marc : « s'il y a une perte de moral, un manque de
+     matériaux, etc., multiplier par deux la pondération pour le manque jusqu'à ce qu'il n'y ait plus
+     de danger ». Une ressource sous son seuil de danger vaut le double — pour ce qu'on en produit
+     comme pour ce qu'on en garde — tant qu'elle y reste. Les seuils : ≤ 3 pour l'énergie, les
+     matériaux et le moral, ≤ 2 pour le savoir.
+     Les poids vivent dans `POIDS_EVAL`, lus à chaque appel : `mesure_poids.js` les échange pour
+     mesurer, sans toucher au moteur. */
+  const _rs=nat.res||{};
+  const manque={energy:(_rs.energy||0)<=3, materials:(_rs.materials||0)<=3, science:(_rs.science||0)<=2, morale:(_rs.morale||0)<=3};
+  /* ⚠️ LE DOUBLEMENT PORTE SUR LA PRODUCTION, JAMAIS SUR LE STOCK — mesuré le 04/09 : l'énergie
+     comptée cher EN STOCK rendait chaque dépense d'énergie trop chère, l'IA thésaurisait, faisait
+     40 % de colonisations en moins et finissait avec MOINS d'énergie (8,3 contre 9,8), 60,8 VP
+     contre 89,4. Marc : « qu'elles produisent plus d'énergie, pas qu'elles la thésaurisent ». */
+  const wP=r=>POIDS_EVAL.production[r]*((POIDS_EVAL.doublerManque&&manque[r])?2:1);
+  const wT=r=>POIDS_EVAL.tresorerie[r];
+  /* ET LA PRODUCTION A UN RENDEMENT DÉCROISSANT — Marc : « une fois qu'on a une production de +10,
+     ça doit perdre la valeur, vrai pour toutes les ressources ». Au-delà du plafond, une unité de
+     plus ne vaut qu'un quart : les stocks sont plafonnés en fin de tour (énergie 12), le surplus
+     se jette. */
+  const _prod=v=>{ v=v||0; const c=POIDS_EVAL.plafondProduction; return v<=c?v:c+(v-c)*POIDS_EVAL.auDela; };
+  /* PRODUCTION — ce que la position rapportera d'ici la fin, en VP par unité et par tour. */
   let rev={};
   try{ rev=revenusBruts(nat)||{}; }catch(e){ rev={}; }
-  const parTour=(rev.materials||0)*0.55+(rev.energy||0)*0.40+(rev.science||0)*0.85;
+  const parTour=_prod(rev.energy)*wP('energy')+_prod(rev.science)*wP('science')+_prod(rev.materials)*wP('materials')+_prod(rev.morale)*wP('morale');
   /* 0,30 → 0,36 : contrepartie du poids réduit des VP ci-dessus. Le but n'est pas de gonfler la
      production dans l'absolu, c'est de rendre le MOTEUR ÉCONOMIQUE plus attirant que le point marqué
      tout de suite, tant qu'il reste des tours pour le faire tourner. */
@@ -8139,7 +8500,10 @@ function evaluerPosition(nat,observateur){
 
   /* TRÉSORERIE — convertible tout de suite, mais elle ne vaut que si l'on a encore le temps de la
      dépenser. Un stock de 20🪨 au dernier tour ne vaut rien. */
-  const tresorerie=aveugle?0:((nat.res.materials||0)*0.14+(nat.res.energy||0)*0.12+(nat.res.science||0)*0.22)*horizon;   // stocks : cachés
+  /* Un stock au-delà du plafond de fin de tour (`realResCap`) ne vaut rien : il sera jeté. */
+  const _cap=realResCap(nat);
+  const _stock=r=>Math.min(_rs[r]||0,_cap[r]||9999);
+  const tresorerie=aveugle?0:(_stock('energy')*wT('energy')+_stock('science')*wT('science')+_stock('materials')*wT('materials'))*horizon;   // stocks : cachés
 
   /* POTENTIEL DE DÉVELOPPEMENT — une colonie de niveau 1 reliée vaut bien plus que sa valeur
      actuelle, tant qu'il reste des tours pour l'améliorer. */
@@ -8377,8 +8741,10 @@ function _viderQuestionsSimulees(){
   }
   return false;
 }
-/* Joue `fn` pour de faux et rend `{ ok, valeur }` ; le plateau est remis comme avant, toujours. */
-function simulerCoup(nat,fn){
+/* Joue `fn` pour de faux et rend `{ ok, valeur }` ; le plateau est remis comme avant, toujours.
+   `evaluer` (facultatif) remplace `evaluerPositionRelative(nat)` pour noter la position obtenue —
+   le projet en chaîne s'en sert pour juger l'état FINAL à un tour futur, questions déjà vidées. */
+function simulerCoup(nat,fn,evaluer){
   const avantLog=(G.log||[]).length, avantJ=(G._journal||[]).length, avantQ=_nbQuestions();
   const sauvegarde=scSerialize();
   const silence=G._simulationIA; G._simulationIA=true; G._simuQuestion=false;
@@ -8391,7 +8757,7 @@ function simulerCoup(nat,fn){
        noté au hasard. */
     const close=_viderQuestionsSimulees();
     poseQuestion=!close;
-    if(ok&&close) valeur=evaluerPositionRelative(nat);
+    if(ok&&close) valeur=(typeof evaluer==='function')?evaluer():evaluerPositionRelative(nat);
   }catch(e){ ok=false; }
   finally{
     try{
@@ -8723,6 +9089,23 @@ function enregistrerCerveau(nom,fn){ CERVEAUX_IA[nom]=fn; }
    `historique` reste enregistré comme TÉMOIN : sans lui, plus aucune mesure ne serait comparable. */
 function nomCerveauCourant(){ return (G&&G._cerveauIA)||'tacticien'; }
 function cerveauCourant(){ return CERVEAUX_IA[nomCerveauCourant()]||CERVEAUX_IA.historique; }
+/* ═══════ LES GARDE-FOUS DE L'ANCIENNE IA NE S'APPLIQUENT QU'À ELLE ═══════
+   `historique` ne sait pas compter : il applique une recette, sans noter ce qu'une action lui
+   coûte vraiment. Trois garde-fous ont donc été posés DEVANT lui pour qu'il ne se ruine pas en
+   guerre : la réserve à l'entrée du tour, `_belowReserve` dans `chooseAndAct`, et `_warConserve`.
+   Le `tacticien`, lui, simule chaque coup et note la position obtenue — avec `perilRessources`, une
+   falaise à ≤2 jetons payables. Il n'a pas besoin qu'on l'empêche de dépenser : il le voit.
+   ⚠️ MESURÉ LE 04/09 (partie tout-IA, graine 1000) : ces trois verrous, restés actifs pour tout le
+   monde, ÉTEIGNAIENT le tacticien pendant chaque guerre — Terriens tours 6, 7 et 9 : 5 AC accordés,
+   0 action jouée, cerveau jamais consulté. Le seuil d'entrée exigeait ≥10🪨 ET ≥10⚡ pour avoir
+   seulement le droit d'agir. C'est ce qui paralysait les Martiens et Jupitériens de la partie
+   C04C cinq tours durant, et ce que Marc appelait « des IA pas assez intelligentes » : elles
+   n'étaient pas bêtes, elles étaient débranchées. Sixième occurrence du motif §64.
+   Les verrous restent tels quels pour `historique` : c'est le témoin, il doit rester identique. */
+/* ⚠️ On regarde le cerveau RÉSOLU, pas le nom : un nom inconnu retombe sur `historique`
+   (`cerveauCourant`), et doit alors retrouver ses verrous — sinon la partie diverge du témoin
+   (`test_cerveau_ia` §4 l'a attrapé). */
+function _cerveauHistorique(){ return cerveauCourant()===CERVEAUX_IA.historique; }
 /* Le cerveau d'origine : la première action réalisable du classement. Rigoureusement l'ancienne
    boucle, déplacée — pas réécrite. */
 enregistrerCerveau('historique', function(ctx){
@@ -8763,7 +9146,14 @@ enregistrerCerveau('tacticien', function(ctx){
        rapporte MAINTENANT ; ça ne peut pas montrer qu'elle ouvre la suivante, parce qu'il faudrait
        simuler deux coups d'affilée. On ajoute donc ce que l'arbre — lu au démarrage — dit qu'elle
        débloque. C'est le demi-pas de profondeur demandé par Marc le 28/08. */
-    const valeur=r.valeur+((c.type==='tech'&&typeof valeurDeblocage==='function')?valeurDeblocage(c.card):0);
+    /* Deux ajouts que la simulation seule ne peut pas voir, tous deux sur le COUP :
+         · `valeurDeblocage` — ce que cette carte OUVRE ensuite (l'arbre, lu au démarrage) ;
+         · `valeurDeni`      — ce qu'elle RETIRE à un rival, quand elle est exclusive et convoitée. */
+    const valeur=r.valeur
+      +((c.type==='tech'&&typeof valeurDeblocage==='function')?valeurDeblocage(c.card):0)
+      +((c.type==='tech'&&typeof valeurDeni==='function')?valeurDeni(c.card,ctx.nation):0)
+      /* · `valeurProjet` — ce que ce coup fait AVANCER dans le projet en chaîne (voir `reviserProjet`). */
+      +((typeof valeurProjet==='function')?valeurProjet(c,ctx.nation):0);
     if(valeur>meilleureValeur){ second=meilleur; secondeValeur=meilleureValeur;
                                   meilleureValeur=valeur; meilleur=c; }
     else if(valeur>secondeValeur){ secondeValeur=valeur; second=c; }
@@ -8793,7 +9183,10 @@ function _doAITurnInterne(aiPlayer,oneShot){
   // Un joueur humain en guerre ne dépense pas sa dernière énergie : il garde de quoi ENGAGER ses jetons
   // (1🪨 +1⚡ par jeton). Avant, l'IA finissait à 0⚡ et se laissait conquérir sans résistance.
   // On coupe TOUTE dépense discrétionnaire dès que la trésorerie tombe au niveau de la réserve.
-  {const _w=(typeof _warOf==='function')?_warOf(ai.civ.id):null;
+  /* ⚠️ RÉSERVÉ À L'ANCIEN CERVEAU — voir `_cerveauHistorique`. Pour le tacticien, ce bloc faisait
+     perdre un tour ENTIER dès que la nation en guerre n'avait pas ≥10🪨 et ≥10⚡ (réserve 6 + marge
+     3). Mesuré : cerveau jamais consulté pendant toute la durée des guerres. */
+  {const _w=(typeof _warOf==='function'&&_cerveauHistorique())?_warOf(ai.civ.id):null;
    if(_w){
      const _resv=Math.max(2,Math.min(6,ai.forceTokens||0));
      const _liq=Math.min(ai.res.materials||0, ai.res.energy||0);
@@ -8806,9 +9199,15 @@ function _doAITurnInterne(aiPlayer,oneShot){
      }
    }
    ai._hoarding=false;}
+  /* ── LE PROJET EN CHAÎNE — révisé UNE fois par tour, avant le premier coup, tacticien seulement ──
+     (`_aiSetupDone` est le drapeau « la mise en place du tour est faite » du mode entrelacé.) */
+  if(!_cerveauHistorique()&&!(oneShot&&ai._aiSetupDone)&&typeof reviserProjet==='function'){
+    try{ reviserProjet(ai); }catch(e){}
+  }
   // ── Suivi des coûts IA : snapshot avant chaque action, diff après, enregistré au journal ──
   function _aiSnapRes(){return{energy:ai.res.energy||0,materials:ai.res.materials||0,science:ai.res.science||0,morale:ai.res.morale||0,force:ai.forceTokens||0};}
   function _aiRec(bAc,bRes,fromIdx){
+    plafonnerMoral();
     const acP=Math.max(0,bAc-ai.acLeft),cost={},gain={};
     /* ⚠️ SEULS LES COÛTS ÉTAIENT RELEVÉS. Un pouvoir gratuit qui RAPPORTE des ressources — le
        « Commerce avec les pirates » des Ceinturiens — s'affichait donc « paie 0 AC (aucune
@@ -10020,7 +10419,8 @@ function _doAITurnInterne(aiPlayer,oneShot){
     // Reconnecter une colonie isolée reste toujours le réflexe prioritaire.
     if(ai.colonies.some(c=>!c.connected&&c.nodeId!==ai.civ.home)&&tryRoute())return true;
     // En guerre et trésorerie basse → on THÉSAURISE (on ne dépense pas ce qui servira à se défendre).
-    if(_belowReserve())return false;
+    // Réservé à l'ancien cerveau : le tacticien porte sa propre falaise (`perilRessources`).
+    if(_cerveauHistorique()&&_belowReserve())return false;
     /* ⚠️ LA TABLE DE NOTES N'EST CALCULÉE QUE SI LE CERVEAU LA DEMANDE. Marc, 27/08 : « je préfère
        un système qui n'a pas de notes sur les actions préalables ». Le cerveau `tacticien` n'en veut
        pas — et grâce à ces accesseurs paresseux, elle ne tourne même pas quand il joue. Les anciens
@@ -10042,11 +10442,13 @@ function _doAITurnInterne(aiPlayer,oneShot){
   ai._aiSetupDone=true;
   if(oneShot){ // INTERLACÉ : UNE action puis la main tourne
     if(ai.acLeft<=0) return false;
-    if(ai._warConserve) return _aiStep(tryRecaptureAssault);
+    /* `_warConserve` (guerre jouable → seulement des assauts de reprise) : réservé à l'ancien cerveau.
+       Le tacticien évalue l'assaut comme un coup parmi d'autres, il n'a pas besoin qu'on l'y force. */
+    if(ai._warConserve&&_cerveauHistorique()) return _aiStep(tryRecaptureAssault);
     return _aiStep(chooseAndAct);
   }
-  if(ai._warConserve){
-    // En guerre jouable : conserver les ressources pour frapper au maximum.
+  if(ai._warConserve&&_cerveauHistorique()){
+    // En guerre jouable : conserver les ressources pour frapper au maximum. (ancien cerveau seulement)
     for(let s=0;s<4&&ai.acLeft>0;s++){if(!_aiStep(tryRecaptureAssault))break;}
     ai.acLeft=0;return;
   }
@@ -11289,7 +11691,7 @@ function _isWarAct(name){return /guerre|assaut|pill|raid|repouss|attaque|reprend
      · la ligne de journal — elle était signée `G.player.civ.name`, donc du nom du lecteur ;
      · `showToast` — un toast pour une action qui n'est pas la sienne ;
      · `_ilMaybePass` — le pire : en solo, chaque action d'IA PASSAIT LA MAIN DU JOUEUR. */
-function addAction(emoji,name,acPaid,resPaid,gainDesc){if(!G.turnActions)G.turnActions=[];/* ⚠️ L'INITIALISATION VIENT AVANT LA GARDE, ET CE N'EST PAS COSMÉTIQUE : si le premier coup du tour est celui d'une IA, sortir avant cette ligne laisserait `G.turnActions` à `undefined` pour tout le reste du tour. `test_passer.js` l'a attrapé dans l'heure (la main revenait au même joueur après un skip). */if(typeof _acteurCourant==='function'&&G&&_acteurCourant()!==G.player)return;const _entry={emoji,name,acPaid:acPaid||0,resPaid:resPaid||{},gainDesc:gainDesc||''};G.turnActions.push(_entry);if(G.player){if(!G.player._turnActions)G.player._turnActions=[];G.player._turnActions.push(_entry);}/* journal par nation : indispensable au bilan en multijoueur */if(G){G._scStuckTries=0;try{G._journal=G._journal||[];G._journal.push({turn:G.turn||0,nat:(G.player&&G.player.civ&&G.player.civ.name)||'Toi',name:name,ac:acPaid||0,cost:_normCost(resPaid),gain:_riToText(gainDesc),war:_isWarAct(name),auto:false});}catch(e){}}showToast(emoji,name,acPaid,resPaid,gainDesc);if(G&&G._il){G._ilPassTries=0;setTimeout(_ilMaybePass,60);}}
+function addAction(emoji,name,acPaid,resPaid,gainDesc){plafonnerMoral();if(!G.turnActions)G.turnActions=[];/* ⚠️ L'INITIALISATION VIENT AVANT LA GARDE, ET CE N'EST PAS COSMÉTIQUE : si le premier coup du tour est celui d'une IA, sortir avant cette ligne laisserait `G.turnActions` à `undefined` pour tout le reste du tour. `test_passer.js` l'a attrapé dans l'heure (la main revenait au même joueur après un skip). */if(typeof _acteurCourant==='function'&&G&&_acteurCourant()!==G.player)return;const _entry={emoji,name,acPaid:acPaid||0,resPaid:resPaid||{},gainDesc:gainDesc||''};G.turnActions.push(_entry);if(G.player){if(!G.player._turnActions)G.player._turnActions=[];G.player._turnActions.push(_entry);}/* journal par nation : indispensable au bilan en multijoueur */if(G){G._scStuckTries=0;try{G._journal=G._journal||[];G._journal.push({turn:G.turn||0,nat:(G.player&&G.player.civ&&G.player.civ.name)||'Toi',name:name,ac:acPaid||0,cost:_normCost(resPaid),gain:_riToText(gainDesc),war:_isWarAct(name),auto:false});}catch(e){}}showToast(emoji,name,acPaid,resPaid,gainDesc);if(G&&G._il){G._ilPassTries=0;setTimeout(_ilMaybePass,60);}}
 function showToast(emoji,name,acPaid,resPaid,gainDesc){
   const el=document.getElementById('action-toast');if(!el)return;
   const paid=[];if(acPaid)paid.push(acPaid+' AC');for(const[r,a]of Object.entries(resPaid||{}))if(a>0)paid.push(a+rEmoji(r));
@@ -11828,23 +12230,36 @@ function _warShowAttackSlider(){
   const engageable=engageableTokens(p); // MÊME source que la barre du haut → plus d'écart d'affichage
   const intel=getIntelLevel(G.player);
   document.getElementById('wcm-sub').textContent='Attaque '+(targetNode?targetNode.name:'colonie')+' — choisis tes jetons :';
+  /* ⚠️ TROIS LIGNES, PAS SIX — Marc, 03/09 : « y a trop de blabla dans cette fenêtre, ça saoûle, on
+     a pas envie de tout lire, surtout dans un petit écran ». Les décomptes entre parenthèses (total
+     et garnison d'un côté, jetons payables + garnison + bonus gratuits de l'autre) expliquaient un
+     chiffre que le joueur n'a pas à recalculer : ce qu'il lui faut pour décider, c'est ce qu'il peut
+     engager et ce qu'il a en face. Le détail vit dans les règles, pas dans une fenêtre de décision.
+     ⚠️ ON NE TOUCHE PAS AUX CHIFFRES EUX-MÊMES : `engageable` et la défense totale restent calculés
+     exactement comme avant — on retire du texte, pas de l'information utile. */
   document.getElementById('wcm-info').innerHTML=
     'Cible : <strong style="color:#ffaa66">'+(targetNode?targetNode.emoji+' '+targetNode.name:'?')+'</strong><br>'+
-    'Tes jetons engageables : <strong>'+engageable+'</strong> <span style="color:#7880a0;font-size:.8em">('+(p.forceTokens||0)+' au total · '+defFloor+' réservé(s) en garnison)</span>'+
+    'Tes jetons engageables : <strong>'+engageable+'</strong>'+
     (stratBonus?'<br>Bonus stratégie : <strong>+'+stratBonus+'</strong>':'')+
     '<br><span style="color:#7880a0;font-size:.82em">'+(intel>=2
-      ? ('🛰️ Défense ennemie totale : <strong>'+(usableDef+1+_freeDef)+'</strong> '
-       +'<span style="color:#8fb0d8">('+usableDef+' jeton(s) payable(s) + 1 garnison'+(_freeDef?(' + '+_freeDef+' bonus gratuits : Empathes/croiseur'):'')+')</span>')
-      : ('🌫️ Force ennemie totale : <strong>~'+aiTok+'</strong> jeton(s) (±1) — part utilisable inconnue sans renseignement'))+'</span>';
+      ? ('🛰️ Défense ennemie totale : <strong>'+(usableDef+1+_freeDef)+'</strong>')
+      : ('🌫️ Force ennemie totale : <strong>~'+aiTok+'</strong> jeton(s) (±1)'))+'</span>';
   const slider=document.getElementById('wcm-slider');
   slider.parentElement.style.display='';
   document.getElementById('wcm-power').style.display='';
   document.getElementById('war-combat-modal').querySelector('.atk-btns').style.display='';
   const _afford=maxAffordableTokens(p, reserveCroiseur(p, !!G._cruiserDeployTemp)); // SOURCE UNIQUE : Navigation (coût ÷2) ET croiseur réservé
+  /* ⚠️ LE CURSEUR MONTE JUSQU'À CE QUE TU POSSÈDES, PAS JUSQU'À CE QUE TU PEUX PAYER.
+     Avant, il était borné au payable — et ce plafond n'était calculé QU'À L'OUVERTURE, croiseur non
+     déployé. Déployer le croiseur ensuite ne rabaissait rien : Marc a donc pu rester à 7 jetons, lire
+     « puissance 12 », valider, et se retrouver à 9 (partie 7CFF, tour 10). Le moteur rognait à 4 en
+     silence, une ligne perdue dans le journal.
+     Désormais le curseur va jusqu'au possédé, et c'est la COULEUR qui dit si c'est payable — rouge
+     au-delà, jaune en dessous (choix de Marc, 03/09) — avec le bouton « Engager » verrouillé tant
+     que c'est rouge. La contrainte se voit au lieu de s'appliquer après coup.
+     La valeur d'ouverture reste le maximum PAYABLE : on ne démarre jamais sur un écran rouge. */
   const maxCommit=Math.max(0,Math.min(p.forceTokens-defFloor,_afford));
-  slider.min=0;slider.max=maxCommit;slider.value=maxCommit;
-  if(defFloor>0)document.getElementById('wcm-info').innerHTML+=
-    '<br><span style="color:#7880a0;font-size:.8em">⚠️ '+defFloor+' jeton(s) réservés pour la défense de tes colonies (non engageables).</span>';
+  slider.min=0;slider.max=Math.max(0,p.forceTokens-defFloor);slider.value=maxCommit;
   if(Math.max(0,p.forceTokens-defFloor)>_afford)document.getElementById('wcm-info').innerHTML+=
     '<br><span style="color:#ff8866;font-size:.8em">⚠️ Limité à '+_afford+' jeton(s) : il faut 1<i class=ri-materials></i> +1<i class=ri-energy></i> par jeton engagé.</span>';
   // Bonus Empathes (gratuit, non gaspillable)
@@ -11959,7 +12374,24 @@ function updateWarCombatSlider(){
   const cruOn=!!G._cruiserDeployTemp&&cruiserAvailable(p)&&cruiserAfford(p);const cruPow=cruOn?(p.cruiserPower||5):0;
   const pPow=committed+stratBonus+emp+cruPow;
   document.getElementById('wcm-slider-val').textContent=committed;
-  const _aff=(p.res.materials||0)>=(committed+(cruOn?5:0))&&(p.res.energy||0)>=(committed+(cruOn?5:0));
+  /* ⚠️ MÊME FORMULE QUE LE MOTEUR, PAS UNE COPIE APPROXIMATIVE. L'ancienne ligne comparait à
+     `committed + 5` en dur : elle ignorait l'IA de Navigation (coût de guerre ÷2) et le vrai coût du
+     croiseur. Elle pouvait donc annoncer « trop cher » quand ça passait, ou l'inverse.
+     `maxAffordableTokens(p, reserveCroiseur(p, cruOn))` est EXACTEMENT ce que `resolveWarCombat`
+     utilise pour rogner l'engagement : un seul calcul, donc l'écran ne peut plus mentir. */
+  const _capPayable=(typeof maxAffordableTokens==='function')
+    ? maxAffordableTokens(p,(typeof reserveCroiseur==='function')?reserveCroiseur(p,cruOn):null)
+    : (p.forceTokens||0);
+  const _aff=committed<=_capPayable;
+  /* Le curseur lui-même change de couleur : c'est le premier endroit où l'œil va. */
+  const _sl=document.getElementById('wcm-slider');
+  if(_sl)_sl.style.accentColor=_aff?'#ffb347':'#ff5555';
+  const _slv=document.getElementById('wcm-slider-val');
+  if(_slv)_slv.style.color=_aff?'#ffb347':'#ff5555';
+  /* ⚠️ ET ON BLOQUE LA VALIDATION (Marc, 03/09 : « tu peux pas valider en rouge, ça doit bloquer »).
+     Sans cela, le joueur partirait encore au combat avec un chiffre que le moteur rognerait. */
+  const _btn=document.querySelector('#war-combat-modal .atk-confirm');
+  if(_btn){ _btn.disabled=!_aff; _btn.title=_aff?'':'Trop cher : baisse les jetons ou range le croiseur.'; }
   document.getElementById('wcm-power').innerHTML='Ta puissance : <strong>'+pPow+'</strong>⚔️ <span style="color:#7880a0;font-size:.85em">('+committed+' jetons'+(emp?' +'+emp+' Empathes':'')+(cruPow?' +'+cruPow+' Croiseur':'')+')</span>'+
     '<br><span style="color:'+(_aff?'#ffaa66':'#ff5555')+';font-weight:700">Coût : −'+committed+'<i class=ri-materials></i> −'+committed+'<i class=ri-energy></i>'+(cruOn?' (+5<i class=ri-materials></i> 5<i class=ri-energy></i> croiseur)':'')+'</span>';
 }
@@ -11969,7 +12401,21 @@ function toggleCruiser(){
   if(b){const on=G._cruiserDeployTemp;b.textContent=on?'⚓ Supercroiseur DÉPLOYÉ (+'+(G.player.cruiserPower||5)+'⚔️) — annuler':'⚓ Déployer le Supercroiseur (+'+(G.player.cruiserPower||5)+'⚔️, coût 5🪨 5⚡)';b.style.background=on?'#0a2a1a':'#0a1a2a';b.style.borderColor=on?'#44bb88':'#4488cc';b.style.color=on?'#66ffaa':'#88bbee';}
   updateWarCombatSlider();
 }
-function confirmWarCombat(){ G._warCancelRefund=null; G._warDecisionAssault=false; if(G&&G._il){G._ilPassTries=0;setTimeout(_ilMaybePass,80);}
+function confirmWarCombat(){
+  /* ⚠️ DEUXIÈME VERROU, ET IL N'EST PAS DE TROP. Le bouton est désactivé quand l'engagement dépasse
+     le payable (voir `updateWarCombatSlider`), mais un bouton désactivé se contourne — clavier,
+     appel direct, ancienne page en cache. On revérifie donc ICI, avec la même formule que le moteur.
+     C'est la leçon du 03/09 : ce qui n'est vérifié qu'à l'affichage n'est pas une règle. */
+  {const _p=G.player;
+   const _cruOn=!!G._cruiserDeployTemp&&cruiserAvailable(_p)&&cruiserAfford(_p);
+   const _cap=(typeof maxAffordableTokens==='function')
+     ? maxAffordableTokens(_p,(typeof reserveCroiseur==='function')?reserveCroiseur(_p,_cruOn):null)
+     : (_p.forceTokens||0);
+   if((parseInt(document.getElementById('wcm-slider').value)||0)>_cap){
+     addLog('⚠️ Engagement trop coûteux : baisse les jetons ou range le Supercroiseur.','red');
+     return;
+   }}
+  G._warCancelRefund=null; G._warDecisionAssault=false; if(G&&G._il){G._ilPassTries=0;setTimeout(_ilMaybePass,80);}
   const committed=parseInt(document.getElementById('wcm-slider').value);
   G._cruiserDeployed=!!G._cruiserDeployTemp&&cruiserAvailable(G.player)&&cruiserAfford(G.player);G._cruiserDeployTemp=false;
   document.getElementById('war-combat-modal').classList.add('hidden');

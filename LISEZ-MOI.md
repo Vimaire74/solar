@@ -353,3 +353,59 @@ piller tes colonies. Corrigé — et la règle vaut pour tout le monde, personne
 nation qui possède cette technologie.
 
 Un nouveau banc de contrôle. Aucun autre changement de règle.
+
+## v10.09 / sw v130 — 03/09/2026
+
+**La fenêtre de combat ne te laisse plus engager ce que tu ne peux pas payer.** Déployer le
+Supercroiseur réserve 5 matériaux et 5 énergie : le curseur passe au rouge dès que ton engagement
+dépasse tes moyens, et le bouton « Engager » refuse tant qu'il est rouge. Redescends le curseur, il
+repasse au jaune. Avant, le jeu acceptait et rognait ton engagement en silence au moment du combat.
+
+**Moins de texte.** Trois lignes d'information au lieu de six — les décomptes détaillés ont été
+retirés, les deux chiffres qui comptent restent.
+
+## v10.10 / sw v131 — 04/09/2026
+
+**Les ordinateurs cherchent désormais à te prendre une technologie de rang 3 avant toi**, quand ils
+voient que tu es en mesure de l'acheter. Ces technologies sont exclusives : la première nation qui
+en prend une la ferme aux autres.
+
+Mesuré sur huit parties : l'effet est pour l'instant nul, parce que les ordinateurs prenaient déjà
+ces technologies quand ils le pouvaient. La règle prendra son sens quand ils sauront préparer leur
+coup plusieurs tours à l'avance.
+
+## v10.11 / sw v132 — 04/09/2026
+
+**Les ordinateurs jouent enfin pendant les guerres.** Trois anciens garde-fous, écrits pour l'IA
+d'avant, coupaient le cerveau des nations en guerre avant même qu'il soit consulté : une nation avec
+8 jetons devait posséder au moins 10 matériaux ET 10 énergie pour avoir le droit d'agir, sinon elle
+perdait une action et passait son tour. C'est ce qui figeait les Martiens et les Jupitériens
+plusieurs tours de suite dans tes parties. Mesuré sur six parties, la nouvelle IA passait de
+2 victoires sur 6 contre l'ancienne à 3 sur 6.
+
+## v10.12 / sw v133 — 04/09/2026
+
+**Les ordinateurs préparent désormais un coup sur plusieurs tours.** Chaque tour, une nation jouée
+par l'ordinateur se choisit un projet — atteindre le rang 3 d'une branche, ou prendre une colonie
+précise après s'être équipée (Supercroiseur, IA Défensive, Télépathie) — le juge sur ce qu'il
+rapportera UNE FOIS TERMINÉ, et favorise les coups qui le font avancer. Elle le garde tant qu'il
+reste faisable, le lâche si un rival lui souffle la technologie visée ou si un autre projet vaut
+nettement mieux, et n'assaille qu'aux deux derniers tours, préparatifs faits.
+Mesuré sur 18 parties (deux nations avec projet contre deux sans, sièges permutés) : 12 victoires
+contre 6, +7 points de victoire en moyenne.
+
+**Télépathie achetée par un ordinateur copie enfin une carte** — avant, elle ne copiait rien du
+tout. Et un joueur humain peut maintenant copier les cartes d'un autre humain, pas seulement celles
+des ordinateurs.
+
+## v10.13 / sw v134 — 04/09/2026
+
+**Les ordinateurs valorisent l'énergie en premier — celle qu'ils PRODUISENT, pas celle qu'ils
+gardent.** Ordre décidé par Marc : énergie, puis savoir, puis matériaux, puis moral. Une ressource
+en manque (≤ 3 en stock, ≤ 2 pour le savoir) vaut le double tant que le danger dure. Au-delà de
++10 par tour, produire davantage d'une ressource ne vaut presque plus rien. Mesuré tête-à-tête sur
+12 parties : 7 victoires contre 4, à points égaux — l'essai « énergie chère aussi en stock »
+avait fait thésauriser les ordinateurs (0 victoire sur 6), il a été écarté.
+
+**Le moral ne dépasse plus jamais son plafond**, même en cours de tour : à 10 (ou 6 sous
+Tyrannie, 7 sous Domination des Corporations), un bonus de moral est perdu, pas mis de côté.
