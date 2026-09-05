@@ -62,6 +62,9 @@ class GameDriver {
     try { this.sb.startTurn(); }
     catch(e){ for(const p of this.roster) p.acLeft = p.acMax; }
     for(const p of this.roster){ p._passedRound = false; p._aiSetupDone = false; }
+    /* Une nation sans colonie ne joue plus (Marc, 05/09) : le moteur la marque « passée » et le dit
+       une fois. Même règle que `startInterleaved` en solo — une seule fonction. */
+    try { if (typeof this.sb.appliquerEliminations === 'function') this.sb.appliquerEliminations(); } catch(e) {}
     this.order = shuffle(this.roster.map(p=>p.civ.id));
     this.ptr = 0;
     return this.order.slice();

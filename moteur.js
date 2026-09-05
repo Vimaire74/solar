@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-05 · v10.28';
+const SOLAR_BUILD_MOTEUR = '2026-09-05 · v10.31';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -1727,8 +1727,31 @@ function capturerNoeud(vainqueur, nodeId){
     if(typeof updateConnections==='function')updateConnections(perdant);
     perdant.res.morale=Math.max(0,(perdant.res.morale||0)-1);
     expulses++;
+    /* ═══ PRENDRE UNE CAPITALE VAUT +10 VP (Marc, 05/09, partie B628) ═══
+       « On devrait donner un bonus de +10 VP quand on conquiert une capitale d'un autre joueur. »
+       Une capitale se défend à 10 de garnison : la prendre est l'exploit militaire du jeu, et il
+       ne rapportait que les VP du nœud. Le bonus est versé ICI, dans la seule porte des captures,
+       quel que soit le chemin (assaut humain, assaut d'ordinateur, reprise, fin de tour). */
+    /* Le bonus ne vaut que contre la nation D'ORIGINE : une capitale déjà conquise par un tiers est
+       « un jeton comme les autres colonies » (Marc, 05/09) — ni garnison de 10, ni +10 VP. */
+    if(perdant.civ&&perdant.civ.home===nodeId){
+      if(typeof gagnerVP==='function')gagnerVP(vainqueur,10,'Capitale de '+perdant.civ.name+' conquise');
+      addLog('👑 '+vainqueur.civ.emoji+' '+vainqueur.civ.name+' s\'empare de '+nom+', CAPITALE de '+perdant.civ.emoji+' '+perdant.civ.name+' — +10 VP !','gold');
+    }
+    if(estEliminee(perdant)){
+      addLog('🏳️ '+perdant.civ.emoji+' '+perdant.civ.name+' n\'a plus aucune colonie : cette nation ne joue plus.','gold');
+    }
     if(expulses>1) addLog('🏴 '+perdant.civ.emoji+' '+perdant.civ.name+' est AUSSI chassé de '+nom
       +' — les cohabitants tombent ensemble.','red');
+  }
+  /* ═══ REPRISE DE SA PROPRE CAPITALE ═══ La garnison repart de 1 et remonte de +1 par tour
+     (voir `garrisonOf`). Tous les participants en sont informés au moment même — c'est une règle
+     qui change ce que chacun peut espérer prendre. */
+  if(vainqueur.civ&&vainqueur.civ.home===nodeId){
+    vainqueur._capitaleRepriseTour=(G&&G.turn)||0;
+    const _msg=vainqueur.civ.emoji+' '+vainqueur.civ.name+' reprend sa capitale '+nom+' : sa garnison repart de <b>1</b> et gagne <b>+1 par tour</b> jusqu\'à 10.';
+    addLog('👑 '+_msg.replace(/<[^>]+>/g,''),'gold');
+    try{ for(const _h of allPlayers()){ if(_h&&_h._isAI===false) notifyNationHit(_h,'👑 Capitale reprise',_msg); } }catch(e){}
   }
   const nouveau=Math.max(1, meilleur-1);   // toute capture endommage la colonie d'un niveau
   const sienne=vainqueur.colonies.find(c=>c.nodeId===nodeId);
@@ -2026,9 +2049,32 @@ function cruiserAvailable(p){return !!p.hasCruiser&&(!p.cruiserCooldown||G.turn>
 // n'engage aucun jeton — 1 jeton pour une colonie ordinaire, 10 pour la BASE de la nation.
 // S'applique dans les DEUX SENS (quand tu attaques comme quand tu es attaqué). Les jetons que le défenseur
 // engage volontairement s'AJOUTENT à cette garnison.
+/* ═══ LA GARNISON D'UNE CAPITALE — RÈGLE DE MARC DU 05/09 ═══
+   · une capitale tenue par sa nation d'origine : 10 ;
+   · une capitale CONQUISE par quelqu'un d'autre : « un jeton comme les autres colonies » — 1. Elle
+     est donc reprenable ;
+   · une capitale REPRISE par sa nation d'origine : sa garnison repart de 1 et gagne +1 par tour,
+     jusqu'à 10 (« comme ça elle remonte »). `_capitaleRepriseTour` est posé par `capturerNoeud`.
+   Une seule source, lue par tous les combats et toutes les fenêtres. */
 function garrisonOf(p,nodeId){
   if(!p||!nodeId)return 1;
-  return (nodeId===(p.civ&&p.civ.home))?10:1;
+  if(nodeId!==(p.civ&&p.civ.home))return 1;
+  if(p._capitaleRepriseTour===undefined||p._capitaleRepriseTour===null)return 10;
+  return Math.max(1,Math.min(10,1+Math.max(0,((G&&G.turn)||0)-p._capitaleRepriseTour)));
+}
+/* Une nation sans aucune colonie ne joue plus — « c'est fini » (Marc, 05/09). Elle garde ce
+   qu'elle a (cartes, jetons, points), mais n'agit plus et ne subit plus rien. Une nation qui a
+   perdu sa CAPITALE mais garde d'autres colonies, elle, continue de jouer. */
+function estEliminee(p){ return !!p && (!p.colonies || p.colonies.length===0); }
+/* À chaque début de tour : une nation éliminée passe d'office, et on le dit UNE fois. Appelée par
+   `startInterleaved` (solo) et par le pilote serveur (`beginRound`). */
+function appliquerEliminations(){
+  for(const p of (typeof allPlayers==='function'?allPlayers():[])){
+    if(!estEliminee(p))continue;
+    p.acLeft=0; p._passedRound=true;
+    if(!p._elimineeDit){ p._elimineeDit=true;
+      addLog('🏳️ '+p.civ.emoji+' '+p.civ.name+' n\'a plus aucune colonie : cette nation ne joue plus jusqu\'à la fin de la partie.','gold'); }
+  }
 }
 function cruiserCost(p){
   const half=(typeof hasSpec==='function'&&hasSpec(p,'nav2_war'));
@@ -4716,8 +4762,17 @@ function guerreEtape(){
   if(_van&&(!_van.colonies||_van.colonies.length===0)){
     const _n=_van.civ.emoji+' '+_van.civ.name;
     endWar(guerreAdverseId());
-    addLog('🏳️ '+_n+' n\'a plus aucune colonie — nation ASSERVIE (vassale). La guerre prend fin.','gold');
-    showWarModal('🏳️ '+_n+' asservi !','Cette nation n\'a plus aucune colonie : elle devient ta <strong>vassale</strong>.<br><br>La guerre prend fin.',{txt:'Victoire totale.',cls:'win'});
+    /* ⚠️ CE MESSAGE SE RÉPÉTAIT À CHAQUE FIN DE TOUR (Marc, B628 : « la nation ceinturienne s'est
+       éteinte, or elle m'attaque au dernier tour »). Une nation sans colonie n'est pas « asservie »
+       au sens du jeu — aucun statut n'est posé, elle continue de jouer et peut assaillir. Le mot
+       était faux. On dit désormais ce qui est (« plus aucune colonie, la guerre s'éteint faute de
+       cible »), UNE FOIS par nation. Ce qu'une telle nation a encore le droit de faire est une
+       règle à trancher (§94), pas un message à réécrire. */
+    if(!_van._sansColonieDit){
+      _van._sansColonieDit=true;
+      addLog('🏳️ '+_n+' n\'a plus aucune colonie — la guerre s\'éteint faute de cible.','gold');
+      showWarModal('🏳️ '+_n+' sans colonie','Cette nation n\'a plus aucune colonie : il n\'y a plus rien à lui prendre.<br><br>La guerre prend fin. Elle garde ses cartes et ses jetons, et peut encore agir.',{txt:'Victoire totale.',cls:'win'});
+    }
     _warSuite('guerreSuivante');
     return;
   }
@@ -5094,6 +5149,7 @@ function startInterleaved(){
   G._order=allPlayers().slice();
   for(let i=G._order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[G._order[i],G._order[j]]=[G._order[j],G._order[i]];}
   for(const p of allPlayers()){ p._passedRound=false; p._aiSetupDone=false; p._turnActions=[]; p._raidsThisTurn=[]; p._recoltesTour=0; }
+  if(typeof appliquerEliminations==='function')appliquerEliminations();
   G._ilIdx=0; G._humanActive=false; G._ilLines=[]; G._ilMarkEntry=(G.log&&G.log[0])||null; G._turnMarkEntry=(G.log&&G.log[0])||null;
   /* ⚠️ LA LIGNE D'INITIATIVE ÉTAIT ÉCRITE APRÈS LE `return` DU MODE SERVEUR — donc JAMAIS en
      multijoueur (demande de Marc, 2026-08-07 : « ajouter dans journal qui est désigné par le hasard
@@ -7413,11 +7469,11 @@ function resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,defender){
       // SENS. Avant, seule TA colonie était d'abord « rétrogradée » (il fallait 3 assauts à l'ennemi pour
       // prendre une colonie Nv.3, alors qu'un seul te suffisait) — asymétrie corrigée.
       const col=target.obj;
-      const _newLvl=Math.max(1,(col.level||1)-1);
-      p.colonies=p.colonies.filter(c=>c.nodeId!==col.nodeId);updateConnections(p);
-      const conn=(typeof checkConnected==='function')?checkConnected(col.nodeId,ai):true;
-      if(!ai.colonies.some(c=>c.nodeId===col.nodeId))ai.colonies.push({nodeId:col.nodeId,level:_newLvl,connected:conn});
-      updateConnections(ai);if(war)war.aiRecaptureTarget=null;
+      /* ⚠️ QUATRIÈME COPIE DE LA CAPTURE, TROUVÉE LE 05/09. Elle retirait et ajoutait la colonie à la
+         main — donc sans le moral de l'abandon forcé, sans les cohabitants, et sans le +10 VP d'une
+         capitale. Une seule capture pour tout le monde : `capturerNoeud`. */
+      const _newLvl=capturerNoeud(ai,col.nodeId);
+      if(war)war.aiRecaptureTarget=null;
       lost='🏴 Colonie '+target.name+' CAPTURÉE par '+ai.civ.name+' (Nv.'+_newLvl+') — tu la perds !';
     }
     p.res.morale=Math.max(0,(p.res.morale||0)-1);
@@ -8085,7 +8141,11 @@ function journalCombat(p,engages,gagne,puissance,detailPuissance,croiseurArme){
   const sort=gagne ? (e-recup)+' revenu(s) tout de suite, '+recup+' en récupération'
                    : recup+' PERDU(S) définitivement, '+(e-recup)+' en récupération';
   const techs=_techsCombat(p,croiseurArme);
-  addLog('📊 '+p.civ.emoji+' '+p.civ.name+' — '+e+' jeton(s) engagé(s) · coût −'+cM+'<i class=ri-materials></i> −'+cE+'<i class=ri-energy></i>'
+  /* Le coût du Supercroiseur figurait sur sa propre ligne, pas ici : Marc (B628) a lu ce récapitulatif
+     et conclu que l'adversaire « n'avait payé que pour ses jetons ». Tout le coût, sur une ligne. */
+  const _cc=(croiseurArme&&typeof cruiserCost==='function')?cruiserCost(p):null;
+  const _coutCr=_cc?(' + Supercroiseur −'+_cc.materials+'<i class=ri-materials></i> −'+_cc.energy+'<i class=ri-energy></i>'):'';
+  addLog('📊 '+p.civ.emoji+' '+p.civ.name+' — '+e+' jeton(s) engagé(s) · coût −'+cM+'<i class=ri-materials></i> −'+cE+'<i class=ri-energy></i>'+_coutCr
     +' · puissance '+puissance+(detailPuissance?' ('+detailPuissance+')':'')
     +' · jetons : '+sort
     +(techs.length?' · techs : '+techs.join(', '):' · aucune tech de combat'),'dim');
@@ -8201,7 +8261,8 @@ function defenseAttendue(ai, cible, nodeId){
     }
   }catch(e){}
   const dEmpath=(typeof bonusCombatCartes==='function')?bonusCombatCartes(cible):0;
-  return jetons+dEmpath+1/*garnison*/+renfort;
+  const garnison=(typeof garrisonOf==='function')?garrisonOf(cible,nodeId):1;   // 10 pour une capitale (§14)
+  return jetons+dEmpath+garnison+renfort;
 }
 /* ═══════ UN TOUR DE GUERRE SE DÉCOMPTE UNE FOIS PAR TOUR, PAS UNE FOIS PAR COMBAT ═══════
    Depuis que la fin de tour porte DEUX combats (l'assaut de chacun), ce décompte serait appelé
@@ -9165,6 +9226,7 @@ function simulerCoup(nat,fn,evaluer){
 function coupsPossibles(nat){
   const coups=[];
   if(!nat||!nat.civ||(nat.acLeft||0)<1)return coups;
+  if(typeof estEliminee==='function'&&estEliminee(nat))return coups;   // sans colonie : plus aucun coup
   const abordable=o=>Object.entries(o||{}).every(([r,a])=>(nat.res[r]||0)>=a);
   const occupe=id=>allPlayers().some(n=>n.colonies&&n.colonies.some(c=>c.nodeId===id));
   const mien=id=>(nat.colonies||[]).some(c=>c.nodeId===id);
@@ -9601,7 +9663,13 @@ function resoudreAssautIA(ai,nodeId,opts){
   if(!bestCol)return false;
   if(typeof agressionInterditeEntre==='function'&&agressionInterditeEntre(ai,best,false))return false;
   const affordTok=Math.min(ai.res.materials||0,ai.res.energy||0);
-  const commit=(o.commit!==undefined)?o.commit:Math.min(ai.forceTokens||0,affordTok,6);   // même plafond que l'ancien cerveau
+  /* ⚠️ PAS DE PLAFOND À 6 PAR LA PORTE DU TACTICIEN. L'ancien cerveau engageait au plus 6 jetons
+     (doctrine `_assaultAIUtil`) — et il excluait les capitales, donc cela ne se voyait pas. Une
+     capitale se défend à 10 : plafonné à 6, un ordinateur ne pourrait JAMAIS en prendre une, alors
+     qu'un humain engage tout ce qu'il peut payer. Égalité de traitement (Marc, 25/08) : par ici,
+     tout ce qu'on a et qu'on peut payer ; `_engage` n'en prend ensuite que le nécessaire.
+     L'ancien cerveau passe son propre `commit` (plafonné) et reste l'étalon qu'il est. */
+  const commit=(o.commit!==undefined)?o.commit:Math.min(ai.forceTokens||0,affordTok);
   if(commit<1)return false;
   let bestSansDefense;
   if(o.sansDefense!==undefined)bestSansDefense=!!o.sansDefense;
@@ -9704,7 +9772,13 @@ function resoudreAssautIA(ai,nodeId,opts){
      ailleurs l'IA engageait `commit`, c'est-à-dire tout ce qu'elle avait, sans jamais vérifier
      que cela suffisait. En dessous de `_requis`, l'assaut est perdu d'avance ; au-dessus, les
      jetons en trop partent en récupération sans rien acheter. */
-  const _defReelle=dCommit+dEmpath+1/*garnison*/+_renfortIA;
+  /* ⚠️ LA GARNISON D'UNE CAPITALE EST DE 10, PAS DE 1 (règle §14, `garrisonOf`). Ce corps datait de
+     l'ancien cerveau, qui EXCLUAIT les capitales de ses cibles : le « +1 » ne se voyait pas. Depuis
+     que le tacticien passe ici (05/09), une capitale y aurait été prise comme une colonie ordinaire.
+     Marc, partie B628 : « le Terrien a éliminé la capitale ceinturienne » — 6⚔️ contre 5🛡️, garnison
+     comptée 1 sur une capitale. Une seule source pour la garnison, partout. */
+  const _garnison=(typeof garrisonOf==='function')?garrisonOf(best,nodeId):1;
+  const _defReelle=dCommit+dEmpath+_garnison+_renfortIA;
   const _requis=_defReelle-aEmpath+1;
   let _engage=Math.max(2,Math.min(commit,Math.max(2,_requis)));
   /* ⚠️ ON RENONCE PLUTÔT QUE D'OFFRIR SES JETONS. La défense réelle peut dépasser l'estimation
@@ -9726,7 +9800,7 @@ function resoudreAssautIA(ai,nodeId,opts){
   if(bestSansDefense&&_engage<commit)
     addLog('🎯 '+ai.civ.emoji+' '+ai.civ.name+' frappe '+((NODES[bestCol.nodeId]&&NODES[bestCol.nodeId].name)||bestCol.nodeId)
       +' — '+best.civ.name+' est à court de ressources et ne peut pas défendre ('+_engage+' jeton(s) suffisent).','gold');
-  const aPow=_engage+aEmpath,dPow=dCommit+dEmpath+1/*garnison de base*/+_renfortIA;
+  const aPow=_engage+aEmpath,dPow=dCommit+dEmpath+_garnison+_renfortIA;
   ai.acLeft=Math.max(0,ai.acLeft-1);ai.spentThisTurn+=1+_engage;ai._attacksThisTurn=(ai._attacksThisTurn||0)+1;
   const win=aPow>dPow;
   applyCombatEngage(ai,_engage,win);if(dCommit>0)applyCombatEngage(best,dCommit,!win);
@@ -9748,6 +9822,7 @@ function resoudreAssautIA(ai,nodeId,opts){
   return true;
 }
 function doAITurn(aiPlayer,oneShot){
+  if(typeof estEliminee==='function'&&estEliminee(aiPlayer)){ aiPlayer.acLeft=0; aiPlayer._passedRound=true; return false; }   // sans colonie : ne joue plus (Marc, 05/09)
   /* Tout ce que cette fonction journalise appartient à CETTE IA. Sans ce marquage, ses lignes
      étaient attribuées à `G.player` — c'est-à-dire à l'humain que le serveur avait activé, ce qui
      est exactement le contraire de la vérité. */
@@ -11194,11 +11269,56 @@ function _logToast(msg){
   if(!t){t=document.createElement('div');t.id='_logtoast';t.style.cssText='position:fixed;left:50%;bottom:calc(var(--botband,84px) + 14px);transform:translateX(-50%);z-index:1200;background:#0c2a12;border:1px solid #3fbf6a;color:#bff3cf;padding:9px 16px;border-radius:10px;font-size:.92em;box-shadow:0 6px 24px rgba(0,0,0,.6);pointer-events:none;opacity:0;transition:opacity .2s;max-width:90vw;text-align:center';document.body.appendChild(t);}
   t.innerHTML=msg;t.style.opacity='1';clearTimeout(t._h);t._h=setTimeout(()=>{t.style.opacity='0';},2400);
 }
+/* ═══ « COPIER LE LOG » NE DOIT JAMAIS ÉCHOUER EN SILENCE (Marc, 05/09 : « le bouton copier le log
+   dans le journal ne marche pas ») ═══
+   Trois façons de rater, toutes muettes ou trompeuses :
+     1. `buildFullLog()` lève une exception (un poste du rapport plante) → rien ne se passe, pas même
+        un message — le bouton « ne marche pas » ;
+     2. sur iPhone/iPad, `navigator.clipboard.writeText` est refusé, et l'ancien repli sélectionnait
+        une zone de texte placée HORS ÉCRAN (`top:-1000px`) : Safari n'y sélectionne rien, la copie
+        rend false ;
+     3. le message d'échec disait « utilise Email ou .txt » — deux boutons RETIRÉS le 09/08.
+   Désormais : le rapport se construit sous garde (au pire, le journal brut est copié et l'erreur est
+   dite) ; le repli sélectionne une zone VISIBLE et lisible (recette iOS : readOnly +
+   setSelectionRange) ; et si tout échoue, le texte est affiché dans une fenêtre où l'on peut le
+   sélectionner à la main — on n'est jamais laissé sans rien. */
 function copyLogText(){
-  const full=buildFullLog();
+  let full='';
+  try{ full=buildFullLog(); }
+  catch(e){
+    try{ full=(G.log||[]).map(l=>String((l&&l.msg)||l).replace(/<[^>]+>/g,'')).reverse().join('\n'); }catch(e2){ full=''; }
+    _logToast('⚠️ Rapport complet impossible ('+(e&&e.message?e.message:'erreur')+') — journal brut copié');
+  }
+  if(!full){ _logToast('⚠️ Rien à copier'); return; }
   const ok=()=>_logToast('✅ Log copié — colle-le dans la conversation');
-  const fallback=()=>{try{const ta=document.createElement('textarea');ta.value=full;ta.style.position='fixed';ta.style.top='-1000px';document.body.appendChild(ta);ta.focus();ta.select();const done=document.execCommand('copy');document.body.removeChild(ta);done?ok():_logToast('⚠️ Copie impossible — utilise Email ou .txt');}catch(e){_logToast('⚠️ Copie impossible — utilise Email ou .txt');}};
-  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(full).then(ok).catch(fallback);}else fallback();
+  const montrer=()=>{ /* dernier recours : afficher pour copier à la main */
+    try{
+      let m=document.getElementById('_logcopie');
+      if(!m){ m=document.createElement('div'); m.id='_logcopie';
+        m.style.cssText='position:fixed;inset:0;z-index:9000;background:rgba(4,4,18,.94);display:flex;flex-direction:column;padding:12px;gap:8px';
+        m.innerHTML='<div style="color:#c8d8f8;font:700 .95em system-ui">Sélectionne tout le texte et copie-le (Ctrl/Cmd+C, ou appui long sur mobile)</div>'
+          +'<textarea id="_logcopie_ta" readonly style="flex:1;width:100%;font:.8em monospace;background:#0c0c24;color:#dce8ff;border:1px solid #3a3a6a;border-radius:8px;padding:8px"></textarea>'
+          +'<button onclick="document.getElementById(\'_logcopie\').remove()" style="padding:10px;border-radius:9px;border:1px solid #3a3a6a;background:#161a2e;color:#c8d8f8;font:700 .95em system-ui">Fermer</button>';
+        document.body.appendChild(m);
+      }
+      const ta=document.getElementById('_logcopie_ta'); ta.value=full; m.style.display='flex';
+      ta.focus(); ta.setSelectionRange(0,ta.value.length);
+    }catch(e){ _logToast('⚠️ Copie impossible'); }
+  };
+  const fallback=()=>{
+    try{
+      const ta=document.createElement('textarea'); ta.value=full; ta.readOnly=true;
+      /* VISIBLE mais discret : iOS refuse de sélectionner ce qui est hors écran. */
+      ta.style.cssText='position:fixed;left:8px;bottom:8px;width:60px;height:24px;opacity:.01;font-size:16px;z-index:9000';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select(); try{ ta.setSelectionRange(0,ta.value.length); }catch(e){}
+      const done=document.execCommand('copy');
+      document.body.removeChild(ta);
+      if(done) ok(); else montrer();
+    }catch(e){ montrer(); }
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(full).then(ok).catch(fallback); }
+  else fallback();
   const el=document.getElementById('end-log-confirm');if(el){el.style.display='block';setTimeout(()=>el.style.display='none',3000);}
 }
 function emailLog(){
