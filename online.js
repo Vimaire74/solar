@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-04 · v10.22';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-05 · v10.28';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -386,25 +386,25 @@ function onDecision(pending){
     if(STATE._queue && STATE._queue.length){ const nx=STATE._queue.shift(); setTimeout(()=>onDecision(nx), 60); }
   };
   // VRAIES modales du jeu (même graphisme qu'en solo) pour ces décisions :
-  if(pending.kind==='agenda' && showAgendaReal(pending)){ STATE._realDecide=finish; return; }
-  if(pending.kind==='strategy' && showStrategyReal(pending)){ STATE._realDecide=finish; return; }
-  if(pending.kind==='invest1' && showInvestReal(pending,1)){ STATE._realDecide=finish; return; }
-  if(pending.kind==='invest2' && showInvestReal(pending,2)){ STATE._realDecide=finish; return; }
-  if(pending.kind==='peace_offer' && showPeaceReal(pending)){ STATE._realDecide=finish; return; }
-  if((pending.kind==='ai_dyson'||pending.kind==='human_dyson'||pending.kind==='dyson_build') && showDysonReal(pending)){ STATE._realDecide=finish; return; }
-  if(pending.kind==='war_result' && showWarResultReal(pending)){ STATE._realDecide=finish; return; }
-  if(pending.kind==='raid_hit' && showHitReal(pending)){ STATE._realDecide=finish; return; }
-  if(pending.kind==='eot' && showEotReal(pending)){ STATE._realDecide=finish; return; }
-  if(pending.kind==='event_result' && showEventResultBlocking(pending)){ STATE._realDecide=finish; return; }
-  if(pending.kind==='event_announce' && showEventAnnounceBlocking(pending)){ STATE._realDecide=finish; return; }
-  if(pending.kind==='forced_war' && showForcedWarReal(pending)){ STATE._realDecide=finish; return; }
-  if(pending.kind==='route_capture' && showRouteCaptureReal(pending)){ STATE._realDecide=finish; return; }
-  if(pending.kind==='accord_confirm' && showAccordReal(pending)){ STATE._realDecide=finish; return; }
-  if(pending.kind==='espionage' && showOptsReal(pending,'espionage-modal','espionage-branch-opts','id')){ STATE._realDecide=finish; return; }
-  if(pending.kind==='empath_copy' && showOptsReal(pending,'empath-copy-modal','empath-copy-opts','cardId',true)){ STATE._realDecide=finish; return; }
+  if(pending.kind==='agenda' && showAgendaReal(pending)){ STATE._realDecide=finish; scReduireFenetreVisible(); return; }
+  if(pending.kind==='strategy' && showStrategyReal(pending)){ STATE._realDecide=finish; scReduireFenetreVisible(); return; }
+  if(pending.kind==='invest1' && showInvestReal(pending,1)){ STATE._realDecide=finish; scReduireFenetreVisible(); return; }
+  if(pending.kind==='invest2' && showInvestReal(pending,2)){ STATE._realDecide=finish; scReduireFenetreVisible(); return; }
+  if(pending.kind==='peace_offer' && showPeaceReal(pending)){ STATE._realDecide=finish; scReduireFenetreVisible(); return; }
+  if((pending.kind==='ai_dyson'||pending.kind==='human_dyson'||pending.kind==='dyson_build') && showDysonReal(pending)){ STATE._realDecide=finish; scReduireFenetreVisible(); return; }
+  if(pending.kind==='war_result' && showWarResultReal(pending)){ STATE._realDecide=finish; scReduireFenetreVisible(); return; }
+  if(pending.kind==='raid_hit' && showHitReal(pending)){ STATE._realDecide=finish; scReduireFenetreVisible(); return; }
+  if(pending.kind==='eot' && showEotReal(pending)){ STATE._realDecide=finish; scReduireFenetreVisible(); return; }
+  if(pending.kind==='event_result' && showEventResultBlocking(pending)){ STATE._realDecide=finish; scReduireFenetreVisible(); return; }
+  if(pending.kind==='event_announce' && showEventAnnounceBlocking(pending)){ STATE._realDecide=finish; scReduireFenetreVisible(); return; }
+  if(pending.kind==='forced_war' && showForcedWarReal(pending)){ STATE._realDecide=finish; scReduireFenetreVisible(); return; }
+  if(pending.kind==='route_capture' && showRouteCaptureReal(pending)){ STATE._realDecide=finish; scReduireFenetreVisible(); return; }
+  if(pending.kind==='accord_confirm' && showAccordReal(pending)){ STATE._realDecide=finish; scReduireFenetreVisible(); return; }
+  if(pending.kind==='espionage' && showOptsReal(pending,'espionage-modal','espionage-branch-opts','id')){ STATE._realDecide=finish; scReduireFenetreVisible(); return; }
+  if(pending.kind==='empath_copy' && showOptsReal(pending,'empath-copy-modal','empath-copy-opts','cardId',true)){ STATE._realDecide=finish; scReduireFenetreVisible(); return; }
   // Événements interactifs : VRAIES fenêtres du jeu (les overrides _evCommPick/_evDiploConfirm envoient la réponse).
-  if(pending.kind==='event_comm' && typeof window.showCommEventModal==='function'){ window._scDiploSel={}; STATE._realDecide=finish; try{ showCommEventModal(function(){}); return; }catch(e){ STATE._realDecide=null; } }
-  if(pending.kind==='event_diplo' && typeof window.showDiploEventModal==='function'){ window._scDiploSel={}; STATE._realDecide=finish; try{ showDiploEventModal(function(){}); return; }catch(e){ STATE._realDecide=null; } }
+  if(pending.kind==='event_comm' && typeof window.showCommEventModal==='function'){ window._scDiploSel={}; STATE._realDecide=finish; try{ showCommEventModal(function(){}); scReduireFenetreVisible(); return; }catch(e){ STATE._realDecide=null; } }
+  if(pending.kind==='event_diplo' && typeof window.showDiploEventModal==='function'){ window._scDiploSel={}; STATE._realDecide=finish; try{ showDiploEventModal(function(){}); scReduireFenetreVisible(); return; }catch(e){ STATE._realDecide=null; } }
   // sinon : panneau générique (restylé au look natif) pour le reste (war_combat, defense, extrasolar, strategy_calm)
   askLocalDecision(pending).then(finish).catch(()=>{ STATE._answering = false; });
 }
@@ -544,12 +544,22 @@ function showForcedWarReal(pending){
   const go=(ans)=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide(ans); };
   let html='<div class="fw-choice" id="fw-peace">🕊️ Exiger la paix (tribut si ennemi faible, sinon la guerre continue)</div>';
   (o.routes||[]).forEach(r=>{ const can=(o.myForce||0)>=r.need; html+='<div class="fw-choice" data-rt="'+r.i+'" style="'+(can?'':'opacity:.5')+'">'+(r.prot?'🛡️':'🔓')+' Attaquer route '+r.name+' — '+r.need+' jeton'+(r.need>1?'s':'')+'</div>'; });
-  if(o.colTarget)html+='<div class="fw-choice" id="fw-col">🏗️ Attaquer colonie la plus proche : '+(o.colName||o.colTarget)+'</div>';
-  if(!(o.routes||[]).length && !o.colTarget)html+='<div class="fw-choice" id="fw-none">✖️ Passer — aucune cible, la pression populaire retombe</div>';
+  /* ⚠️ ON MONTRE TOUTES LES COLONIES À PORTÉE, pas seulement la plus proche. Avant, cette fenêtre
+     n'offrait que `colTarget` et la fenêtre d'assaut qui suivait les proposait toutes : deux règles
+     pour une seule décision (Marc, 083E tour 7). `cols` vient du moteur et applique la vraie règle
+     de portée ; le repli sur `colTarget` ne sert qu'aux parties reprises d'une version antérieure. */
+  const _cols=(o.cols&&o.cols.length)?o.cols:(o.colTarget?[{node:o.colTarget,name:(o.colName||o.colTarget)}]:[]);
+  _cols.forEach(function(c,i){
+    html+='<div class="fw-choice" data-col="'+c.node+'">🏗️ Attaquer '+(c.name||c.node)
+      +(c.level?(' Nv.'+c.level):'')+(c.isHome?' 🏛️ capitale (10 de garnison)':'')
+      +(c.dist!==undefined?(' <span style="opacity:.6;font-size:.85em">— '+c.dist+' nœud'+(c.dist>1?'s':'')+(i===0?', la plus proche':'')+'</span>'):'')
+      +'</div>';
+  });
+  if(!(o.routes||[]).length && !_cols.length)html+='<div class="fw-choice" id="fw-none">✖️ Passer — aucune cible, la pression populaire retombe</div>';
   choices.innerHTML=html;
   const pe=document.getElementById('fw-peace'); if(pe)pe.onclick=()=>go({peace:true});
   choices.querySelectorAll('.fw-choice[data-rt]').forEach(el=>{ el.onclick=()=>go({route:parseInt(el.getAttribute('data-rt'))}); });
-  const col=document.getElementById('fw-col'); if(col)col.onclick=()=>go({colony:o.colTarget});
+  choices.querySelectorAll('.fw-choice[data-col]').forEach(el=>{ el.onclick=()=>go({colony:el.getAttribute('data-col')}); });
   const none=document.getElementById('fw-none'); if(none)none.onclick=()=>go({});
   m.classList.remove('hidden');
   return true;
@@ -1783,19 +1793,62 @@ function renderWait(){
 // ── Panneau de décision générique (contrat de réponses = celui des modales du jeu) ──
 // Le bouton « 👁 Voir le plateau » a été RETIRÉ (demande de Marc) : c'était un ajout de la version en ligne,
 // absent du jeu d'origine. Les fenêtres se comportent désormais comme celles du jeu (on répond, elles se ferment).
+/* ═══ RÉDUIRE UNE FENÊTRE POUR ALLER VOIR SES MENUS ═══
+   Marc, 05/09 : « on peut jamais voir les menus Empire ou Diplomatie quand y a des événements qui
+   apparaissent, tu peux mettre un − pour minimiser la fenêtre ? »
+   Réduire ne RÉPOND À RIEN : la question reste en attente côté serveur, la pastille « Reprendre »
+   la ramène intacte. C'est donc sans risque — on ne peut pas valider par mégarde en réduisant.
+   Une seule fonction pour toutes les fenêtres : celles du panneau générique (`#sc-decision`) comme
+   les vraies modales du jeu (événements, bilan, investissements, guerre populaire, paix…), qui sont
+   justement celles que Marc rencontre. */
+function scRendreReductible(m){
+  try{
+    if(!m)return;
+    const card=m.firstElementChild||m;
+    if(card.querySelector('.sc-min-btn'))return;                    // déjà posé
+    try{ if(getComputedStyle(card).position==='static')card.style.position='relative'; }catch(e){ card.style.position='relative'; }
+    const b=el('<button class="sc-min-btn" title="Réduire — va consulter Empire, Diplo ou les Techs ; la question reste en attente" style="position:absolute;top:6px;right:8px;width:32px;height:32px;border-radius:9px;border:1px solid #3a3a6a;background:#161a2e;color:#c8d8f8;font:700 1.2em system-ui;line-height:1;cursor:pointer;z-index:20">−</button>');
+    card.appendChild(b);
+    b.onclick=function(ev){
+      try{ ev.stopPropagation(); }catch(e){}
+      STATE._reduite=m;
+      if(m.id==='sc-decision') m.style.display='none'; else m.classList.add('hidden');
+      showResumeChip();
+    };
+  }catch(e){}
+}
+function scRestaurerFenetre(){
+  const m=STATE._reduite;
+  if(m){ if(m.id==='sc-decision') m.style.display='flex'; else m.classList.remove('hidden'); STATE._reduite=null; }
+  else { const p=document.getElementById('sc-decision'); if(p)p.style.display='flex'; }
+  hideResumeChip();
+}
+/* Les « vraies » modales du jeu (événements, bilan de fin de tour, investissements, guerre
+   populaire, paix, Dyson…) vivent dans index.html et ne passent pas par `decisionPanel`. Plutôt que
+   d'aller poser un bouton dans chacune — quinze endroits, donc quinze occasions d'en oublier un —
+   on rend réductible CELLE QUI EST VISIBLE au moment où la question est posée. Une fenêtre ajoutée
+   demain sera couverte sans qu'on y pense, à condition d'être dans cette liste. */
+function scReduireFenetreVisible(){
+  const ids=['eot-modal','bilan-modal','strategy-modal','agenda-sel-modal','invest-modal','invest2-modal',
+             'invest-active-modal','event-modal','event-announce-modal','dyson-modal','espionage-modal',
+             'empath-copy-modal','war-modal','war-combat-modal','attack-modal','discovery-modal','peace-modal',
+             'forced-war-modal','accord-modal','route-capture-modal','comm-event-modal','diplo-event-modal'];
+  for(const id of ids){ const m=document.getElementById(id); if(m&&!m.classList.contains('hidden')) scRendreReductible(m); }
+}
 function decisionPanel(html){
   let p=document.getElementById('sc-decision');
   if(!p){ injectStyles(); p=el('<div id="sc-decision"></div>'); document.body.appendChild(p); }
   p.innerHTML='<div class="card">'+html+'</div>';
   p.style.display='flex';
   hideResumeChip();
+  scRendreReductible(p);
   return p;
 }
-function closeDecision(){ const p=document.getElementById('sc-decision'); if(p) p.style.display='none'; hideResumeChip(); }
+function closeDecision(){ const p=document.getElementById('sc-decision'); if(p) p.style.display='none'; STATE._reduite=null; hideResumeChip(); }
 function showResumeChip(){
   let c=document.getElementById('sc-resume');
   if(!c){ c=el('<button id="sc-resume" style="position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:8900;background:linear-gradient(135deg,#2f6fd0,#1f4fa0);color:#fff;border:0;border-radius:10px;padding:10px 18px;font:700 .9em system-ui;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.5)">▶ Reprendre (choix en attente)</button>'); document.body.appendChild(c);
-    c.onclick=()=>{ const p=document.getElementById('sc-decision'); if(p) p.style.display='flex'; hideResumeChip(); }; }
+    c.onclick=()=>scRestaurerFenetre(); }
   c.style.display='block';
 }
 function hideResumeChip(){ const c=document.getElementById('sc-resume'); if(c) c.style.display='none'; }
@@ -1824,7 +1877,11 @@ function askLocalDecision(pending){
       const cc=o.cruiserCost||{materials:5,energy:5};
       body='<h2>🛡️ Défense !</h2>'
         +'<div style="margin-bottom:8px"><b>'+who+'</b> assaille <b>'+cible+'</b>.<br>'
-        +'<span class="muted">Force de l\'assaut : ~'+(o.threat||0)+'⚔️ · tes jetons engageables : '+max+' (1🪨 +1⚡ chacun)</span></div>'
+        /* La force annoncée est la PUISSANCE RÉELLE (jetons + Empathes + Stratégie + Supercroiseur) :
+           voir `showAiAssaultDefenseModal`. Le détail est écrit à côté, sinon le joueur croit
+           défendre contre des jetons et se retrouve devant un croiseur (E682, tour 9). */
+        +'<span class="muted">Force de l\'assaut : ~'+(o.threat||0)+'⚔️'+(o.threatDetail?(' ('+o.threatDetail+')'):'')+' · tes jetons engageables : '+max+' (1🪨 +1⚡ chacun)</span></div>'
+        +(o.attackerCruiser?'<div style="background:#2a1200;border:1px solid #cc6622;border-radius:8px;padding:6px 9px;margin-bottom:8px;color:#ffcfa0;font-size:.85em">⚓ Il déploie son <b>Supercroiseur</b> — déjà compté ci-dessus.</div>':'')
         +'<input type="range" id="sc-d" min="0" max="'+max+'" value="'+Math.min(2,max)+'" style="width:100%">'
         +'<div style="margin:4px 0 8px">Défense : <b id="sc-dv">'+Math.min(2,max)+'</b> jeton(s)</div>'
         +(o.cruiser?('<label class="opt" style="display:block;text-align:left;cursor:pointer"><input type="checkbox" id="sc-cru" style="margin-right:8px">⚓ Déployer le <b>Supercroiseur</b> (+'+(o.cruiserPower||5)+'⚔️, −'+cc.materials+'🪨 −'+cc.energy+'⚡)</label>'):'')
@@ -2008,6 +2065,37 @@ function askLocalDecision(pending){
       else if(op.desc){ sub = op.desc + (op.calmTension?'<br><span style="color:#8fb6e6">🕊️ Calme la tension</span>':''); }
       return `<button class="opt" data-i="${i}">${op.emoji||''} <b>${op.name||op.id||op.branch||op.node}</b>${sub?'<br><span class="muted">'+sub+'</span>':''}</button>`;
     }).join('');
+    /* ═══ CALMER UNE TENSION : LE RENDU GÉNÉRIQUE NE MONTRAIT MÊME PAS LE CHIFFRE ═══
+       Il affichait « 🔴 Martiens » et rien d'autre : ni la tension qui bouge, ni ce qu'elle devient.
+       Marc, 05/09 : « il faut que la popup montre aussi les tensions relatives entre la nation et
+       les autres nations, sinon ça sert à rien. » Le moteur envoie désormais les trois (§`tensionsCroisees`). */
+    if(k==='strategy_calm'){
+      const _amt=o.amount||0, _leur=(o.sens==='eux');
+      body='<h2>🕊️ '+(_leur?'Apaiser une nation':'Calmer une tension')+'</h2>'
+        +'<div class="muted" style="margin-bottom:8px">'+(_leur
+          ? ('Une mission diplomatique : <b>sa</b> tension envers toi baisse de <b>'+_amt+'</b>. Moins elle t\'en veut, moins son peuple peut la pousser à te déclarer la guerre.')
+          : ('<b>Ta</b> tension envers la nation choisie baisse de <b>'+_amt+'</b>.'))
+        +'</div>';
+      body+=opts.map(function(op,i){
+        const v=op.tension||0, ap=Math.max(0,v-_amt);
+        const col=v>=8?'#ff6644':v>=5?'#ffaa44':v>=3?'#ffcc66':'#66cc88';
+        let sub='<span style="color:'+col+'">'+(_leur?'Sa tension envers toi':'Ta tension')+' : '+v+'/10 → '+ap+'/10</span>'
+          +'<span style="color:#5a6a8a"> | '+(_leur?'la tienne':'la leur')+' : '+(op.reciproque||0)+'/10</span>';
+        const cr=(op.croisees||[]);
+        if(cr.length){
+          sub+='<br><span style="color:#7880a0;font-size:.92em">ses autres tensions <span style="opacity:.7">(envers / de)</span> : '
+            +cr.map(function(x){
+                const chaud=Math.max(x.vers||0,x.de||0);
+                const c2=chaud>=8?'#ff6644':chaud>=5?'#ffaa44':chaud>=3?'#ffcc66':'#66cc88';
+                return '<span style="color:'+c2+'">'+(x.emoji||'')+' '+esc(x.name||x.id)+' '+(x.vers||0)+'/'+(x.de||0)+(x.guerre?' ⚔️':'')+'</span>';
+              }).join(' · ')+'</span>';
+        }
+        return '<button class="opt" data-i="'+i+'">'+(op.emoji||'')+' <b>'+esc(op.name||op.id)+'</b><br><span class="muted">'+sub+'</span></button>';
+      }).join('');
+      decisionPanel(body);
+      document.querySelectorAll('#sc-decision .opt').forEach(function(b){ b.onclick=function(){ done({targetId:opts[parseInt(b.getAttribute('data-i'))].id}); }; });
+      return;
+    }
     if(k==='empath_copy') body+='<button class="opt" data-skip="1">Aucune copie</button>';
     decisionPanel(body);
     document.querySelectorAll('#sc-decision .opt').forEach(b=>{ b.onclick=()=>{

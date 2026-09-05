@@ -187,6 +187,9 @@ function corpsRapport(entry) {
   const L = [];
   L.push('Partie ' + entry.code + ' — terminée le ' + entry.dateFr + (entry.turn ? ' (tour ' + entry.turn + ')' : ''));
   L.push('Joueurs : ' + entry.joueurs.map(j => j.civ + (j.user ? ' = ' + j.user : ' (IA)')).join(' · '));
+  /* Tempéraments et cerveau, juste sous la liste des joueurs : c'est la première chose qu'on veut
+     savoir en relisant une partie (« qui était quoi ? »), et elle vivait au tour 1 du journal. */
+  for (const l of (entry.profils || [])) L.push(l);
   L.push('');
   L.push('═══════════ CALCUL FINAL DES POINTS DE VICTOIRE ═══════════');
   for (let i = 0; i < entry.scores.length; i++) {
@@ -258,7 +261,7 @@ function corpsRapport(entry) {
   return L.join('\n');
 }
 function archiveGame(g) {
-  let scores = [], journal = [], turn = null, analyse = [];
+  let scores = [], journal = [], turn = null, analyse = [], profils = [];
   try {
     const sb = g.driver.sb, G = g.driver.state();
     turn = G.turn;
@@ -291,13 +294,21 @@ function archiveGame(g) {
     /* La trajectoire des nations et les décisions des IA, produites par le MOTEUR — une seule
        source pour le solo et pour le serveur. */
     try { if (typeof sb._analyseTexte === 'function') analyse = sb._analyseTexte(); } catch (e) {}
+    /* Les tempéraments (Bâtisseur, Conquérant, Opportuniste…) et le cerveau : même source que le
+       solo (`_profilsTexte`). Marc les cherchait au tour 1 du journal, six cents lignes plus bas. */
+    try { if (typeof sb._profilsTexte === 'function') profils = sb._profilsTexte(); } catch (e) {}
   } catch (e) { console.error('archiveGame:', e.message); }
   const endedAt = Date.now();
   const humans = g.seats.filter(s => !s.ai && s.user);
   const entry = {
     code: g.code, endedAt, dateFr: frDate(endedAt), turn,
+    /* DÉBUT DE PARTIE ET INITIANT — pour le tableau de /stats (Marc, 04/09 : « date et heure du
+       début de partie et de la fin », « l'email de l'initiant »). Une archive sans date de début
+       ne permet ni de trier, ni de mesurer combien de temps une partie a duré. */
+    debut: g.cree || null, debutFr: g.cree ? frDate(g.cree) : '',
+    hote: g.host || null,
     joueurs: g.seats.map(s => ({ civ: s.civId, ai: !!s.ai, user: s.user || null })),
-    scores, journal, analyse, bugs: (g._bugs || [])
+    scores, journal, analyse, profils, bugs: (g._bugs || [])
   };
   const corps = corpsRapport(entry);
   for (const s of humans) {
@@ -1322,32 +1333,121 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (req.url === '/stats' || req.url.indexOf('/stats?') === 0) {
-    // STATS : 10 dernières parties PAR JOUEUR — date/heure FR, scores par nation, bugs signalés, journal complet.
-    // Texte brut → sélectionnable/copiable pour me l'envoyer.
-    const out = [];
-    out.push('SOLAR — STATISTIQUES  (généré le ' + frDate(Date.now()) + ')');
-    out.push('Joueurs inscrits : ' + Object.keys(users).length);
-    for (const u of Object.keys(users)) out.push('  · ' + u + ' — inscrit le ' + frDate(users[u].created || Date.now()));
+    /* ═══════════════════════════════════════════════════════════════════════════════════════
+       STATS — UN TABLEAU, UNE LIGNE PAR PARTIE
+       ---------------------------------------------------------------------------------------
+       Marc, 04/09 : « c'est très inutile parce que ça liste toutes les parties les unes après les
+       autres, c'est pas lisible ». L'ancienne page déroulait le journal ENTIER de chaque partie
+       de chaque joueur — des milliers de lignes où l'on ne retrouvait rien.
+       Ce qu'il a demandé, dans l'ordre : début et fin (pas de fin = abandonnée ou en cours),
+       l'initiant, les humains, le nombre d'IA, le score, et un bouton pour COPIER le debug d'une
+       partie sans l'afficher.
+       Trois ajouts de mon côté, du même esprit : la DURÉE et le TOUR atteint (une partie
+       abandonnée au tour 2 et une au tour 9 ne se lisent pas pareil), le nombre de BUGS signalés,
+       et un bouton pour copier tout le tableau en CSV (tableur).
+       ⚠️ UNE PARTIE, UNE LIGNE. Les archives sont rangées PAR JOUEUR : une partie à deux humains
+       est écrite deux fois. On regroupe par code, sinon le tableau ment sur le nombre de parties.
+       ⚠️ LES PARTIES EN COURS Y SONT AUSSI (mémoire + fichiers), sans quoi « pas d'heure de fin »
+       ne voudrait rien dire : on ne verrait jamais les abandons. */
+    const parties = new Map();   // code → ligne
+    const pousser = (code, l) => { if (!parties.has(code)) parties.set(code, l); };
+    // 1) parties TERMINÉES (archives, dédoublonnées par code)
     let files = []; try { files = fs.readdirSync(ARCH_DIR).filter(f => f.endsWith('.json')); } catch (e) {}
     for (const f of files) {
-      const user = decodeURIComponent(f.replace(/\.json$/, ''));
-      const list = readArch(user);
-      out.push('\n' + '='.repeat(70) + '\nJOUEUR : ' + user + '  (' + list.length + ' partie(s) conservée(s), 10 max)');
-      list.forEach((e, i) => {
-        out.push('\n--- Partie ' + (i + 1) + ' — code ' + e.code + ' — terminée le ' + e.dateFr + (e.turn ? (' — tour ' + e.turn) : '') + ' ---');
-        if (e.joueurs) out.push('Nations : ' + e.joueurs.map(j => j.civ + (j.user ? ('=' + j.user) : ' (IA)')).join(', '));
-        out.push('SCORES :');
-        (e.scores || []).forEach((s, k) => out.push('   ' + (k + 1) + '. ' + s.name + ' — ' + s.vp + ' VP'));
-        if (e.bugs && e.bugs.length) {
-          out.push('🐞 BUGS SIGNALÉS (' + e.bugs.length + ') :');
-          e.bugs.forEach(b => out.push('   [' + b.dateFr + '] ' + b.user + ' : ' + b.text));
-        }
-        out.push('JOURNAL COMPLET (' + (e.journal || []).length + ' lignes) :');
-        (e.journal || []).forEach(l => out.push('   ' + l));
+      for (const e of readArch(decodeURIComponent(f.replace(/\.json$/, '')))) {
+        if (!e || !e.code) continue;
+        const humains = (e.joueurs || []).filter(j => !j.ai && j.user).map(j => j.user);
+        pousser(e.code, {
+          code: e.code, statut: 'terminée',
+          debut: e.debut || null, fin: e.endedAt || null,
+          hote: e.hote || humains[0] || '', humains,
+          ia: (e.joueurs || []).filter(j => j.ai).length,
+          tour: e.turn || null,
+          scores: (e.scores || []).map(x => ({ nom: x.name, vp: x.vp, user: x.user || null })),
+          bugs: (e.bugs || []).length,
+          debug: e            // le rapport complet : copié sur demande, jamais affiché
+        });
+      }
+    }
+    // 2) parties EN COURS (en mémoire) — pas de fin : c'est le signe d'un abandon ou d'une attente
+    for (const g of games.values()) {
+      let tour = null, scores = [];
+      try {
+        const G = g.driver && g.driver.state();
+        if (G) { tour = G.turn || null;
+          scores = [G.player].concat(G.ais || []).map(p => ({ nom: p.civ.name, vp: (g.driver.sb.calcVP(p) || {}).total || 0, user: null })).sort((a, b) => b.vp - a.vp); }
+      } catch (e) {}
+      const humains = g.seats.filter(s => !s.ai && s.user).map(s => s.user);
+      pousser(g.code, {
+        code: g.code, statut: g.status === 'lobby' ? 'pas commencée' : 'en cours',
+        debut: g.cree || null, fin: null,
+        hote: g.host || humains[0] || '', humains,
+        ia: g.seats.filter(s => s.ai).length,
+        tour, scores, bugs: (g._bugs || []).length,
+        debug: { code: g.code, statut: g.status, tour, sieges: g.seats.map(x => ({ civId: x.civId, ai: !!x.ai, user: x.user || null })), note: 'partie non terminée — utiliser /debug pour l\'état complet' }
       });
     }
-    // État réel de l'envoi + dernières ERREURS (diagnostic sans ouvrir les logs Coolify)
-    out.push('\n' + '='.repeat(70) + '\nÉTAT EMAIL : ' + (_transport ? 'SMTP configuré (' + (process.env.SMTP_HOST || '?') + ')' : 'SMTP NON configuré — aucun envoi possible'));
+    const lignes = [...parties.values()].sort((a, b) => (b.debut || b.fin || 0) - (a.debut || a.fin || 0));
+    const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const duree = l => {
+      if (!l.debut || !l.fin) return '';
+      const m = Math.round((l.fin - l.debut) / 60000);
+      return m < 60 ? (m + ' min') : (Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0'));
+    };
+    const scoreTxt = l => (l.scores || []).map(s => s.nom + ' ' + s.vp).join(' · ');
+    const tr = lignes.map((l, i) => '<tr class="' + (l.fin ? '' : 'ouverte') + '">'
+      + '<td>' + esc(l.code) + '<div class="pt">' + esc(l.statut) + '</div></td>'
+      + '<td>' + esc(l.debut ? frDate(l.debut) : '—') + '</td>'
+      + '<td>' + esc(l.fin ? frDate(l.fin) : '—') + '<div class="pt">' + esc(duree(l)) + '</div></td>'
+      + '<td>' + esc(l.hote) + '</td>'
+      + '<td>' + (l.humains.length ? l.humains.map(esc).join('<br>') : '<span class="pt">—</span>') + '</td>'
+      + '<td style="text-align:center">' + l.ia + '</td>'
+      + '<td style="text-align:center">' + (l.tour || '—') + '</td>'
+      + '<td>' + esc(scoreTxt(l)) + '</td>'
+      + '<td style="text-align:center">' + (l.bugs ? ('🐞 ' + l.bugs) : '') + '</td>'
+      + '<td><button class="cp" data-i="' + i + '">📋 Debug</button></td>'
+      + '</tr>').join('\n');
+    const donnees = JSON.stringify(lignes.map(l => l.debug));
+    const csv = JSON.stringify(
+      ['code;statut;debut;fin;duree;hote;humains;IA;tour;scores;bugs'].concat(
+        lignes.map(l => [l.code, l.statut, l.debut ? frDate(l.debut) : '', l.fin ? frDate(l.fin) : '',
+          duree(l), l.hote, l.humains.join(' '), l.ia, l.tour || '', scoreTxt(l), l.bugs].join(';'))).join('\n'));
+    const page = '<!doctype html><html lang="fr"><meta charset="utf-8">'
+      + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+      + '<title>Solar — parties</title><style>'
+      + 'body{background:#0a0e1e;color:#dfe8ff;font:14px system-ui,sans-serif;margin:0;padding:14px}'
+      + 'h1{font-size:1.15em;margin:0 0 4px}.sub{opacity:.65;font-size:.85em;margin-bottom:12px}'
+      + 'table{border-collapse:collapse;width:100%;font-size:.86em}'
+      + 'th,td{border:1px solid #24304f;padding:5px 7px;vertical-align:top;text-align:left}'
+      + 'th{background:#141b33;position:sticky;top:0}tr:nth-child(even) td{background:#0d1226}'
+      + 'tr.ouverte td{background:#1a1408}.pt{opacity:.55;font-size:.85em}'
+      + 'button{background:#1b2748;color:#cfe0ff;border:1px solid #3a4a7a;border-radius:6px;padding:4px 8px;cursor:pointer;font:inherit}'
+      + 'button:hover{background:#26365f}.barre{margin:10px 0}'
+      + '</style>'
+      + '<h1>Parties — ' + lignes.length + '</h1>'
+      + '<div class="sub">Généré le ' + frDate(Date.now()) + ' · fond ambré = partie sans heure de fin (en cours, en attente ou abandonnée)</div>'
+      + '<div class="barre"><button id="csv">📋 Copier le tableau (CSV)</button></div>'
+      + '<table><thead><tr><th>Partie</th><th>Début</th><th>Fin / durée</th><th>Initiant</th><th>Humains</th><th>IA</th><th>Tour</th><th>Scores</th><th>Bugs</th><th>Debug</th></tr></thead>'
+      + '<tbody>' + tr + '</tbody></table>'
+      + '<script>var D=' + donnees + ';var CSV=' + csv + ';'
+      + 'function copier(t,b){var f=function(){var a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();try{document.execCommand("copy")}catch(e){}a.remove();};'
+      + 'if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).catch(f);}else f();'
+      + 'var v=b.textContent;b.textContent="✓ copié";setTimeout(function(){b.textContent=v;},1500);}'
+      + 'document.getElementById("csv").onclick=function(){copier(CSV,this);};'
+      + '[].forEach.call(document.querySelectorAll(".cp"),function(b){b.onclick=function(){copier(JSON.stringify(D[+b.getAttribute("data-i")],null,1),b);};});'
+      + '<\/script>';
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(page);
+    return;
+  }
+  /* /stats-mail — l'ancienne page texte, réduite à ce qu'elle seule savait dire : l'état de l'envoi
+     des emails et les derniers échecs. Le journal des parties, lui, vit dans le tableau ci-dessus. */
+  if (req.url === '/stats-mail' || req.url.indexOf('/stats-mail?') === 0) {
+    const out = [];
+    out.push('SOLAR — EMAIL  (généré le ' + frDate(Date.now()) + ')');
+    out.push('Joueurs inscrits : ' + Object.keys(users).length);
+    for (const u of Object.keys(users)) out.push('  · ' + u + ' — inscrit le ' + frDate(users[u].created || Date.now()));
+    out.push('\nÉTAT EMAIL : ' + (_transport ? 'SMTP configuré (' + (process.env.SMTP_HOST || '?') + ')' : 'SMTP NON configuré — aucun envoi possible'));
     const _bad = Object.keys(users).filter(u => !isEmail(u));
     if (_bad.length) out.push('⚠️ Comptes SANS adresse email (ils ne peuvent PAS recevoir de mail) : ' + _bad.join(', '));
     if (_mailErrors.length) { out.push('⚠️ Derniers échecs d\'envoi :'); _mailErrors.forEach(e => out.push('   · ' + e)); }
@@ -1412,7 +1512,8 @@ const server = http.createServer((req, res) => {
   res.end('Solar — serveur de jeu (WebSocket).\n\n'
     + 'Pages disponibles :\n'
     + '  /health    état du serveur\n'
-    + '  /stats     parties archivées et journaux\n'
+    + '  /stats     tableau des parties (début, fin, joueurs, scores, debug à copier)\n'
+    + '  /stats-mail état de l\'envoi des emails\n'
     + '  /mailtest  diagnostic de l\'envoi d\'emails\n\n'
     + 'Version : ' + SERVER_BUILD + '\n'
     + "Si /mailtest renvoie cette page, c'est que cette version n'est pas encore déployée.\n");

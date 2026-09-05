@@ -481,3 +481,19 @@ Sphère de Dyson demandée à l'achat, moral jugé après son revenu).
 **Tu peux supprimer une partie depuis l'écran d'accueil** : une corbeille 🗑 à côté de chaque
 partie, avec confirmation. Tu peux supprimer tes parties contre des ordinateurs ; quand d'autres
 humains y jouent, seul l'hôte le peut, et ils sont prévenus que la partie est terminée.
+
+## v10.23 / sw v144 — 04/09/2026
+
+**La page /stats devient un tableau** : une ligne par partie — début, fin et durée (pas d'heure de
+fin = en cours, en attente ou abandonnée, surligné), initiant, joueurs humains, nombre d'IA, tour
+atteint, scores, bugs signalés, et un bouton pour copier le rapport de debug de cette partie sans
+l'afficher. Plus un bouton pour copier tout le tableau en CSV. Les parties en cours y figurent
+aussi. L'état de l'envoi des emails a sa propre page, /stats-mail.
+
+## v10.24 / sw v145 — 04/09/2026
+
+**La fenêtre de défense annonce la vraie force de l'assaut.** Elle montrait le nombre de jetons de
+l'assaillant, sans son Supercroiseur ni ses bonus : on croyait affronter 6 et on se retrouvait
+devant 11 (partie E682, Triton perdu). Elle affiche maintenant le total, avec le détail
+(jetons + Empathes + Stratégie + Supercroiseur), et signale « il déploie son Supercroiseur ». Et
+ce qui est annoncé est ce qui se bat : le déploiement adverse est décidé avant l'annonce.

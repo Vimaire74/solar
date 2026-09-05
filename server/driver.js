@@ -209,7 +209,15 @@ class GameDriver {
        Marc, partie FDDD du 23/08 : « j'ai fait un accord avec le Terrien et j'ai pas vu si ils ont
        accepté ou pas. » Le journal, lui, disait bien qu'ils avaient refusé.
        Règle : une notice qui répond à une action du joueur est BLOQUANTE — il doit la lire. */
-    if(!p || !['war_result','event_result','event_announce','raid_hit','raid_result','accord_result','eot'].includes(p.kind)) return false;
+    /* ⚠️ NEUVIÈME OCCURRENCE DU MÊME MOTIF — `dyson_build`, ajouté le 05/09.
+       Marc, partie 083E : « j'ai pas eu de fenêtre qui me dit que les autres nations ont accepté que
+       je construise la Sphère de Dyson, sinon on est dans le doute. » Le moteur émettait bien la
+       notice (`_emitNotice('dyson_build', …, {refusing:[]})`), `online.js` a bien la fenêtre — mais
+       le kind manquait ICI, donc ce pilote acquittait lui-même et l'écran du joueur ne recevait
+       rien. Exactement ce qui était arrivé à `accord_result` et `raid_result`.
+       Le journal disait « toutes les nations acceptent le monopole » ; personne ne lit le journal au
+       moment où il attend une réponse. */
+    if(!p || !['war_result','event_result','event_announce','raid_hit','raid_result','accord_result','dyson_build','eot'].includes(p.kind)) return false;
     // ⚠️ JUGEMENT FINAL : sa fenêtre ne doit JAMAIS bloquer — sinon la partie ne se termine pas, les scores
     // ne sont pas calculés, l'archive et l'email ne partent jamais (bug vécu par Marc, partie figée au tour 10).
     try{ const ev=p.payload&&p.payload.event; if(ev&&ev.id==='final') return false; }catch(e){}
