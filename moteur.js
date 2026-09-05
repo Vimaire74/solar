@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-05 · v10.31';
+const SOLAR_BUILD_MOTEUR = '2026-09-05 · v10.32';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -12732,8 +12732,19 @@ function showWarCombatModal(cb){
   if(_decisionActive()){ // mode serveur : router le choix de combat vers le joueur (avec la CIBLE)
     const _p=G.player; const _ai=G.warWith?G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0]:G.ais[0];
     const _aiTok=_ai?_ai.forceTokens:0;
-    // Posture IA (attaquer/tenir) + cible menacée, comme en solo, pour que la défense fonctionne.
-    if(!G._warKeepStance){ G._aiWarStance=(_aiTok>=2&&Math.random()>0.35)?'attack':'hold';
+    /* ═══ PLUS DE MENACE INVENTÉE (Marc, partie 09A0, 05/09) ═══
+       « J'ai dû faire une défense pour Cérès, mettre des jetons en aveugle sans voir la force de
+       l'attaque, et à la fin du tour le Ceinturien ne m'a pas attaqué. »
+       Ce bloc tirait une POSTURE AU HASARD (`Math.random()>0.35`) et une CIBLE AU HASARD, et la
+       fenêtre affichait « l'ennemi menace Cérès — tu peux défendre ». Une fiction : l'assaut réel
+       de l'ordinateur se décide plus tard (`maybeAiAssaultPlayer`), avec SA fenêtre de défense qui
+       annonce la vraie force (§86). Dans le modèle « assaut » (toutes les guerres sont `live`), une
+       réponse « défendre » ici n'engage RIEN — elle vaut « tenir » (voir `guerreCombatLiveChoisi`).
+       Marc n'a donc rien payé, mais il a décidé à l'aveugle contre un fantôme. On ne tire plus de
+       posture pour une guerre `live` : pas de menace affichée, pas de bouton « Défendre ». */
+    const _warLive=(function(){ try{ const w=_warBetween(_moiId(),G.warWith); return !!(w&&w.live); }catch(e){ return true; } })();
+    if(_warLive){ G._aiWarStance='hold'; G._aiWarTarget=null; }
+    else if(!G._warKeepStance){ G._aiWarStance=(_aiTok>=2&&Math.random()>0.35)?'attack':'hold';
       const _tc=_p.colonies.filter(c=>c.nodeId!==_p.civ.home&&c.connected), _tr=_p.routes.filter(r=>(r.tokens||0)>0);
       const _all=[..._tc.map(c=>({type:'colony',name:NODES[c.nodeId]?.name||c.nodeId,obj:c})),..._tr.map(r=>({type:'route',name:(NODES[r.from]?.name||r.from)+'→'+(NODES[r.to]?.name||r.to),obj:r}))];
       G._aiWarTarget=_all.length?_all[Math.floor(Math.random()*_all.length)]:null;
