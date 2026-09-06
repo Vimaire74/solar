@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-06 · v10.33';
+const SOLAR_BUILD_MOTEUR = '2026-09-06 · v10.35';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -662,11 +662,11 @@ function _evOverlay(html){
   m.innerHTML='<div class="ea-card" style="max-width:440px;width:100%;text-align:left">'+html+'</div>';m.style.display='flex';
 }
 function _evCloseOverlay(){const m=document.getElementById('event-choice-modal');if(m)m.style.display='none';}
-function _evMyStats(){var p=G.player;return '<div style="font-size:.78em;color:#dfe8ff;background:#0e1630;border:1px solid #2a3a6a;border-radius:8px;padding:6px 9px;margin-bottom:8px"><b>'+p.civ.emoji+' '+p.civ.name+' (toi)</b> — 🏆 '+calcVP(p).total+' VP · ⚔️ '+p.forceTokens+' · '+(p.res.materials||0)+'<i class=ri-materials></i> '+(p.res.energy||0)+'<i class=ri-energy></i> '+(p.res.morale||0)+'<i class=ri-morale></i></div>';}
+function _evMyStats(){var p=G.player;return '<div style="font-size:.78em;color:#dfe8ff;background:#0e1630;border:1px solid #2a3a6a;border-radius:8px;padding:6px 9px;margin-bottom:8px"><b>'+p.civ.emoji+' '+p.civ.name+' (toi)</b> — 🏆 '+vpAffiche(p)+' VP · ⚔️ '+p.forceTokens+' · '+(p.res.materials||0)+'<i class=ri-materials></i> '+(p.res.energy||0)+'<i class=ri-energy></i> '+(p.res.morale||0)+'<i class=ri-morale></i></div>';}
 /* ⚠️ « CE QUE JE SAIS D'ELLE » DÉPEND DE QUI REGARDE. Cette fiche lisait `G.player` : avec
    plusieurs humains interrogés EN MÊME TEMPS, tous voyaient la force perçue et le niveau de
    renseignement de la nation active, pas les leurs. L'observateur est maintenant explicite. */
-function _evAiInfo(ai,obs){var _o=obs||G.player;var pf=perceivedForce(_o,ai);var s='🏆 '+calcVP(ai).total+' VP · ⚔️ '+pf.val+(pf.exact?'':'±3');if(getIntelLevel(_o)>=2)s+=' · '+(ai.res.materials||0)+'<i class=ri-materials></i> '+(ai.res.energy||0)+'<i class=ri-energy></i> '+(ai.res.morale||0)+'<i class=ri-morale></i>';return s;}
+function _evAiInfo(ai,obs){var _o=obs||G.player;var pf=perceivedForce(_o,ai);var s='🏆 '+vpAffiche(ai)+' VP · ⚔️ '+pf.val+(pf.exact?'':'±3');if(getIntelLevel(_o)>=2)s+=' · '+(ai.res.materials||0)+'<i class=ri-materials></i> '+(ai.res.energy||0)+'<i class=ri-energy></i> '+(ai.res.morale||0)+'<i class=ri-morale></i>';return s;}
 /* Les nations avec qui NAT peut encore signer — humaines comprises.
    ⚠️ L'ancienne liste partait de `G.ais` : deux joueurs humains ne pouvaient donc JAMAIS se
    proposer d'accord pendant un sommet, l'un n'apparaissait simplement pas dans la liste de l'autre. */
@@ -755,7 +755,7 @@ function showCommEventModal(onDone){
   let opts;
   if(cands.length===0)opts='<div style="color:#8898b8;font-size:.85em;margin:8px 0">Toutes les nations ont déjà un accord avec toi.</div>';
   else opts=cands.map(function(ai){
-    const vp=calcVP(ai).total;const pf=perceivedForce(G.player,ai);const war=_warBetween(_moiId(),ai.civ.id);
+    const vp=vpAffiche(ai);const pf=perceivedForce(G.player,ai);const war=_warBetween(_moiId(),ai.civ.id);
     return '<button onclick="_evCommPick(\''+ai.civ.id+'\')" style="display:block;width:100%;text-align:left;margin:5px 0;padding:9px 11px;background:#141a30;border:1px solid #2a3a6a;border-radius:8px;color:#cfe0ff;cursor:pointer">'+ai.civ.emoji+' <b>'+ai.civ.name+'</b>'+(war?' <span style="color:#ff7766">⚔️ en guerre</span>':'')+'<br><span style="font-size:.82em;color:#9fb4d6">'+_evAiInfo(ai)+'</span></button>';
   }).join('');
   _evOverlay('<div style="font-size:2.2em;text-align:center">🤝</div><div style="text-align:center;font-weight:700;margin-bottom:4px">Accords Commerciaux</div><div style="color:#9fb4d6;font-size:.82em;text-align:center;margin-bottom:10px">Accord commercial <b>gratuit</b> : +3 VP pour chaque nation, met fin à une guerre si elle existe. Un leader trop en avance peut refuser.</div>'+_evMyStats()+opts+'<button class="ea-btn" onclick="_evCommPick(null)" style="margin-top:10px">Passer (aucun accord)</button>');
@@ -1700,10 +1700,19 @@ function defenseursDuNoeud(nodeId, attaquant){
   return occupantsDuNoeud(nodeId).filter(n=>n!==attaquant);
 }
 /* Le défenseur PRINCIPAL : celui contre qui la guerre se déclare. On prend le plus développé sur ce
-   nœud — pas le premier venu de l'ordre interne, qui n'a aucun sens de jeu. */
+   nœud — pas le premier venu de l'ordre interne, qui n'a aucun sens de jeu.
+   ═══ SAUF SI LE NŒUD EST LA CAPITALE DE L'UN D'EUX (997D, 06/09) ═══
+   Laurent cohabitait sur Éris, la capitale de Marc, au même niveau. À égalité, le tri gardait le
+   premier de la liste : Laurent. Tout le chemin d'assaut ne connaît que le défenseur principal —
+   la guerre lui a été déclarée, la fenêtre de défense lui est allée, et la garnison comptée fut la
+   SIENNE (1) au lieu des 10 de la capitale. Éris est tombée « 1🛡️ vs 7⚔️ » sans que Marc ait été
+   consulté. Une capitale se défend à 10 : son propriétaire est le seul défenseur qui ait un sens,
+   quel que soit le niveau des colonies en présence. Banc : test_capitale_partagee. */
 function defenseurPrincipal(nodeId, attaquant){
   const d=defenseursDuNoeud(nodeId, attaquant);
   if(!d.length) return null;
+  const proprio=d.find(n=>n.civ&&n.civ.home===nodeId);
+  if(proprio) return proprio;
   const niv=n=>Math.max.apply(null,n.colonies.filter(c=>c.nodeId===nodeId).map(c=>c.level||1));
   return d.slice().sort((a,b)=>niv(b)-niv(a))[0];
 }
@@ -1736,7 +1745,19 @@ function capturerNoeud(vainqueur, nodeId){
        « un jeton comme les autres colonies » (Marc, 05/09) — ni garnison de 10, ni +10 VP. */
     if(perdant.civ&&perdant.civ.home===nodeId){
       if(typeof gagnerVP==='function')gagnerVP(vainqueur,10,'Capitale de '+perdant.civ.name+' conquise');
-      addLog('👑 '+vainqueur.civ.emoji+' '+vainqueur.civ.name+' s\'empare de '+nom+', CAPITALE de '+perdant.civ.emoji+' '+perdant.civ.name+' — +10 VP !','gold');
+      /* ═══ RÈGLE B (Marc, 06/09, partie 997D) : LE BONUS NE SE GARDE QUE TANT QU'ON LA TIENT ═══
+         Le Jupitérien avait pris Éris deux fois et l'avait perdue deux fois : il finissait à +20
+         pour une capitale qu'il ne tenait pas. On note ICI qui porte le bonus et pour quel nœud ;
+         il est repris plus bas dès que la capitale lui échappe — reprise par son propriétaire ou
+         prise par un tiers, qui lui ne touche rien. */
+      if(!vainqueur._vpCapitales)vainqueur._vpCapitales={};
+      vainqueur._vpCapitales[nodeId]=perdant.civ.name;
+      addLog('👑 '+vainqueur.civ.emoji+' '+vainqueur.civ.name+' s\'empare de '+nom+', CAPITALE de '+perdant.civ.emoji+' '+perdant.civ.name+' — +10 VP (tant qu\'il la tient) !','gold');
+    }
+    if(perdant._vpCapitales&&perdant._vpCapitales[nodeId]){
+      const _de=perdant._vpCapitales[nodeId]; delete perdant._vpCapitales[nodeId];
+      if(typeof gagnerVP==='function')gagnerVP(perdant,-10,'Capitale de '+_de+' ('+nom+') perdue — bonus repris');
+      addLog('👑 '+perdant.civ.emoji+' '+perdant.civ.name+' perd '+nom+', capitale de '+_de+' : ses +10 VP de conquête sautent.','red');
     }
     if(estEliminee(perdant)){
       addLog('🏳️ '+perdant.civ.emoji+' '+perdant.civ.name+' n\'a plus aucune colonie : cette nation ne joue plus.','gold');
@@ -3876,7 +3897,7 @@ function _runStrategyDraftAfterAnnounce(){
   try{
     /* Fait de partie, pas d'une nation — voir la note d'auteur du journal. */
     logAuteur('systeme',()=>addLog('🃏 Ordre du draft Stratégie (du plus faible au plus fort) : '
-      + order.map((p,i)=>(i+1)+'. '+p.civ.name+' ('+calcVP(p).total+' VP, '+(p.forceTokens||0)+'⚔️)').join(' · '),'dim'));
+      + order.map((p,i)=>(i+1)+'. '+p.civ.name+' ('+vpAffiche(p)+' VP, '+(p.forceTokens||0)+'⚔️)').join(' · '),'dim'));
   }catch(e){}
   /* TAILLE DE LA PIOCHE — constante à tous les tours (choix de Marc, 2026-08-07 : option « b »).
      AVANT : `nations + (tour===1 ? 3 : 2)`. La pioche perdait donc une carte entre le tour 1 et le
@@ -5175,7 +5196,7 @@ function _ilEl(){
 }
 // Une modale de transition (bilan de fin de tour, choix de bonus/stratégie, investissement, événement…) est-elle ouverte ?
 function _ilTransitionOpen(){
-  const ids=['eot-modal','bilan-modal','strategy-modal','agenda-sel-modal','invest-modal','invest2-modal','invest-active-modal','event-modal','event-announce-modal','dyson-modal','espionage-modal','empath-copy-modal','war-modal','war-combat-modal','attack-modal','discovery-modal','peace-modal','forced-war-modal'];
+  const ids=['eot-modal','bilan-modal','strategy-modal','agenda-sel-modal','invest-modal','invest2-modal','invest-active-modal','event-modal','event-announce-modal','dyson-modal','espionage-modal','empath-copy-modal','war-modal','war-combat-modal','discovery-modal','peace-modal','forced-war-modal'];
   for(const id of ids){ const el=document.getElementById(id); if(el && !el.classList.contains('hidden') && el.style.display!=='none') return true; }
   return false;
 }
@@ -5194,7 +5215,7 @@ function _ilDismiss(){
 }
 function _ilModalOpen(){
   // uniquement les modales d'ACTION (qui s'ouvrent pendant TON tour) — pas les transitions de tour
-  const ids=['war-combat-modal','route-token-modal','attack-modal','dyson-modal','discovery-modal','peace-modal','war-modal','empath-copy-modal','espionage-modal'];
+  const ids=['war-combat-modal','route-token-modal','dyson-modal','discovery-modal','peace-modal','war-modal','empath-copy-modal','espionage-modal'];
   for(const id of ids){ const el=document.getElementById(id); if(el && !el.classList.contains('hidden') && el.style.display!=='none') return true; }
   if(document.getElementById('aad-overlay')||document.getElementById('calm-overlay')) return true;
   return false;
@@ -7383,6 +7404,15 @@ function showAiAssaultDefenseModal(ai,target,aiCommit,done,defender){
     .concat(_aiCruAtt?['+'+(ai.cruiserPower||5)+' Supercroiseur']:[]).join(' ');
   G._aiCruAtt=_aiCruAtt;   // ce qui est annoncé est ce qui sera résolu (voir `resolveAiAssaultOnPlayer`)
   const shownThreat=(getIntelLevel(p)>=2)?(_menace+'⚔️'):('≈'+_menace+'⚔️ (estimé)');
+  /* ═══ LA GARNISON EST ANNONCÉE (Marc, 06/09) ═══
+     « Je vois pas combien j'ai en défense de base dans ma capitale une fois reprise. » La garnison
+     compte dans le combat (`resolveAiAssaultOnPlayer` : 10 capitale, 1 colonie, capitale reprise
+     1 puis +1 par tour) mais la fenêtre ne la montrait pas : on choisissait ses jetons sans savoir
+     d'où l'on partait. Même source que le combat, `garrisonOf`. */
+  const _garn=(target&&target.type==='colony'&&target.obj)?garrisonOf(p,target.obj.nodeId):1;
+  const _garnLabel=(target&&target.type==='colony'&&target.obj&&target.obj.nodeId===p.civ.home)
+    ?(p._capitaleRepriseTour?('capitale reprise au tour '+p._capitaleRepriseTour+' : +1 par tour, plafonnée à 10'):'garnison de capitale')
+    :(target&&target.type==='colony'?'garnison de colonie':'route');
   /* ⚠️ Le croiseur défensif se paie AUSSI : on le réserve avant de compter les jetons engageables. */
   const maxDef=Math.max(0,Math.min(p.forceTokens||0,
     maxAffordableTokens(p, reserveCroiseur(p, (typeof cruiserAvailable==='function'&&cruiserAvailable(p)&&typeof cruiserAfford==='function'&&cruiserAfford(p)))))); // limité à ce qu'on peut PAYER
@@ -7397,6 +7427,7 @@ function showAiAssaultDefenseModal(ai,target,aiCommit,done,defender){
     (_isRemote(p)?_emitRemote:_emitDecision)('defense', p,
       {attacker:ai.civ.id, attackerName:ai.civ.name, target:{type:target.type,name:target.name},
        threat:_menace, threatDetail:_detMenace, threatTokens:aiCommit, attackerCruiser:_aiCruAtt, maxDef,
+       garrison:_garn, garrisonLabel:_garnLabel, empath:bonusCombatCartes(p),
        cruiser:_cruOk, cruiserPower:(p.cruiserPower||5), cruiserCost:_cruC,
        myTokens:(p.forceTokens||0), myMat:(p.res.materials||0), myEnergy:(p.res.energy||0)},
       null, 'adDefenseContreIA');
@@ -7412,6 +7443,7 @@ function showAiAssaultDefenseModal(ai,target,aiCommit,done,defender){
     '<div style="font-size:.85em;color:#cc9988;margin-bottom:6px">Cible : <strong style="color:#ffbbaa">'+tgtLabel+'</strong></div>'+
     '<div style="font-size:.82em;color:#cc9988;margin-bottom:12px">Force d\'attaque : <strong style="color:#ff9977">'+shownThreat+'</strong>'
       +'<span style="color:#a08878;font-size:.9em"> ('+_detMenace+')</span>. Combien de jetons engages-tu en défense ? <span style="color:#7880a0">(1<i class=ri-materials></i> 1<i class=ri-energy></i> / jeton)</span>'+
+      '<br><span style="color:#9fd8b0">🏛️ Garnison sur place : <b>'+_garn+'</b> ('+_garnLabel+') — comptée dans ta défense</span>'+
       (pEmp?'<br><span style="color:#c080ff">🔮 +'+pEmp+' Empathes (gratuit)</span>':'')+
       (cruAvail?'<br><span style="color:#88bbee">⚓ Supercroiseur : +'+(p.cruiserPower||5)+'⚔️ auto si tu engages ≥1 jeton (5<i class=ri-materials></i> 5<i class=ri-energy></i>)</span>':'')+'</div>'+
     '<input type="range" id="aad-slider" min="0" max="'+maxDef+'" value="0" style="width:100%" oninput="_aadUpd(this.value)">'+
@@ -7488,7 +7520,7 @@ function resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,defender){
   const _act={emoji:'⚔️',name:'Assaut sur '+target.name,desc:aPow+'⚔️ vs '+pDef+'🛡️'};
   if(ai._turnActions)ai._turnActions.push(_act);else ai._turnActions=[_act];
   render();
-  showWarModal('⚔️ '+ai.civ.emoji+' '+ai.civ.name+' attaque',resultTxt,{txt:(cls==='win'?'Tes positions tiennent.':'Tu as subi des pertes.'),cls});
+  showWarModal('⚔️ '+ai.civ.emoji+' '+ai.civ.name+' attaque',resultTxt,{txt:(cls==='win'?'Tes positions tiennent.':'Tu as subi des pertes.'),cls},ai.civ.id);
   _warSuite(typeof done==='string'?done:null); // `done` est désormais un NOM (voir _warSuite)
 }
 /* ============================================================ CONNECTION LOGIC ============================================================ */
@@ -8048,9 +8080,14 @@ function declarerGuerre(agresseur, cible, raison, declaredBy){
     }
   }
 
-  /* Routes traversant le territoire ennemi : rompues, jetons rendus. Des deux côtés. */
+  /* Routes traversant le territoire ennemi : rompues, jetons rendus. Des deux côtés.
+     ═══ SAUF LE CHEMIN DE SA PROPRE CAPITALE (Marc, 06/09, partie 997D) ═══
+     Éris venait d'être prise ; Marc contre-attaquait pour la reprendre, et cette règle lui a rompu
+     Éris→Triton — plus aucune extrémité à lui, une à l'ennemi. Une route qui touche SA capitale,
+     même occupée, n'est pas une incursion chez l'ennemi : c'est le chemin du retour. On la traite
+     comme « chez moi ». Banc : test_route_capitale_occupee. */
   for(const [x,y] of [[agresseur,cible],[cible,agresseur]]){
-    const chezMoi=id=>x.colonies.some(c=>c.nodeId===id);
+    const chezMoi=id=>id===x.civ.home||x.colonies.some(c=>c.nodeId===id);
     const chezLui=id=>y.colonies.some(c=>c.nodeId===id);
     const cassees=[];
     x.routes=x.routes.filter(r=>{const br=(!chezMoi(r.from)&&!chezMoi(r.to))&&(chezLui(r.from)||chezLui(r.to));if(br)cassees.push(r);return !br;});
@@ -9724,6 +9761,16 @@ function resoudreAssautIA(ai,nodeId,opts){
     if(typeof noterAssautDuTour==='function') noterAssautDuTour(_w,ai.civ.id);
     addLog('⚔️ '+ai.civ.emoji+' '+ai.civ.name+' frappe '+_nom+' par surprise !','red');
     G.aiActions.push({emoji:'⚔️',name:'Assaut sur '+_nom,desc:'frappe surprise'});
+    /* Nœud partagé : le cohabitant humain n'est ni le défenseur ni un payeur, mais il tombera avec
+       le principal si la place est prise (`capturerNoeud`). Il doit le savoir AVANT, pas le
+       découvrir sur sa carte (997D : Marc, propriétaire d'Éris, n'a rien vu venir). */
+    for(const _co of defenseursDuNoeud(bestCol.nodeId,ai)){
+      if(_co===best||_co._isAI!==false)continue;
+      notifyNationHit(_co,'⚔️ '+_nom+' assaillie — tu la partages',
+        ai.civ.emoji+' '+ai.civ.name+' assaille <b>'+_nom+'</b>, que tu partages avec '+best.civ.emoji+' '+best.civ.name+'.<br>'
+        +'C\'est <b>'+best.civ.name+'</b> qui défend'+(best.civ.home===bestCol.nodeId?' — c\'est sa capitale (garnison '+garrisonOf(best,bestCol.nodeId)+')':'')+'. Tu ne paies rien ; '
+        +'si la place tombe, tous ses occupants en sont chassés.');
+    }
     /* La fenêtre de défense s'ouvre chez l'assailli et le combat se résout dans la foulée.
        Pas de suite nommée : on n'est pas dans la séquence de fin de tour, l'IA poursuit son tour
        comme après une proposition d'accord (`proposeAccord`), qui emprunte déjà ce chemin. */
@@ -11030,9 +11077,17 @@ function calcVP(p){
   const _nbTech=p.cards.filter(c=>!!c.branch).length;
   const techBonusVP=Math.floor(_nbTech*0.5);
   if(_nbTech)det.tech.push(_nbTech+' technologie(s) × 0,5 = '+String(_nbTech*0.5).replace('.',',')+' → '+techBonusVP+' (arrondi à l\'inférieur)');
-  // Bonus revenus/tour (rpt) v6 : par ressource — rpt>5→+2VP, rpt>10→+5VP
+  // Bonus revenus/tour : par ressource — >5/tour → +2 VP, >10/tour → +5 VP
+  /* ⚠️ CE CALCUL LISAIT `p.rpt`, QUI N'EST PAS LE REVENU (Marc et Laurent, 997D, 06/09 : « on
+     pense que ça compte pas énergie et matériel »). `rpt` ne contient que les BONUS DE CARTES
+     (Universités, Ordinateur Quantique…), jamais la production des colonies. L'énergie et les
+     matériaux, qui viennent surtout des colonies, ne franchissaient presque jamais 5/tour ; seule
+     la science, portée par les techs, y arrivait. La règle écrite dit « revenus par tour, par
+     ressource » : on lit donc le revenu officiel, `revenusBruts` — celui qui crédite vraiment.
+     Banc : test_vp_revenus_agenda. */
   let rptVP=0;
-  for(const r of['energy','materials','science','morale']){const v=p.rpt[r]||0;const _g=v>10?5:v>5?2:0;rptVP+=_g;
+  let _brut={}; try{ _brut=revenusBruts(p)||{}; }catch(e){ _brut=p.rpt||{}; }
+  for(const r of['energy','materials','science','morale']){const v=_brut[r]||0;const _g=v>10?5:v>5?2:0;rptVP+=_g;
     /* ⚠️ `rEmoji` rend une BALISE HTML, que le rapport texte supprime : la ligne s'affichait
        « · 6/tour → +2 », sans dire de quelle ressource il s'agissait. On écrit le nom en clair —
        un rapport lisible ne doit rien devoir au CSS. */
@@ -11047,7 +11102,7 @@ function calcVP(p){
      le recopier. Les parties commencées avant cette version n'en ont pas — on le dit plutôt que de
      laisser croire à une erreur. */
   if(Array.isArray(p._vpDetail)&&p._vpDetail.length){
-    for(const e of p._vpDetail) det.evt.push('T'+(e.tour||'?')+' — '+e.raison+' : +'+e.n);
+    for(const e of p._vpDetail) det.evt.push('T'+(e.tour||'?')+' — '+e.raison+' : '+(e.n>=0?'+':'')+e.n);
   } else if(evtVP) det.evt.push('+'+evtVP+' au total (détail non enregistré : partie commencée avant la v9.82)');
   /* ═══ « BONUS DIVERS » NE VEUT RIEN DIRE POUR CELUI QUI LE LIT ═══
      Marc, partie 140A : « dans le décompte des points de fin de partie, c'est pas clair pourquoi »
@@ -11065,6 +11120,15 @@ function calcVP(p){
   const forceVP=0; // supprimé v6
   return{colVP,routeVP,cardsVP,techBonusVP,rptVP,forceVP,agendasVP,evtVP,extraVP,extraDetail,det,
     total:colVP+routeVP+cardsVP+techBonusVP+rptVP+agendasVP+evtVP+extraVP};
+}
+/* ═══ CE QUE LES JOUEURS VOIENT : SANS L'AGENDA SECRET (Marc, 06/09) ═══
+   « Les points d'agenda secret ne doivent pas être comptés pendant la partie, seulement à la fin,
+   pour le suspense. » Dans 09A0, Marc passait de 13 à 44 VP au tour 5 sous les yeux de tous —
+   son agenda était deviné. `calcVP().total` reste le compte COMPLET (règles : ordre du draft,
+   ordinateurs, fin de partie) ; les AFFICHAGES pendant la partie passent par ici. */
+function vpAffiche(p){
+  const v=calcVP(p);
+  return (typeof G!=='undefined'&&G&&G.phase==='over')?v.total:(v.total-(v.agendasVP||0));
 }
 // ── Log de partie : construction + copier / email / télécharger (en jeu ET à la fin) ──
 // Rapport lisible : chaque action de chaque nation avec coûts + gain, groupée par tour,
@@ -11428,8 +11492,8 @@ function doEndGame(){
 /* ============================================================ RENDERING ============================================================ */
 function render(){
   renderTopBar();renderWarRisk();renderEvents();renderMap();renderTechTree();renderRight();renderActions();
-  document.getElementById('score-p').textContent='~'+calcVP(G.player).total+' VP';
-  document.getElementById('score-a').textContent='~'+G.ais.map(ai=>calcVP(ai).total).join('/') +' VP';
+  document.getElementById('score-p').textContent='~'+vpAffiche(G.player)+' VP';
+  document.getElementById('score-a').textContent='~'+G.ais.map(ai=>vpAffiche(ai)).join('/') +' VP';
   // Label adverse : pseudo si connu (multijoueur, fourni par online.js via window._scPseudo), sinon nom de civ.
   // (Avant : « IA » en dur dès qu'il n'y avait qu'un adversaire → faux en multijoueur humain.)
   {const _lbl=(a)=>{try{if(window._scPseudo&&window._scPseudo[a.civ.id])return a.civ.emoji+' '+window._scPseudo[a.civ.id];}catch(e){}return a.civ.emoji+(G.ais.length===1?(' '+a.civ.name):'');};
@@ -11488,8 +11552,8 @@ function renderWarRisk(){
       ?'⚔️ Force : <b style="color:#ff9966">'+pf.val+'</b> <span style="color:#5a7a66">(renseignement précis)</span>'
       :'⚔️ Force estimée : <b style="color:#ffb380">~'+pf.val+'</b> <span style="color:#5a6a8a">(±3 — sans renseignement)</span>';
     const ecoLine=_intel>=2
-      ?'<i class=ri-energy></i>'+(ai.res.energy||0)+' <i class=ri-materials></i>'+(ai.res.materials||0)+' <i class=ri-science></i>'+(ai.res.science||0)+' <i class=ri-morale></i>'+(ai.res.morale||0)+' · 🏙️'+ai.colonies.length+' 🛤️'+ai.routes.length+' · ~'+calcVP(ai).total+' VP'
-      :'🏙️ '+ai.colonies.length+' col · 🛤️ '+ai.routes.length+' routes · ~'+calcVP(ai).total+' VP <span style="color:#5a6a8a">· éco &amp; moral : tech requise</span>';
+      ?'<i class=ri-energy></i>'+(ai.res.energy||0)+' <i class=ri-materials></i>'+(ai.res.materials||0)+' <i class=ri-science></i>'+(ai.res.science||0)+' <i class=ri-morale></i>'+(ai.res.morale||0)+' · 🏙️'+ai.colonies.length+' 🛤️'+ai.routes.length+' · ~'+vpAffiche(ai)+' VP'
+      :'🏙️ '+ai.colonies.length+' col · 🛤️ '+ai.routes.length+' routes · ~'+vpAffiche(ai)+' VP <span style="color:#5a6a8a">· éco &amp; moral : tech requise</span>';
     tensHtml+=`<div class="dip-nation"><div class="dip-hdr"><span>${ai.civ.emoji} ${ai.civ.name}</span>${status}</div>`+
       `<div class="dip-force">${forceLine}</div>`+
       `<div class="dip-force" style="color:#8a98b8;font-size:.92em">${ecoLine}</div>`+
@@ -12180,8 +12244,8 @@ function renderRight(){
      On met donc le classement complet — SOI COMPRIS — juste avant le détail des rivales : c'est la
      seule question qu'on se pose vraiment en bas de cette page (« où j'en suis ? »). Les VP des
      rivales sont estimés, comme partout ailleurs (§14.8) ; les siens sont exacts. */
-  {const _moiVP=calcVP(G.player).total;
-   const _rang=[{n:G.player,vp:_moiVP,moi:true}].concat(G.ais.map(a=>({n:a,vp:calcVP(a).total,moi:false})))
+  {const _moiVP=vpAffiche(G.player);
+   const _rang=[{n:G.player,vp:_moiVP,moi:true}].concat(G.ais.map(a=>({n:a,vp:vpAffiche(a),moi:false})))
      .sort((a,b)=>b.vp-a.vp);
    const _cl=document.getElementById('r-classement');
    if(_cl)_cl.innerHTML=_rang.map((r,i)=>
@@ -12411,7 +12475,7 @@ function dismissDiscovery(){
   }
   render();
 }
-function showWarModal(title,body,result){
+function showWarModal(title,body,result,adverseId){
   /* ⚠️ UNE NOTICE BLOQUANTE ATTEND UN ACCUSÉ DE RÉCEPTION — DONC QUELQU'UN POUR L'ENVOYER.
      `war_result` est une fenêtre COLLECTIVE : le serveur la diffuse à tous, mais c'est son
      PROPRIÉTAIRE (`G.player` au moment de l'émission) qui la referme et débloque la suite. Après
@@ -12433,7 +12497,17 @@ function showWarModal(title,body,result){
      rendre la main entre les étapes. C'est désormais le PILOTE qui répond pour les IA
      (`driver.js`, `_reponseIA`), après que la question a été posée normalement. */
   if(_decisionActive()){ // mode serveur : notice non bloquante ; la suite (un NOM dans G) est jouée à la réponse
-    _emitNotice('war_result', G.player, {title, body, result:result||null, colonizeOffer:G._postWarColonizeOffer||null}, 'stWarResultFerme');
+    /* ═══ AUX DEUX BELLIGÉRANTS, ET À EUX SEULS (Marc, 06/09, partie 997D) ═══
+       Cette fenêtre est écrite à la deuxième personne pour SON propriétaire (« tu as subi des
+       pertes », « vous avez évité la guerre »). Le serveur la diffusait à toute la table, telle
+       quelle : Laurent voyait les combats et les paix de Marc comme si c'étaient les siens.
+       On nomme ici les deux camps ; le serveur ne l'envoie qu'à eux, et l'autre camp la reçoit
+       préfixée « Vu par X ». Les tiers ont le journal, qui est public. */
+    const _moi=(G.player&&G.player.civ&&G.player.civ.id)||null;
+    let _adv=(adverseId!==undefined)?adverseId:null;
+    if(_adv===null){ try{ _adv=guerreAdverseId(); }catch(e){ _adv=null; } }
+    _emitNotice('war_result', G.player, {title, body, result:result||null, colonizeOffer:G._postWarColonizeOffer||null,
+      civs:[_moi,_adv].filter(Boolean), ownerName:(G.player&&G.player.civ)?(G.player.civ.emoji+' '+G.player.civ.name):''}, 'stWarResultFerme');
     return;
   }
   document.getElementById('wm-title').textContent=title;
@@ -12500,7 +12574,7 @@ function showPeaceOfferModal(isJustDeclared,cb){
   if(_decisionActive()){ // mode serveur : router le choix paix/guerre vers l'humain en guerre
     _emitDecision('peace_offer', p,
       {attacker:(ai?ai.civ.id:null), attackerName:(ai?ai.civ.name:'IA'), isJustDeclared:!!isJustDeclared, declaredBy:declBy,
-       vpYou:calcVP(p).total, vpEnemy:calcVP(ai||G.ais[0]).total, stocks:{materials:p.res.materials||0,energy:p.res.energy||0,science:p.res.science||0},
+       vpYou:vpAffiche(p), vpEnemy:vpAffiche(ai||G.ais[0]), stocks:{materials:p.res.materials||0,energy:p.res.energy||0,science:p.res.science||0},
        /* COMBIEN DE JETONS IL POURRAIT RÉELLEMENT ENGAGER S'IL REFUSE. Deux amis de Marc, 17/08 :
           l'un refuse la paix, choisit d'attaquer, et découvre seulement à la fenêtre suivante qu'il
           n'a pas de quoi engager un seul jeton. Le chiffre existe déjà (`maxAffordableTokens` tient
@@ -12516,7 +12590,7 @@ function showPeaceOfferModal(isJustDeclared,cb){
     `<span style="color:${ai?ai.civ.color:'#888'};font-weight:700">${ai?ai.civ.emoji:''} ${ai?ai.civ.name:'IA'}</span>`;
   document.getElementById('pm-declaredby').textContent=
     declBy==='player'?'Guerre déclarée par toi — l\'IA répond.':'Guerre déclarée par '+(ai?ai.civ.name:'l\'IA')+'.';
-  const pVP=calcVP(p).total;const aVP=calcVP(ai||G.ais[0]).total;
+  const pVP=vpAffiche(p);const aVP=vpAffiche(ai||G.ais[0]);
   document.getElementById('pm-context').innerHTML=
     (isJustDeclared?'<strong>'+G._warDeclareReason+'</strong><br><br>':'')+
     'VP actuels — Toi : <strong>'+pVP+'</strong> | IA : <strong>'+aVP+'</strong><br>'+
@@ -13474,111 +13548,14 @@ function exportDebugLog(){
   document.getElementById('debug-turn-label').textContent=G.turn+'/'+G.maxTurns;
   setTimeout(()=>{const ta=document.getElementById('debug-export-text');ta.select();},100);
 }
-/* ============================================================ ATTACK MODE ============================================================ */
-let _attackTargetNode=null;
-function showAttackModal(nodeId){
-  const node=NODES[nodeId];if(!node)return;
-  _attackTargetNode=nodeId;
-  const homeId=G.player.civ.home;
-  const playerNodes=G.player.colonies.map(c=>c.nodeId);
-  let minDist=99;
-  for(const colId of playerNodes){const d=getNodeDistance(colId,nodeId);if(d<minDist)minDist=d;}
-  const travelCost=1+Math.max(0,minDist-1);
-  const maxTokens=G.player.forceTokens;
-  document.getElementById('atk-sub').textContent='Cible : '+node.emoji+' '+node.name;
-  document.getElementById('atk-info').innerHTML=
-    `Distance depuis ta colonie la plus proche : <strong>${minDist} nœud(s)</strong><br>`+
-    `Coût de trajet : <strong>${travelCost} jeton(s)</strong> — minimum à envoyer<br>`+
-    `Force effective = jetons envoyés − ${travelCost}`;
-  const slider=document.getElementById('atk-slider');
-  slider.min=travelCost;slider.max=Math.max(travelCost,maxTokens);slider.value=travelCost;
-  document.getElementById('atk-modal').classList.remove('hidden');
-  updateAtkSlider();
-}
-function updateAtkSlider(){
-  const slider=document.getElementById('atk-slider');
-  const sent=parseInt(slider.value);
-  const info=document.getElementById('atk-info').innerHTML;
-  const travelCost=parseInt(slider.min);
-  const eff=sent-travelCost;
-  document.getElementById('atk-slider-val').textContent=sent;
-  const _affA=(G.player.res.materials||0)>=sent&&(G.player.res.energy||0)>=sent;
-  document.getElementById('atk-power').innerHTML=
-    `Force effective : <strong style="color:${eff>0?'#ff8080':'#7880a0'}">${eff}</strong>`+
-    (eff<=0?' — <span style="color:#ff6060">Insuffisant pour attaquer</span>':'')+
-    '<br><span style="color:'+(_affA?'#ffaa66':'#ff5555')+';font-weight:700">Coût combat : −'+sent+'<i class=ri-materials></i> −'+sent+'<i class=ri-energy></i></span>'+(_affA?'':' <span style="color:#ff5555">— ressources insuffisantes</span>');
-  document.getElementById('atk-confirm-btn').disabled=(eff<=0||sent>G.player.forceTokens||!_affA);
-}
-function confirmAttack(){
-  if(!_attackTargetNode)return;
-  const node=NODES[_attackTargetNode];
-  const slider=document.getElementById('atk-slider');
-  const sent=parseInt(slider.value);
-  const travelCost=parseInt(slider.min);
-  const effAtk=sent-travelCost;
-  if(sent>G.player.forceTokens){addLog('⚠️ Pas assez de jetons Force.','red');cancelAttack();return;}
-  if(G.player.acLeft<1){addLog('⚠️ Attaque : besoin 1 AC.','red');cancelAttack();return;}
-  if((G.player.res.materials||0)<sent||(G.player.res.energy||0)<sent){addLog('⚠️ Attaque : besoin '+sent+'<i class=ri-materials></i> +'+sent+'<i class=ri-energy></i> (coût combat, 1<i class=ri-materials></i>+1<i class=ri-energy></i> par jeton).','red');cancelAttack();return;}
-  cancelAttack();
-  undoStack=[];
-  G.player.acLeft-=1;G.player.forceTokens-=sent;
-  G.player.res.materials-=sent;G.player.res.energy-=sent;
-  addLog('⚔️ Coût combat : −'+sent+'<i class=ri-materials></i> −'+sent+'<i class=ri-energy></i> ('+sent+' jeton(s) envoyé(s))','dim');
-  G.player.forceCooldown.push({count:sent,returnTurn:getCooldownTurn(G.player)});
-  G.player.spentThisTurn+=1+sent;
-  // Défense IA DÉTERMINISTE (plus d'aléatoire) : garnison de base (1) + ce que l'IA peut PAYER (1🪨+1⚡/jeton).
-  /* ⚠️ CHEMIN SOLO — MÊME RÈGLE QUE LE SERVEUR. Il calculait ici sa propre défense
-     (`min(jetons, matériaux, énergie)`), donc solo et en ligne divergeaient sur le même combat.
-     `defenseIA` est désormais la SEULE définition ; les jetons engagés et ceux payés sont le même
-     nombre, ce qui n'était pas garanti avant. */
-  const atkAi=G.ais.find(ai=>ai.colonies.find(c=>c.nodeId===_attackTargetNode))||G.ais[0];
-  const aiAfford=atkAi?((typeof defenseIA==='function')?defenseIA(atkAi,G.player,_attackTargetNode)
-                                                      :Math.max(0,Math.min(atkAi.forceTokens||0,atkAi.res.materials||0,atkAi.res.energy||0))):0;
-  const aiDef=1/*garnison de base*/+aiAfford;
-  if(atkAi&&aiAfford>0&&typeof applyCombatEngage==='function')applyCombatEngage(atkAi,aiAfford,effAtk<=aiDef); // l'IA paie sa défense engagée
-  let resultMsg='';let resultCls='';
-  if(effAtk>aiDef){
-    // VICTOIRE — CAPTURE de la colonie (elle change de propriétaire), PAS une simple destruction (bug : en ligne
-    // le serveur passait par ici et « détruisait » sans te donner la colonie → tes captures ne tenaient jamais).
-    const col=atkAi?atkAi.colonies.find(c=>c.nodeId===_attackTargetNode||c.nodeId===node.id):null;
-    if(col&&atkAi){
-      const newLvl=Math.max(1,(col.level||1)-1);
-      atkAi.colonies=atkAi.colonies.filter(c=>c.nodeId!==col.nodeId);
-      atkAi.forceTokens=Math.max(0,(atkAi.forceTokens||0)-1); // jeton de garnison détruit dans la défense
-      atkAi.res.morale=Math.max(0,(atkAi.res.morale||0)-1);
-      updateConnections(atkAi);
-      const connP=(typeof checkConnected==='function')?checkConnected(col.nodeId,G.player):true;
-      if(!G.player.colonies.some(c=>c.nodeId===col.nodeId))G.player.colonies.push({nodeId:col.nodeId,level:newLvl,connected:connP,_conquest:3});
-      updateConnections(G.player);
-      gagnerVP(G.player,2,'Colonie capturée : '+node.name);
-      resultMsg='🏴 Victoire ! Tu CAPTURES '+node.name+' (Nv.'+newLvl+') — elle est à toi ! (+2 VP)';resultCls='gold';
-      addLog('🏴 '+node.name+' CAPTURÉE sur '+atkAi.civ.emoji+' '+atkAi.civ.name+' ! (Nv.'+newLvl+', '+effAtk+'⚔️ vs '+aiDef+'🛡️)','gold');
-    }
-    else{resultMsg='✅ Victoire ! Zone sécurisée.';resultCls='gold';}
-    G.warRisk=Math.min(10,G.warRisk+5);
-  } else if(aiDef===effAtk){
-    resultMsg='🛡️ Attaque repoussée — égalité ('+effAtk+' vs '+aiDef+').';resultCls='red';
-    addLog('⚔️ Attaque sur '+node.name+' repoussée.','red');
-  } else if(aiDef===effAtk+1){
-    G.player.forceTokens=Math.max(0,G.player.forceTokens-1);
-    resultMsg='💥 Contre-attaque ! Tu perds 1 jeton Force ('+effAtk+' vs '+aiDef+').';resultCls='red';
-    addLog('⚔️ Contre-attaque — −1 jeton.','red');
-  } else {
-    G.player.forceTokens=Math.max(0,G.player.forceTokens-2);
-    resultMsg='💥 Contre-attaque puissante ! Tu perds 2 jetons Force ('+effAtk+' vs '+aiDef+').';resultCls='red';
-    addLog('⚔️ Contre-attaque forte — −2 jetons.','red');
-  }
-  G.warRisk=Math.min(15,G.warRisk+3);
-  if(G.warRisk>=12&&!G.warState)declareWar('Attaque sur '+node.name+'!');
-  addAction('⚔️','Attaque '+node.name,1,{},'Force eff. '+effAtk+' vs '+aiDef);
-  showWarModal('⚔️ Résultat de l\'attaque',resultMsg,{txt:resultMsg,cls:effAtk>aiDef?'win':'loss'});
-  _warSuite('stRendre');
-  mode=null;setHint('');render();
-}
-function cancelAttack(){
-  document.getElementById('attack-modal').classList.add('hidden');
-  _attackTargetNode=null;
-}
+/* ═══ ANCIENNE FENÊTRE D'ATTAQUE SUPPRIMÉE (06/09, v10.35) ═══
+   Ici vivaient `_attackTargetNode`, `showAttackModal`, `updateAtkSlider`, `confirmAttack` et
+   `cancelAttack` : la fenêtre « Attaque ciblée » d'avant le modèle de combat. Personne ne
+   l'appelait plus (aucun appel à `showAttackModal` nulle part, et elle cherchait un `#atk-modal`
+   qui n'existe pas), mais `confirmAttack` contenait une CINQUIÈME copie de la capture — retirer et
+   ajouter la colonie à la main, sans `capturerNoeud`, donc sans les règles de capitale, de
+   cohabitation, ni le +10. L'assaut du plateau passe par `confirmWarCombat` → serveur →
+   `capturerNoeud`, la seule porte. Voir docs/REPRISE.md §99. */
 function toggleLog(){
   const content=document.getElementById('log-content');const arr=document.getElementById('log-arr');
   content.classList.toggle('open');arr.textContent=content.classList.contains('open')?'▼':'▶';
@@ -13701,7 +13678,7 @@ function _scMaybeStuck(){ // à appeler quand c'est le tour du joueur
 // (aucune fenêtre ouverte, aucune décision en attente, rien depuis ~8 s), on relance la continuation en attente.
 function _scAnyModalOpen(){
   if(typeof document==='undefined')return false;
-  const ids=['eot-modal','strategy-modal','agenda-sel-modal','invest-modal','invest2-modal','invest-active-modal','event-modal','event-announce-modal','dyson-modal','espionage-modal','empath-copy-modal','war-modal','war-combat-modal','attack-modal','discovery-modal','peace-modal','forced-war-modal','route-token-modal','forge-modal','accord-modal','sc-stuck-modal','sc-ability-reminder','sc-attack-notice'];
+  const ids=['eot-modal','strategy-modal','agenda-sel-modal','invest-modal','invest2-modal','invest-active-modal','event-modal','event-announce-modal','dyson-modal','espionage-modal','empath-copy-modal','war-modal','war-combat-modal','discovery-modal','peace-modal','forced-war-modal','route-token-modal','forge-modal','accord-modal','sc-stuck-modal','sc-ability-reminder','sc-attack-notice'];
   for(const id of ids){ const el=document.getElementById(id); if(el && !el.classList.contains('hidden') && el.style.display!=='none') return true; }
   if(document.getElementById('aad-overlay')||document.getElementById('calm-overlay')) return true;
   return false;

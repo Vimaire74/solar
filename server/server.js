@@ -476,6 +476,16 @@ function sendWindowToAll(g, kind, payload, ownerCiv) {
       const html = (bodies && bodies[s.civId]) || payload.html || '';
       if (!html) continue;
       sendTo(s.ws, { t: 'notice', kind: 'eot', payload: { turn: payload.turn, html } });
+    } else if (kind === 'war_result' && Array.isArray(payload.civs) && payload.civs.length) {
+      /* ═══ RÉSULTAT DE GUERRE : AUX DEUX CAMPS, ET À EUX SEULS (Marc, 06/09, partie 997D) ═══
+         La fenêtre est écrite « tu » pour son propriétaire ; diffusée telle quelle à toute la
+         table, Laurent lisait les combats et les paix de Marc comme les siens. Le moteur nomme
+         désormais les deux camps (`payload.civs`) : on n'envoie qu'à eux, et l'autre camp la lit
+         préfixée du nom de celui qui parle. Les tiers ont le journal. Un moteur plus ancien sans
+         `civs` garde l'ancienne diffusion (branche `else`). */
+      if (!payload.civs.includes(s.civId)) continue;
+      const titre = (payload.ownerName ? ('👁️ Vu par ' + payload.ownerName + ' — ') : '') + (payload.title || '');
+      sendTo(s.ws, { t: 'notice', kind, payload: Object.assign({}, payload, { title: titre }) });
     } else {
       sendTo(s.ws, { t: 'notice', kind, payload });
     }

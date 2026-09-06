@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-06 · v10.33';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-06 · v10.35';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -1071,14 +1071,6 @@ const INTENT_MAP = {
     try{ if(window.routeManageClose) window.routeManageClose(); }catch(e){}
     return r ? {type:'routeToken', from:r.from, to:r.to, deploy:false} : null;
   },
-  confirmAttack:    ()=>{ // lit la vraie modale d'attaque de la page, puis la ferme
-    let node=null, tokens=1;
-    try{ node=_attackTargetNode; }catch(e){}
-    try{ tokens=parseInt((document.getElementById('atk-slider')||{}).value)||1; }catch(e){}
-    try{ if(window.cancelAttack) window.cancelAttack(); }catch(e){}
-    if(!node) return null; // rien à envoyer
-    return {type:'attack', node, tokens, cruiser:_croiseurCoche()};
-  },
   // CRITIQUE : l'assaut du PLATEAU passe par la modale de COMBAT DE GUERRE (confirmWarCombat), pas l'ancienne
   // modale d'attaque. Sans cette interception, la capture ne se faisait QUE sur l'écran du joueur (jamais envoyée
   // au serveur) → la colonie « repartait » à la resynchro suivante. On envoie l'attaque au serveur (qui capture).
@@ -1831,7 +1823,7 @@ function scRestaurerFenetre(){
 function scReduireFenetreVisible(){
   const ids=['eot-modal','bilan-modal','strategy-modal','agenda-sel-modal','invest-modal','invest2-modal',
              'invest-active-modal','event-modal','event-announce-modal','dyson-modal','espionage-modal',
-             'empath-copy-modal','war-modal','war-combat-modal','attack-modal','discovery-modal','peace-modal',
+             'empath-copy-modal','war-modal','war-combat-modal','discovery-modal','peace-modal',
              'forced-war-modal','accord-modal','route-capture-modal','comm-event-modal','diplo-event-modal'];
   for(const id of ids){ const m=document.getElementById(id); if(m&&!m.classList.contains('hidden')) scRendreReductible(m); }
 }
@@ -1882,15 +1874,21 @@ function askLocalDecision(pending){
            défendre contre des jetons et se retrouve devant un croiseur (E682, tour 9). */
         +'<span class="muted">Force de l\'assaut : ~'+(o.threat||0)+'⚔️'+(o.threatDetail?(' ('+o.threatDetail+')'):'')+' · tes jetons engageables : '+max+' (1🪨 +1⚡ chacun)</span></div>'
         +(o.attackerCruiser?'<div style="background:#2a1200;border:1px solid #cc6622;border-radius:8px;padding:6px 9px;margin-bottom:8px;color:#ffcfa0;font-size:.85em">⚓ Il déploie son <b>Supercroiseur</b> — déjà compté ci-dessus.</div>':'')
+        /* La garnison compte dans le combat, elle doit compter dans la fenêtre (Marc, 06/09 : « je vois
+           pas combien j'ai en défense de base dans ma capitale une fois reprise »). Serveurs plus
+           anciens : pas de garnison dans le payload → ligne absente, rien de faux affiché. */
+        +(o.garrison!==undefined?'<div style="background:#0e2a18;border:1px solid #3a8a5a;border-radius:8px;padding:6px 9px;margin-bottom:8px;color:#9fe8b8;font-size:.85em">🏛️ Garnison sur place : <b>'+o.garrison+'</b>'+(o.garrisonLabel?(' ('+o.garrisonLabel+')'):'')+(o.empath?(' · 🔮 +'+o.empath+' Empathes'):'')+' — comptés dans ta défense.</div>':'')
         +'<input type="range" id="sc-d" min="0" max="'+max+'" value="'+Math.min(2,max)+'" style="width:100%">'
-        +'<div style="margin:4px 0 8px">Défense : <b id="sc-dv">'+Math.min(2,max)+'</b> jeton(s)</div>'
+        +'<div style="margin:4px 0 8px">Défense : <b id="sc-dv">'+Math.min(2,max)+'</b> jeton(s)'+(o.garrison!==undefined?' → total <b id="sc-dt">'+(Math.min(2,max)+(o.garrison||0)+(o.empath||0))+'</b>🛡️ contre ~'+(o.threat||0)+'⚔️':'')+'</div>'
         +(o.cruiser?('<label class="opt" style="display:block;text-align:left;cursor:pointer"><input type="checkbox" id="sc-cru" style="margin-right:8px">⚓ Déployer le <b>Supercroiseur</b> (+'+(o.cruiserPower||5)+'⚔️, −'+cc.materials+'🪨 −'+cc.energy+'⚡)</label>'):'')
         +'<button class="opt" id="sc-ok">🛡️ Défendre</button>'
         +'<button class="opt" id="sc-none" style="background:#2a2f45">La colonie se défend toute seule avec ses jetons (1 pour une colonie, 10 pour la base de ta nation)</button>';
       decisionPanel(body);
       const sl=document.getElementById('sc-d'), dv=document.getElementById('sc-dv');
-      if(sl)sl.oninput=()=>{ dv.textContent=sl.value; };
       const cru=()=>{ const c=document.getElementById('sc-cru'); return !!(c&&c.checked); };
+      const total=()=>{ const t=document.getElementById('sc-dt'); if(!t)return; t.textContent=(parseInt(sl.value)||0)+(o.garrison||0)+(o.empath||0)+(cru()?(o.cruiserPower||5):0); };
+      if(sl)sl.oninput=()=>{ dv.textContent=sl.value; total(); };
+      { const c=document.getElementById('sc-cru'); if(c)c.onchange=total; }
       document.getElementById('sc-ok').onclick=()=>done({defTokens:parseInt(sl.value)||0, cruiser:cru()});
       document.getElementById('sc-none').onclick=()=>done({defTokens:0, cruiser:false});
       return;

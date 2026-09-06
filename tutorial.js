@@ -172,7 +172,7 @@ function simUnlock(branch){ const g=G(); if(!g)return; g.branchTiers=g.branchTie
 /* ---------- Fenêtres spéciales : on affiche les VRAIES fenêtres du jeu (avec un contenu d'illustration) ---------- */
 // « Mode neutre » : ferme TOUTES les fenêtres spéciales et de transition de tour (pour ne rien laisser bloquer l'écran).
 function hideAllSpecialModals(){
-  ['forced-war-modal','war-modal','war-combat-modal','attack-modal',
+  ['forced-war-modal','war-modal','war-combat-modal',
    'invest-modal','invest2-modal','eot-modal','strategy-modal','event-modal','event-announce-modal','agenda-sel-modal','discovery-modal'
   ].forEach(function(id){ const m=$(id); if(m)m.classList.add('hidden'); });
   const pm=$('peace-modal'); if(pm){ pm.classList.add('hidden'); pm.style.display='none'; }

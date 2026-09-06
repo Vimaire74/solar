@@ -39,7 +39,7 @@ function makeEl(id) {
 
 function buildSandbox() {
   // getElementById CACHE les éléments par id : indispensable pour piloter les modales
-  // headless (ex. attaque : showAttackModal règle slider.min, confirmAttack le relit).
+  // headless (ex. combat : la fenêtre règle slider.min, la confirmation le relit).
   const _els = {};
   const document = {
     getElementById(id){ return _els[id] || (_els[id] = makeEl(id)); }, createElement(){ return makeEl(); },
@@ -191,7 +191,7 @@ const ACTIONS = {
   },
   attack:   (sb, a) => {
     // Assaut du PLATEAU : on résout avec le MÊME modèle que la modale de combat (resolveWarCombat) — jetons
-    // engagés vs défense affichée, PAS l'ancien confirmAttack (coût de trajet). Ainsi l'affichage ne ment plus.
+    // engagés vs défense affichée, PAS l'ancienne fenêtre « Attaque ciblée », supprimée le 06/09. Ainsi l'affichage ne ment plus.
     const G = sb.__G, p = G.player, node = a.node;
     if (!node) { _postAction(sb); return; }
     /* ═══════ ATTAQUER UN JOUEUR HUMAIN N'A JAMAIS PU FONCTIONNER ═══════
