@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-06 · v10.35';
+const SOLAR_BUILD_MOTEUR = '2026-09-06 · v10.36';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -282,6 +282,12 @@ const STRATEGY_CARDS=[
      La remise faisait doublon avec Biosphère Autonome, qui donne désormais exactement la même chose
      de façon permanente — une carte à usage unique ne pouvait pas rivaliser. */
   {id:'st8',name:'Consolidation',emoji:'🛡️',desc:'+1<i class=ri-morale></i> +1<i class=ri-energy></i>',res:{morale:1,energy:1}},
+  /* ═══ INITIATIVE (Marc, 06/09) ═══ Jouer en premier se choisit, il ne se subit plus seulement.
+     Le draft Stratégie a lieu AVANT le tirage de l'ordre du tour (`ordreDuTour`) : Initiative agit
+     donc sur le tour en cours ; Initiative planifiée sur le suivant, et elle prime. La prise est
+     annoncée à tous, et rappelée en tête du draft du tour suivant. Textes de Marc, tels quels. */
+  {id:'st10',name:'Initiative',emoji:'🥇',desc:'Tu joues en premier ce tour, mais tu es 2ᵉ si un joueur a choisi Initiative planifiée le tour précédent.',initiative:'tour'},
+  {id:'st11',name:'Initiative planifiée',emoji:'📅',desc:'Tu joueras en premier le tour prochain.',initiative:'prochain'},
 ];
 const DISCOVERY_TILES=[
   {id:'dt1',name:'Gisement Riche',emoji:'⛏️',desc:'+2<i class=ri-materials></i> immédiats.',res:{materials:2}},
@@ -3927,13 +3933,41 @@ function _runStrategyDraftAfterAnnounce(){
   G.ais.forEach(a=>a._draftedStrat=null);
   _runDraftStep();
 }
+/* ═══ LA COURSE AU RANG 3 (Marc, 06/09) ═══
+   « Pour l'IA qui veut absolument prendre une tech niveau 3 en premier, elle doit comprendre que
+   ça peut servir à ça. » Une technologie de branche de rang 3 est exclusive à son premier acheteur
+   (`isTechExclusive`) : quand un rival a lui aussi le rang 2 de la branche, jouer AVANT lui est la
+   seule façon d'être sûr. Rend 'tour' si l'IA peut acheter dès ce tour (→ 🥇 Initiative),
+   'prochain' si elle a le prérequis mais pas les moyens ce tour (→ 📅 Initiative planifiée), null
+   sinon. Réservé au tacticien : le cerveau témoin ne change pas de comportement. */
+function courseAuRang3(nat){
+  if(!nat||typeof nomCerveauCourant!=='function'||nomCerveauCourant()!=='tacticien')return null;
+  const tous=allPlayers();
+  let meilleur=null;
+  for(const c of CARDS_POOL){
+    if(!c||!c.branch||c.tier!==3||!isTechExclusive(c))continue;
+    if(tous.some(n=>possedeCarte(n,c.id)))continue;                       // déjà prise : plus de course
+    if(!nat.cards.some(k=>k.branch===c.branch&&k.tier===2))continue;      // pas le prérequis
+    if(c.tier>((G.branchTiers&&G.branchTiers[c.branch])||0)+1)continue;   // rang pas encore ouvert
+    const rival=tous.some(n=>n!==nat&&n.cards.some(k=>k.branch===c.branch&&k.tier===2));
+    if(!rival)continue;
+    const cout=getEffCost(c,nat);
+    const payable=Object.keys(cout).every(r=>(nat.res[r]||0)>=(cout[r]||0))&&(nat.acLeft||0)>=2;
+    if(payable)return 'tour';
+    meilleur=meilleur||'prochain';
+  }
+  return meilleur;
+}
 function _aiBestStratFromPool(ai,pool){
   const prefs=[];
+  const _course=courseAuRang3(ai);
+  if(_course==='tour')prefs.push('st10'); else if(_course==='prochain')prefs.push('st11');
   if((ai.res.morale||0)<=3)prefs.push('st8');
   if(ai.forceTokens<=1&&(G.warState||(G.warRisk||0)>=5))prefs.push('st2');
   if((ai.res.science||0)<=2)prefs.push('st3');
   if((ai.res.materials||0)<=2||(ai.res.energy||0)<=2)prefs.push('st4');
-  prefs.push('st6','st2','st7','st3','st4','st8','st1','st5','st9');
+  /* Hors course, Initiative vaut à peu près « +1 AC » : juste derrière Mobilisation. */
+  prefs.push('st6','st10','st2','st7','st3','st4','st8','st1','st5','st9','st11');
   for(const id of prefs){const c=pool.find(x=>x.id===id);if(c)return c;}
   return pool[0];
 }
@@ -3983,20 +4017,24 @@ function _runDraftStep(){
          draft — c'est-à-dire une partie sur deux — ne redémarrait pas. La nation qui répond est
          rendue par le courtier (second argument), il n'y a donc rien à capturer. */
       _emitRemote('strategy', nat,
-        {rank:_pos, total:_total, phrase:_phrase, options:pool.map(c=>({id:c.id,name:c.name,emoji:c.emoji,desc:c.desc,calmTension:c.calmTension||0}))},
+        {rank:_pos, total:_total, phrase:_phrase, rappel:(typeof rappelInitiative==='function'?rappelInitiative():null), options:pool.map(c=>({id:c.id,name:c.name,emoji:c.emoji,desc:c.desc,calmTension:c.calmTension||0}))},
         'stStrategieChoisie', null);
       return;
     }
     if(nat._isAI===false){ // une nation HUMAINE doit choisir
       if(_decisionActive()){ // mode serveur : router vers ce joueur
         _emitDecision('strategy', nat,
-          {rank:_pos, total:_total, phrase:_phrase, options:pool.map(c=>({id:c.id,name:c.name,emoji:c.emoji,desc:c.desc,calmTension:c.calmTension||0}))},
+          {rank:_pos, total:_total, phrase:_phrase, rappel:(typeof rappelInitiative==='function'?rappelInitiative():null), options:pool.map(c=>({id:c.id,name:c.name,emoji:c.emoji,desc:c.desc,calmTension:c.calmTension||0}))},
           'stStrategieChoisie', null);
       } else { G._stratPlayerRank=_pos; G._stratTotal=_total; showStrategyModal(); } // solo : l'unique humain est G.player
       return;
     }
     order.shift();
-    if(pool.length){const c=_aiBestStratFromPool(nat,pool);const i=pool.findIndex(x=>x.id===c.id);if(i>=0)pool.splice(i,1);nat._draftedStrat=c;}
+    if(pool.length){const c=_aiBestStratFromPool(nat,pool);const i=pool.findIndex(x=>x.id===c.id);if(i>=0)pool.splice(i,1);nat._draftedStrat=c;
+      /* L'ordre du tour est tiré à `startInterleaved`, AVANT que l'IA n'applique sa carte (au début
+         de son tour d'actions). Initiative doit donc être posée ICI, au draft, sinon elle arriverait
+         après le tirage et ne servirait à rien. Les autres effets gardent leur moment. */
+      if(c&&c.initiative&&typeof appliquerInitiative==='function')appliquerInitiative(nat,c);}
   }
   _finishDraft();
 }
@@ -4085,9 +4123,36 @@ function showStrategyModal(){
   let rank=G._stratPlayerRank;
   if(!rank&&Array.isArray(G._stratOrder)){ const i=G._stratOrder.indexOf(G.player.civ.id); if(i>=0) rank=i+1; }
   const total=G._stratTotal||_tous.length;
-  document.getElementById('strat-sub').innerHTML=draftPhrase(rank,total)+' — '+pool.length+' carte(s) proposée(s).'+_tensionMiniHtml();
+  {const _rp=(typeof rappelInitiative==='function')?rappelInitiative():null;
+  document.getElementById('strat-sub').innerHTML=(_rp?'<div style="color:#ffd27a;margin-bottom:6px">'+_rp+'</div>':'')+draftPhrase(rank,total)+' — '+pool.length+' carte(s) proposée(s).'+_tensionMiniHtml();}
   document.getElementById('strategy-modal').classList.remove('hidden');
   if(typeof _syncEndBtn==='function')_syncEndBtn();
+}
+/* ═══ INITIATIVE : UNE SEULE PORTE POUR LES DEUX CHEMINS (humain et IA) ═══
+   Pose le drapeau sur la nation, l'écrit au journal (lu par tous, IA comprises) et prévient
+   chaque humain par une fenêtre — Marc, 06/09 : « la situation doit être expliquée à tous les
+   joueurs y compris les IA ». Le drapeau porte le NUMÉRO du tour visé : `ordreDuTour` ne lit que
+   celui du tour courant, un drapeau périmé ne fait donc rien. */
+function appliquerInitiative(nat,card){
+  if(!nat||!card||!card.initiative)return;
+  const qui=nat.civ.emoji+' '+nat.civ.name;
+  let msg;
+  if(card.initiative==='prochain'){
+    nat._initiativePlanifieeTour=(G.turn||0)+1;
+    msg=qui+' jouera en <b>premier</b> au tour '+nat._initiativePlanifieeTour+' (Initiative planifiée). Une Initiative prise ce tour-là placera son auteur deuxième.';
+  }else{
+    nat._initiativeTour=G.turn||0;
+    const _plan=allPlayers().find(n=>n!==nat&&n._initiativePlanifieeTour===G.turn);
+    msg=qui+' joue en <b>premier</b> ce tour (Initiative)'+(_plan?(' — <b>deuxième</b>, en fait : '+_plan.civ.emoji+' '+_plan.civ.name+' l\'avait planifié le tour précédent.'):'.');
+  }
+  addLog((card.initiative==='prochain'?'📅 ':'🥇 ')+msg.replace(/<[^>]+>/g,''),'gold');
+  try{ for(const _h of allPlayers()){ if(_h&&_h._isAI===false) notifyNationHit(_h,(card.initiative==='prochain'?'📅':'🥇')+' Ordre du tour',msg); } }catch(e){}
+}
+/* Le rappel du tour suivant, en tête du draft : qui a planifié de jouer premier CE tour. */
+function rappelInitiative(){
+  const n=allPlayers().find(x=>x&&x._initiativePlanifieeTour===G.turn);
+  if(!n)return null;
+  return '📅 '+n.civ.emoji+' '+n.civ.name+' joue en premier ce tour (Initiative planifiée au tour précédent). Une Initiative prise maintenant te placerait deuxième.';
 }
 // Applique les effets d'une carte Stratégie à une NATION donnée (humain ou IA actif).
 // Retourne true si une sous-décision « calmer une tension » reste à résoudre.
@@ -4096,6 +4161,7 @@ function _applyStratTo(nat,card){
   // calm = sous-décision (choix de la nation cible). `calmTension` = MA tension envers elle ;
   // `calmTheirs` = SA tension envers moi (Diplomatie). Les deux ouvrent la même fenêtre.
   if(card.calmTension||card.calmTheirs)return true;
+  if(card.initiative)appliquerInitiative(nat,card);
   if(card.res)for(const[r,a]of Object.entries(card.res)){nat.res[r]=(nat.res[r]||0)+a;}
   if(card.force){nat.forceTokens+=card.force;nat.stratForceBonus=(nat.stratForceBonus||0)+card.force;}
   if(card.forceKeep){nat.forceTokens+=card.forceKeep;} // conservable (non temporaire)
@@ -5165,10 +5231,26 @@ fluxDeclarer('guerreCombatClassiqueChoisi', guerreCombatClassiqueChoisi);
 fluxDeclarer('guerreFraicheCombatChoisi', guerreFraicheCombatChoisi);
 
 /* ===== ENTRELACÉ (machinerie — non activée tant que startTurn/endTurn/addAction ne sont pas branchés) ===== */
+/* ═══ L'ORDRE DU TOUR — UNE SEULE RÈGLE (Marc, 06/09) ═══
+   1. celui qui a joué 📅 Initiative planifiée au tour PRÉCÉDENT ;
+   2. celui qui a joué 🥇 Initiative CE tour ;
+   3. les autres, tirés au sort — comme avant.
+   Rend l'ordre et l'étiquette de chacun, pour que le journal dise POURQUOI il est là. */
+function ordreDuTour(){
+  const tous=allPlayers().slice();
+  const planifie=tous.filter(n=>n&&n._initiativePlanifieeTour===G.turn);
+  const initiative=tous.filter(n=>n&&n._initiativeTour===G.turn&&planifie.indexOf(n)<0);
+  const reste=shuffle(tous.filter(n=>planifie.indexOf(n)<0&&initiative.indexOf(n)<0));
+  const etiquettes={};
+  planifie.forEach(n=>etiquettes[n.civ.id]='planifié');
+  initiative.forEach(n=>etiquettes[n.civ.id]='Initiative');
+  reste.forEach(n=>etiquettes[n.civ.id]='tirage');
+  return {ordre:planifie.concat(initiative,reste), etiquettes};
+}
 function startInterleaved(){
   G._il=true;
-  G._order=allPlayers().slice();
-  for(let i=G._order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[G._order[i],G._order[j]]=[G._order[j],G._order[i]];}
+  const _odt=ordreDuTour();
+  G._order=_odt.ordre; G._ordreEtiquettes=_odt.etiquettes;
   for(const p of allPlayers()){ p._passedRound=false; p._aiSetupDone=false; p._turnActions=[]; p._raidsThisTurn=[]; p._recoltesTour=0; }
   if(typeof appliquerEliminations==='function')appliquerEliminations();
   G._ilIdx=0; G._humanActive=false; G._ilLines=[]; G._ilMarkEntry=(G.log&&G.log[0])||null; G._turnMarkEntry=(G.log&&G.log[0])||null;
@@ -5176,9 +5258,12 @@ function startInterleaved(){
      multijoueur (demande de Marc, 2026-08-07 : « ajouter dans journal qui est désigné par le hasard
      comme premier joueur du tour »). Elle est remontée ici, avant le retour, et nomme les nations
      plutôt que « Toi » : le journal est LU PAR TOUS, « Toi » n'y veut rien dire. */
-  logAuteur('systeme',()=>addLog('━ Initiative du tour '+G.turn+' : '+G._order.map(n=>n.civ.emoji+' '+n.civ.name).join(' › ')
+  /* Chacun est étiqueté — (planifié) / (Initiative) / (tirage) — pour qu'on sache POURQUOI il est
+     à cette place. Une place gagnée par une carte ne doit pas ressembler à un coup de dés. */
+  const _et=id=>(G._ordreEtiquettes&&G._ordreEtiquettes[id])||'tirage';
+  logAuteur('systeme',()=>addLog('━ Initiative du tour '+G.turn+' : '+G._order.map(n=>n.civ.emoji+' '+n.civ.name+' ('+_et(n.civ.id)+')').join(' › ')
     +' — '+G._order[0].civ.name+' commence ━','dim'));
-  if(typeof _journalAuto==='function')_journalAuto(G._order[0].civ.name,'Premier joueur du tour (tirage au sort)',G._order.map(n=>n.civ.name).join(' › '));
+  if(typeof _journalAuto==='function')_journalAuto(G._order[0].civ.name,'Premier joueur du tour ('+(_et(G._order[0].civ.id)==='tirage'?'tirage au sort':_et(G._order[0].civ.id))+')',G._order.map(n=>n.civ.name).join(' › '));
   if(_decisionActive()){ G._il=false; G._serverActionPhase=true; return; } // SERVEUR : le driver pilote la phase d'actions (pas l'interleave solo)
   interleaveStep();
 }
@@ -10379,6 +10464,8 @@ function _doAITurnInterne(aiPlayer,oneShot){
       }
     }
     ai.stratBonus={acBonus:card.acBonus||0,spec:card.spec||null,combatBonus:card.combatBonus||0,upkeepDiscount:card.upkeepDiscount||0};
+    /* (Initiative : déjà appliquée au moment du draft, voir `_runDraftStep` — l'ordre du tour est
+       tiré AVANT ce bloc, il fallait que le drapeau soit posé à temps.) */
     if(card.acBonus)ai.acLeft+=card.acBonus;
     if(card.force)ai.forceTokens+=card.force;
     if(card.res){const cap=getResCapFor(ai);for(const[r,a]of Object.entries(card.res))ai.res[r]=Math.min(cap[r]||99,(ai.res[r]||0)+a);}

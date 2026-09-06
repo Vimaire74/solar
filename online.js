@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-06 · v10.35';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-06 · v10.36';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -2055,6 +2055,7 @@ function askLocalDecision(pending){
     /* La phrase vient du MOTEUR (`payload.phrase`) : solo et en ligne ne peuvent donc pas dire deux
        choses différentes. Et « rang d'initiative » était faux de toute façon — l'ordre du draft va du
        plus faible au plus fort, il n'a rien à voir avec l'initiative du tour. */
+    if(k==='strategy' && o.rappel){ body += '<div style="color:#ffd27a;margin-bottom:6px">'+o.rappel+'</div>'; }   // Initiative planifiée au tour précédent : dit AVANT le choix (Marc, 06/09)
     if(k==='strategy' && (o.phrase||o.rank)){ body += '<div class="muted" style="margin-bottom:6px">'+(o.phrase||('Tu choisis en '+o.rank+'/'+(o.total||'?')))+'</div>'; }
     // Chaque option : nom + (bénéfice/contrepartie pour invest, effet tension pour stratégie, desc sinon)
     body += opts.map((op,i)=>{
