@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-05 · v10.32';
+const SOLAR_BUILD_MOTEUR = '2026-09-06 · v10.33';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -5670,11 +5670,15 @@ function doMaintenance(){
     // Payer matériaux colonies
     const payM=Math.min(totalMat,p.res.materials||0);p.res.materials-=payM;
     const missM=totalMat-payM;if(missM>0){p.res.morale=Math.max(0,(p.res.morale||0)-missM);}
-    /* ⚠️ CE DÉTAIL N'ÉTAIT REMPLI QUE POUR LA NATION ACTIVE. `result` est rendu à l'APPELANT, qui
-       sait très bien de quelle nation il parle : le bilan de fin de tour d'un autre joueur restait
-       donc vide de ses coûts d'entretien. On remplit toujours ; c'est l'appelant qui choisit d'en
-       faire quelque chose. */
-    result.energyCost=totalEnergy;result.matCost=totalMat;result.moraleLostCols=missE+missM;
+    /* ⚠️ DEUX CORRECTIFS SUCCESSIFS SE SONT CONTREDITS ICI — le second a créé le défaut de 997D.
+       Au départ, `result` n'était rempli que pour la nation active. Pour que le bilan d'un autre
+       joueur ne reste pas vide, on l'a rempli pour TOUTES — mais `result` est un objet unique,
+       réécrit à chaque passage : l'appelant recevait l'entretien de la DERNIÈRE nation de la liste.
+       Laurent (Terriens, 1 route) a lu « Routes (1) : −5⚡ +5🪨 » — les cinq routes du Jupitérien,
+       dernier de la liste — et la ligne « Revenus nets » du journal était fausse du même montant.
+       Le bilan de chaque nation vit dans `p._lastMaint` (plus bas) ; `result`, comme le rendu de
+       `doRevenues`, est celui de `G.player` et de lui seul. Banc : test_bilan_entretien_perspective. */
+    if(p===G.player){result.energyCost=totalEnergy;result.matCost=totalMat;result.moraleLostCols=missE+missM;}
     // Routes : coût 1<i class=ri-energy></i>/route, revenu 1<i class=ri-materials></i>/route (routes non alimentées n'affectent pas le moral)
     const numRoutes=p.routes.length;
     const _freeRteUpkeep=hasSpec(p,'route_force_free'); // Hyperpropulsion : entretien des routes gratuit
@@ -5691,7 +5695,7 @@ function doMaintenance(){
        tombait pas juste (signalé par Marc le 2026-08-07). Le GAIN en matériaux, lui, est bien de 1
        par route même sans payer : les routes rapportent, c'est voulu. */
     const _coutRoutes=_freeRteUpkeep?0:payRE;
-    result.routeEnergyCost=_coutRoutes;result.routeMatGain=payRE;result.moraleLostRoutes=0;
+    if(p===G.player){result.routeEnergyCost=_coutRoutes;result.routeMatGain=payRE;result.moraleLostRoutes=0;}
     /* Entretien mémorisé PAR NATION : en multijoueur chaque humain doit voir SON bilan de fin de tour
        (et non celui du joueur qui a clos la manche). Mêmes chiffres, calculés une seule fois ici. */
     p._lastMaint={energyCost:totalEnergy,matCost:totalMat,routeEnergyCost:_coutRoutes,routeMatGain:payRE,moraleLostCols:missE+missM,moraleLostRoutes:0};
