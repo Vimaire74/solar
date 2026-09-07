@@ -2142,6 +2142,14 @@ function croiseurEnReparation(p,opts){
 }
 // Supercroiseur : disponible si possédé et hors récupération ; déployable si on peut payer 5<i class=ri-materials></i> 5<i class=ri-energy></i>
 function cruiserAvailable(p){return !!p.hasCruiser&&(!p.cruiserCooldown||G.turn>=p.cruiserCooldown);}
+/* « Même sans Réseau Orbital, on ne cache pas un supercroiseur, c'est trop gros » (Marc, 07/09).
+   Ligne publique pour les panneaux Empire et Diplomatie : la POSSESSION seulement. Qu'il soit en
+   réparation ou en récupération reste secret (« c'est trop d'info ») — cet état n'est montré qu'à
+   son propriétaire, dans son propre bloc de forces (`r-force`). */
+function croiseurLigne(n){
+  if(!n||!n.hasCruiser) return '';
+  return '⚓ Possède un <b>Supercroiseur</b> (+'+(n.cruiserPower||5)+'⚔️)';
+}
 // Coût de déploiement du Supercroiseur : 5🪨 +5⚡. Avec l'IA de Navigation (coût de guerre ÷2, la demie sur
 // l'ÉNERGIE) → ⌊5/2⌋=2🪨 et ⌈5/2⌉=3⚡. SOURCE UNIQUE, utilisée par l'affordabilité ET par la déduction.
 // GARNISON AUTOMATIQUE d'une colonie (règle Marc) : elle se défend TOUJOURS seule, même si le défenseur
@@ -4949,6 +4957,7 @@ function guerreEtape(){
     if(!_van._sansColonieDit){
       _van._sansColonieDit=true;
       addLog('🏳️ '+_n+' n\'a plus aucune colonie — la guerre s\'éteint faute de cible.','gold');
+      try{ annoncerAuxTiers(G.player,_van,'🏳️ '+_n+' sans colonie','<b>'+_n+'</b> n\'a plus aucune colonie : sa guerre contre <b>'+_nomNation(G.player)+'</b> s\'éteint faute de cible.'); }catch(e){}
       showWarModal('🏳️ '+_n+' sans colonie','Cette nation n\'a plus aucune colonie : il n\'y a plus rien à lui prendre.<br><br>La guerre prend fin. Elle garde ses cartes et ses jetons, et peut encore agir.',{txt:'Victoire totale.',cls:'win'});
     }
     _warSuite('guerreSuivante');
@@ -8327,6 +8336,7 @@ function declarerGuerre(agresseur, cible, raison, declaredBy){
   _usureDeGuerre(w);
   addLog('🚨 GUERRE DÉCLARÉE : '+agresseur.civ.emoji+' '+agresseur.civ.name+' contre '
     +cible.civ.emoji+' '+cible.civ.name+' — '+raison,'red');
+  annoncerGuerreAuxTiers(agresseur,cible,raison);
   return w;
 }
 /* Façade historique : « MOI contre X ». Le vrai moteur est `declarerGuerre(agresseur,victime,…)`,
@@ -8750,6 +8760,7 @@ function endWar(aiId){
   if(idx<0){syncWarState();return null;}
   const war=G.wars.splice(idx,1)[0];
   const warEnemyEW=G.ais.find(a=>a.civ.id===ewAiId)||G.ais[0];
+  if(warEnemyEW)annoncerPaixAuxTiers(G.player,warEnemyEW,'');
   let txt,cls;
   if(war.wins.player>war.wins.ai){
     // Joueur gagne : +1<i class=ri-morale></i>. Tension du gagnant → 0, du perdant → 5. (Plus de +VP ni perte de colonie.)
@@ -11788,8 +11799,9 @@ function renderWarRisk(){
     const ecoLine=_intel>=2
       ?'<i class=ri-energy></i>'+(ai.res.energy||0)+' <i class=ri-materials></i>'+(ai.res.materials||0)+' <i class=ri-science></i>'+(ai.res.science||0)+' <i class=ri-morale></i>'+(ai.res.morale||0)+' · 🏙️'+ai.colonies.length+' 🛤️'+ai.routes.length+' · ~'+vpAffiche(ai)+' VP'
       :'🏙️ '+ai.colonies.length+' col · 🛤️ '+ai.routes.length+' routes · ~'+vpAffiche(ai)+' VP <span style="color:#5a6a8a">· éco &amp; moral : tech requise</span>';
+    const cruLine=croiseurLigne(ai);
     tensHtml+=`<div class="dip-nation"><div class="dip-hdr"><span>${ai.civ.emoji} ${ai.civ.name}</span>${status}</div>`+
-      `<div class="dip-force">${forceLine}</div>`+
+      `<div class="dip-force">${forceLine}${cruLine?'<br>'+cruLine:''}</div>`+
       `<div class="dip-force" style="color:#8a98b8;font-size:.92em">${ecoLine}</div>`+
       _bar('Moi → eux',pt,moralWarn)+
       _bar('Eux → moi',at,warWarn)+
@@ -12489,7 +12501,7 @@ function renderRight(){
      +'<span>'+r.n.civ.emoji+'</span><span style="flex:1;color:'+(r.n.civ.color||'#c8d8f8')+';font-weight:700">'+r.n.civ.name+(r.moi?' (toi)':'')+'</span>'
      +'<strong style="color:#ffd700">'+r.vp+' VP</strong>'+(r.moi?'':'<span style="opacity:.55;font-size:.8em"> est.</span>')
      +'</div>').join('');}
-  document.getElementById('r-ai').innerHTML=G.ais.map(ai=>{const aiVP=calcVP(ai);const aiCd=ai.forceCooldown.reduce((s,fc)=>s+fc.count,0);const _int=getIntelLevel(G.player);const pf=perceivedForce(G.player,ai);const forceTxt=pf.exact?('⚔️'+pf.val+(aiCd>0?'(+'+aiCd+'cd)':'')+' <span style="color:#5a7a66">(renseignement)</span>'):('⚔️~'+pf.val+' <span style="color:#5a6a8a">(±3, sans renseignement)</span>');const eco=_int>=2?('<i class=ri-energy></i>'+(ai.res.energy||0)+' <i class=ri-materials></i>'+(ai.res.materials||0)+' <i class=ri-science></i>'+(ai.res.science||0)+' <i class=ri-morale></i>'+(ai.res.morale||0)):'<span style="color:#5a6a8a">éco &amp; moral : inconnus (tech Renseignement)</span>';return`${ai.civ.emoji} <strong>${ai.civ.name}</strong> · Nv.${ai.gov_level}<br>${eco}<br>${forceTxt} · Cols:${ai.colonies.length} Routes:${ai.routes.length}<br><strong style="color:#ffd700">~${aiVP.total} VP estimés</strong>`;}).join('<hr style="border-color:#1a1a3a;margin:4px 0">');
+  document.getElementById('r-ai').innerHTML=G.ais.map(ai=>{const aiVP=calcVP(ai);const aiCd=ai.forceCooldown.reduce((s,fc)=>s+fc.count,0);const _int=getIntelLevel(G.player);const pf=perceivedForce(G.player,ai);const forceTxt=pf.exact?('⚔️'+pf.val+(aiCd>0?'(+'+aiCd+'cd)':'')+' <span style="color:#5a7a66">(renseignement)</span>'):('⚔️~'+pf.val+' <span style="color:#5a6a8a">(±3, sans renseignement)</span>');const eco=_int>=2?('<i class=ri-energy></i>'+(ai.res.energy||0)+' <i class=ri-materials></i>'+(ai.res.materials||0)+' <i class=ri-science></i>'+(ai.res.science||0)+' <i class=ri-morale></i>'+(ai.res.morale||0)):'<span style="color:#5a6a8a">éco &amp; moral : inconnus (tech Renseignement)</span>';const cru=croiseurLigne(ai);return`${ai.civ.emoji} <strong>${ai.civ.name}</strong> · Nv.${ai.gov_level}<br>${eco}<br>${forceTxt} · Cols:${ai.colonies.length} Routes:${ai.routes.length}${cru?'<br>'+cru:''}<br><strong style="color:#ffd700">~${aiVP.total} VP estimés</strong>`;}).join('<hr style="border-color:#1a1a3a;margin:4px 0">');
 }
 function renderActions(){
   const active=G.phase==='actions';
@@ -12867,7 +12879,7 @@ function stPaixReponse(ans){
   const oui=!!(ans&&(ans.value==='yes'||ans.targetId==='yes'||ans.id==='yes'||ans.accept===true||ans.choice==='yes'));
   if(!prop||!dest){ _paixSuiteJouer('WAR'); return; }
   if(oui) _paixAppliquer(prop,dest,o);
-  else{
+  else logAuteur(prop, function(){
     addLog('💢 '+dest.civ.emoji+' '+dest.civ.name+' REFUSE la paix proposée par '+prop.civ.emoji+' '+prop.civ.name+' — le conflit continue !','red');
     /* ⚠️ LA FENÊTRE DOIT JOUER LA SUITE, SINON LA PARTIE S'ARRÊTE ICI.
        J'avais d'abord émis une simple `notice` de refus, avec `stRien` pour continuation, avant de
@@ -12877,12 +12889,19 @@ function stPaixReponse(ans){
     _warSuite('stPaixRefuseeContinuer');
     showWarModal('💢 Paix refusée',
       dest.civ.emoji+' '+dest.civ.name+' refuse ta proposition de paix.<br><br>Le conflit continue — choisis ton assaut à l\'écran suivant.',
-      null);
-  }
+      null, dest.civ.id, prop);
+  });
 }
 /* Les EFFETS de la paix, pour un couple explicite — aucun recours à « le joueur » : la réponse peut
    arriver bien après, quand la perspective a changé de nation. */
 function _paixAppliquer(prop,dest,o){
+  /* F04B (07/09) : même famille que la fenêtre de défense — la réponse d'un humain arrive quand
+     `G.player` est le pivot, et la fenêtre « Paix acceptée » partait chez lui (mesuré : war_result
+     → terriens, civs [terriens], pour une paix Jupitériens ↔ Ceinturiens). On signe et on adresse
+     au couple. */
+  return logAuteur(prop, function(){ return _paixAppliquerPour(prop,dest,o); });
+}
+function _paixAppliquerPour(prop,dest,o){
   o=o||{};
   for(const r of ['materials','energy','science']){
     const q=Math.min(prop.res[r]||0,o[r]||0);
@@ -12894,12 +12913,13 @@ function _paixAppliquer(prop,dest,o){
   syncWarState();
   const offerStr=[o.materials?o.materials+'<i class=ri-materials></i>':'',o.energy?o.energy+'<i class=ri-energy></i>':'',o.science?o.science+'<i class=ri-science></i>':''].filter(Boolean).join(' ');
   addLog('🕊️ Paix conclue entre '+prop.civ.emoji+' '+prop.civ.name+' et '+dest.civ.emoji+' '+dest.civ.name+(offerStr?' contre '+offerStr:'')+' !','gold');
+  annoncerPaixAuxTiers(prop,dest,offerStr?('contre '+offerStr):'');
   prop.res.morale=(prop.res.morale||0)+1;
   dest.res.morale=(dest.res.morale||0)+1;   // les deux peuples soufflent, pas seulement celui qui a proposé
   _warSuite('stRien');
   showWarModal('🕊️ Paix acceptée',
     dest.civ.emoji+' '+dest.civ.name+' a ACCEPTÉ la paix'+(offerStr?' contre '+offerStr:'')+'.<br><br>La guerre entre vous prend fin.',
-    {txt:'Paix conclue.',cls:'win'});
+    {txt:'Paix conclue.',cls:'win'}, dest.civ.id, prop);
   _paixSuiteJouer('PEACE');
 }
 function submitPeaceOffer(){
@@ -12965,6 +12985,7 @@ function submitPeaceOffer(){
     syncWarState();
     const offerStr=[o.materials?o.materials+'<i class=ri-materials></i>':'',o.energy?o.energy+'<i class=ri-energy></i>':'',o.science?o.science+'<i class=ri-science></i>':''].filter(Boolean).join(' ');
     addLog('🕊️ Paix acceptée par '+(peaceAi?peaceAi.civ.name:'IA')+(offerStr?' contre '+offerStr:'')+'!','gold');
+    if(peaceAi)annoncerPaixAuxTiers(G.player,peaceAi,offerStr?('contre '+offerStr):'');
     G.player.res.morale=(G.player.res.morale||0)+1;
     _paixSuiteJouer('PEACE');
   }else{
@@ -13974,6 +13995,29 @@ function _scStuckDismiss(){_scCloseStuck();if(G){G._scStuckTries=0;G._scStuckSho
 // vers le joueur concerné, humain local ou distant). Une IA n'affiche rien : l'info reste dans le journal.
 // C'est la raison pour laquelle les raids subis n'étaient pas annoncés : _notePlayerHit sortait si !G._il
 // (donc toujours en mode serveur) et ne regardait que G.player, qui tourne d'une nation à l'autre.
+/* ═══ LES TIERS SONT PRÉVENUS (Marc, 07/09) ═══
+   « Les autres joueurs peuvent voir un message disant : ces deux nations sont en guerre, et plus
+   tard : ces deux nations ont fait la paix. » Jusqu'ici ils n'avaient que le journal. Une notice
+   non bloquante chez chaque humain qui n'est ni l'un ni l'autre ; les belligérants, eux, ont
+   leurs propres fenêtres. */
+function annoncerAuxTiers(a,b,title,body){
+  try{
+    for(const h of allPlayers()){
+      if(!h||h===a||h===b||h._isAI!==false)continue;
+      notifyNationHit(h,title,body);
+    }
+  }catch(e){}
+}
+function _nomNation(n){ return n&&n.civ?(n.civ.emoji+' '+n.civ.name):'?'; }
+function annoncerGuerreAuxTiers(a,b,raison){
+  annoncerAuxTiers(a,b,'⚔️ Guerre : '+_nomNation(a)+' contre '+_nomNation(b),
+    '<b>'+_nomNation(a)+'</b> et <b>'+_nomNation(b)+'</b> sont en guerre.'+(raison?'<br><em>'+raison+'</em>':'')
+    +'<br><br>Tu n\'es pas concerné — mais leurs routes en territoire ennemi tombent et leurs accords entre eux sont rompus.');
+}
+function annoncerPaixAuxTiers(a,b,detail){
+  annoncerAuxTiers(a,b,'🕊️ Paix : '+_nomNation(a)+' et '+_nomNation(b),
+    '<b>'+_nomNation(a)+'</b> et <b>'+_nomNation(b)+'</b> ont fait la paix'+(detail?' — '+detail:'')+'.');
+}
 function notifyNationHit(victim,title,body){
   try{
     if(!victim)return;
