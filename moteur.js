@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-06 · v10.36';
+const SOLAR_BUILD_MOTEUR = '2026-09-07 · v10.37';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -1719,8 +1719,80 @@ function defenseurPrincipal(nodeId, attaquant){
   if(!d.length) return null;
   const proprio=d.find(n=>n.civ&&n.civ.home===nodeId);
   if(proprio) return proprio;
+  /* Règle de Marc (07/09) : « le propriétaire initial PUIS l'hôte ». Hors capitale, le propriétaire
+     est celui qui était là le premier — l'hôte extra-solaire porte `noUpgrade`. */
   const niv=n=>Math.max.apply(null,n.colonies.filter(c=>c.nodeId===nodeId).map(c=>c.level||1));
-  return d.slice().sort((a,b)=>niv(b)-niv(a))[0];
+  const parNiveau=l=>l.slice().sort((a,b)=>niv(b)-niv(a))[0];
+  const initiaux=d.filter(n=>n.colonies.some(c=>c.nodeId===nodeId&&!c.noUpgrade));
+  if(initiaux.length&&initiaux.length<d.length) return parNiveau(initiaux);
+  return parNiveau(d);
+}
+/* ═══════ DÉFENSE À DEUX — RÈGLE DE MARC (07/09, partie F04B) ═══════
+   « Pour la défense d'une colonie partagée il faut que le propriétaire initial PUIS l'hôte soient
+   questionnés, chacun dit ce qu'il veut investir, puis on additionne le tout. »
+   Jusqu'ici l'hôte « prêtait main-forte » d'office avec TOUS ses jetons payables (chemin de
+   l'assaut humain et IA → IA) ou pas du tout (assaut IA → humain). Désormais, une fois la réponse
+   du défenseur principal connue, chaque cohabitant est consulté à son tour :
+     · humain en ligne : une fenêtre « Défense ! » marquée `renfort:true`, avec le nom du principal ;
+     · ordinateur, ou partie solo : le pilote répond avec sa règle habituelle, `defenseIA`.
+   Les réponses vivent dans `fluxDonnees()` (donc sauvegardées), sous le nœud concerné, et sont
+   consommées par la résolution. Ce qu'un cohabitant engage, il le paie ; s'il perd, il est chassé
+   avec le principal (`capturerNoeud`), et si c'est une capitale le vainqueur touche ses +10 VP. */
+function cohabitantsRenfort(nodeId, attaquant, principal){
+  return defenseursDuNoeud(nodeId, attaquant).filter(n=>n&&n!==principal);
+}
+function renfortMax(co){
+  return Math.max(0,Math.min(co.forceTokens||0, (typeof maxAffordableTokens==='function')?maxAffordableTokens(co):Math.min(co.res.materials||0,co.res.energy||0)));
+}
+function _renfortPilote(co, attaquant, nodeId){
+  let n=0; try{ n=(typeof defenseIA==='function')?defenseIA(co, attaquant, nodeId):0; }catch(e){ n=0; }
+  return Math.max(0,Math.min(n|0, renfortMax(co)));
+}
+/* Pose la question au prochain cohabitant humain qui n'a pas répondu ; rend true si une fenêtre
+   est partie (la suite nommée reviendra ici). Rend false quand tout le monde a répondu. */
+function _renfortAPoser(nodeId, attaquant, principal, suiteNom, threat){
+  if(!nodeId||!attaquant||!principal) return false;
+  const d=fluxDonnees();
+  if(d.renfortNoeud!==nodeId){ d.renfortNoeud=nodeId; d.renfortReponses={}; }
+  for(const co of cohabitantsRenfort(nodeId, attaquant, principal)){
+    const id=co.civ.id;
+    if(d.renfortReponses[id]!==undefined) continue;
+    const max=renfortMax(co);
+    if(co._isAI!==false || !_decisionActive() || max<=0){ d.renfortReponses[id]=_renfortPilote(co, attaquant, nodeId); continue; }
+    d.renfortEnCours=id;
+    const nom=(NODES[nodeId]&&NODES[nodeId].name)||nodeId;
+    _emitDecision('defense', co,
+      {attacker:attaquant.civ.id, attackerName:attaquant.civ.name, target:{type:'colony', name:nom, node:nodeId},
+       threat:(threat|0), maxDef:max, garrison:0, empath:bonusCombatCartes(co),
+       renfort:true, principal:principal.civ.emoji+' '+principal.civ.name,
+       myTokens:(co.forceTokens||0), myMat:(co.res.materials||0), myEnergy:(co.res.energy||0)},
+      suiteNom, 'adRenfortCohabitant');
+    return true;
+  }
+  return false;
+}
+function adRenfortCohabitant(ans){
+  const d=fluxDonnees(), id=d.renfortEnCours; d.renfortEnCours=null;
+  if(id){
+    const co=allPlayers().find(n=>n&&n.civ&&n.civ.id===id);
+    d.renfortReponses=d.renfortReponses||{};
+    d.renfortReponses[id]=co?Math.max(0,Math.min(renfortMax(co),(ans&&ans.defTokens)|0)):0;
+  }
+  return ans;
+}
+/* Ce que chaque cohabitant engage vraiment : la réponse enregistrée, sinon le pilote. Consomme. */
+function renfortsEngages(nodeId, attaquant, principal){
+  const d=fluxDonnees(), out=[];
+  if(!nodeId||!attaquant||!principal) return out;
+  for(const co of cohabitantsRenfort(nodeId, attaquant, principal)){
+    let j=(d.renfortNoeud===nodeId&&d.renfortReponses&&d.renfortReponses[co.civ.id]!==undefined)
+      ? d.renfortReponses[co.civ.id] : _renfortPilote(co, attaquant, nodeId);
+    j=Math.max(0,Math.min(j|0, renfortMax(co)));
+    const b=(typeof bonusCombatCartes==='function')?bonusCombatCartes(co):0;
+    out.push({co, j, b});
+  }
+  if(d.renfortNoeud===nodeId){ d.renfortNoeud=null; d.renfortReponses=null; d.renfortEnCours=null; }
+  return out;
 }
 /* LA CAPTURE, ÉCRITE UNE SEULE FOIS. Le joueur et l'IA avaient chacun leur copie ; l'une avait un
    garde-fou contre la double colonie, l'autre non. Deux copies d'un même calcul, c'est une de trop
@@ -3913,8 +3985,12 @@ function _runStrategyDraftAfterAnnounce(){
      donc passer en dernier coûte toujours quelque chose. C'est voulu — c'est ce qui donne son sens
      à l'ordre de passage (le plus faible choisit en premier). Ce qui ne l'était pas, c'est que la
      pioche DE DÉPART rétrécisse d'un tour à l'autre. */
-  const poolSize=Math.min(STRATEGY_CARDS.length, nations.length+2);
-  G._stratPool=shuffle([...STRATEGY_CARDS]).slice(0,poolSize);
+  /* F04B (06/09) : 📅 Initiative planifiée vendue au tour 10 pour un tour 11 qui n'existe pas. Au
+     dernier tour, la carte sort de la pioche. */
+  const _dernierTour=(G.turn||1)>=(G.maxTurns||10);
+  const _cartes=STRATEGY_CARDS.filter(c=>!(_dernierTour&&c.initiative==='prochain'));
+  const poolSize=Math.min(_cartes.length, nations.length+2);
+  G._stratPool=shuffle([..._cartes]).slice(0,poolSize);
   // Tracé aussi : « je vois 3 cartes » et « le code en prépare 5 » ne peuvent plus rester une
   // discussion d'opinion. Si le journal dit 5 et que l'écran en montre 3, le défaut est APRÈS ici.
   try{ addLog('🃏 Pioche Stratégie : '+poolSize+' cartes pour '+nations.length+' nations ('+nations.length+' + 2, plafonné à '+STRATEGY_CARDS.length+').','dim'); }catch(e){}
@@ -4536,14 +4612,25 @@ function stAssautJoueurChoisi(committed){
    une fermeture, donc une sauvegarde pendant le choix des jetons perdait la cible ET la suite. */
 function adDefenseContreIA(ans){
   const ctx=G._aiAssaultCtx||{};
-  const p=(typeof allPlayers==='function'?allPlayers():[G.player].concat(G.ais||[])).find(x=>x&&x.civ&&x.civ.id===ctx.defCivId)||G.player;
-  const ai=(G.ais||[]).find(a=>a&&a.civ&&a.civ.id===ctx.aiId)||(typeof allPlayers==='function'?allPlayers():[]).find(a=>a&&a.civ&&a.civ.id===ctx.aiId);
   const maxDef=ctx.maxDef||0;
-  const def=Math.max(0,Math.min(maxDef,(ans&&ans.defTokens)||0));
-  G._defCruiserChoice=!!(ans&&ans.cruiser&&ctx.cruOk);
-  G._aiAssaultCtx=null;
-  resolveAiAssaultOnPlayer(ai,ctx.target,ctx.aiCommit,def,ctx.done,p);
+  ctx.defTokens=Math.max(0,Math.min(maxDef,(ans&&ans.defTokens)||0));
+  ctx.cruiser=!!(ans&&ans.cruiser&&ctx.cruOk);
+  stDefenseContreIAResoudre();
   return ans;
+}
+/* Le principal a répondu ; on consulte l'hôte s'il y en a un (07/09), puis on résout. Nommée pour
+   que la question de l'hôte puisse revenir ici après une sauvegarde. */
+function stDefenseContreIAResoudre(){
+  const ctx=G._aiAssaultCtx; if(!ctx)return;
+  const _tous=(typeof allPlayers==='function'?allPlayers():[G.player].concat(G.ais||[]));
+  const p=_tous.find(x=>x&&x.civ&&x.civ.id===ctx.defCivId)||G.player;
+  const ai=_tous.find(a=>a&&a.civ&&a.civ.id===ctx.aiId);
+  const node=(ctx.target&&ctx.target.type==='colony'&&ctx.target.obj)?ctx.target.obj.nodeId:null;
+  if(node&&ai&&_renfortAPoser(node, ai, p, 'stDefenseContreIAResoudre', ctx.aiCommit|0)) return;
+  G._aiAssaultCtx=null;
+  if(!ai){ _assautSuite(ctx.done); return; }
+  G._defCruiserChoice=!!ctx.cruiser;
+  resolveAiAssaultOnPlayer(ai,ctx.target,ctx.aiCommit,ctx.defTokens|0,ctx.done,p);
 }
 function adDefenseAssaut(ans){
   const maxDef=fluxDonnees().maxDefAssaut||0;
@@ -4552,6 +4639,8 @@ function adDefenseAssaut(ans){
 }
 function stAssautJoueurResoudre(){
   const d=fluxDonnees(), nodeId=_assautCible(), ennemi=_assautEnnemi();
+  /* Défense à deux (07/09) : le principal a répondu, on consulte l'hôte avant de résoudre. */
+  if(ennemi&&_renfortAPoser(nodeId, G.player, ennemi, 'stAssautJoueurResoudre', d.engagementAssaut|0)) return;
   const committed=d.engagementAssaut;
   d.engagementAssaut=null; d.maxDefAssaut=null;
   const war=ennemi?_warBetween(_moiId(),ennemi.civ.id):null;
@@ -4721,6 +4810,8 @@ fluxDeclarer('stRien', stRien);
 fluxDeclarer('stAssautJoueurChoisi', stAssautJoueurChoisi);
 fluxDeclarer('stAssautJoueurResoudre', stAssautJoueurResoudre);
 fluxDeclarer('adDefenseAssaut', adDefenseAssaut);
+fluxDeclarer('adRenfortCohabitant', adRenfortCohabitant);
+fluxDeclarer('stDefenseContreIAResoudre', stDefenseContreIAResoudre);
 fluxDeclarer('adDefenseContreIA', adDefenseContreIA);
 fluxDeclarer('_evSuiteJouer', _evSuiteJouer);
 fluxDeclarer('stEvenementChoixOuFin', stEvenementChoixOuFin);
@@ -5040,16 +5131,19 @@ function guerreCombatLiveChoisi(committed){
       'guerreDefenseRecue', 'adDefenseAssaut');
     return;
   }
-  const res=resolveWarCombat(committed);
-  showWarModal('⚔️ Combat contre '+warEnName,
-    res?('Puissance — Toi : <strong>'+res.pPow+'</strong> | '+warEnName+' : <strong>'+res.aPow+'</strong>'):'',
-    res?{txt:res.txt,cls:res.cls}:null);
-  _warSuite('guerreAssautIAPuisSuivante');
+  /* Défenseur ordinateur : même chemin de sortie que le défenseur humain — une seule résolution,
+     et la consultation des cohabitants (07/09) y est faite une fois pour toutes. */
+  fluxDonnees().engagementGuerre=(committed|0);
+  guerreDefenseRecue();
 }
 
 /* Le défenseur humain a répondu (`adDefenseAssaut` a déjà posé `G._aiWarCommitted`) : on résout. */
 function guerreDefenseRecue(){
-  const d=fluxDonnees(), committed=d.engagementGuerre|0;
+  const d=fluxDonnees();
+  /* Défense à deux (07/09) : l'hôte du nœud visé est consulté après le principal, avant le combat. */
+  if(typeof _warAttackColonyTarget!=='undefined'&&_warAttackColonyTarget
+     &&_renfortAPoser(_warAttackColonyTarget, G.player, guerreEnnemi(), 'guerreDefenseRecue', d.engagementGuerre|0)) return;
+  const committed=d.engagementGuerre|0;
   d.engagementGuerre=null; d.maxDefAssaut=null;
   const warEnName=guerreEnnemiNom();
   const res=resolveWarCombat(committed);
@@ -7548,8 +7642,19 @@ function confirmAiAssaultDefense(){
   resolveAiAssaultOnPlayer(ai,ctx.target,ctx.aiCommit,def,ctx.done);
   if(G._ilPaused){ G._ilPaused=false; setTimeout(interleaveStep,300); }
 }
+/* ═══ SIGNÉE ET ADRESSÉE AU VRAI DÉFENSEUR (partie F04B, 06/09) ═══
+   La question de défense partait bien chez l'assailli (`defCivId`), mais la RÉSOLUTION écrivait
+   ses lignes et sa fenêtre de résultat au nom de `G.player` — le pivot du serveur, c'est-à-dire
+   Marc. Il a vu « Défense réussie ! 3🛡️ vs 3⚔️ — Colonie Titan tient. Tes positions tiennent. »
+   pour une colonie qui n'était pas la sienne, et le rapport porte « 🛡️ Défense : 2 jeton(s) »
+   signé Terriens. Le filtre « aux deux belligérants » (#104) marchait : on lui donnait le mauvais
+   propriétaire. `logAuteur(p)` signe le journal ; `showWarModal(…, p)` adresse la fenêtre. */
 function resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,defender){
-  const p=defender||G.player;const war=_warBetween(ai.civ.id,p.civ.id)||_warOf(ai.civ.id);
+  const p=defender||G.player;
+  return logAuteur(p, function(){ return _resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,p); });
+}
+function _resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,p){
+  const war=_warBetween(ai.civ.id,p.civ.id)||_warOf(ai.civ.id);
   const pEmp=bonusCombatCartes(p);
   const aEmp=bonusCombatCartes(ai);
   // Le Supercroiseur ne se déploie plus tout seul : en ligne c'est le CHOIX du défenseur (G._defCruiserChoice).
@@ -7557,7 +7662,18 @@ function resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,defender){
   const _cruChoice=G._defCruiserChoice; G._defCruiserChoice=undefined;
   const cruDef=(_cruChoice!==undefined ? !!_cruChoice : (defTokens>0))&&cruiserAvailable(p)&&cruiserAfford(p);
   if(cruDef){const _cc=cruiserPay(p);addLog('⚓ Supercroiseur en défense (+'+(p.cruiserPower||5)+'⚔️, '+_cc+').','gold');}
-  const pDef=defTokens+pEmp+(cruDef?(p.cruiserPower||5):0)+((target&&target.type==='colony'&&target.obj)?garrisonOf(p,target.obj.nodeId):1); // garnison auto : 1 colonie / 10 base
+  /* Défense à deux (07/09) : l'hôte du nœud, consulté après le principal, ajoute ses jetons. Ce
+     chemin (assaut IA → humain) n'avait AUCUN renfort de cohabitant. */
+  const _nodeDef=(target&&target.type==='colony'&&target.obj)?target.obj.nodeId:null;
+  const _renforts=_nodeDef?renfortsEngages(_nodeDef, ai, p):[];
+  let _renfort=0;
+  for(const _r of _renforts){
+    if(_r.j+_r.b<=0)continue;
+    _renfort+=_r.j+_r.b;
+    addLog('🤝 '+_r.co.civ.emoji+' '+_r.co.civ.name+' défend '+((NODES[_nodeDef]&&NODES[_nodeDef].name)||_nodeDef)
+      +' aux côtés de '+p.civ.emoji+' '+p.civ.name+' (+'+(_r.j+_r.b)+'⚔️) — cohabitants.','gold');
+  }
+  const pDef=defTokens+pEmp+(cruDef?(p.cruiserPower||5):0)+(_nodeDef?garrisonOf(p,_nodeDef):1)+_renfort; // garnison auto : 1 colonie / 10 base
   /* Le croiseur de l'ASSAILLANT a été décidé au moment d'annoncer la menace (`G._aiCruAtt`) : la
      fenêtre de défense a montré ce chiffre, il doit être celui du combat. Sans ce report, la
      décision était reprise ici et pouvait différer de l'annonce (E682, tour 9). */
@@ -7568,6 +7684,7 @@ function resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,defender){
   // Coût + récupération SYMÉTRIQUES : l'attaquant IA paie/récupération ses jetons ; si tu repousses l'assaut, l'IA en perd la MOITIÉ définitivement (défendre fait perdre des jetons à l'ennemi). Le défenseur paie ce qu'il engage.
   applyCombatEngage(ai,aiCommit,aPow>pDef); // l'attaquant paie TOUJOURS ses jetons engagés (même si tu ne défends pas) — sinon capture GRATUITE
   applyCombatEngage(p,defTokens,pDef>=aPow);
+  for(const _r of _renforts) if(_r.j>0)applyCombatEngage(_r.co,_r.j,pDef>=aPow);
   if(defTokens>0)addLog('🛡️ Défense : '+defTokens+' jeton(s) engagé(s) (−'+defTokens+'<i class=ri-materials></i> −'+defTokens+'<i class=ri-energy></i>).','dim');
   let resultTxt,cls;
   if(pDef>=aPow){
@@ -7605,7 +7722,7 @@ function resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,defender){
   const _act={emoji:'⚔️',name:'Assaut sur '+target.name,desc:aPow+'⚔️ vs '+pDef+'🛡️'};
   if(ai._turnActions)ai._turnActions.push(_act);else ai._turnActions=[_act];
   render();
-  showWarModal('⚔️ '+ai.civ.emoji+' '+ai.civ.name+' attaque',resultTxt,{txt:(cls==='win'?'Tes positions tiennent.':'Tu as subi des pertes.'),cls},ai.civ.id);
+  showWarModal('⚔️ '+ai.civ.emoji+' '+ai.civ.name+' attaque',resultTxt,{txt:(cls==='win'?'Tes positions tiennent.':'Tu as subi des pertes.'),cls},ai.civ.id,p);
   _warSuite(typeof done==='string'?done:null); // `done` est désormais un NOM (voir _warSuite)
 }
 /* ============================================================ CONNECTION LOGIC ============================================================ */
@@ -7837,8 +7954,7 @@ function updateTension(){
        ensemble. La garde regarde CES DEUX nations — pas « suis-je en guerre », qui ne les
        concerne pas. */
     if(tensEff(x.civ.id,y.civ.id)>=10&&!_warBetween(x.civ.id,y.civ.id)){
-      guerrePopulaireAuto(x,y);
-      return;
+      if(guerrePopulaireAuto(x,y)) return;   // au dernier tour la guerre est refusée : on continue le tour normalement
     }
   }
   for(const ai of G.ais){
@@ -7859,10 +7975,10 @@ function updateTension(){
        suivant — cinq colonies prises ainsi dans la partie 0C10 — pendant que les IA, elles,
        devaient attendre. Une règle qui ne s'applique qu'à un camp n'est pas une règle. */
     const _warWithThis=!!(_warBetween(_moiId(),ai.civ.id)); // déjà en guerre avec CETTE nation → pas de guerre populaire en plus
-    if(pt>=10&&!_warWithThis){triggerGuereeForcee('player',ai);return;}
+    if(pt>=10&&!_warWithThis){ if(triggerGuereeForcee('player',ai)) return; }
     // Effets tension IA → joueur
     const at=tensEff(ai.civ.id,'player');
-    if(at>=10&&!_warWithThis){triggerGuereeForcee('ai',ai);return;}
+    if(at>=10&&!_warWithThis){ if(triggerGuereeForcee('ai',ai)) return; }
   }
   // Compat aliases
   G.playerTension=G.ais.reduce((mx,ai)=>Math.max(mx,getTens('player',ai.civ.id)),0);
@@ -7912,8 +8028,19 @@ function _guerrePopEnAttente(){ return !!fluxDonnees().suiteGuerrePop; }
       autres nations, et ZÉRO guerre déclarée. Le monde était en paix perpétuelle sauf autour de toi.
    `G.warWith` / `playerTension` / `aiTension` sont des miroirs de l'écran local : on ne les pose que
    si cet écran-ci est concerné. */
+/* ═══ PAS DE GUERRE POPULAIRE AU DERNIER TOUR (partie F04B, 06/09) ═══
+   La tension a atteint 10 PENDANT la fin du tour 10 : guerre déclarée, −6 de moral, fenêtre de
+   combat posée au joueur… et deux lignes plus loin « la guerre s'éteint sans vainqueur ». Une
+   guerre qui naît après le dernier coup ne peut rien produire que du bruit et des pénalités. La
+   tension reste ce qu'elle est (le journal la montre), mais son peuple attendra un tour 11 qui ne
+   vient pas. Un humain garde le droit de déclarer lui-même une guerre au dernier tour. */
+function guerrePopulaireInterdite(){ return (G&&(G.turn||1)>=(G.maxTurns||10)); }
 function guerrePopulaireEntre(offense,offenseur){
   if(!offense||!offenseur||offense===offenseur)return null;
+  if(guerrePopulaireInterdite()){
+    addLog('😡 '+offense.civ.emoji+' '+offense.civ.name+' : le peuple exige vengeance contre '+offenseur.civ.name+' — mais la partie s\'achève, pas de guerre au dernier tour.','dim');
+    return null;
+  }
   const w=declarerGuerre(offense,offenseur,'Guerre Populaire Forcée — le peuple exige vengeance !','other');
   if(!w)return null;
   for(const n of [offense,offenseur]) n.res.morale=Math.max(0,(n.res.morale||0)-2);
@@ -7954,10 +8081,10 @@ function guerrePopulaireAuto(offense,offenseur){
    la fenêtre de choix, qui n'a de sens que pour quelqu'un qui regarde un écran. */
 function triggerGuereeForcee(offendedSide,targetAi){
   const fwTargetAi=targetAi||(G.ais[0]);
-  if(!fwTargetAi)return;
+  if(!fwTargetAi)return false;
   const offense=(offendedSide==='player')?G.player:fwTargetAi;
   const offenseur=(offendedSide==='player')?fwTargetAi:G.player;
-  if(!guerrePopulaireEntre(offense,offenseur))return;
+  if(!guerrePopulaireEntre(offense,offenseur))return false;
   const fwAi=fwTargetAi;
   if(offendedSide==='player'){
     // Joueur offensé : montrer choix
@@ -8002,7 +8129,7 @@ function triggerGuereeForcee(offendedSide,targetAi){
       if(nearestAiCol&&force>=1) forcedWarChoiceColony(nearestAiCol.col.nodeId);
       else if(routeAbordable>=0) forcedWarChoiceRoute(routeAbordable);
       else forcedWarNoTarget();
-      return;
+      return true;
     }
     if(_decisionActive()){ // EN LIGNE : router le choix vers le joueur (sinon la modale ne s'affiche jamais côté serveur headless)
       const _rts=aiAllRoutes.map(function(r,i){return {i:i, name:(NODES[r.from]?.name||r.from)+'→'+(NODES[r.to]?.name||r.to), need:((r.tokens||0)>=1?2:1), prot:((r.tokens||0)>=1)};});
@@ -8022,7 +8149,7 @@ function triggerGuereeForcee(offendedSide,targetAi){
             else forcedWarNoTarget();
           }catch(e){ try{forcedWarNoTarget();}catch(_){} }
         });
-      return;
+      return true;
     }
     document.getElementById('fw-title').textContent='⚔️ Guerre Populaire contre '+fwAi.civ.emoji+' '+fwAi.civ.name+' !';
     document.getElementById('fw-desc').innerHTML='Tension à 10 envers '+fwAi.civ.emoji+' '+fwAi.civ.name+' : attaque une de ses routes ou colonies maintenant.';
@@ -8039,6 +8166,7 @@ function triggerGuereeForcee(offendedSide,targetAi){
       addLog('😡 L\'IA lance des raids sur tes frontières (guerre populaire).','red');
     }
   }
+  return true;
 }
 function forcedWarChoiceRoute(idx){
   const fwcAi=G.warWith?G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0]:G.ais[0];
@@ -8154,9 +8282,17 @@ function declarerGuerre(agresseur, cible, raison, declaredBy){
   }
 
   /* Cohabitation extra-solaire : chacun perd la colonie posée sur un nœud de l'autre. Symétrique —
-     l'ancienne version ne faisait tomber que celles de la nation active. */
+     l'ancienne version ne faisait tomber que celles de la nation active.
+     ═══ MAIS SEULEMENT LA COLONIE DE L'HÔTE, JAMAIS CELLE DU PROPRIÉTAIRE (partie F04B, 06/09) ═══
+     « Partage un nœud avec l'autre » désignait les DEUX colonies du nœud. Le premier tour de boucle
+     traitait l'agresseur : sa colonie était partagée, il la perdait ; au second tour, plus rien
+     n'était partagé et l'hôte gardait la sienne. Claude (Ceinturiens) a ainsi perdu Éris, SA
+     CAPITALE, au profit du Jupitérien venu s'y poser par Exploration Extra-Solaire — le jeu lui
+     proposait ensuite d'« attaquer Éris ». Une colonie posée chez l'autre porte `noUpgrade`
+     (voir `_extraSolarColonize`) : c'est elle, et elle seule, qui tombe. Une capitale ne tombe
+     jamais par ce chemin. Banc : test_accords_rupture (cas « capitale partagée »). */
   for(const [x,y] of [[agresseur,cible],[cible,agresseur]]){
-    const perdues=x.colonies.filter(c=>y.colonies.some(yc=>yc.nodeId===c.nodeId));
+    const perdues=x.colonies.filter(c=>c.noUpgrade&&c.nodeId!==x.civ.home&&y.colonies.some(yc=>yc.nodeId===c.nodeId));
     if(perdues.length){
       x.colonies=x.colonies.filter(c=>!perdues.includes(c));
       if(typeof updateConnections==='function')updateConnections(x);
@@ -8382,7 +8518,9 @@ function defenseAttendue(ai, cible, nodeId){
   try{
     for(const co of defenseursDuNoeud(nodeId, ai)){
       if(co===cible) continue;
-      renfort+=Math.max(0,Math.min(co.forceTokens||0, co.res.materials||0, co.res.energy||0))
+      /* 07/09 : l'hôte est consulté et répond par le pilote — on estime ce qu'il RÉPONDRA, pas
+         tout ce qu'il possède. */
+      renfort+=_renfortPilote(co, ai, nodeId)
               +((typeof bonusCombatCartes==='function')?bonusCombatCartes(co):0);
     }
   }catch(e){}
@@ -8484,15 +8622,14 @@ function resolveWarCombat(playerCommitted, attaquant){
      officielle de la guerre prête quand même main-forte : ses jetons engageables et ses bonus de
      cartes s'ajoutent à la défense. En contrepartie, s'il perd, il est expulsé lui aussi
      (`capturerNoeud`). */
-  let _renfort=0;
+  let _renfort=0; const _renfortsFaits=[];
   if(_warAttackColonyTarget){
-    for(const _co of defenseursDuNoeud(_warAttackColonyTarget,_atk)){
-      if(_co===warEnemy)continue;
-      const _j=Math.max(0,Math.min(_co.forceTokens||0,_co.res.materials||0,_co.res.energy||0));
-      const _b=(typeof bonusCombatCartes==='function')?bonusCombatCartes(_co):0;
+    /* 07/09 : l'hôte n'engage plus tout d'office — il a été CONSULTÉ (fenêtre ou pilote), voir
+       `renfortsEngages`. Il paie APRÈS le verdict, comme le principal : moitié récupérée s'il tient. */
+    for(const _r of renfortsEngages(_warAttackColonyTarget,_atk,warEnemy)){
+      const _co=_r.co, _j=_r.j, _b=_r.b;
       if(_j+_b<=0)continue;
-      _renfort+=_j+_b;
-      if(typeof applyCombatEngage==='function')applyCombatEngage(_co,_j,false); // il se bat vraiment : ses jetons partent
+      _renfort+=_j+_b; _renfortsFaits.push(_r);
       addLog('🤝 '+_co.civ.emoji+' '+_co.civ.name+' défend '+((NODES[_warAttackColonyTarget]&&NODES[_warAttackColonyTarget].name)||_warAttackColonyTarget)
         +' aux côtés de '+warEnemy.civ.emoji+' '+warEnemy.civ.name+' (+'+(_j+_b)+'⚔️) — cohabitants.','gold');
     }
@@ -8521,6 +8658,7 @@ function resolveWarCombat(playerCommitted, attaquant){
     addLog('🛡️ '+warEnemy.civ.emoji+' '+warEnemy.civ.name+' engage '+aiEngaged+' jeton(s) en défense (−'+_d.m+'<i class=ri-materials></i> −'+_d.e+'<i class=ri-energy></i>'+(_d.demi?', coût divisé par deux':'')+').','dim');}
   if(engagedP>0)applyCombatEngage(_atk,_atkUsed,!aWin); // coût + récupération pour _atkUsed jetons (la garnison compte toujours comme défense)
   applyCombatEngage(warEnemy,aiEngaged,!pWin);
+  for(const _r of _renfortsFaits) if(_r.j>0&&typeof applyCombatEngage==='function')applyCombatEngage(_r.co,_r.j,!pWin);
   /* LE COMPTE RENDU, DES DEUX CÔTÉS. Écrit APRÈS l'application des coûts : les nombres tracés sont
      donc ceux qui ont réellement été prélevés, pas une prévision. */
   try{
@@ -9427,7 +9565,14 @@ function coupsPossibles(nat){
            quand même ferait évaluer, comparer et parfois RETENIR ce raid comme meilleur coup — et
            l'IA perdrait une action par tour à ne rien faire, sans qu'une ligne ne le dise. */
         const _protege=(typeof hasSpec==='function')&&hasSpec(o,'ia_immune');
-        if((nat.forceTokens||0)>=jetons&&!_protege&&!coloniePilleeCeTour(col))
+        /* ═══ « NE PILLE JAMAIS » VAUT AUSSI POUR LE TACTICIEN (partie F04B, 06/09) ═══
+           Le profil bâtisseur met `raid:0` — mais ce zéro ne vit que dans le cerveau UTILITAIRE
+           (`_appliquerProfil`). Le tacticien énumère ses coups lui-même et proposait le raid à tout
+           le monde : le Jupitérien « Bâtisseur — ne pille jamais » a raidé six fois en dix tours.
+           Même règle que pour le multiplicateur : bâtisseur et conquérant ne raident pas, quel que
+           soit leur état de siège. */
+        const _raidInterdit=(nat._profil==='batisseur'||nat._profil==='guerrier');
+        if((nat.forceTokens||0)>=jetons&&!_protege&&!_raidInterdit&&!coloniePilleeCeTour(col))
           coups.push({type:'raid',cible:o.civ.id,node:col.nodeId,libelle:'raid sur '+nom+' ('+o.civ.name+')'});
         if((nat.forceTokens||0)>=jetons&&(nat.res.materials||0)>=1&&(nat.res.energy||0)>=1)
           coups.push({type:'assaut',node:col.nodeId,libelle:'assaillir '+nom+' ('+o.civ.name+')'});
@@ -9853,8 +9998,8 @@ function resoudreAssautIA(ai,nodeId,opts){
       if(_co===best||_co._isAI!==false)continue;
       notifyNationHit(_co,'⚔️ '+_nom+' assaillie — tu la partages',
         ai.civ.emoji+' '+ai.civ.name+' assaille <b>'+_nom+'</b>, que tu partages avec '+best.civ.emoji+' '+best.civ.name+'.<br>'
-        +'C\'est <b>'+best.civ.name+'</b> qui défend'+(best.civ.home===bestCol.nodeId?' — c\'est sa capitale (garnison '+garrisonOf(best,bestCol.nodeId)+')':'')+'. Tu ne paies rien ; '
-        +'si la place tombe, tous ses occupants en sont chassés.');
+        +'C\'est <b>'+best.civ.name+'</b> qui défend en premier'+(best.civ.home===bestCol.nodeId?' — c\'est sa capitale (garnison '+garrisonOf(best,bestCol.nodeId)+')':'')+'. '
+        +'Tu seras consulté après lui pour ajouter tes jetons ; si la place tombe, tous ses occupants en sont chassés.');
     }
     /* La fenêtre de défense s'ouvre chez l'assailli et le combat se résout dans la foulée.
        Pas de suite nommée : on n'est pas dans la séquence de fin de tour, l'IA poursuit son tour
@@ -9890,12 +10035,10 @@ function resoudreAssautIA(ai,nodeId,opts){
      puis l'engagement — et il ne peut plus y avoir de facture sans bataille. */
   const _renforts=[];
   let _renfortIA=0;
-  for(const _co of defenseursDuNoeud(bestCol.nodeId,ai)){
-    if(_co===best)continue;
-    const _j=Math.max(0,Math.min(_co.forceTokens||0,_co.res.materials||0,_co.res.energy||0));
-    const _b=(typeof bonusCombatCartes==='function')?bonusCombatCartes(_co):0;
-    if(_j+_b<=0)continue;
-    _renfortIA+=_j+_b; _renforts.push({co:_co,j:_j,b:_b});
+  /* 07/09 : l'hôte répond par le pilote (`defenseIA`), il n'engage plus tout d'office. */
+  for(const _r of renfortsEngages(bestCol.nodeId,ai,best)){
+    if(_r.j+_r.b<=0)continue;
+    _renfortIA+=_r.j+_r.b; _renforts.push(_r);
   }
   /* ═══ CONTRE UNE NATION À SEC, ON N'ENGAGE QUE CE QU'IL FAUT ═══
      Doctrine de Marc : « elle attaque une colonie avec deux jetons ». Face à un défenseur qui ne
@@ -11630,8 +11773,12 @@ function renderWarRisk(){
       :(pt>=6||at>=6)?'<span class="dip-status hot">Tensions fortes</span>'
       :(pt>=3||at>=3)?'<span class="dip-status warm">Tensions</span>'
       :'<span class="dip-status ok">Paix</span>';
-    const moralWarn=pt>=6?'<span class="dip-moral">−1<i class=ri-morale></i>/tour</span>':'';
-    const warWarn=at>=10?'<span class="dip-moral" style="color:#ff4444">guerre !</span>':at>=8?'<span class="dip-moral" style="color:#ff7744">imminent</span>':'';
+    /* F04B (capture de Marc, T9) : « −1❤️/tour » ET « guerre ! » affichés sur une nation avec qui on
+       est DÉJÀ en guerre. Le moteur, lui, ne facture pas la manifestation pendant une guerre (pas
+       de double peine avec l'usure) et une guerre en cours n'est pas « imminente ». L'écran doit
+       dire ce que le moteur fait. */
+    const moralWarn=(pt>=6&&!atWar)?'<span class="dip-moral">−1<i class=ri-morale></i>/tour</span>':'';
+    const warWarn=atWar?'':at>=10?'<span class="dip-moral" style="color:#ff4444">guerre !</span>':at>=8?'<span class="dip-moral" style="color:#ff7744">imminent</span>':'';
     // Estimation des jetons Force : exacte avec renseignement (intel niv.2), sinon ±3 (stable sur le tour)
     const _intel=(typeof getIntelLevel==='function')?getIntelLevel(G.player):0;
     const pf=perceivedForce(G.player,ai);
@@ -12562,7 +12709,7 @@ function dismissDiscovery(){
   }
   render();
 }
-function showWarModal(title,body,result,adverseId){
+function showWarModal(title,body,result,adverseId,owner){
   /* ⚠️ UNE NOTICE BLOQUANTE ATTEND UN ACCUSÉ DE RÉCEPTION — DONC QUELQU'UN POUR L'ENVOYER.
      `war_result` est une fenêtre COLLECTIVE : le serveur la diffuse à tous, mais c'est son
      PROPRIÉTAIRE (`G.player` au moment de l'émission) qui la referme et débloque la suite. Après
@@ -12590,11 +12737,14 @@ function showWarModal(title,body,result,adverseId){
        quelle : Laurent voyait les combats et les paix de Marc comme si c'étaient les siens.
        On nomme ici les deux camps ; le serveur ne l'envoie qu'à eux, et l'autre camp la reçoit
        préfixée « Vu par X ». Les tiers ont le journal, qui est public. */
-    const _moi=(G.player&&G.player.civ&&G.player.civ.id)||null;
+    /* `owner` : le vrai propriétaire de la fenêtre quand ce n'est pas `G.player` — l'assailli d'un
+       assaut IA résolu depuis le pivot (F04B). Sans lui, le pivot recevait « Tes positions tiennent ». */
+    const _own=(owner&&owner.civ)?owner:G.player;
+    const _moi=(_own&&_own.civ&&_own.civ.id)||null;
     let _adv=(adverseId!==undefined)?adverseId:null;
     if(_adv===null){ try{ _adv=guerreAdverseId(); }catch(e){ _adv=null; } }
-    _emitNotice('war_result', G.player, {title, body, result:result||null, colonizeOffer:G._postWarColonizeOffer||null,
-      civs:[_moi,_adv].filter(Boolean), ownerName:(G.player&&G.player.civ)?(G.player.civ.emoji+' '+G.player.civ.name):''}, 'stWarResultFerme');
+    _emitNotice('war_result', _own, {title, body, result:result||null, colonizeOffer:G._postWarColonizeOffer||null,
+      civs:[_moi,_adv].filter(Boolean), ownerName:(_own&&_own.civ)?(_own.civ.emoji+' '+_own.civ.name):''}, 'stWarResultFerme');
     return;
   }
   document.getElementById('wm-title').textContent=title;

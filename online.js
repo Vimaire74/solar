@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-06 · v10.36';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-07 · v10.37';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -1867,7 +1867,10 @@ function askLocalDecision(pending){
       const who=(window._scPseudo&&window._scPseudo[o.attacker])||o.attackerName||o.attacker;
       const cible=o.target?((o.target.type==='route'?'🛤️ route ':'🏙️ ')+o.target.name):'tes positions';
       const cc=o.cruiserCost||{materials:5,energy:5};
-      body='<h2>🛡️ Défense !</h2>'
+      body='<h2>'+(o.renfort?'🤝 Renfort !':'🛡️ Défense !')+'</h2>'
+        /* Défense à deux (Marc, 07/09) : l'hôte d'un nœud partagé est consulté APRÈS le propriétaire ;
+           ses jetons s'ajoutent à ceux du principal et à la garnison. */
+        +(o.renfort?'<div style="background:#0e2a18;border:1px solid #3a8a5a;border-radius:8px;padding:6px 9px;margin-bottom:8px;color:#9fe8b8;font-size:.85em">Tu partages <b>'+(o.target?o.target.name:'ce nœud')+'</b> avec <b>'+(o.principal||'son propriétaire')+'</b>, qui a déjà choisi sa défense. Tes jetons <b>s\'ajoutent</b> aux siens. Si la place tombe, vous êtes chassés tous les deux.</div>':'')
         +'<div style="margin-bottom:8px"><b>'+who+'</b> assaille <b>'+cible+'</b>.<br>'
         /* La force annoncée est la PUISSANCE RÉELLE (jetons + Empathes + Stratégie + Supercroiseur) :
            voir `showAiAssaultDefenseModal`. Le détail est écrit à côté, sinon le joueur croit
@@ -1881,8 +1884,8 @@ function askLocalDecision(pending){
         +'<input type="range" id="sc-d" min="0" max="'+max+'" value="'+Math.min(2,max)+'" style="width:100%">'
         +'<div style="margin:4px 0 8px">Défense : <b id="sc-dv">'+Math.min(2,max)+'</b> jeton(s)'+(o.garrison!==undefined?' → total <b id="sc-dt">'+(Math.min(2,max)+(o.garrison||0)+(o.empath||0))+'</b>🛡️ contre ~'+(o.threat||0)+'⚔️':'')+'</div>'
         +(o.cruiser?('<label class="opt" style="display:block;text-align:left;cursor:pointer"><input type="checkbox" id="sc-cru" style="margin-right:8px">⚓ Déployer le <b>Supercroiseur</b> (+'+(o.cruiserPower||5)+'⚔️, −'+cc.materials+'🪨 −'+cc.energy+'⚡)</label>'):'')
-        +'<button class="opt" id="sc-ok">🛡️ Défendre</button>'
-        +'<button class="opt" id="sc-none" style="background:#2a2f45">La colonie se défend toute seule avec ses jetons (1 pour une colonie, 10 pour la base de ta nation)</button>';
+        +'<button class="opt" id="sc-ok">'+(o.renfort?'🤝 Renforcer':'🛡️ Défendre')+'</button>'
+        +'<button class="opt" id="sc-none" style="background:#2a2f45">'+(o.renfort?'Je n\'engage rien — le propriétaire défend seul':'La colonie se défend toute seule avec ses jetons (1 pour une colonie, 10 pour la base de ta nation)')+'</button>';
       decisionPanel(body);
       const sl=document.getElementById('sc-d'), dv=document.getElementById('sc-dv');
       const cru=()=>{ const c=document.getElementById('sc-cru'); return !!(c&&c.checked); };
