@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-07 · v10.37';
+const SOLAR_BUILD_MOTEUR = '2026-09-07 · v10.38';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -301,7 +301,7 @@ const DISCOVERY_TILES=[
 ];
 const AGENDAS_POOL=[
   {id:'ag1',name:'Explorateur',emoji:'🚀',desc:'5+ colonies connectées → +8 VP',score(p){return p.colonies.filter(c=>c.connected).length>=5?8:0;}},
-  {id:'ag2',name:'Maître des Routes',emoji:'🛤️',desc:'5+ routes → +6 VP',score(p){return p.routes.length>=5?6:0;}},
+  {id:'ag2',name:'Maître des Routes',emoji:'🛤️',desc:'5+ routes → +6 VP',score(p){return routesComptees(p).length>=5?6:0;}},
   {id:'ag3',name:'Superpuissance Tech.',emoji:'⚗️',desc:'Plus de cartes Tech que toute autre nation → +8 VP',score(p){const myT=p.cards.filter(c=>c.branch).length;const best=Math.max(...allPlayers().filter(x=>x!==p).map(x=>x.cards.filter(c=>c.branch).length),0);return myT>=best&&myT>0?8:0;}},
   /* ═══ ARMADA SOLAIRE — CE QU'ON COMPTE, ET POURQUOI (Marc, 05/09) ═══
      Partie 083E : deux nations sur trois avaient cet agenda, elles ont fini à 9 et à 0 jetons. Il
@@ -318,8 +318,8 @@ const AGENDAS_POOL=[
   {id:'ag4',name:'Armada Solaire',emoji:'⚔️',desc:'15+ jetons Force (réserve + récupération + routes + bonus empathe) → +8 VP',score(p){return armadaCompte(p)>=15?8:0;}},
   {id:'ag6',name:'Gouvernance Éclairée',emoji:'🏛️',desc:'Gouvernement niveau 4 et Moral 8+ → +8 VP',score(p){return p.gov_level>=4&&(p.res.morale||0)>=8?8:0;}},
   {id:'ag8',name:'Hub Jovien',emoji:'🟠',desc:'3+ colonies joviennes → +6 VP',score(p){const j=['io','europe','ganymede','callisto'];return p.colonies.filter(c=>j.includes(c.nodeId)).length>=3?6:0;}},
-  {id:'ag13',name:'Empire Énergétique',emoji:'⚡',desc:'Toutes les cartes tech qui génèrent <i class=ri-energy></i> → +12 VP',score(p){const energyCards=CARDS_POOL.filter(c=>c.rGain&&(c.rGain.energy||0)>0).map(c=>c.id);return energyCards.length>0&&energyCards.every(id=>p.cards.find(c=>c.id===id||c.id===id+'_esp'))?12:0;}},
-  {id:'ag14',name:'Opulence Matérielle',emoji:'🪨',desc:'Toutes les cartes tech qui génèrent <i class=ri-materials></i> → +12 VP',score(p){const matCards=CARDS_POOL.filter(c=>c.rGain&&(c.rGain.materials||0)>0).map(c=>c.id);return matCards.length>0&&matCards.every(id=>p.cards.find(c=>c.id===id||c.id===id+'_esp'))?12:0;}},
+  {id:'ag13',name:'Empire Énergétique',emoji:'⚡',desc:'Toutes les cartes tech qui génèrent <i class=ri-energy></i> → +12 VP',score(p){const energyCards=CARDS_POOL.filter(c=>c.rGain&&(c.rGain.energy||0)>0).map(c=>c.id);return energyCards.length>0&&energyCards.every(id=>possedeCarte(p,id))?12:0;}},
+  {id:'ag14',name:'Opulence Matérielle',emoji:'🪨',desc:'Toutes les cartes tech qui génèrent <i class=ri-materials></i> → +12 VP',score(p){const matCards=CARDS_POOL.filter(c=>c.rGain&&(c.rGain.materials||0)>0).map(c=>c.id);return matCards.length>0&&matCards.every(id=>possedeCarte(p,id))?12:0;}},
 ];
 const INVESTMENT_CARDS=[
   {id:'inv_esp',name:'Espionnage',emoji:'🕵️',cout:{},
@@ -402,7 +402,9 @@ const INVESTMENT_CARDS_2=[
      G.empathesFounder.civIds.add(p.civ.id);
      if(!p.investBonus2)p.investBonus2={};
      p.investBonus2.unionSacree=true;
-     const label=p===G.player?'Joueur ('+p.civ.name+')':'IA ('+p.civ.name+')';
+     /* 5B38 : « accessible pour IA (Ceinturiens) » — c'était l'ami de Marc. On ne lit plus G.player
+        mais la nature de la nation. */
+     const label=p.civ.emoji+' '+p.civ.name+(p._isAI?' (ordinateur)':'');
      addLog('🧠 Union Sacrée : branche Empathes accessible pour '+label+' — exclusive jusqu\'au tour '+G.empathesFounder.openAtTurn,'gold');
    },
    applyCost(G,p){
@@ -1554,6 +1556,25 @@ function mesGuerres(civId){
    `ownerNation` cherche parmi TOUTES les nations. `getNodeOwnerAI` reste, mais ne renvoie plus que
    les IA, pour les rares endroits qui veulent vraiment « une IA » (l'ancien nom, l'ancien sens). */
 function ownerNation(nodeId){ return allPlayers().find(n=>n&&n.colonies&&n.colonies.some(c=>c.nodeId===nodeId))||null; }
+/* ═══ UNE ROUTE NE COMPTE QUE SI ELLE EST À SOI (règle de Marc, 07/09, partie 5B38) ═══
+   Une route valait +1 VP et +1🪨 quelle que soit son extrémité. Le tacticien jupitérien l'a compris :
+   Io→Cérès, Io→Ganymède, Io→Vesta, Io→Lune vers les colonies de Marc, détruites par les pirates,
+   reconstruites, redétruites — un tiers de ses actions, et 6 VP de routes à l'arrivée. « Ça n'a
+   aucun sens. » Désormais une route compte (VP, revenu en 🪨, agenda Maître des Routes) si ses
+   deux bouts sont à son propriétaire — colonie, capitale, cohabitation —, ou si un bout est à lui
+   et l'autre LIBRE (une extension vers un nœud qu'on ira coloniser). Une route vers la colonie
+   d'une autre nation ne rapporte rien ; elle coûte toujours son entretien. */
+function routeCompte(nat,r){
+  if(!nat||!r)return false;
+  const mien=id=>nat.colonies.some(c=>c.nodeId===id);
+  const libre=id=>!allPlayers().some(n=>n&&n.colonies&&n.colonies.some(c=>c.nodeId===id));
+  const a=r.from,b=r.to;
+  if(mien(a)&&mien(b))return true;
+  if(mien(a)&&libre(b))return true;
+  if(mien(b)&&libre(a))return true;
+  return false;
+}
+function routesComptees(nat){ return (nat&&nat.routes||[]).filter(r=>routeCompte(nat,r)); }
 function getNodeOwnerAI(nodeId){const o=ownerNation(nodeId);return (o&&o._isAI!==false)?o:null;}
 
 /* ══════════ COHABITATION SUR UN NŒUD (Exploration Extra-Solaire) ══════════
@@ -1963,9 +1984,14 @@ function hasSpec(p,s){return p.cards.some(c=>c.spec===s||c.spec2===s);}
    👉 On ne recopie pas le test huit fois — c'est ainsi qu'on fabrique la divergence
    (`ARCHITECTURE_AVENIR.md` §4). Une fonction, appelée partout. Le jour où l'espionnage change de
    convention de nommage, il y a UN endroit à corriger. */
+/* Trois formes d'une même carte : achetée (`id`), volée par espionnage (`id_esp`), copiée par
+   Télépathie (`empath_copy_id`). Partie 5B38 (07/09) : la copie par Télépathie de la Sphère de Dyson
+   comptait +5 VP au rapport final mais PAS pour l'agenda « Empire Énergétique » (qui ne connaissait
+   que les deux premières formes) — 12 VP perdus pour l'ami de Marc. Et rien n'empêchait de racheter
+   une carte déjà copiée. Une seule réponse à « a-t-il cette carte ? », ici. */
 function possedeCarte(nat,cardId){
   if(!nat||!nat.cards||!cardId)return false;
-  return nat.cards.some(c=>c&&(c.id===cardId||c.id===cardId+'_esp'));
+  return nat.cards.some(c=>c&&(c.id===cardId||c.id===cardId+'_esp'||c.id==='empath_copy_'+cardId));
 }
 /* POURQUOI cette techno est-elle inaccessible ? Le jeu connaît trois raisons bien distinctes ;
    les confondre dans un même grisage muet n'aidait personne (retour de Marc). Texte court, destiné
@@ -3565,7 +3591,7 @@ function espInventaire(espion){
     const parBranche={};
     for(const c of (n.cards||[])){
       if(!c.branch||c.espCopy) continue;
-      if(espion.cards.find(x=>x.id===c.id||x.id===c.id+'_esp')) continue;   // déjà à nous
+      if(possedeCarte(espion,c.id)) continue;   // déjà à nous (achetée, volée ou copiée)
       (parBranche[c.branch]||(parBranche[c.branch]=[])).push(c);
     }
     for(const b of Object.keys(parBranche)) par.push({nation:n, branch:b, cartes:parBranche[b]});
@@ -3695,7 +3721,7 @@ function espPiller(espion, opt){
   for(const id of opt.ids){
     const carte=(victime.cards||[]).find(c=>c.id===id);
     if(!carte) continue;
-    if(espion.cards.find(x=>x.id===carte.id||x.id===carte.id+'_esp')) continue;
+    if(possedeCarte(espion,carte.id)) continue;
     const copie={...carte, id:carte.id+'_esp', espCopy:true};
     espion.cards.push(copie); applyCard(copie,espion); pris++;
     noms.push((carte.emoji||'')+' <b>'+carte.name+'</b>'+(carte.effect?' — <span style="opacity:.8">'+carte.effect+'</span>':''));
@@ -4819,6 +4845,7 @@ fluxDeclarer('stAssautJoueurChoisi', stAssautJoueurChoisi);
 fluxDeclarer('stAssautJoueurResoudre', stAssautJoueurResoudre);
 fluxDeclarer('adDefenseAssaut', adDefenseAssaut);
 fluxDeclarer('adRenfortCohabitant', adRenfortCohabitant);
+fluxDeclarer('stTributReponse', stTributReponse);
 fluxDeclarer('stDefenseContreIAResoudre', stDefenseContreIAResoudre);
 fluxDeclarer('adDefenseContreIA', adDefenseContreIA);
 fluxDeclarer('_evSuiteJouer', _evSuiteJouer);
@@ -5043,8 +5070,21 @@ function _assautsDuTour(war,civId){
   return war._assautsPar[civId]||0;
 }
 /* Appelé à CHAQUE assaut de la phase d'actions, quel que soit l'assaillant. */
+/* Les malus différés d'une guerre populaire : au premier combat, ou en fin de tour si elle tient. */
+function encaisserPenalitesPopulaires(w){
+  if(!w||!w.penalitesDifferees||w.ended)return;
+  w.penalitesDifferees=false;
+  _usureDeGuerre(w);
+  for(const id of [w.a,w.b]){
+    const n=allPlayers().find(function(x){return x&&x.civ&&x.civ.id===id;});
+    if(n) n.res.morale=Math.max(0,(n.res.morale||0)-2);
+  }
+  addLog('💥 Guerre populaire : la guerre a lieu — −2<i class=ri-morale></i> pour chaque camp.','red');
+}
+function encaisserPenalitesPopulairesRestantes(){ for(const w of (G.wars||[])) encaisserPenalitesPopulaires(w); }
 function noterAssautDuTour(war,civId){
   if(!war||!civId) return;
+  encaisserPenalitesPopulaires(war);
   if(war._assautsTour!==G.turn){ war._assautsTour=G.turn; war._assautsPar={}; }
   war._assautsPar[civId]=(war._assautsPar[civId]||0)+1;
 }
@@ -5279,6 +5319,7 @@ function guerreFraichePaixRepondue(peaceResult){
    fermeture ne permettait pas.
    ========================================================================== */
 function stFinDeTour(){
+  encaisserPenalitesPopulairesRestantes();   // la guerre populaire a survécu à la question de paix : elle se paie
   const revs=doRevenues(); const maint=doMaintenance(); _emitNetRevenueLog(maint);
   _photographierTour();   // l'état de chaque nation, une fois le tour soldé — voir la note plus haut
   refillGeneralRiver();
@@ -5894,20 +5935,23 @@ function doMaintenance(){
     const payRE=_freeRteUpkeep?numRoutes:Math.min(numRoutes,p.res.energy||0);
     if(!_freeRteUpkeep)p.res.energy-=payRE;
     const missRE=_freeRteUpkeep?0:numRoutes-payRE;
+    /* Le 🪨 ne revient que des routes À SOI (`routeCompte`) — et parmi elles, celles dont l'énergie est
+       payée. */
+    const gainRE=Math.min(payRE, routesComptees(p).length);
     if(missRE>0&&p===G.player)addLog('⚠️ '+missRE+' route(s) non alimentée(s) ce tour (manque <i class=ri-energy></i>).','dim');
     const caps=getResCapFor(p);
     // Seules les routes payées génèrent du revenu commercial
-    p.res.materials=Math.min(caps.materials,(p.res.materials||0)+payRE);
+    p.res.materials=Math.min(caps.materials,(p.res.materials||0)+gainRE);
     /* ⚠️ CE QUI EST ANNONCÉ DOIT ÊTRE CE QUI EST PRÉLEVÉ. Avec Hyperpropulsion l'entretien des routes
        est gratuit (`if(!_freeRteUpkeep) p.res.energy -= payRE`), mais le bilan annonçait quand même
        `numRoutes`⚡ de dépense : le joueur voyait un coût qui n'avait pas eu lieu et son bilan ne
        tombait pas juste (signalé par Marc le 2026-08-07). Le GAIN en matériaux, lui, est bien de 1
        par route même sans payer : les routes rapportent, c'est voulu. */
     const _coutRoutes=_freeRteUpkeep?0:payRE;
-    if(p===G.player){result.routeEnergyCost=_coutRoutes;result.routeMatGain=payRE;result.moraleLostRoutes=0;}
+    if(p===G.player){result.routeEnergyCost=_coutRoutes;result.routeMatGain=gainRE;result.moraleLostRoutes=0;}
     /* Entretien mémorisé PAR NATION : en multijoueur chaque humain doit voir SON bilan de fin de tour
        (et non celui du joueur qui a clos la manche). Mêmes chiffres, calculés une seule fois ici. */
-    p._lastMaint={energyCost:totalEnergy,matCost:totalMat,routeEnergyCost:_coutRoutes,routeMatGain:payRE,moraleLostCols:missE+missM,moraleLostRoutes:0};
+    p._lastMaint={energyCost:totalEnergy,matCost:totalMat,routeEnergyCost:_coutRoutes,routeMatGain:gainRE,moraleLostCols:missE+missM,moraleLostRoutes:0};
     // Entretien de la forme de gouvernement (Démocratie : −1<i class=ri-materials></i> −1<i class=ri-energy></i>/tour tant qu'active)
     if(p.govFormUpkeep){for(const[r,a]of Object.entries(p.govFormUpkeep)){const pay=Math.min(a,p.res[r]||0);p.res[r]=(p.res[r]||0)-pay;}}
     p.stratBonus=null;
@@ -6044,7 +6088,7 @@ function _netIncome(p){
   const nr=p.routes.length; const _gratuit=hasSpec(p,'route_force_free');
   const _dispoE=(p.res.energy||0)+(g.energy||0);
   const _payables=_gratuit?nr:Math.max(0,Math.min(nr,_dispoE));
-  if(!_gratuit) g.energy-=nr; g.materials+=_payables;
+  if(!_gratuit) g.energy-=nr; g.materials+=Math.min(_payables, routesComptees(p).length);   // 🪨 des seules routes à soi
   if(p.govFormUpkeep) for(const r in p.govFormUpkeep) g[r]=(g[r]||0)-(p.govFormUpkeep[r]||0);
   return g;
 }
@@ -7617,7 +7661,8 @@ function showAiAssaultDefenseModal(ai,target,aiCommit,done,defender){
        threat:_menace, threatDetail:_detMenace, threatTokens:aiCommit, attackerCruiser:_aiCruAtt, maxDef,
        garrison:_garn, garrisonLabel:_garnLabel, empath:bonusCombatCartes(p),
        cruiser:_cruOk, cruiserPower:(p.cruiserPower||5), cruiserCost:_cruC,
-       myTokens:(p.forceTokens||0), myMat:(p.res.materials||0), myEnergy:(p.res.energy||0)},
+       myTokens:(p.forceTokens||0), myMat:(p.res.materials||0), myEnergy:(p.res.energy||0),
+       navDemi:!!(typeof hasSpec==='function'&&hasSpec(p,'nav2_war'))},
       null, 'adDefenseContreIA');
     return;
   }
@@ -7630,7 +7675,7 @@ function showAiAssaultDefenseModal(ai,target,aiCommit,done,defender){
     '<div style="font-size:1.05em;font-weight:700;color:#ff8866;margin-bottom:8px">🔴 '+ai.civ.emoji+' '+ai.civ.name+' t\'assaille !</div>'+
     '<div style="font-size:.85em;color:#cc9988;margin-bottom:6px">Cible : <strong style="color:#ffbbaa">'+tgtLabel+'</strong></div>'+
     '<div style="font-size:.82em;color:#cc9988;margin-bottom:12px">Force d\'attaque : <strong style="color:#ff9977">'+shownThreat+'</strong>'
-      +'<span style="color:#a08878;font-size:.9em"> ('+_detMenace+')</span>. Combien de jetons engages-tu en défense ? <span style="color:#7880a0">(1<i class=ri-materials></i> 1<i class=ri-energy></i> / jeton)</span>'+
+      +'<span style="color:#a08878;font-size:.9em"> ('+_detMenace+')</span>. Combien de jetons engages-tu en défense ? <span style="color:#7880a0">('+((typeof hasSpec==='function'&&hasSpec(p,'nav2_war'))?'½<i class=ri-materials></i> ½<i class=ri-energy></i> / jeton — IA de Navigation':'1<i class=ri-materials></i> 1<i class=ri-energy></i> / jeton')+')</span>'+
       '<br><span style="color:#9fd8b0">🏛️ Garnison sur place : <b>'+_garn+'</b> ('+_garnLabel+') — comptée dans ta défense</span>'+
       (pEmp?'<br><span style="color:#c080ff">🔮 +'+pEmp+' Empathes (gratuit)</span>':'')+
       (cruAvail?'<br><span style="color:#88bbee">⚓ Supercroiseur : +'+(p.cruiserPower||5)+'⚔️ auto si tu engages ≥1 jeton (5<i class=ri-materials></i> 5<i class=ri-energy></i>)</span>':'')+'</div>'+
@@ -7664,6 +7709,7 @@ function resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,defender){
 }
 function _resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,p){
   const war=_warBetween(ai.civ.id,p.civ.id)||_warOf(ai.civ.id);
+  if(war&&typeof encaisserPenalitesPopulaires==='function')encaisserPenalitesPopulaires(war);   // un combat : la guerre a lieu
   const pEmp=bonusCombatCartes(p);
   const aEmp=bonusCombatCartes(ai);
   // Le Supercroiseur ne se déploie plus tout seul : en ligne c'est le CHOIX du défenseur (G._defCruiserChoice).
@@ -7694,7 +7740,10 @@ function _resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,p){
   applyCombatEngage(ai,aiCommit,aPow>pDef); // l'attaquant paie TOUJOURS ses jetons engagés (même si tu ne défends pas) — sinon capture GRATUITE
   applyCombatEngage(p,defTokens,pDef>=aPow);
   for(const _r of _renforts) if(_r.j>0)applyCombatEngage(_r.co,_r.j,pDef>=aPow);
-  if(defTokens>0)addLog('🛡️ Défense : '+defTokens+' jeton(s) engagé(s) (−'+defTokens+'<i class=ri-materials></i> −'+defTokens+'<i class=ri-energy></i>).','dim');
+  /* Le prix annoncé est celui que `applyCombatEngage` prélève : IA de Navigation ÷2 (5B38 : Marc a lu
+     « −16🪨 −16⚡ » pour un prélèvement réel de 8 et 8). */
+  if(defTokens>0){ const _h=(typeof hasSpec==='function'&&hasSpec(p,'nav2_war')); const _m=_h?Math.floor(defTokens/2):defTokens, _e=_h?Math.ceil(defTokens/2):defTokens;
+    addLog('🛡️ Défense : '+defTokens+' jeton(s) engagé(s) (−'+_m+'<i class=ri-materials></i> −'+_e+'<i class=ri-energy></i>'+(_h?', IA de Navigation : coût divisé par deux':'')+').','dim'); }
   let resultTxt,cls;
   if(pDef>=aPow){
     if(war)war.winsBy[p.civ.id]=(war.winsBy[p.civ.id]||0)+1;
@@ -8050,9 +8099,13 @@ function guerrePopulaireEntre(offense,offenseur){
     addLog('😡 '+offense.civ.emoji+' '+offense.civ.name+' : le peuple exige vengeance contre '+offenseur.civ.name+' — mais la partie s\'achève, pas de guerre au dernier tour.','dim');
     return null;
   }
-  const w=declarerGuerre(offense,offenseur,'Guerre Populaire Forcée — le peuple exige vengeance !','other');
+  /* ═══ LES MALUS ATTENDENT QUE LA GUERRE AIT LIEU (Marc, 07/09, partie 5B38) ═══
+     Deux guerres populaires mortes-nées dans cette partie : déclaration, −6 de moral par camp,
+     et paix conclue le même soir sans un seul combat. « Dans ce cas, les malus ne devraient pas
+     s'appliquer puisque la guerre n'a pas eu lieu réellement. » L'usure (−4) et les −2 populaires
+     ne sont donc prélevés qu'au premier combat, ou en fin de tour si la guerre tient encore. */
+  const w=declarerGuerre(offense,offenseur,'Guerre Populaire Forcée — le peuple exige vengeance !','other',{penalitesDifferees:true});
   if(!w)return null;
-  for(const n of [offense,offenseur]) n.res.morale=Math.max(0,(n.res.morale||0)-2);
   /* La tension reste à 10 pendant la guerre ; elle ne redescend qu'à la paix. */
   setTens(offense.civ.id,offenseur.civ.id,10); setTens(offenseur.civ.id,offense.civ.id,10);
   const local=(offense===G.player||offenseur===G.player);
@@ -8060,12 +8113,12 @@ function guerrePopulaireEntre(offense,offenseur){
     const autre=(offense===G.player)?offenseur:offense;
     G.warWith=autre.civ.id;              // épingler la cible, sinon syncWarState pointe sur G.wars[0]
     G.playerTension=10; G.aiTension=10;
-    addLog('💥 Guerre populaire ! −2<i class=ri-morale></i> pour chaque camp.','red');
-    _journalAuto(G.player.civ.name,'Guerre populaire forcée','−2 moral pour chaque camp',true);
+    addLog('💥 Guerre populaire ! Les malus (usure −4, −2 populaire) ne tomberont que si elle a lieu.','red');
+    _journalAuto(G.player.civ.name,'Guerre populaire forcée','malus si la guerre a lieu',true);
   }else{
     addLog('💥 Guerre populaire entre '+offense.civ.emoji+' '+offense.civ.name+' et '
-      +offenseur.civ.emoji+' '+offenseur.civ.name+' — −2<i class=ri-morale></i> pour chacune.','red');
-    _journalAuto(offense.civ.name,'Guerre populaire forcée','contre '+offenseur.civ.name+' — −2 moral pour chaque camp',true);
+      +offenseur.civ.emoji+' '+offenseur.civ.name+' — les malus tomberont si elle a lieu.','red');
+    _journalAuto(offense.civ.name,'Guerre populaire forcée','contre '+offenseur.civ.name+' — malus si la guerre a lieu',true);
   }
   return w;
 }
@@ -8077,6 +8130,7 @@ function guerrePopulaireAuto(offense,offenseur){
   if(!w)return null;
   const cible=offenseur.routes.find(r=>offense.colonies.some(c=>c.nodeId===r.from||c.nodeId===r.to));
   if(cible){
+    encaisserPenalitesPopulaires(w);   // une route neutralisée : la guerre a lieu
     cible.tokens=0; offenseur.forceTokens=Math.max(0,(offenseur.forceTokens||0)-1);
     updateConnections(offenseur);
     addLog('😡 '+offense.civ.emoji+' '+offense.civ.name+' neutralise une route de '+offenseur.civ.name
@@ -8168,6 +8222,7 @@ function triggerGuereeForcee(offendedSide,targetAi){
     // IA offensée : attaque auto la route la plus gênante ou colonie la plus proche
     const playerRouteNearAI=G.player.routes.find(r=>{const a=fwAi.colonies.find(c=>c.nodeId===r.from||c.nodeId===r.to);return a;});
     if(playerRouteNearAI){
+      { const _w=_warBetween(_moiId(),fwAi.civ.id); if(_w)encaisserPenalitesPopulaires(_w); }   // acte de guerre : les malus tombent
       playerRouteNearAI.tokens=0;G.player.forceTokens=Math.max(0,G.player.forceTokens-1);
       updateConnections(G.player);
       addLog('😡 L\'IA attaque ta route (guerre populaire) : '+NODES[playerRouteNearAI.from]?.name+'→'+NODES[playerRouteNearAI.to]?.name+' — route neutralisée, −1 jeton !','red');
@@ -8178,6 +8233,7 @@ function triggerGuereeForcee(offendedSide,targetAi){
   return true;
 }
 function forcedWarChoiceRoute(idx){
+  { const _w=_warBetween(_moiId(),G.warWith); if(_w)encaisserPenalitesPopulaires(_w); }   // attaquer une route : la guerre a lieu
   const fwcAi=G.warWith?G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0]:G.ais[0];
   const r=fwcAi?fwcAi.routes[idx]:null;
   if(!r)return;
@@ -8200,6 +8256,24 @@ function forcedWarChoiceColony(nodeId){
 function forcedWarDemandPeace(){
   document.getElementById('forced-war-modal').classList.add('hidden');
   const ai=G.warWith?G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0]:G.ais[0];
+  /* ═══ UN HUMAIN N'EST PAS UNE FORMULE (partie 5B38, 07/09) ═══
+     Marc exige la paix dans sa guerre populaire contre les Ceinturiens — tenus par son ami. La
+     règle « l'IA cède si elle n'est pas militairement supérieure » s'est appliquée à lui : 2🪨 2⚡
+     prélevés d'office, sans question. « Mon ami n'a pas vraiment pu répondre. » On lui pose la
+     question ; il peut refuser, et la guerre continue. */
+  if(ai&&ai._isAI===false&&_decisionActive()){
+    const d=fluxDonnees(); d.tributDemandeur=G.player.civ.id; d.tributCible=ai.civ.id;
+    const tM=Math.min(2,ai.res.materials||0),tE=Math.min(2,ai.res.energy||0);
+    addLog('🕊️ '+G.player.civ.emoji+' '+G.player.civ.name+' exige la paix de '+ai.civ.emoji+' '+ai.civ.name+' contre un tribut ('+tM+'🪨 '+tE+'⚡) — en attente de sa réponse…','dim');
+    _emitDecision('peace_answer', ai,
+      {title:'🕊️ Exigence de paix',
+       from:G.player.civ.id, fromName:G.player.civ.emoji+' '+G.player.civ.name,
+       offer:{materials:0,energy:0,science:0},
+       texte:G.player.civ.emoji+' '+G.player.civ.name+' — dont le peuple exige vengeance — te propose d\'éviter la guerre contre un <b>tribut de '+tM+'🪨 et '+tE+'⚡</b>. Si tu refuses, la guerre continue.',
+       options:[{id:'yes',name:'🕊️ Payer le tribut — paix'},{id:'no',name:'⚔️ Refuser — la guerre continue'}]},
+      'stTributReponse', null);
+    return;
+  }
   const weak=ai&&(ai.forceTokens||0)<=(G.player.forceTokens||0); // l'IA cède si elle n'est pas militairement supérieure
   if(ai&&weak){
     const tM=Math.min(2,ai.res.materials||0),tE=Math.min(2,ai.res.energy||0);
@@ -8215,6 +8289,32 @@ function forcedWarDemandPeace(){
   }
   G.playerTension=0;G.aiTension=0;
   if(!_guerrePopSuiteJouer())render();
+}
+/* La réponse de l'humain à l'exigence de paix (voir `forcedWarDemandPeace`). Les deux nations sont
+   relues dans `G` : la réponse peut arriver quand la perspective a changé. */
+function stTributReponse(ans){
+  const d=fluxDonnees();
+  const dem=allPlayers().find(n=>n&&n.civ&&n.civ.id===d.tributDemandeur);
+  const cib=allPlayers().find(n=>n&&n.civ&&n.civ.id===d.tributCible);
+  d.tributDemandeur=null; d.tributCible=null;
+  const oui=!!(ans&&(ans.value==='yes'||ans.targetId==='yes'||ans.id==='yes'||ans.accept===true||ans.choice==='yes'));
+  if(dem&&cib) logAuteur(dem, function(){
+    if(oui){
+      const tM=Math.min(2,cib.res.materials||0),tE=Math.min(2,cib.res.energy||0);
+      cib.res.materials=Math.max(0,(cib.res.materials||0)-tM); cib.res.energy=Math.max(0,(cib.res.energy||0)-tE);
+      const cap=(typeof getResCapFor==='function')?getResCapFor(dem):{materials:9999,energy:9999};
+      dem.res.materials=Math.min(cap.materials,(dem.res.materials||0)+tM); dem.res.energy=Math.min(cap.energy,(dem.res.energy||0)+tE);
+      const _i=_warIndexBetween(dem.civ.id,cib.civ.id); if(_i>=0)G.wars.splice(_i,1);
+      halveTensions(dem.civ.id,cib.civ.id); syncWarState();
+      addLog('🕊️ '+cib.civ.emoji+' '+cib.civ.name+' accepte de payer le tribut ('+tM+'🪨 '+tE+'⚡) — la paix est conclue.','gold');
+      annoncerPaixAuxTiers(dem,cib,'tribut');
+    } else {
+      addLog('⚔️ '+cib.civ.emoji+' '+cib.civ.name+' refuse de payer — la guerre continue (pas de combat ce tour).','red');
+    }
+  });
+  G.playerTension=0;G.aiTension=0;
+  if(!_guerrePopSuiteJouer())render();
+  return ans;
 }
 // Filet de sécurité : guerre populaire sans aucune cible (pas de route protégée ni de colonie ennemie non-mère) → la pression retombe, on débloque.
 function forcedWarNoTarget(){
@@ -8256,7 +8356,8 @@ function updateWarRisk(){
    conséquences, mais SYMÉTRIQUEMENT et aux deux nations réellement concernées. `declareWar` reste
    comme façade pour tous ses appelants existants : elle traduit « moi contre X » en un appel
    nommé. */
-function declarerGuerre(agresseur, cible, raison, declaredBy){
+function declarerGuerre(agresseur, cible, raison, declaredBy, opts){
+  opts=opts||{};
   if(!agresseur||!cible||agresseur===cible) return null;
   const A=agresseur.civ.id, B=cible.civ.id;
   if(_warBetween(A,B)) return null;                       // déjà en guerre : rien à faire
@@ -8333,7 +8434,9 @@ function declarerGuerre(agresseur, cible, raison, declaredBy){
      que le journal montrait la punition AVANT son motif : partie 8B47, tour 7, Marc lisait deux
      « usure de guerre −4 » puis seulement « GUERRE DÉCLARÉE ». Un journal se lit dans l'ordre des
      causes. Le prélèvement lui-même est inchangé — « dès que la guerre est enclenchée au tour 1 ». */
-  _usureDeGuerre(w);
+  /* Guerre populaire (5B38, 07/09) : l'usure attend de savoir si la guerre a vraiment lieu — voir
+     `encaisserPenalitesPopulaires`. */
+  if(opts.penalitesDifferees) w.penalitesDifferees=true; else _usureDeGuerre(w);
   addLog('🚨 GUERRE DÉCLARÉE : '+agresseur.civ.emoji+' '+agresseur.civ.name+' contre '
     +cible.civ.emoji+' '+cible.civ.name+' — '+raison,'red');
   annoncerGuerreAuxTiers(agresseur,cible,raison);
@@ -8604,6 +8707,7 @@ function resolveWarCombat(playerCommitted, attaquant){
     const cible=id||G.warWith;
     return allPlayers().find(n=>n!==_atk&&n.civ.id===cible)||allPlayers().find(n=>n!==_atk)||G.ais[0];
   })();
+  { const _wp=warEnemy&&_warBetween(_atk.civ.id,warEnemy.civ.id); if(_wp&&typeof encaisserPenalitesPopulaires==='function')encaisserPenalitesPopulaires(_wp); }   // un combat : la guerre populaire a lieu
   const pBonus=(_atk.stratBonus&&_atk.stratBonus.combatBonus)||0;
   const pEmpathBonus=bonusCombatCartes(_atk);
   const aEmpathBonus=bonusCombatCartes(warEnemy);
@@ -11301,10 +11405,12 @@ function calcVP(p){
       +(_liaison?' +1 (liaison) ':' ')+'→ '+(_base+_liaison)
       +(effectiveBVP!==node.baseVP?'  [Ceinturiens : '+ (node.name||col.nodeId) +' vaut 2 au niveau 1]':''));
   }
-  // Routes : 1 VP par route établie (incite l'IA à construire des routes)
-  const routeVP=p.routes.length;
-  if(routeVP)det.routes.push(routeVP+' route(s) × 1 = '+routeVP+'   ('
-    +p.routes.map(r=>((NODES[r.from]&&NODES[r.from].name)||r.from)+'→'+((NODES[r.to]&&NODES[r.to].name)||r.to)).join(', ')+')');
+  // Routes : 1 VP par route établie… à soi (voir `routeCompte`) — une route vers la colonie d'un autre ne vaut rien.
+  const _rc=routesComptees(p), _rx=p.routes.filter(r=>!routeCompte(p,r));
+  const routeVP=_rc.length;
+  const _nomR=r=>((NODES[r.from]&&NODES[r.from].name)||r.from)+'→'+((NODES[r.to]&&NODES[r.to].name)||r.to);
+  if(routeVP)det.routes.push(routeVP+' route(s) × 1 = '+routeVP+'   ('+_rc.map(_nomR).join(', ')+')');
+  if(_rx.length)det.routes.push(_rx.length+' route(s) vers une colonie étrangère : 0   ('+_rx.map(_nomR).join(', ')+')');
   const cardsVP=p.cards.reduce((s,c)=>s+(c.vp||0),0);
   for(const c of p.cards){ if(c&&c.vp) det.cartes.push((c.emoji||'')+' '+(c.name||c.id)+' (niveau '+(c.tier||'?')+') : +'+c.vp); }
   /* ═══ « TECHNOLOGIE » VOULAIT DIRE DEUX CHOSES DIFFÉRENTES ═══
@@ -11797,8 +11903,10 @@ function renderWarRisk(){
       ?'⚔️ Force : <b style="color:#ff9966">'+pf.val+'</b> <span style="color:#5a7a66">(renseignement précis)</span>'
       :'⚔️ Force estimée : <b style="color:#ffb380">~'+pf.val+'</b> <span style="color:#5a6a8a">(±3 — sans renseignement)</span>';
     const ecoLine=_intel>=2
-      ?'<i class=ri-energy></i>'+(ai.res.energy||0)+' <i class=ri-materials></i>'+(ai.res.materials||0)+' <i class=ri-science></i>'+(ai.res.science||0)+' <i class=ri-morale></i>'+(ai.res.morale||0)+' · 🏙️'+ai.colonies.length+' 🛤️'+ai.routes.length+' · ~'+vpAffiche(ai)+' VP'
-      :'🏙️ '+ai.colonies.length+' col · 🛤️ '+ai.routes.length+' routes · ~'+vpAffiche(ai)+' VP <span style="color:#5a6a8a">· éco &amp; moral : tech requise</span>';
+      /* Plus d'emoji 🏙️/🛤️ ici : sur certains navigateurs ils sortent en carré « 01F6E4 » (capture de
+         Marc, 07/09). Des mots, lisibles partout. */
+      ?'<i class=ri-energy></i>'+(ai.res.energy||0)+' <i class=ri-materials></i>'+(ai.res.materials||0)+' <i class=ri-science></i>'+(ai.res.science||0)+' <i class=ri-morale></i>'+(ai.res.morale||0)+' · '+ai.colonies.length+' col · '+ai.routes.length+' route'+(ai.routes.length>1?'s':'')+' · ~'+vpAffiche(ai)+' VP'
+      :ai.colonies.length+' col · '+ai.routes.length+' route'+(ai.routes.length>1?'s':'')+' · ~'+vpAffiche(ai)+' VP <span style="color:#5a6a8a">· éco &amp; moral : tech requise</span>';
     const cruLine=croiseurLigne(ai);
     tensHtml+=`<div class="dip-nation"><div class="dip-hdr"><span>${ai.civ.emoji} ${ai.civ.name}</span>${status}</div>`+
       `<div class="dip-force">${forceLine}${cruLine?'<br>'+cruLine:''}</div>`+
@@ -13749,12 +13857,20 @@ function showEventAnnounce(ev,onDone){
   el.style.borderColor=typeColors[ev.type]||'#5a1a7a';
   el.classList.remove('hidden');
   el.querySelector('.ea-card').style.borderColor=typeColors[ev.type]||'#5a1a7a';
-  _eventAnnounceCb=onDone||null;
+  _eventAnnounceCb=(typeof onDone==='function')?onDone:null;   // une FONCTION seulement ; un NOM est déjà rangé dans G
 }
 let _eventAnnounceCb=null;
+/* ⚠️ HORS SERVEUR, LA SUITE DE L'ANNONCE N'ÉTAIT JAMAIS JOUÉE (tutoriel, 07/09). `showEventAnnounce`
+   reçoit un NOM de suite et le range dans `G` — mais le posait AUSSI dans `_eventAnnounceCb`, que ce
+   bouton appelait comme une fonction : `cb()` sur une chaîne, TypeError, et le draft Stratégie du
+   tour 1 n'arrivait jamais. C'est le « blocage à l'étape 3 » du tutoriel (Marc, 24/08) : le coach
+   avait été rendu tolérant, mais le jeu, lui, restait sans carte Stratégie au tour 1 et se figeait
+   au tour 3 (annonce du tour 4). En ligne, `stAnnonceLue` faisait ce travail ; ici aussi désormais. */
 function dismissEventAnnounce(){
   document.getElementById('event-announce-modal').classList.add('hidden');
-  if(_eventAnnounceCb){const cb=_eventAnnounceCb;_eventAnnounceCb=null;cb();}
+  const cb=_eventAnnounceCb; _eventAnnounceCb=null;
+  if(typeof cb==='function'){ cb(); return; }
+  if(typeof stAnnonceLue==='function') stAnnonceLue();
 }
 /* ============================================================ DEBUG / NOTE SYSTEM ============================================================ */
 function showDebugModal(){

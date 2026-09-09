@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-08-29 · v10.02';</script>
+<script>window.SOLAR_BUILD_HTML='2026-09-07 · v10.38';</script><!-- ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE : celle-ci, `SOLAR_BUILD_JS` (online.js) et `SOLAR_BUILD_MOTEUR` (moteur.js). Surveillé par test_versions.js. -->
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -1273,6 +1273,10 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
       <div id="r-agendas"></div>
     </div>
     <div class="rps">
+      <h4>🏆 Points de victoire</h4>
+      <div id="r-classement" style="font-size:.8em;line-height:1.6"></div>
+    </div>
+    <div class="rps">
       <h4>Adversaire IA</h4>
       <div id="r-ai" style="font-size:.72em;color:#7080a0;line-height:1.7"></div>
     </div>
@@ -1600,6 +1604,7 @@ function uiMapFit(){
     if(dispo>80){ wrap.style.maxHeight=dispo+'px'; wrap.style.height=dispo+'px'; }
     var w=wrap.clientWidth||0, h=wrap.clientHeight||0;
     if(w>40&&h>40){ svg.style.width=Math.round(w*uiMZ)+'px'; svg.style.height=Math.round(h*uiMZ)+'px'; }
+    if(typeof cadrerVueGlobale==='function')cadrerVueGlobale();   // paysage ↔ portrait : le cadrage suit
   }catch(e){}
 }
 function uiApplyMZ(){

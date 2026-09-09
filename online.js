@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-07 · v10.37';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-07 · v10.38';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -66,10 +66,22 @@ function connect(onReady){
   };
   ws.onmessage = (ev) => { let m; try{ m = JSON.parse(ev.data); }catch(e){ return; } handle(m); };
   ws.onclose = () => {
+    const etaitOuverte = STATE.connected;
     STATE.connected = false;
     clearInterval(STATE._pingTimer);
     // reconnexion systématique dès qu'on a une session (pas seulement en partie)
     if (STATE.user || STATE.token){ status('🔌 Connexion perdue — reconnexion en cours…'); scheduleReconnect(); }
+    /* ⚠️ « JE TAPE MON MOT DE PASSE, RIEN NE SE PASSE » (Marc, 07/09, juste après un redéploiement).
+       Sans session, si le serveur ne répond pas à l'ouverture (redémarrage en cours), le bouton
+       ne produisait AUCUN retour : le statut « Connexion au serveur… » restait affiché, sans
+       erreur, sans nouvel essai. On le dit, sous le formulaire, et on rend la main. */
+    else if (!etaitOuverte){
+      status('');
+      hideStatus();
+      const msg='⚠️ Serveur injoignable pour le moment (mise à jour en cours ?). Réessaie dans quelques secondes.';
+      if (typeof _errCb==='function') _errCb(msg);
+      else { const e=document.getElementById('lv-err'); if(e) e.textContent=msg; }
+    }
   };
   ws.onerror = () => {};
 }
@@ -1875,7 +1887,7 @@ function askLocalDecision(pending){
         /* La force annoncée est la PUISSANCE RÉELLE (jetons + Empathes + Stratégie + Supercroiseur) :
            voir `showAiAssaultDefenseModal`. Le détail est écrit à côté, sinon le joueur croit
            défendre contre des jetons et se retrouve devant un croiseur (E682, tour 9). */
-        +'<span class="muted">Force de l\'assaut : ~'+(o.threat||0)+'⚔️'+(o.threatDetail?(' ('+o.threatDetail+')'):'')+' · tes jetons engageables : '+max+' (1🪨 +1⚡ chacun)</span></div>'
+        +'<span class="muted">Force de l\'assaut : ~'+(o.threat||0)+'⚔️'+(o.threatDetail?(' ('+o.threatDetail+')'):'')+' · tes jetons engageables : '+max+(o.navDemi?' (½🪨 +½⚡ chacun — IA de Navigation)':' (1🪨 +1⚡ chacun)')+'</span></div>'
         +(o.attackerCruiser?'<div style="background:#2a1200;border:1px solid #cc6622;border-radius:8px;padding:6px 9px;margin-bottom:8px;color:#ffcfa0;font-size:.85em">⚓ Il déploie son <b>Supercroiseur</b> — déjà compté ci-dessus.</div>':'')
         /* La garnison compte dans le combat, elle doit compter dans la fenêtre (Marc, 06/09 : « je vois
            pas combien j'ai en défense de base dans ma capitale une fois reprise »). Serveurs plus
