@@ -191,16 +191,21 @@ function simUnlock(branch){ const g=G(); if(!g)return; g.branchTiers=g.branchTie
 // « Mode neutre » : ferme TOUTES les fenêtres spéciales et de transition de tour (pour ne rien laisser bloquer l'écran).
 function hideAllSpecialModals(){
   ['forced-war-modal','war-modal','war-combat-modal',
-   'invest-modal','invest2-modal','eot-modal','strategy-modal','event-modal','event-announce-modal','agenda-sel-modal','discovery-modal'
+   'invest-modal','invest2-modal','invest-active-modal','eot-modal','strategy-modal','event-modal','event-announce-modal','agenda-sel-modal','discovery-modal','route-token-modal'
   ].forEach(function(id){ const m=$(id); if(m)m.classList.add('hidden'); });
   const pm=$('peace-modal'); if(pm){ pm.classList.add('hidden'); pm.style.display='none'; }
+  const ec=$('event-choice-modal'); if(ec)ec.style.display='none';
+  ['sc-attack-notice','sc-ability-reminder','sc-stuck','calm-overlay'].forEach(function(id){ const e=$(id); if(e)e.remove(); });
 }
 function demoPanel(tab){ try{ if(window.uiTab)uiTab(tab); }catch(e){ console.error('[TUTO panel]',tab,e); } }
 // Affiche la vraie fenêtre d'investissement (réutilise celle du jeu si déjà peuplée, sinon la (ré)ouvre).
+let _demoOuverture=false;
 function demoInvest(){
   const m=$('invest-modal'), opts=$('inv-opts');
   if(m && opts && opts.children && opts.children.length){ m.classList.remove('hidden'); return; }
+  _demoOuverture=true;
   try{ if(window.showInvestmentModal)window.showInvestmentModal(); }catch(e){ console.error('[TUTO invest]',e); }
+  _demoOuverture=false;
 }
 // Guerre populaire forcée (tension 10) : on peuple la vraie fenêtre avec un contenu d'illustration (boutons inertes).
 function demoForcedWar(){
@@ -480,14 +485,14 @@ const STEPS=[
   tx:"Le <b>bilan</b> : revenus des colonies reliées, entretien, actions des autres nations. <b>Valider et continuer</b> → tour suivant."},
 
  {lab:'À toi de jouer !', free:true,
-  tx:"Joue ce tour librement : <b>coloniser → relier → améliorer → techs</b>. Valide chaque action. Quand tu n'as plus d'AC, le bilan arrive. Je reviens ensuite pour les <b>fenêtres spéciales</b>.",
+  tx:"Joue ce tour librement : <b>coloniser → relier → améliorer → techs</b>. Valide chaque action. Quand tu n'as plus d'AC, le bilan arrive ; je m'occupe du reste et je reviens pour les <b>fenêtres spéciales</b>.",
   hint:"Joue ; valide chaque action"},
 ];
 // Après le tour libre : on présente les fenêtres spéciales une à une. Certaines sont AFFICHÉES pour de vrai
 // (avec un contenu d'illustration), sans avoir à les déclencher par le jeu — les IA étant passives ici.
 const SPECIAL=[
  {lab:'Les investissements 💼', glow:'invest-modal', pos:'top', onShow:demoInvest, inhibit:['#invest-modal .inv-opt','#invest-modal button'],
-  tx:"<b>💼 Investissements</b> : à la <b>fin du tour 2</b>, choisis une carte — un gros bonus et une contrepartie, actifs <b>tours 3 à 5</b>. Un second choix à la fin du tour 6 (tours 7 à 9). Regarde, puis <b>Suivant</b>."},
+  tx:"<b>💼 Investissements</b> : à la <b>fin du tour 2</b>, tu choisis une carte — un gros bonus et une contrepartie, actifs <b>tours 3 à 5</b> (second choix à la fin du tour 6). Je viens de choisir pour toi ; en vraie partie, c'est toi. Regarde, puis <b>Suivant</b>."},
 
  // ── Les 3 onglets du bas — Empire est ouvert PAR LE JOUEUR (fiable, pas de calibrage) ──
  {lab:'Clique l\'onglet Empire 🏛️', glow:'m-tabs', awaitClick:'.mtab[data-tab="empire"]',
@@ -640,7 +645,7 @@ const _seen={};
 function enterFreePlay(){
   _free=true; _collapsed=false; clearGlow(); unInhibit(); hideCursor(); // en jeu libre, les boutons du jeu redeviennent normaux
   coach('Jeu libre · ton tour',
-    "Continue à jouer normalement. Astuce : garde un œil sur ton <b>moral</b> (❤️). <b>Valide chaque action</b> avec <b>✓ Valider</b> (les raids et les attaques se font d'office, sans validation). Quand tu n'as plus d'actions, le <b>Bilan</b> arrive tout seul — <b>fais défiler vers le bas</b> pour cliquer <b>« Tour suivant »</b>. Je reprends la main ensuite pour les <b>fenêtres spéciales</b>.",
+    "Joue ton tour : <b>✓ Valider</b> après chaque action. Quand tu n'as plus d'AC, le <b>bilan</b> arrive tout seul ; je m'occupe de l'investissement et de l'événement, et je reprends la main pour les <b>fenêtres spéciales</b>.",
     {noNext:true});
 }
 function onLog(msg){
@@ -674,7 +679,7 @@ function finish(){
 }
 
 /* ---------- surveillance du tour (1 tour libre → fenêtres spéciales) ---------- */
-let _cacheDepuis=0;
+let _cacheDepuis=0, _eotBouton=false;
 function startWatch(){
   setInterval(()=>{
     const g=G(); if(!g||_finished)return;
@@ -683,11 +688,29 @@ function startWatch(){
        Après 12 s caché, on le rend avec l'étape courante. */
     if(_coachEl&&_coachEl.classList.contains('tuto-hidden')){ if(!_cacheDepuis)_cacheDepuis=Date.now(); else if(Date.now()-_cacheDepuis>12000){ _cacheDepuis=0; hideCursor(); const s=curArr()[_cur]; if(s)renderCoachForStep(s); } }
     else _cacheDepuis=0;
-    if(_free){
-      // Dès que la fenêtre d'investissement (fin du tour 2) apparaît, OU si le tour a avancé, on reprend la main.
-      const im=$('invest-modal'), im2=$('invest2-modal');
-      const investShowing=(im&&!im.classList.contains('hidden'))||(im2&&!im2.classList.contains('hidden'));
-      if(investShowing || g.turn>=3 || g.phase==='over'){ startSpecial(); }
+    if(_free&&!_special){
+      /* ═══ LE TUTORIEL SOLDE LE TOUR 2 LUI-MÊME (Marc, 09/09) ═══
+         Avant : on prenait la main dès que la fenêtre Investissements apparaissait, et on la
+         cachait — mais pour le jeu c'était une vraie question sans réponse : il la reposait, le
+         bilan arrivait par-dessus, et Empire / Diplo / Journal restaient inaccessibles. Désormais
+         on RÉPOND : investissement choisi (et dit), événement fermé, bilan validé par le bouton du
+         coach, carte Stratégie du tour 3 choisie par le jeu — puis le jeu est gelé au tour 3 et
+         on présente les fenêtres spéciales sur un écran calme. */
+      const vis=id=>{ const m=$(id); return !!(m&&!m.classList.contains('hidden')&&m.style.display!=='none'); };
+      if(vis('invest-modal')||vis('invest2-modal')){
+        const m=vis('invest-modal')?$('invest-modal'):$('invest2-modal');
+        const o=m.querySelector('.inv-opt:not(.inv-nope)');
+        if(o){ const nom=(o.querySelector('.inv-opt-name')||{}).textContent||'un investissement'; o.click(); note('💼 <b>Investissement</b> : j\'ai pris « '+nom.trim()+' » pour toi — je t\'explique cette fenêtre juste après.'); }
+        else { try{ const b=m.querySelector('button'); if(b)b.click(); }catch(e){} }
+        return;
+      }
+      if(vis('event-modal')){ const n=$('ev-name'); note('🎯 <b>Événement du tour 2</b>'+(n&&n.textContent?' : '+n.textContent:'')+' — je continue.'); try{ if(window.dismissEventModal)window.dismissEventModal(); }catch(e){} return; }
+      { const ec=$('event-choice-modal'); if(ec&&ec.style.display!=='none'){ const b=Array.prototype.slice.call(ec.querySelectorAll('button.ea-btn')).pop(); if(b)b.click(); return; } }
+      if(vis('event-announce-modal')&&g.turn>=3){ try{ if(window.dismissEventAnnounce)window.dismissEventAnnounce(); }catch(e){} return; }
+      if(vis('invest-active-modal')){ const m=$('invest-active-modal'); const b=m.querySelector('button'); if(b)b.click(); else m.classList.add('hidden'); return; }
+      if(vis('eot-modal')){ if(!_eotBouton){ _eotBouton=true; coach('Jeu libre · fin du tour', "Voici le <b>bilan</b> du tour. Lis-le, puis clique <b>Tour suivant</b> — ici ou dans la fenêtre.", {nextText:'Tour suivant ▶', onNext:function(){ confirmEOT(); }}); } return; }
+      if(g.turn>=3 && g.phase==='actions' && !vis('strategy-modal')){ startSpecial(); }
+      else if(g.phase==='over'){ startSpecial(); }
     }
   }, 250);
 }
@@ -717,6 +740,13 @@ function hookGame(){
      libre, avant même que le coach ait présenté la guerre (vu au banc, 07/09). Sans tension, pas de
      guerre : les fenêtres de guerre sont montrées par le coach, avec un contenu d'illustration. */
   if(typeof window.updateTension==='function'){ window.updateTension=function(){}; }
+  /* Pendant les fenêtres spéciales le jeu est gelé : il ne rouvre ni investissements, ni bilan, ni
+     annonce — sauf la démo du coach (`demoInvest`, drapeau `_demoOuverture`). Et le chien de garde
+     « tu sembles bloqué » du jeu n'a rien à dire pendant tout le tutoriel. */
+  for(const fn of ['showInvestmentModal','showInvestmentModal2','showInvestmentActiveModal','showEOTModal','showEventAnnounce','showEventModal']){
+    if(typeof window[fn]==='function'){ const orig=window[fn]; window[fn]=function(){ if(_special&&!_demoOuverture)return; return orig.apply(this,arguments); }; }
+  }
+  for(const fn of ['_armPlayerStuckWatch','_scMaybeStuck','_scShowStuckModal']){ if(typeof window[fn]==='function')window[fn]=function(){}; }
   // Synchro tuto ↔ validations du jeu (agenda/stratégie/événement/fin de tour/bilan)
   wrapSync('confirmAgendaChoice','agenda');
   wrapSync('applyStrategy','strategy');
@@ -740,7 +770,13 @@ function hookGame(){
     const _ssm=window.showStrategyModal;
     window.showStrategyModal=function(){
       const g=G();
-      if(_free && !_special && g && g.turn>=3){ startSpecial(); return; }
+      if(_special) return;   // jeu gelé pendant les fenêtres spéciales
+      if(_free && !_special && g && g.turn>=3){
+        /* Tour 3 : la carte est choisie par le jeu (la première), pour que le tour démarre et que
+           l'écran soit libre ; `startWatch` gèle ensuite. */
+        try{ if(Array.isArray(g._stratPool)&&g._stratPool.length){ const f=g._stratPool.filter(c=>c&&!c.calmTension&&!c.calmTheirs&&!c.initiative); const c=(f[0]||g._stratPool[0]); if(window.applyStrategy)window.applyStrategy(c.id); note('🃏 <b>Carte Stratégie</b> du tour 3 : « '+c.name+' », choisie pour toi.'); return; } }catch(e){ console.error('[TUTO strat T3]',e); }
+        startSpecial(); return;
+      }
       /* Les cartes qui ouvrent une SECONDE fenêtre (Calmer les tensions, Diplomatie : choisir une
          nation) ou qui changent l'ordre du tour (Initiative) n'apportent rien ici et déroutent :
          on les retire de la pioche du tutoriel, en gardant au moins deux cartes. */
