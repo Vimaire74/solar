@@ -523,7 +523,7 @@ const SPECIAL=[
   hint:"Suivant"},
 
  {lab:'Attaque de colonie (immédiate)', glow:'war-modal', pos:'top', onShow:demoAssault, inhibit:['#war-modal button'],
-  tx:"3ᵉ : <b>toi</b> tu assailles une colonie. Combat résolu <b>immédiatement</b> ; si tu gagnes, tu la <b>captures</b>. Une capitale se défend à 10 et vaut <b>+10 VP</b>."},
+  tx:"3ᵉ : <b>toi</b> tu assailles une colonie. Combat résolu <b>immédiatement</b> ; si tu gagnes, tu la <b>captures</b>. Une colonie se défend à <b>1</b> (sa garnison permanente) <b>+ les jetons</b> que le défenseur ajoute ; une capitale à <b>10 + les jetons</b>, et sa prise vaut <b>+10 VP</b>."},
 
  // ── Négociation de paix (vraie fenêtre) ──
  {lab:'Négociation de paix 🕊️', glow:'peace-modal', pos:'top', onShow:demoPeace, inhibit:['#peace-modal button'],
@@ -534,10 +534,10 @@ const SPECIAL=[
   tx:"<b>Combat</b> : choisis une <b>cible</b>, puis le nombre de <b>jetons</b> à engager. Le <b>⚓ Supercroiseur</b> ajoute +5⚔️ (il se paie). <b>Renoncer</b> garde tes jetons : la guerre continue sans assaut. La force ennemie n'est qu'une <b>estimation (±3)</b> sans renseignement."},
 
  {lab:'Attaquer une route 🛤️', glow:'war-combat-modal', pos:'top', onShow:demoCombat, inhibit:['#war-combat-modal button'],
-  tx:"Une <b>route</b> est facile : <b>1 jeton</b> si elle est non protégée, <b>2</b> si elle l'est. Tu la <b>captures</b> (elle devient tienne) ou la <b>détruis</b> ; l'adversaire perd son revenu."},
+  tx:"Une <b>route est facile à attaquer</b> : elle ne se défend pas, il te suffit d'engager <b>1 jeton</b> si elle est non protégée, <b>2</b> si un jeton la protège. Tu la <b>captures</b> (elle devient tienne) ou la <b>détruis</b> ; l'adversaire perd son revenu."},
 
  {lab:'Le coût de la guerre', glow:'war-combat-modal', pos:'top', onShow:demoCombat, inhibit:['#war-combat-modal button'],
-  tx:"⚠️ Chaque jeton engagé coûte <b>1🪨 + 1⚡</b> et part en <b>récupération</b> ; si tu perds, la <b>moitié est détruite</b>. Une colonie se défend toujours avec sa <b>garnison</b> (1 jeton, 10 pour une capitale). <b>IA de Navigation</b> divise le coût par 2."},
+  tx:"⚠️ Chaque jeton engagé coûte <b>1🪨 + 1⚡</b> et part en <b>récupération pendant 2 tours</b> ; si tu perds, la <b>moitié est détruite</b>. Une colonie se défend toujours avec sa <b>garnison</b> (1 jeton, 10 pour une capitale). <b>IA de Navigation</b> divise le coût par 2."},
 ];
 
 let _cur=0, _free=false, _special=false;
