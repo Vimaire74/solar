@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-07 · v10.38';
+const SOLAR_BUILD_MOTEUR = '2026-09-10 · v10.39';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -1860,6 +1860,14 @@ function capturerNoeud(vainqueur, nodeId){
     }
     if(estEliminee(perdant)){
       addLog('🏳️ '+perdant.civ.emoji+' '+perdant.civ.name+' n\'a plus aucune colonie : cette nation ne joue plus.','gold');
+      /* ⚠️ ELLE REND LA MAIN À L'INSTANT, PAS AU DÉBUT DU TOUR SUIVANT (Marc, 10/09).
+         `appliquerEliminations` ne tourne qu'à l'ouverture d'une manche : une nation vidée
+         EN COURS de tour gardait ses AC et son `_passedRound=false`, et le tour de table
+         revenait vers elle. Un ordinateur se sabordait tout seul dans `doAITurn` ; un HUMAIN,
+         lui, recevait `your_action` et la partie l'attendait sans limite — la règle d'or du
+         serveur interdit de jouer à sa place, donc la table restait figée pour tout le monde.
+         Même effet, même fonction, aux deux endroits : la règle ne vit qu'ici. */
+      if(typeof eliminerRendreLaMain==='function')eliminerRendreLaMain(perdant);
     }
     if(expulses>1) addLog('🏴 '+perdant.civ.emoji+' '+perdant.civ.name+' est AUSSI chassé de '+nom
       +' — les cohabitants tombent ensemble.','red');
@@ -2201,10 +2209,13 @@ function garrisonOf(p,nodeId){
 function estEliminee(p){ return !!p && (!p.colonies || p.colonies.length===0); }
 /* À chaque début de tour : une nation éliminée passe d'office, et on le dit UNE fois. Appelée par
    `startInterleaved` (solo) et par le pilote serveur (`beginRound`). */
+/* L'EFFET d'une élimination, sans le message : la nation rend la main immédiatement.
+   Une seule définition, appelée à la capture (élimination en cours de tour) ET à chaque
+   début de manche — deux copies de cette règle finiraient par diverger. */
+function eliminerRendreLaMain(p){ if(!estEliminee(p))return false; p.acLeft=0; p._passedRound=true; return true; }
 function appliquerEliminations(){
   for(const p of (typeof allPlayers==='function'?allPlayers():[])){
-    if(!estEliminee(p))continue;
-    p.acLeft=0; p._passedRound=true;
+    if(!eliminerRendreLaMain(p))continue;
     if(!p._elimineeDit){ p._elimineeDit=true;
       addLog('🏳️ '+p.civ.emoji+' '+p.civ.name+' n\'a plus aucune colonie : cette nation ne joue plus jusqu\'à la fin de la partie.','gold'); }
   }
@@ -4986,8 +4997,20 @@ function guerreEtape(){
       addLog('🏳️ '+_n+' n\'a plus aucune colonie — la guerre s\'éteint faute de cible.','gold');
       try{ annoncerAuxTiers(G.player,_van,'🏳️ '+_n+' sans colonie','<b>'+_n+'</b> n\'a plus aucune colonie : sa guerre contre <b>'+_nomNation(G.player)+'</b> s\'éteint faute de cible.'); }catch(e){}
       showWarModal('🏳️ '+_n+' sans colonie','Cette nation n\'a plus aucune colonie : il n\'y a plus rien à lui prendre.<br><br>La guerre prend fin. Elle garde ses cartes et ses jetons, et peut encore agir.',{txt:'Victoire totale.',cls:'win'});
+      /* La suite est jouée par la FERMETURE de cette fenêtre (`stWarResultFerme`). */
+      _warSuite('guerreSuivante');
+      return;
     }
-    _warSuite('guerreSuivante');
+    /* ⚠️ SANS FENÊTRE, PERSONNE NE JOUE LA SUITE — c'est le blocage de la partie 8280 (10/09).
+       Le drapeau `_sansColonieDit` (27/08) empêche de répéter le message, et c'est juste. Mais
+       `_warSuite` ne fait que RANGER un nom : il n'est joué que par la fermeture d'une fenêtre
+       (`dismissWarModal` en solo, `stWarResultFerme` en ligne). Au deuxième passage il n'y a plus
+       de fenêtre, donc plus personne pour fermer quoi que ce soit : la file s'arrêtait là, sans
+       question en attente. `pump()` rendait `idle`, le serveur écrivait « la machine se croit
+       saine » — elle l'était : ce qui était mort, c'est la chaîne des guerres, pas la machine.
+       Une nation éteinte en guerre avec DEUX camps bloquait la table à coup sûr.
+       On enchaîne donc ici, tout de suite. */
+    guerreSuivante();
     return;
   }
   G.warWith=guerreAdverseId();
@@ -8832,6 +8855,24 @@ function resolveWarCombat(playerCommitted, attaquant){
     addLog('⚔️ Combat : défaite ('+pPow+' vs '+aPow+')','red');
   }
   else{_atk.res.morale=Math.max(0,(_atk.res.morale||0)-1);warEnemy.res.morale=Math.max(0,(warEnemy.res.morale||0)-1);txt='Égalité — −1<i class=ri-morale></i> pour les deux.';cls='draw';addLog('⚔️ Égalité','dim');}
+  /* ═══ LE RAPPORT DE PARTIE IGNORAIT LES ASSAUTS D'UN HUMAIN (Marc, 8280, 10/09) ═══
+     Le journal structuré est rempli par `addAction` (humain) ou par `_journalAdd` depuis
+     `G.aiActions` (ordinateur). `playerAssaultColony` n'appelle ni l'un ni l'autre : ni l'assaut
+     lancé du plateau, ni le combat de la fenêtre de guerre (0 AC) n'y figuraient. Dans la 8280, la
+     prise d'Éris n'apparaît qu'au décompte des VP — le déroulé du tour 10 laisse croire que Marc
+     s'est contenté de trois Extraction d'He3. On l'inscrit ICI, à la porte unique du combat, donc
+     par tous les chemins à la fois.
+     ⚠️ SEULEMENT POUR UN HUMAIN : une nation tenue par l'ordinateur a déjà son entrée par
+     `G.aiActions`, et une seconde la ferait compter deux fois. */
+  try{
+    if(_atk&&!_atk._isAI&&typeof _journalAuto==='function'){
+      const _nomCible=targetAvantNettoyage?((NODES[targetAvantNettoyage]&&NODES[targetAvantNettoyage].name)||targetAvantNettoyage):null;
+      _journalAuto(_atk.civ.name,
+        _nomCible?('Assaut sur '+_nomCible):('Combat contre '+(warEnemy?warEnemy.civ.name:'l\'ennemi')),
+        /* Pas d'emoji ici : `_riToText` en écrase une partie et le rapport affichait « 3� ». */
+        'puissance '+pPow+' contre '+aPow+' — '+(pWin?'victoire':(aWin?'défaite':'égalité')), true);
+    }
+  }catch(e){}
   return{pPow,aPow,txt,cls};
 }
 function _isWithinDistance(targetId,player,maxDist){

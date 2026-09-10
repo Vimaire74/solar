@@ -399,12 +399,17 @@ class GameDriver {
              heures alors que le moteur criait, et qu'on lui avait mis la main sur la bouche.
              On garde le filet — une exception ici ne doit pas tuer le serveur pour toutes les
              parties — mais elle est désormais JOURNALISÉE, avec l'état et le tour. */
-          try{ this.sb.runEndOfRound(); }
+          try{ this.sb.runEndOfRound(); this._eotErreur=null; }   // le tour a été soldé : plus rien à signaler
           catch(e){
             const G2=this.sb.__G||{};
             console.error('⚠️ runEndOfRound a levé (tour ' + (G2.turn||'?') + ') : ' + e.message);
             if(e.stack) console.error(e.stack.split('\n').slice(1,4).join('\n'));
-            this._eotErreur = { tour:G2.turn, message:e.message };
+            /* ⚠️ CE CHAMP N'ÉTAIT LU PAR PERSONNE — pas même par `diagnostiquer()`, alors qu'il
+               existe pour ce mail-là. La 8280 (10/09) a été diagnostiquée à la main faute de
+               l'avoir sous les yeux. On garde aussi la première ligne de pile : sans elle, le
+               message seul ne dit pas OÙ. */
+            this._eotErreur = { tour:G2.turn, message:e.message,
+                                ou:(e.stack?String(e.stack).split('\n')[1]||'':'').trim() };
           }
           continue;
         }

@@ -837,9 +837,24 @@ function renvoyerLaMain(g, s, ws) {
      autres au sablier alors qu'ils avaient une fenêtre en cours. */
   const sienne = (r.kind === 'decision' && Array.isArray(r.questions))
     ? r.questions.find(q => q.civId === s.civId) : null;
-  if (sienne) { sendTo(ws, { t: 'decision', pending: sienne.pending }); }
+  /* ⚠️ CE QU'IL A DÉJÀ VALIDÉ NE DOIT PAS LUI ÊTRE REPOSÉ (Marc, 10/09 : « si je mets mon
+     téléphone en veille, quand je reprends et si je suis en fin de tour, la fin de tour m'est
+     montrée 2× »). `lastRoute.questions` porte une entrée pour CHAQUE siège humain, qu'il ait
+     cliqué ou non — c'est voulu : c'est ce qui permet à quelqu'un qui revient de retrouver sa
+     fenêtre (test_refresh). Ce qui manquait, c'est de la confronter à ce qu'on sait déjà :
+     `g.repondues` dit exactement qui a répondu à quelle question. Sans ce filtre, celui qui avait
+     validé son bilan le revoyait au réveil, recliquait, et sa réponse revenait « décision périmée ».
+     On ne le laisse pas pour autant sur un écran muet : il reçoit l'attente en cours. */
+  const dejaRepondu = id => { const e = g.repondues && g.repondues.get(id); return !!(e && e.has(s.civId)); };
+  const attenteEnCours = () => {
+    sendTo(ws, { t: 'waiting', civId: r.civId, kind: r.pending && r.pending.kind,
+                 civIds: (r.questions || []).map(q => q.civId) });
+    if (g.attenteBilan) sendTo(ws, { t: 'bilan_attente', restants: g.attenteBilan.restants.slice() });
+  };
+  if (sienne && !dejaRepondu(sienne.pending.id)) { sendTo(ws, { t: 'decision', pending: sienne.pending }); }
+  else if (sienne) { attenteEnCours(); }
   else if (r.civId === s.civId) {
-    if (r.kind === 'decision') sendTo(ws, { t: 'decision', pending: r.pending });
+    if (r.kind === 'decision') { if (dejaRepondu(r.pending && r.pending.id)) attenteEnCours(); else sendTo(ws, { t: 'decision', pending: r.pending }); }
     else if (r.kind === 'action') sendTo(ws, { t: 'your_action', civId: s.civId });
     else if (r.kind === 'confirm') sendTo(ws, { t: 'confirm_pending', civId: s.civId });
   } else {
@@ -1114,9 +1129,17 @@ function diagnostiquer(g) {
   try { d = g.driver && g.driver.sb.fluxDiagnostiquer(); } catch (e) {}
   const G = (() => { try { return g.driver.state(); } catch (e) { return null; } })();
   if (!d) return { resume: 'Diagnostic indisponible.', texte: 'Partie ' + g.code + ' : diagnostic indisponible.' };
+  const eot = (g.driver && g.driver._eotErreur) || null;
   const resume = 'État « ' + d.nom + ' » (' + d.type + '), tour ' + d.tour
     + (d.actifs.length ? ', en attente de : ' + d.actifs.join(', ') : ', AUCUNE nation active')
+    + (eot ? ' — la fin de tour a levé : ' + eot.message : '')
     + (d.soucis.length ? ' — ' + d.soucis[0] : '');
+  /* ⚠️ LA CAUSE EST PEUT-ÊTRE DÉJÀ ÉCRITE, ET PERSONNE NE LA LISAIT.
+     `driver.pump()` range l'exception d'une fin de tour dans `_eotErreur` — c'est le champ qui
+     dit POURQUOI le tour ne s'est pas soldé, donc pourquoi la partie ne repart pas. Il existait
+     pour ce mail et n'y figurait pas : la 8280 (10/09) a été diagnostiquée à la main alors que le
+     moteur avait peut-être déjà la réponse. Le champ est remis à zéro dès qu'un tour se solde,
+     donc s'il est là, il est d'actualité. */
   const texte = [
     'Partie ' + g.code + ' bloquée le ' + frDate(Date.now()),
     'Tour ' + (G ? G.turn : '?') + ' — phase ' + (G ? G.phase : '?'),
@@ -1127,6 +1150,10 @@ function diagnostiquer(g) {
     '',
     'Problèmes détectés :',
     ...(d.soucis.length ? d.soucis.map(x => '  · ' + x) : ['  (aucun — la machine se croit saine, le blocage est ailleurs)']),
+    ...(eot ? ['', 'La fin de tour a LEVÉ une exception (tour ' + (eot.tour || '?') + ') :',
+               '  · ' + eot.message, ...(eot.ou ? ['  · ' + eot.ou] : []),
+               '  → le tour ne s\'est pas soldé : ni revenus, ni tour suivant. C\'est la cause.']
+          : []),
     '',
     'Douze dernières transitions :',
     ...(d.histoire || []).map(h => '  tour ' + h.t + ' : ' + h.deNom + ' --' + h.via + '--> ' + h.versNom)
