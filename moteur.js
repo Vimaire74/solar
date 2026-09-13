@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-10 · v10.39';
+const SOLAR_BUILD_MOTEUR = '2026-09-13 · v10.42';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -2607,6 +2607,25 @@ function reviserProjet(nat){
   }
   if(meilleur&&mv>PROJET_GAIN_MIN){ nat._projet=meilleur; _tracerProjet(nat,'adopte',meilleur,mv); }
 }
+/* ═══ CE QUE LE TEMPÉRAMENT CHERCHE — une prime sur le COUP, jamais sur l'état (13/09) ═══
+   Le tacticien note une position ; le tempérament n'y entrait que par l'interdiction de raid.
+   Marc : « des colonies connectées niveau 3, c'est le must pour les ressources ; le Bâtisseur devrait
+   viser ça ». Prime sur « améliorer » une colonie RELIÉE (ce qui la fait produire) : toute IA un
+   peu, le Bâtisseur le double. Décroît avec l'horizon — au dernier tour, une amélioration ne
+   produit plus rien. Banc : `test_ia_colonies.js`. */
+const TEMPERAMENT_PRIME_AMELIORER=1.5;
+function valeurTemperament(coup,nat){
+  try{
+    if(!coup||!nat)return 0;
+    const restants=Math.max(0,(G.maxTurns||10)-(G.turn||1)+1), horizon=restants/(G.maxTurns||10);
+    if(coup.type==='ameliorer'){
+      const col=(nat.colonies||[]).find(c=>c.nodeId===coup.node);
+      if(!col||!col.connected)return 0;
+      return TEMPERAMENT_PRIME_AMELIORER*horizon*(nat._profil==='batisseur'?2:1);
+    }
+    return 0;
+  }catch(e){ return 0; }
+}
 /* La prime d'un coup qui fait avancer le projet courant — sur le COUP, jamais sur l'état. */
 function valeurProjet(coup,nat){
   try{
@@ -2946,7 +2965,11 @@ function _aiPickAgendas(){
     const prefs=(aiPref[ai.civ.id]||[]); let pick=null;
     for(const prefId of prefs){const f=shuffled.find(a=>a.id===prefId);if(f){pick=f;break;}}
     ai.agenda=pick||shuffled[0];
-    addLog('🤖 '+ai.civ.emoji+' '+ai.civ.name+' — Agenda secret : '+ai.agenda.emoji+' '+ai.agenda.name,'dim');
+    /* ⚠️ LE NOM DE L'AGENDA ÉTAIT ÉCRIT ICI, DANS LE JOURNAL QUE L'HUMAIN LIT (Marc, 13/09 :
+       « à l'époque je le voyais »). Un agenda « secret » lu au tour 1, ce n'est plus un secret :
+       on sait quoi contrer. Même ligne que pour un humain ; le nom est révélé à la fin, dans le
+       décompte des VP, comme pour tout le monde. Banc : `test_agenda_secret.js`. */
+    addLog('📋 '+ai.civ.emoji+' '+ai.civ.name+' — agenda secret choisi.','dim');
   }
 }
 /* TIRAGE D'AGENDA (serveur) — la file par IDENTIFIANT et les cinq agendas proposés vont dans `G`.
@@ -3054,7 +3077,11 @@ function confirmAgendaChoice(){
     let pick=null;
     for(const prefId of prefs){const found=shuffled.find(a=>a.id===prefId);if(found){pick=found;break;}}
     ai.agenda=pick||shuffled[0];
-    addLog('🤖 '+ai.civ.emoji+' '+ai.civ.name+' — Agenda secret : '+ai.agenda.emoji+' '+ai.agenda.name,'dim');
+    /* ⚠️ LE NOM DE L'AGENDA ÉTAIT ÉCRIT ICI, DANS LE JOURNAL QUE L'HUMAIN LIT (Marc, 13/09 :
+       « à l'époque je le voyais »). Un agenda « secret » lu au tour 1, ce n'est plus un secret :
+       on sait quoi contrer. Même ligne que pour un humain ; le nom est révélé à la fin, dans le
+       décompte des VP, comme pour tout le monde. Banc : `test_agenda_secret.js`. */
+    addLog('📋 '+ai.civ.emoji+' '+ai.civ.name+' — agenda secret choisi.','dim');
   }
   G.agendas=allPlayers().map(p=>p.agenda).filter(Boolean);
   document.getElementById('agenda-sel-modal').classList.add('hidden');
@@ -6849,6 +6876,47 @@ let _pendingRouteObj=null;
    Le paramètre est FACULTATIF : sans lui on retombe sur `G.player`, et les appels existants se
    comportent exactement comme avant (`mesure_equivalence.js` le vérifie). Ce qui change, c'est
    qu'un appelant qui SAIT de qui il parle peut désormais le dire. */
+/* ═══════════ LE JETON SUR UNE ROUTE — UNE SEULE PORTE, HUMAIN OU ORDINATEUR ═══════════
+   Poser un jeton protège la route des pirates (et rien d'autre : elle connecte avec ou sans jeton,
+   voir `updateConnections`). À la construction c'est gratuit en AC ; sur une route existante ça
+   coûte 1 AC (`routeManageDeploy` pour l'humain). L'IA de Navigation (`route_force_free`) pose le
+   jeton sans le prélever. */
+function deployerJetonSurRoute(nat, route, opts){
+  opts=opts||{};
+  if(!nat||!route||(route.tokens||0)>0) return false;
+  const gratuit=hasSpec(nat,'route_force_free');
+  if(!gratuit&&(nat.forceTokens||0)<1) return false;
+  if(opts.ac){ if((nat.acLeft||0)<1) return false; nat.acLeft-=1; nat.spentThisTurn=(nat.spentThisTurn||0)+1; }
+  if(!gratuit) nat.forceTokens-=1;
+  route.tokens=1;
+  updateConnections(nat);
+  return true;
+}
+/* ═══ RÈGLE DE MARC (13/09) : L'ORDINATEUR PROTÈGE CE QU'IL CONSTRUIT ═══
+   Partie 4942 : les Terriens (Bâtisseur) ont dépensé ~14 actions en routes depuis Lune que les
+   pirates détruisaient LE MÊME TOUR, chaque tour, sans jamais poser un jeton. Le chemin du
+   tacticien (`doEstablishRoute`) ouvrait la fenêtre « déployer un jeton ? » à laquelle personne
+   ne répondait — la route restait à `tokens:0`. Seul l'ancien `tryRoute` posait un jeton.
+   « Dès 40 % de chance que les pirates attaquent, je protège chaque route que je fais. Si l'IA
+   joue le Ceinturien, elle n'en a pas besoin. L'utilité de garder des jetons, c'est d'attaquer tôt
+   ou de faire des raids : le Bâtisseur ne réfléchit pas comme ça et protège toutes ses routes. »
+   Donc : Ceinturiens → jamais (les pirates ne les touchent pas) ; immunisé par une technologie →
+   inutile ; Bâtisseur → toujours ; les autres → dès que la chance pirate du tour atteint 40 %
+   (= tour 3, voir `advancePirates` : 10 % + 10 % par tour). Banc : `test_ia_routes.js`. */
+function chancePiratesDuTour(){ return Math.min(1,0.10+(G.turn||1)*0.10); }
+function ordinateurProtegeSesRoutes(nat){
+  if(!nat||!nat.civ) return false;
+  if(nat.civ.id==='ceinturiens') return false;
+  if(typeof routesProtegeesParTech==='function'&&routesProtegeesParTech(nat)) return false;
+  if(nat._profil==='batisseur') return true;
+  return chancePiratesDuTour()>=0.40;
+}
+function protegerRouteIA(nat, route){
+  if(!ordinateurProtegeSesRoutes(nat)) return false;
+  if(!deployerJetonSurRoute(nat, route)) return false;
+  addLog('⚔️ '+nat.civ.emoji+' '+nat.civ.name+' pose un jeton sur la route '+((NODES[route.from]||{}).name||route.from)+'→'+((NODES[route.to]||{}).name||route.to)+' (protégée des pirates).','dim');
+  return true;
+}
 function doEstablishRoute(from,to, nation){
   const _n=nation||G.player;
   if(_scGuard())return;
@@ -6867,13 +6935,20 @@ function doEstablishRoute(from,to, nation){
   _n.routes.push(newRoute);updateConnections(_n);
   addLog('🛤️ Route '+fn.name+' → '+tn.name+(rc._useFree?' (GRATUITE)':''),'green');
   addAction('🛤️','Route '+fn.name+' → '+tn.name,rc.ac,{materials:rc.mat},'Construite');
+  /* ORDINATEUR : pas de fenêtre — la règle de Marc décide du jeton (voir `protegerRouteIA`).
+     L'IA de Navigation pose le sien gratuitement, comme pour un humain. */
+  if(_n._isAI){
+    if(hasSpec(_n,'route_force_free')){ newRoute.tokens=1; updateConnections(_n); }
+    else protegerRouteIA(_n,newRoute);
+    return;
+  }
   // Popup assignation jeton
   if(_n.forceTokens>0&&!hasSpec(_n,'route_force_free')){
     _pendingRouteObj=newRoute;
     document.getElementById('rtm-info').innerHTML=
       'Route <strong>'+fn.name+' → '+tn.name+'</strong><br>'+
       'Jetons disponibles : <strong>'+_n.forceTokens+'</strong><br>'+
-      '<span style="color:#7880a0;font-size:.92em">Un jeton protège la route des pirates et la maintient connectée. Sans jeton : route passive (revenu 1<i class=ri-materials></i>/tour mais pas de connectivité et cargos vulnérables).</span>';
+      '<span style="color:#7880a0;font-size:.92em">Un jeton protège la route des pirates. Sans jeton, la route connecte quand même et rapporte 1<i class=ri-materials></i>/tour, mais les pirates peuvent la détruire ('+Math.round(chancePiratesDuTour()*100)+' % ce tour, +10 % par tour).</span>';
     document.getElementById('route-token-modal').classList.remove('hidden');
   }else{
     /* IA DE NAVIGATION (`route_force_free`) — « déploiement GRATUIT en jetons ».
@@ -6924,7 +6999,7 @@ function showRouteManageModal(idx){
     'Jeton : <strong style="color:'+(hasToken?'#66cc66':'#ff8844')+'">'+(hasToken?'⚔️ Déployé':'Aucun (route non protégée)')+'</strong>'+warnConn+
     '<br>Jetons disponibles : <strong>'+p.forceTokens+'</strong> | AC restants : <strong>'+p.acLeft+'</strong>'+
     (isFree?'<br><span style="color:#66cc99;font-size:.88em">IA Navigation : déploiement gratuit en jetons.</span>':'')+
-    '<br><span style="color:#7880a0;font-size:.82em">Route protégée = connectivité + immunité pirates. Non protégée = revenu 1<i class=ri-materials></i>/tour mais vulnérable.</span>';
+    '<br><span style="color:#7880a0;font-size:.82em">Le jeton protège des pirates ('+Math.round(chancePiratesDuTour()*100)+' % ce tour) ; la route connecte avec ou sans jeton.</span>';
   const deployBtn=document.getElementById('rmm-deploy-btn');
   const recallBtn=document.getElementById('rmm-recall-btn');
   if(hasToken){
@@ -8967,6 +9042,16 @@ function iaSimuleInvestissement(ai,level){
   return (best&&essayes>=2)?best.id:null;
 }
 function chooseInvestmentForAI(ai,level){
+  /* ═══ LE BÂTISSEUR PREND « COLONIES AVANCÉES » (Marc, 13/09) ═══
+     « Le Bâtisseur devrait viser [les colonies reliées niveau 3] et donc prendre Colonies Avancées
+     au tour 7. » La carte monte TOUTES ses colonies au niveau max : c'est son tempérament en une
+     carte. Règle ferme dès qu'il a au moins deux colonies à monter et de quoi la payer ; sinon la
+     simulation compare, comme pour tout le monde. */
+  if(level===2&&ai&&ai._profil==='batisseur'){
+    const carte=(INVESTMENT_CARDS_2||[]).find(c=>c.id==='inv2_colonies');
+    let aMonter=0; for(const c of (ai.colonies||[])){ const n=NODES[c.nodeId]; if(n&&!n.decorative&&(c.level||1)<(n.maxLv||3))aMonter++; }
+    if(carte&&aMonter>=2&&investPayable(carte,ai))return carte.id;
+  }
   const parSimulation=iaSimuleInvestissement(ai,level);
   if(parSimulation)return parSimulation;
   const pool=level===2?INVESTMENT_CARDS_2:INVESTMENT_CARDS;
@@ -9250,7 +9335,9 @@ const POIDS_EVAL={
   plafondProduction:10,   // au-delà de +10 par tour, une unité de plus ne vaut plus qu'un quart
   auDela:0.25,
   action:0.45,            // VP par action et par tour restant (une action ≈ un coup moyen)
-  plafondMoral:0.08       // VP perdus par point de plafond sous 10, par tour restant (×2 en guerre)
+  plafondMoral:0.08,      // VP perdus par point de plafond sous 10, par tour restant (×2 en guerre)
+  route:1.0,              // ce que vaut une route (≈ 1 VP + son revenu) — perdue avec la chance pirate du tour
+  immunite:0.5            // VP par tour restant que vaut l'immunité aux raids et aux pirates (IA Défensive)
 };
 function evaluerPosition(nat,observateur){
   if(!nat||!nat.civ)return 0;
@@ -9321,10 +9408,17 @@ function evaluerPosition(nat,observateur){
 
   /* POTENTIEL DE DÉVELOPPEMENT — une colonie de niveau 1 reliée vaut bien plus que sa valeur
      actuelle, tant qu'il reste des tours pour l'améliorer. */
+  /* ⚠️ CE TERME PAYAIT L'IA POUR NE PAS AMÉLIORER (13/09). Il valait `marge × VP du nœud` — la
+     marge d'amélioration RESTANTE : monter Titan de Nv.1 à Nv.2 faisait donc PERDRE 1,8 point de
+     « potentiel » au tour 3, et l'amélioration passait juste derrière une technologie de rang 2
+     (mesuré : 9,0 contre 10,2). C'est le piège déjà décrit plus haut pour `optionsTech` : payer
+     pour AVOIR une option, c'est payer pour ne jamais la prendre. Le potentiel d'une colonie reliée
+     est désormais le même quel que soit son niveau — coloniser reste récompensé, améliorer n'est
+     plus puni. Marc : « des colonies connectées niveau 3, c'est le must pour les ressources ». */
   let potentiel=0;
   for(const c of (nat.colonies||[])){
     const n=NODES[c.nodeId]; if(!n||n.decorative)continue;
-    const marge=Math.max(0,(n.maxLv||3)-(c.level||1));
+    const marge=Math.max(0,(n.maxLv||3)-1);            // la marge TOTALE du nœud, pas celle qui reste
     potentiel+=marge*(n.baseVP||1)*0.45*horizon;
     if(!c.connected)potentiel-=(n.baseVP||1)*0.5;    // isolée : la moitié des VP, et un revenu nul
   }
@@ -9393,7 +9487,30 @@ function evaluerPosition(nat,observateur){
     plafondMoral=-Math.max(0,10-capM)*POIDS_EVAL.plafondMoral*restants*(enGuerre?2:1);
   }
 
-  return acquis+production+tresorerie+potentiel+perilMoral+perilRessources+force+actions+plafondMoral;
+  /* ═══════ UNE ROUTE NON PROTÉGÉE N'EST PAS UNE ROUTE, C'EST UN PARI (13/09) ═══════
+     La carte est publique, le risque aussi : chaque route sans jeton d'une nation que les pirates
+     visent (ni Ceinturiens, ni immunisée par une technologie) sera détruite avec la chance du tour
+     (`advancePirates` : 10 % + 10 % par tour). Sans ce terme, le tacticien comptait une route
+     exposée au tour 7 (80 % de destruction) comme une route sûre — les Terriens de la 4942 en ont
+     reconstruit onze. Ce terme lui fait préférer : protéger, ou ne pas construire ce qu'il ne peut
+     pas protéger. Il ne s'applique pas aux Ceinturiens : pour eux, aucune route n'est un pari. */
+  let risquePirates=0;
+  if(nat.civ.id!=='ceinturiens'&&!(typeof routesProtegeesParTech==='function'&&routesProtegeesParTech(nat))){
+    const exposees=(nat.routes||[]).filter(r=>!((r.tokens||0)>0)).length;
+    if(exposees) risquePirates=-exposees*chancePiratesDuTour()*POIDS_EVAL.route;
+  }
+  /* ═══════ ÊTRE IMPILLABLE VAUT QUELQUE CHOSE (Marc, 13/09 : « les IA ne cherchent jamais à prendre
+     IA Défensive, alors que moi je le fais tout le temps ») ═══════
+     L'évaluation voyait de cette carte ses +4 jetons et ses 5 VP — pas ce qu'elle EMPÊCHE : les
+     raids (qui volent la production d'une colonie), les pirates, les tempêtes. Une nation qui ne
+     peut plus être pillée garde chaque tour ce que les autres perdent. On le compte par tour
+     restant, seulement s'il reste quelqu'un pour piller. */
+  let immunite=0;
+  if(!aveugle&&typeof hasSpec==='function'&&hasSpec(nat,'ia_immune')){
+    const pilleurs=allPlayers().some(o=>o&&o!==nat&&(o.forceTokens||0)>=1);
+    if(pilleurs) immunite=POIDS_EVAL.immunite*restants;
+  }
+  return acquis+production+tresorerie+potentiel+perilMoral+perilRessources+force+actions+plafondMoral+risquePirates+immunite;
 }
 /* ══════════════════════════════════════════════════════════════════════════════════════════════
    ÉTAPE 3b — CE QU'UN COUP RETIRE À L'ADVERSAIRE COMPTE AUTANT QUE CE QU'IL ME RAPPORTE
@@ -9691,6 +9808,14 @@ function coupsPossibles(nat){
       }
     }
   }
+  /* PROTÉGER — poser un jeton sur une route déjà construite et exposée (1 AC + 1 jeton). */
+  if(typeof ordinateurProtegeSesRoutes==='function'&&ordinateurProtegeSesRoutes(nat)
+     &&((nat.forceTokens||0)>=1||hasSpec(nat,'route_force_free'))){
+    for(const r of (nat.routes||[])){
+      if((r.tokens||0)>0)continue;
+      coups.push({type:'proteger',from:r.from,to:r.to,libelle:'protéger la route '+((NODES[r.from]||{}).name||r.from)+'→'+((NODES[r.to]||{}).name||r.to)});
+    }
+  }
   /* TECHNOLOGIE — chaque carte réellement achetable, nommément. */
   for(const card of CARDS_POOL){
     if(possedeCarte(nat,card.id))continue;                 // achetée OU volée : voir `possedeCarte`
@@ -9699,7 +9824,20 @@ function coupsPossibles(nat){
     if(card.reqCard&&!possedeCarte(nat,card.reqCard))continue;
     const ac=card.tier===3?2:1;
     if((nat.acLeft||0)<ac)continue;
-    if(!abordable(getEffCost(card,nat)))continue;
+    const _cout=getEffCost(card,nat);
+    if(!abordable(_cout))continue;
+    /* ═══ EXPLORATION EXTRA-SOLAIRE : UNE CARTE DE FIN DE PARTIE (Marc, 13/09) ═══
+       « Elles s'évertuent à prendre Exploration Extra-Solaire, qui est moyennement utile — elles
+       font une fixation dessus. » Vu dans F04B, 8280, 4942 : achetée au tour 7 pour ses +13 VP
+       (5 + 8), au prix de 3⚡ qui manquaient ensuite — c'est le départ de l'effondrement d'énergie
+       des Jupitériens (#81). Le tacticien n'anticipe qu'un coup : il voit les VP, pas l'économie
+       qu'ils remplacent. Doctrine de Marc : d'abord le système de ressources, les points à la fin.
+       Donc : pas avant le tour 8, et jamais si l'achat laisse moins de 3 jetons payables. */
+    if(card.spec==='extrasolar'){
+      if((G.turn||1)<8)continue;
+      const _apres=Math.min((nat.res.materials||0)-(_cout.materials||0),(nat.res.energy||0)-(_cout.energy||0));
+      if(_apres<3)continue;
+    }
     coups.push({type:'tech',card:card.id,libelle:'acheter '+card.name});
   }
   /* CIVIQUE — chaque carte du marché abordable. */
@@ -9779,6 +9917,12 @@ function appliquerCoup(nat,coup){
     case 'coloniser': doColonize(coup.node,nat); break;
     case 'ameliorer': doUpgrade(coup.node,nat); break;
     case 'route':     doEstablishRoute(coup.from,coup.to,nat); break;
+    case 'proteger': {
+      const r=(nat.routes||[]).find(x=>(x.from===coup.from&&x.to===coup.to)||(x.from===coup.to&&x.to===coup.from));
+      if(r&&deployerJetonSurRoute(nat,r,{ac:true}))
+        addLog('⚔️ '+nat.civ.emoji+' '+nat.civ.name+' pose un jeton sur la route '+((NODES[r.from]||{}).name||r.from)+'→'+((NODES[r.to]||{}).name||r.to)+'.','dim');
+      break;
+    }
     case 'tech':      buyTech(coup.card,nat); break;
     case 'civique': {
       const c=(typeof CIVIC_MARKET!=='undefined'?CIVIC_MARKET:[]).find(x=>x.id===coup.card);
@@ -9817,6 +9961,7 @@ function appliquerCoup(nat,coup){
         e={emoji:'⬆️',name:'Améliore '+nom(coup.node),desc:'Nv.'+((col&&col.level)||'?')}; break;
       }
       case 'route':     e={emoji:'🛤️',name:'Route → '+nom(coup.to),desc:'depuis '+nom(coup.from)}; break;
+      case 'proteger':  e={emoji:'⚔️',name:'Jeton déployé — '+nom(coup.from)+'→'+nom(coup.to),desc:'Route protégée'}; break;
       case 'tech': {
         const c=CARDS_POOL.find(x=>x.id===coup.card);
         e={emoji:(c&&c.emoji)||'✅',name:'Achète '+((c&&c.name)||coup.card),desc:(c&&c.effect)||''}; break;
@@ -10029,7 +10174,11 @@ enregistrerCerveau('tacticien', function(ctx){
       /* · `valeurAssaut` — la seule chose que la simulation ne PEUT pas voir sur un assaut : son
            issue. Un assaut lancé en phase d'actions ne livre pas le combat (il se joue en fin de
            tour) ; sans ce terme, toutes les cibles reçoivent la même note — mesuré. */
-      +((typeof valeurAssaut==='function')?valeurAssaut(c,ctx.nation):0);
+      +((typeof valeurAssaut==='function')?valeurAssaut(c,ctx.nation):0)
+      /* · `valeurTemperament` — ce que le tempérament CHERCHE (Marc : « le tempérament oriente ce
+           qu'elle cherche, le cerveau comment elle le calcule »). Le Bâtisseur vise les colonies
+           reliées au niveau 3. */
+      +((typeof valeurTemperament==='function')?valeurTemperament(c,ctx.nation):0);
     if(ruine){ ruineux.add(c); continue; }
     if(valeur>meilleureValeur){ second=meilleur; secondeValeur=meilleureValeur;
                                   meilleureValeur=valeur; meilleur=c; }

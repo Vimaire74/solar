@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-10 · v10.39';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-13 · v10.42';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -34,8 +34,26 @@ try{ window.SOLAR_BUILD_JS = SOLAR_BUILD_JS; }catch(e){}
 'use strict';
 
 // ───────────────────────── Config serveur ─────────────────────────
-const LOCAL = (location.protocol === 'file:' || /^(localhost|127\.)/.test(location.hostname));
-const SERVER_URL = LOCAL ? 'ws://127.0.0.1:8080' : 'wss://live.solar-game.com';
+/* ⚠️ DANS L'APPLICATION (Capacitor), LA PAGE EST SERVIE DEPUIS `localhost`.
+   Android : `https://localhost`, iOS : `capacitor://localhost`. L'ancien test « localhost = poste de
+   développement » aurait donc envoyé chaque joueur de l'appli sur `ws://127.0.0.1:8080` — un serveur
+   qui n'existe que sur la machine de Marc. Le mode en ligne serait mort dans l'appli, et rien ne
+   l'aurait dit avant les magasins (repéré le 13/09 en préparant la bêta).
+   La règle, dans l'ordre : `window.SOLAR_SERVER` s'il est posé (surcharge explicite) › appli native
+   → serveur public › fichier local ou localhost → serveur de développement › sinon serveur public.
+   Fonction PURE, testée par `server/test_serveur_url.js`. */
+function serveurPour(loc, win){
+  loc = loc || {}; win = win || {};
+  if (typeof win.SOLAR_SERVER === 'string' && win.SOLAR_SERVER) return win.SOLAR_SERVER;
+  const cap = win.Capacitor;
+  const natif = !!(cap && ((typeof cap.isNativePlatform === 'function' && cap.isNativePlatform())
+                           || (cap.platform && cap.platform !== 'web')))
+             || loc.protocol === 'capacitor:' || loc.protocol === 'ionic:';
+  if (natif) return 'wss://live.solar-game.com';
+  const local = (loc.protocol === 'file:' || /^(localhost|127\.)/.test(loc.hostname || ''));
+  return local ? 'ws://127.0.0.1:8080' : 'wss://live.solar-game.com';
+}
+const SERVER_URL = serveurPour(location, window);
 
 // ───────────────────────── État de session ─────────────────────────
 const STATE = { ws:null, connected:false, user:null, token:null, tier:1,
@@ -134,6 +152,14 @@ function handle(m){
     case 'partie_supprimee':
       /* Le serveur renvoie la liste à jour juste après : rien à faire ici, sinon rester au lobby. */
       STATE._surLobby=true; STATE.game=null;
+      break;
+    /* Le compte n'existe plus : on oublie tout ce que le navigateur en gardait (jeton, adresse,
+       partie mémorisée) et on revient à l'écran de connexion, avec une phrase qui le dit. */
+    case 'compte_supprime':
+      STATE.user=null; STATE.token=null; STATE.game=null; STATE.parties=[]; STATE._surLobby=false;
+      try{ localStorage.removeItem('sc_ws_token'); localStorage.removeItem('sc_ws_game'); localStorage.removeItem('sc_ws_user'); }catch(e){}
+      screenAuth('login');
+      try{ const e=document.getElementById('sc-err'); if(e){ e.style.color='#9ad89a'; e.textContent='Ton compte a été supprimé. Merci d\'avoir joué.'; } }catch(e){}
       break;
     case 'mes_parties':
       STATE.parties = Array.isArray(m.parties) ? m.parties : [];
@@ -1628,6 +1654,8 @@ function screenAuth(mode){
       <a href="tutorial.html" style="color:#8fc8ff;text-decoration:none">🎓 Découvrir le jeu — tutoriel</a>
       <span style="color:#3a4a6a"> · </span>
       <a href="regles.html" style="color:#8fc8ff;text-decoration:none">📖 Règles</a>
+      <span style="color:#3a4a6a"> · </span>
+      <a href="confidentialite.html" style="color:#8fc8ff;text-decoration:none">🔒 Confidentialité</a>
     </div>
     <div class="muted" style="font-size:.72em;opacity:.7;margin-top:9px;text-align:center">${_buildLabel()}</div>
   `);
@@ -1708,6 +1736,11 @@ function screenLobby(){
     <button class="sec" id="sc-refresh">🔄 Rafraîchir mes parties</button>
     <button class="sec" id="sc-logout">Se déconnecter</button>
     <button class="sec" id="sc-close">↩ Retour au jeu solo</button>
+    <!-- Supprimer son compte DEPUIS l'appli : exige par Apple (5.1.1) et Google Play. Discret,
+         mais present la ou l'on gere son compte — pas cache dans une page de reglement. -->
+    <div style="margin-top:8px;text-align:center;font-size:.8em">
+      <a href="#" id="sc-suppr-compte" style="color:#c88;text-decoration:none">Supprimer mon compte</a>
+    </div>
     <!-- ATTENTION : ce bloc est dans un gabarit JS. Pas de guillemet oblique ici, il refermerait
          le gabarit et casserait tout le fichier (erreur commise en écrivant ce commentaire).
          LE LIEN DU TUTORIEL EXISTAIT DEJA, MAIS SUR L'AUTRE ECRAN (Marc, 26/08). L'ecran de saisie
@@ -1719,7 +1752,12 @@ function screenLobby(){
       <a href="tutorial.html" style="color:#8fc8ff;text-decoration:none">🎓 Découvrir le jeu — tutoriel</a>
       <span style="color:#3a4a6a"> · </span>
       <a href="regles.html" style="color:#8fc8ff;text-decoration:none">📖 Règles</a>
+      <span style="color:#3a4a6a"> · </span>
+      <a href="confidentialite.html" style="color:#8fc8ff;text-decoration:none">🔒 Confidentialité</a>
     </div>
+    <!-- La version ICI aussi (Marc, 13/09) : un joueur dont le compte est memorise arrive
+         directement sur cet ecran et devait se deconnecter pour lire le numero de version. -->
+    <div class="muted" style="font-size:.72em;opacity:.7;margin-top:9px;text-align:center">${_buildLabel()}</div>
   `);
   _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
   [...document.querySelectorAll('.sc-reprise')].forEach(b=>{
@@ -1741,6 +1779,33 @@ function screenLobby(){
   };
   document.getElementById('sc-logout').onclick = ()=>{ try{ if(STATE.game&&STATE.game.code) send({t:'leave'}); }catch(e){} STATE.user=null; STATE.token=null; STATE.game=null; try{localStorage.removeItem('sc_ws_token'); localStorage.removeItem('sc_ws_game');}catch(e){} screenAuth('login'); };
   document.getElementById('sc-close').onclick = ()=>{ _errCb=null; STATE._surLobby=false; hideOverlay(); };
+  document.getElementById('sc-suppr-compte').onclick = (ev)=>{ ev.preventDefault(); STATE._surLobby=false; screenSupprimerCompte(); };
+}
+/* ═══ SUPPRIMER SON COMPTE ═══ Ce que ça efface est dit AVANT, en clair ; le mot de passe est
+   redemandé (le serveur le verifie) ; « Annuler » ramene au lobby sans rien faire. */
+function screenSupprimerCompte(){
+  overlay(`
+    <h2>Supprimer mon compte</h2>
+    <p style="font-size:.9em;color:#e0c0c0">Cette action est <b>définitive</b>. Elle efface :</p>
+    <ul style="font-size:.88em;color:#c8c8d8;margin:4px 0 10px 18px;padding:0">
+      <li>ton compte (<b>${STATE.user}</b>) et tes sessions sur tous tes appareils ;</li>
+      <li>tes parties en cours contre l'ordinateur et tes parties archivées ;</li>
+      <li>dans une partie en cours avec d'autres joueurs, ta nation passe à l'ordinateur — leur partie continue sans toi.</li>
+    </ul>
+    <p style="font-size:.88em;color:#9fb0d0">Les parties jouées hors connexion sur cet appareil ne sont pas concernées.</p>
+    <div class="row"><input id="sc-p" type="password" placeholder="Ton mot de passe, pour confirmer" autocomplete="current-password"></div>
+    <div class="err" id="sc-err"></div>
+    <button class="pri" id="sc-go" style="background:linear-gradient(135deg,#b03030,#7a1a1a)">Supprimer définitivement</button>
+    <button class="sec" id="sc-close">Annuler</button>
+  `);
+  _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
+  document.getElementById('sc-close').onclick = ()=>{ _errCb=null; screenLobby(); };
+  document.getElementById('sc-go').onclick = ()=>{
+    const pass=document.getElementById('sc-p').value;
+    if(!pass){ _errCb('Entre ton mot de passe pour confirmer.'); return; }
+    if(!confirm('Supprimer définitivement le compte '+STATE.user+' ?')) return;
+    send({t:'supprimer_compte', pass});
+  };
 }
 function screenCreate(){
   const rows = CIVS_LIST.map(([id,label],i)=>`

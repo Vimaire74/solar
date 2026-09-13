@@ -713,14 +713,18 @@ function voterRemplacement(g, votantCiv) {
 }
 /* Conversion effective d'un siège humain en IA. C'est le SEUL chemin par lequel une nation
    humaine peut se mettre à jouer seule — et il passe par un vote, jamais par une horloge. */
-function remplacerParIA(g, cible) {
+function remplacerParIA(g, cible, motif) {
   const s = g.seats.find(x => x.civId === cible);
   if (!s || s.ai) return;
   s.remplaceLe = Date.now(); s.remplaceUser = s.user || null;
   s.ai = true;
   try { const n = g.driver && g.driver.nation(cible); if (n) n._isAI = true; } catch (e) {}
   g.vote = null; g.voteOuvert = null; clearTimer(g);
-  broadcast(g, { t: 'notice', kind: 'info', payload: { msg: '🤖 ' + nomSiege(g, cible) + ' est remplacé par une IA (vote des joueurs présents).' } });
+  /* Siège sans adresse (compte supprimé) : on nomme la NATION, pas « terriens » en minuscules. */
+  const nom = (function () { if (s.user) return nomSiege(g, cible);
+    try { const n = g.driver && g.driver.nation(cible); if (n && n.civ) return (n.civ.emoji ? n.civ.emoji + ' ' : '') + n.civ.name; } catch (e) {}
+    return nomSiege(g, cible); })();
+  broadcast(g, { t: 'notice', kind: 'info', payload: { msg: '🤖 ' + nom + ' est remplacé par une IA ' + (motif || '(vote des joueurs présents)') + '.' } });
   broadcast(g, { t: 'game', game: gameView(g) });
   // La décision déjà émise pour cet humain doit être soldée, sinon la partie reste figée dessus.
   try {
@@ -1955,6 +1959,81 @@ wss.on('connection', (ws) => {
           if (sess.game === code) sess.game = null;
           sendTo(ws, { t: 'partie_supprimee', code });
           sendTo(ws, { t: 'mes_parties', parties: mesParties(sess.user) });
+          break;
+        }
+
+        /* ═══════════ SUPPRIMER SON COMPTE (bêta magasins, 13/09) ═══════════
+           Exigé par Apple (règle 5.1.1) et par Google Play dès qu'une appli crée des comptes : le
+           joueur doit pouvoir effacer son compte DEPUIS l'appli, pas seulement par courriel.
+           {t:'supprimer_compte', pass} — le mot de passe est redemandé : un jeton volé ou un
+           téléphone prêté ne doit pas suffire à détruire un compte.
+           Ce qui est effacé, dans l'ordre, et pourquoi dans cet ordre :
+             1. ses PARTIES — lobby : on libère le siège (ou on ferme la partie s'il en est l'hôte) ;
+                en cours seul contre des ordinateurs : la partie est supprimée (c'est SA partie) ;
+                en cours avec d'autres humains : son siège passe à l'ordinateur — c'est la seule
+                issue qui ne détruit pas la partie des autres, et c'est LUI qui l'a décidé (la règle
+                d'or « le serveur ne joue jamais à la place de quelqu'un » vise l'absence, pas un
+                départ volontaire). L'hôte, s'il l'était, passe au premier humain restant.
+             2. ses ARCHIVES — son fichier est effacé ; dans les archives des AUTRES, son adresse est
+                remplacée par `null` (la nation reste nommée : leur partie reste lisible).
+             3. ses SESSIONS — tous ses jetons, écriture IMMÉDIATE (un redéploiement dans la seconde
+                ne doit pas les faire renaître).
+             4. le COMPTE lui-même. L'adresse redevient libre pour une nouvelle inscription.
+           Banc : `test_suppression_compte.js` (vrai serveur, vraies WebSockets). */
+        case 'supprimer_compte': {
+          if (!requireAuth()) break;
+          const u = String(sess.user).toLowerCase();
+          const rec = users[u];
+          if (!rec) return err('compte introuvable');
+          if (!m.pass || !checkPass(m.pass, rec.pass)) return err('mot de passe incorrect');
+          const meme = x => x && String(x).toLowerCase() === u;
+          let partiesFermees = 0, siegesRemplaces = 0;
+          for (const g of [...games.values()]) {
+            const s = g.seats.find(x => meme(x.user));
+            if (!s) continue;
+            const autresHumains = g.seats.filter(x => !x.ai && x.user && !meme(x.user));
+            if (g.status === 'lobby') {
+              if (meme(g.host) || !autresHumains.length) {
+                clearTimer(g); broadcast(g, { t: 'game_ended', by: u }); oublierPartie(g.code); games.delete(g.code); partiesFermees++;
+              } else { s.user = null; s.ws = null; broadcast(g, { t: 'game', game: gameView(g) }); }
+              continue;
+            }
+            if (!autresHumains.length) {   // sa partie à lui, contre des ordinateurs
+              clearTimer(g); oublierPartie(g.code); games.delete(g.code); partiesFermees++;
+              continue;
+            }
+            if (meme(g.host)) g.host = autresHumains[0].user;
+            s.ws = null; s.user = null;   // effacé AVANT l'annonce : les autres voient la nation, pas l'adresse
+            remplacerParIA(g, s.civId, '(le joueur a supprimé son compte)');
+            s.remplaceUser = null;        // plus aucune trace de l'adresse dans la partie
+            siegesRemplaces++;
+            broadcast(g, { t: 'game', game: gameView(g) });
+            snapshot(g);
+          }
+          try { fs.unlinkSync(archFile(u)); } catch (e) {}
+          try {
+            for (const f of fs.readdirSync(ARCH_DIR)) {
+              if (!f.endsWith('.json')) continue;
+              const fp = path.join(ARCH_DIR, f);
+              let list; try { list = JSON.parse(fs.readFileSync(fp, 'utf8')); } catch (e) { continue; }
+              let touche = false;
+              for (const e of (Array.isArray(list) ? list : [])) {
+                for (const sc of (e.scores || [])) if (meme(sc.user)) { sc.user = null; touche = true; }
+                for (const b of (e.bugs || [])) if (meme(b.user)) { b.user = null; touche = true; }
+              }
+              if (touche) fs.writeFileSync(fp, JSON.stringify(list));
+            }
+          } catch (e) { console.error('supprimer_compte/archives:', e.message); }
+          let jetons = 0;
+          for (const [t, o] of tokens) if (o && meme(o.user)) { tokens.delete(t); jetons++; }
+          saveTokens(true);
+          delete users[u]; saveUsers();
+          sendMail(ADMIN_MAIL, 'Solar — compte supprimé : ' + u,
+            'Compte supprimé par son titulaire le ' + frDate(Date.now()) + '\nEmail : ' + u
+            + '\nParties fermées : ' + partiesFermees + ' · sièges passés à l\'ordinateur : ' + siegesRemplaces
+            + ' · sessions révoquées : ' + jetons + '\nJoueurs restants : ' + Object.keys(users).length);
+          sess.user = null; sess.game = null;
+          sendTo(ws, { t: 'compte_supprime' });
           break;
         }
 
