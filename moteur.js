@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-13 · v10.42';
+const SOLAR_BUILD_MOTEUR = '2026-09-13 · v10.44';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -4855,7 +4855,7 @@ function adChoixDeCombat(ans){
     const _adv=allPlayers().find(a=>a&&a.civ.id===G.warWith)||null;
     const _r=_adv&&_adv.routes?_adv.routes[_idx]:null;
     const _besoin=_r?(((_r.tokens||0)>=1)?2:1):0;
-    if(!_r||(_p.forceTokens||0)<_besoin){
+    if(!_r||engageableTokens(_p)<_besoin){ // garnison exclue (13/09)
       addLog('⚠️ Route inattaquable ('+(_r?('il faut '+_besoin+' jeton'+(_besoin>1?'s':'')):'cible introuvable')+') — assaut abandonné pour ce tour.','red');
       suite('STANDOFF');
     } else warAttackRoute(_idx);
@@ -6885,7 +6885,7 @@ function deployerJetonSurRoute(nat, route, opts){
   opts=opts||{};
   if(!nat||!route||(route.tokens||0)>0) return false;
   const gratuit=hasSpec(nat,'route_force_free');
-  if(!gratuit&&(nat.forceTokens||0)<1) return false;
+  if(!gratuit&&engageableTokens(nat)<1) return false; // garnison exclue (13/09) — test_raid_garnison.js
   if(opts.ac){ if((nat.acLeft||0)<1) return false; nat.acLeft-=1; nat.spentThisTurn=(nat.spentThisTurn||0)+1; }
   if(!gratuit) nat.forceTokens-=1;
   route.tokens=1;
@@ -7023,7 +7023,7 @@ function routeManageDeploy(){
   const r=p.routes[_routeManageIdx];
   if(!r||p.acLeft<1){addLog('⚠️ AC insuffisants.','red');routeManageClose();return;}
   const isFree=hasSpec(p,'route_force_free');
-  if(!isFree&&p.forceTokens<1){addLog('⚠️ Aucun jeton disponible.','red');routeManageClose();return;}
+  if(!isFree&&engageableTokens(p)<1){addLog('⚠️ Aucun jeton engageable (la garnison ne compte pas).','red');routeManageClose();return;}
   undoStack=[];
   p.acLeft--;p.spentThisTurn+=1;
   if(!isFree)p.forceTokens--;
@@ -7207,7 +7207,11 @@ function doRaidTarget(aiId,nodeId,pillard){
       if(_cc&&coloniePilleeCeTour(_cc)){addLog('⚠️ '+((NODES[nodeId]&&NODES[nodeId].name)||nodeId)+' a déjà été pillée ce tour — sa production est partie.','red');return;}
     }
     if(p.acLeft<1){addLog('⚠️ Raid : besoin 1 AC.','red');return;}
-    if(p.forceTokens<tc){addLog('⚠️ Raid : besoin '+tc+' jeton(s) Force.','red');return;}
+    /* ⚠️ RÉSERVE BRUTE ≠ ENGAGEABLE (Marc, 13/09 : « le jeu te laisse faire des raids même si t'as
+       plus de jetons Force disponibles »). La barre affiche `engageableTokens` (réserve − garnison),
+       la règle lisait `forceTokens` : à 0 affiché, le raid passait en puisant dans la garnison.
+       Banc : test_raid_garnison.js. */
+    if(engageableTokens(p)<tc){addLog('⚠️ Raid : besoin '+tc+' jeton(s) Force engageable(s) (la garnison ne compte pas).','red');return;}
     if(enCost>0&&(p.res.energy||0)<enCost){addLog('⚠️ Raid : besoin '+enCost+'<i class=ri-energy></i> (carburant).','red');return;}
     undoStack=[];
     p.acLeft-=1;p.forceTokens-=tc;p.forceCooldown.push({count:tc,returnTurn:getCooldownTurn(p)});
@@ -7421,7 +7425,7 @@ function attackColony(nodeId,attaquant){
      (garrisonOf) suffit à la rendre difficile ; l'interdire n'a plus lieu d'être. */
   const tc=p.civ.id==='ceinturiens'?1:2;
   if(p.acLeft<1){addLog('⚠️ Assaut : besoin 1 AC.','red');return;}
-  if(p.forceTokens<tc){addLog('⚠️ Assaut : besoin d’au moins '+tc+' jeton(s) Force.','red');return;}
+  if(engageableTokens(p)<tc){addLog('⚠️ Assaut : besoin d’au moins '+tc+' jeton(s) Force engageable(s) (la garnison ne compte pas).','red');return;}
   if(Math.min(p.res.materials||0,p.res.energy||0)<1){addLog('⚠️ Assaut : il faut du <i class=ri-materials></i> et de l’<i class=ri-energy></i> pour engager des jetons.','red');return;}
   // LIMITE DE 2 ATTAQUES/TOUR SUPPRIMÉE (demande de Marc) : le nombre d'assauts n'est plus plafonné —
   // il reste limité naturellement par les AC, les jetons Force et le coût en ressources de chaque combat.
@@ -7590,7 +7594,7 @@ function attackEnemyRoute(aiId,ri){
   // pourtant les routes partout ailleurs. Une seule règle : `routesProtegeesParTech`.
   if(routesProtegeesParTech(ai)){addLog('🛡️ Routes de '+ai.civ.name+' protégées ('+techsProtegeantRoutes(ai).join(', ')+') — inattaquables.','red');return;}
   const need=((route.tokens||0)>=1)?2:1; // route protégée par un jeton → 2 jetons pour la briser
-  if((G.player.forceTokens||0)<need){addLog('⚠️ Il te faut '+need+' jeton(s) Force pour cette route'+(((route.tokens||0)>=1)?' (protégée par un jeton)':'')+'.','red');return;}
+  if(engageableTokens(G.player)<need){addLog('⚠️ Il te faut '+need+' jeton(s) Force engageable(s) pour cette route'+(((route.tokens||0)>=1)?' (protégée par un jeton)':'')+'.','red');return;}
   undoStack=[];
   G.player.acLeft-=1;G.player.spentThisTurn+=1;G.player._attacksThisTurn=(G.player._attacksThisTurn||0)+1;
   resolveRouteAttack(G.player,ai,route,need);
@@ -7691,7 +7695,7 @@ function maybeAiAssaultPlayer(ai,done,defender,prefNode){
   if(war._aiAssaultedThisTurn){_assautSuite(done);return;} // l'IA a déjà attaqué pendant son tour → pas de double assaut
   const afford=Math.min(ai.res.materials||0,ai.res.energy||0);
   const target=_aiPickPlayerTarget(ai,defender,prefNode);
-  if(!target||(ai.forceTokens||0)<1||afford<1||(ai.res.morale||0)<1){
+  if(!target||engageableTokens(ai)<1||afford<1||(ai.res.morale||0)<1){ // garnison exclue (13/09)
     /* ═══ « IL N'A PAS ATTAQUÉ » DOIT SE VOIR, ET NE SE DIRE QU'UNE FOIS ═══
        Marc, partie 792D : « quand on est en guerre et que l'autre ne m'attaque pas en premier, ce
        n'est pas clair. Il faudrait un texte disant qu'il n'a pas attaqué. »
@@ -7843,14 +7847,23 @@ function _resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,p){
   if(defTokens>0){ const _h=(typeof hasSpec==='function'&&hasSpec(p,'nav2_war')); const _m=_h?Math.floor(defTokens/2):defTokens, _e=_h?Math.ceil(defTokens/2):defTokens;
     addLog('🛡️ Défense : '+defTokens+' jeton(s) engagé(s) (−'+_m+'<i class=ri-materials></i> −'+_e+'<i class=ri-energy></i>'+(_h?', IA de Navigation : coût divisé par deux':'')+').','dim'); }
   let resultTxt,cls;
+  /* ═══ +2 VP AU VAINQUEUR, ICI AUSSI (1C29, 14/09) ═══ Marc a repoussé deux assauts surprise
+     (6 contre 2, 14 contre 12) pour 0 VP, quand les Martiens touchaient +2 pour chaque assaut
+     repoussé sur Phobos — parce que leurs combats passaient par `resolveWarCombat`, et les siens
+     par cette fenêtre. Même règle partout : « victoires de combat (+2 chacune) », c'est ce que la
+     feuille de score annonce. Banc : test_combat_vp_equitable.js. */
+  /* Une ROUTE n'est pas un combat (Marc, 14/09 : « c'est un peu facile ») : aucun VP, dans les deux sens. */
+  const _vpCombat=(target&&target.type!=='route');
   if(pDef>=aPow){
     if(war)war.winsBy[p.civ.id]=(war.winsBy[p.civ.id]||0)+1;
+    if(_vpCombat&&typeof gagnerVP==='function')gagnerVP(p,2,'Combat gagné contre '+ai.civ.name);
     if(_aiCru)croiseurEnReparation(ai); // croiseur IA en réparation suite à l'échec de l'assaut
     ai.res.morale=Math.max(0,(ai.res.morale||0)-1);
     resultTxt='🛡️ Défense réussie ! '+pDef+'🛡️ vs '+aPow+'⚔️ — '+(target.type==='colony'?'Colonie '+target.name+' tient.':'Route '+target.name+' tient.');cls='win';
     addLog('🛡️ '+ai.civ.emoji+' '+ai.civ.name+' repoussé ('+pDef+'🛡️ vs '+aPow+'⚔️).','gold');
   }else{
     if(war)war.winsBy[ai.civ.id]=(war.winsBy[ai.civ.id]||0)+1;
+    if(_vpCombat&&typeof gagnerVP==='function')gagnerVP(ai,2,'Combat gagné contre '+p.civ.name);
     /* Ici la fenêtre de combat s'ouvre juste après : la nouvelle du croiseur y est COLLÉE
        (`sansFenetre`) plutôt qu'ouverte en second — deux fenêtres l'une sur l'autre, sur mobile,
        ne se lisent pas. */
@@ -8336,7 +8349,7 @@ function forcedWarChoiceRoute(idx){
   const r=fwcAi?fwcAi.routes[idx]:null;
   if(!r)return;
   const prot=(r.tokens||0)>=1;const need=prot?2:1;
-  if((G.player.forceTokens||0)<need){addLog('⚠️ Il te faut '+need+' jeton'+(need>1?'s':'')+' Force pour cette route'+(prot?' (protégée)':'')+'.','red');return;} // garde la fenêtre ouverte
+  if(engageableTokens(G.player)<need){addLog('⚠️ Il te faut '+need+' jeton'+(need>1?'s':'')+' Force engageable'+(need>1?'s':'')+' pour cette route'+(prot?' (protégée)':'')+'.','red');return;} // garde la fenêtre ouverte
   G.player._attacksThisTurn=(G.player._attacksThisTurn||0)+1;
   document.getElementById('forced-war-modal').classList.add('hidden');
   G._pendingRouteAtk={ai:fwcAi, route:r, prot:prot, mode:'forced'}; // même modale récupérer/détruire que la fenêtre de combat
@@ -9810,7 +9823,7 @@ function coupsPossibles(nat){
   }
   /* PROTÉGER — poser un jeton sur une route déjà construite et exposée (1 AC + 1 jeton). */
   if(typeof ordinateurProtegeSesRoutes==='function'&&ordinateurProtegeSesRoutes(nat)
-     &&((nat.forceTokens||0)>=1||hasSpec(nat,'route_force_free'))){
+     &&(engageableTokens(nat)>=1||hasSpec(nat,'route_force_free'))){ // garnison exclue (13/09)
     for(const r of (nat.routes||[])){
       if((r.tokens||0)>0)continue;
       coups.push({type:'proteger',from:r.from,to:r.to,libelle:'protéger la route '+((NODES[r.from]||{}).name||r.from)+'→'+((NODES[r.to]||{}).name||r.to)});
@@ -9866,9 +9879,14 @@ function coupsPossibles(nat){
            Même règle que pour le multiplicateur : bâtisseur et conquérant ne raident pas, quel que
            soit leur état de siège. */
         const _raidInterdit=(nat._profil==='batisseur'||nat._profil==='guerrier');
-        if((nat.forceTokens||0)>=jetons&&!_protege&&!_raidInterdit&&!coloniePilleeCeTour(col))
+        /* Garnison exclue (13/09) : même compte que la règle et la barre — test_raid_garnison.js. */
+        /* Butin nul = pas de coup (1C29, 14/09) : les Ceinturiens ont pillé Europe puis Vesta « rien
+           à prendre », deux actions et deux jetons pour rien. Le butin se calcule avant — test_raid_butin_vide.js. */
+        const _butinVide=(typeof butinDeRaid==='function')&&Object.keys(butinDeRaid(o,col.nodeId).butin||{}).length===0;
+        if(engageableTokens(nat)>=jetons&&!_protege&&!_raidInterdit&&!coloniePilleeCeTour(col)&&!_butinVide)
           coups.push({type:'raid',cible:o.civ.id,node:col.nodeId,libelle:'raid sur '+nom+' ('+o.civ.name+')'});
-        if((nat.forceTokens||0)>=jetons&&(nat.res.materials||0)>=1&&(nat.res.energy||0)>=1)
+        if(engageableTokens(nat)>=jetons&&(nat.res.materials||0)>=1&&(nat.res.energy||0)>=1
+           &&(typeof moralSuffisantPourAssaillir!=='function'||moralSuffisantPourAssaillir(nat,o)))   // test_assaut_sans_moyens.js
           coups.push({type:'assaut',node:col.nodeId,libelle:'assaillir '+nom+' ('+o.civ.name+')'});
         if((nat.res.materials||0)>=2&&!mien(col.nodeId))
           coups.push({type:'accord',node:col.nodeId,libelle:'accord sur '+nom+' ('+o.civ.name+')'});
@@ -10230,6 +10248,20 @@ enregistrerCerveau('tacticien', function(ctx){
    cible ordinateur → combat résolu sur-le-champ, capture ou repoussé.
    Rend `true` si l'assaut a eu lieu (ou a été lancé chez l'humain), `false` s'il y a renoncement.
    ══════════════════════════════════════════════════════════════════════════════════════════════ */
+/* ═══ LE MORAL DOIT SURVIVRE À L'ASSAUT, ET ON LE SAIT AVANT DE DÉCLARER (1C29, 14/09) ═══
+   Tour 9 : « GUERRE DÉCLARÉE : Martiens contre Terriens — Assaut surprise sur Lune ! » puis
+   « Martiens maintient la guerre mais n'a pas les moyens d'attaquer ce tour ». L'ordre était :
+   `declarerGuerre` → usure −4🙂 aux DEUX camps → AC débité → et seulement ensuite
+   `maybeAiAssaultPlayer` refusait (moral < 1). Marc : « sinon c'est aberrant ».
+   Une seule question, posée AVANT tout paiement : après l'usure que coûtera la déclaration (rien si
+   la guerre existe déjà), reste-t-il au moins 1 de moral ? Sert à l'énumération (`coupsPossibles`)
+   et à la règle (`resoudreAssautIA`). Banc : test_assaut_sans_moyens.js. */
+function moralSuffisantPourAssaillir(ai,cible){
+  if(!ai||!cible)return false;
+  const enGuerre=(typeof _warBetween==='function')&&!!_warBetween(ai.civ.id,cible.civ.id);
+  const usure=enGuerre?0:(typeof USURE_GUERRE_MORAL==='number'?USURE_GUERRE_MORAL:4);
+  return ((ai.res.morale||0)-usure)>=1;
+}
 function resoudreAssautIA(ai,nodeId,opts){
   const o=opts||{};
   if(!ai||!nodeId)return false;
@@ -10245,8 +10277,11 @@ function resoudreAssautIA(ai,nodeId,opts){
      qu'un humain engage tout ce qu'il peut payer. Égalité de traitement (Marc, 25/08) : par ici,
      tout ce qu'on a et qu'on peut payer ; `_engage` n'en prend ensuite que le nécessaire.
      L'ancien cerveau passe son propre `commit` (plafonné) et reste l'étalon qu'il est. */
-  const commit=(o.commit!==undefined)?o.commit:Math.min(ai.forceTokens||0,affordTok);
+  /* Garnison exclue (13/09) : l'IA n'engage que ses jetons ENGAGEABLES, comme l'humain dans sa
+     fenêtre de combat — test_raid_garnison.js. */
+  const commit=(o.commit!==undefined)?o.commit:Math.min(engageableTokens(ai),affordTok);
   if(commit<1)return false;
+  if(!moralSuffisantPourAssaillir(ai,best))return false;   // avant toute déclaration, rien n'est payé
   let bestSansDefense;
   if(o.sansDefense!==undefined)bestSansDefense=!!o.sansDefense;
   else{
@@ -10388,6 +10423,8 @@ function resoudreAssautIA(ai,nodeId,opts){
   ai.acLeft=Math.max(0,ai.acLeft-1);ai.spentThisTurn+=1+_engage;ai._attacksThisTurn=(ai._attacksThisTurn||0)+1;
   const win=aPow>dPow;
   applyCombatEngage(ai,_engage,win);if(dCommit>0)applyCombatEngage(best,dCommit,!win);
+  /* +2 VP au vainqueur, comme dans `resolveWarCombat` (1C29, 14/09) — test_combat_vp_equitable.js. */
+  if(typeof gagnerVP==='function')gagnerVP(win?ai:best,2,'Combat gagné contre '+(win?best:ai).civ.name);
   addTens(ai.civ.id,best.civ.id,1);addTens(best.civ.id,ai.civ.id,3);
   const node=NODES[bestCol.nodeId];
   if(win){
@@ -10790,7 +10827,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
        vérifie ici, à l'entrée, là où aucun chemin ne peut la contourner. */
     if(ai._profil==='batisseur'||ai._profil==='guerrier')return false;
     const raidTok=isPirate?1:2;const raidEn=0;
-    if(ai.acLeft<1||ai.forceTokens<raidTok)return false;
+    if(ai.acLeft<1||engageableTokens(ai)<raidTok)return false; // garnison exclue (13/09)
     if((ai._attacksThisTurn||0)>=1)return false; // max 1 action agressive/tour
     if(raidEn>0&&(ai.res.energy||0)<raidEn)return false;
     /* ⚠️ L'IA SE RUINAIT CONTRE UN MUR, TOUR APRÈS TOUR.
@@ -11102,7 +11139,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
     if(ai.acLeft<1)return false;
     if((ai._attacksThisTurn||0)>=1)return false; // max 2 actions agressives / manche / nation
     const raidTok=isPirate?1:2;
-    if((ai.forceTokens||0)<raidTok)return false;
+    if(engageableTokens(ai)<raidTok)return false; // garnison exclue (13/09)
     const rivals=G.ais.filter(a=>a!==ai && a._isAI!==false && a.colonies.some(c=>c.nodeId!==a.civ.home && !NODES[c.nodeId]?.decorative));
     if(!rivals.length)return false;
     let best=null,bd=99;
@@ -11319,7 +11356,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
   }
   function _raidUtil(){
     const _e=aiEnnemi(ai);if(!_e)return 0;
-    const tok=isPirate?1:2;if((ai.forceTokens||0)<tok)return 0;
+    const tok=isPirate?1:2;if(engageableTokens(ai)<tok)return 0; // garnison exclue (13/09)
     if(((_e.res.energy||0)+(_e.res.materials||0))<=0)return 0;
     if(!isPirate&&(ai.res.morale||0)<=2)return 0;
     let v=isPirate?3:1.5; // valeur de base FAIBLE (avant : raid quasi systématique)
@@ -11330,7 +11367,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
     return Math.max(0,v);
   }
   function _raidAIUtil(){
-    const tok=isPirate?1:2;if((ai.forceTokens||0)<tok)return 0;
+    const tok=isPirate?1:2;if(engageableTokens(ai)<tok)return 0; // garnison exclue (13/09)
     if((ai._attacksThisTurn||0)>=1)return 0;
     let rich=-1;
     for(const r of G.ais){if(r===ai||r._isAI===false)continue;for(const c of ai.colonies)for(const oc of r.colonies){if(getNodeDistance(c.nodeId,oc.nodeId)<=2)rich=Math.max(rich,(r.res.energy||0)+(r.res.materials||0));}}
@@ -12807,7 +12844,7 @@ function renderActions(){
   {const _bu=document.getElementById('btn-undo');if(_bu)_bu.disabled=!active||undoStack.length===0;}
   document.getElementById('btn-col').classList.toggle('on',mode==='colonize');
   document.getElementById('btn-route').classList.toggle('on',mode==='route');
-  if(active){const p=G.player;const tc=p.civ.id==='ceinturiens'?1:2;document.getElementById('btn-raid').disabled=p.acLeft<1||p.forceTokens<tc;}
+  if(active){const p=G.player;const tc=p.civ.id==='ceinturiens'?1:2;document.getElementById('btn-raid').disabled=p.acLeft<1||engageableTokens(p)<tc;}
   else document.getElementById('btn-raid').disabled=true;
 }
 /* ══════════════════════════════════════════════════════════════════════════════════════════════
@@ -13616,7 +13653,7 @@ function warAttackRoute(idx){
   const r=warAtkAi?warAtkAi.routes[idx]:null;
   if(!r){document.getElementById('war-combat-modal').classList.add('hidden');const _s=_combatSuiteLire();if(_s)_s(0);return;}
   const prot=(r.tokens||0)>=1;const need=prot?2:1;
-  if((G.player.forceTokens||0)<need){addLog('⚠️ Il te faut '+need+' jeton'+(need>1?'s':'')+' Force pour cette route'+(prot?' (protégée)':'')+'.','red');return;} // on laisse rechoisir
+  if(engageableTokens(G.player)<need){addLog('⚠️ Il te faut '+need+' jeton'+(need>1?'s':'')+' Force engageable'+(need>1?'s':'')+' pour cette route'+(prot?' (protégée)':'')+'.','red');return;} // on laisse rechoisir
   G._pendingRouteAtk={ai:warAtkAi, route:r, prot:prot};
   document.getElementById('war-combat-modal').classList.add('hidden');
   showRouteCaptureModal(r, prot);

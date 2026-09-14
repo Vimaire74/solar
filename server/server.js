@@ -1198,10 +1198,21 @@ function recover(g, tag, e) {
    différé, et c'est moi qui l'avais posé.
    Sans `ADMIN_KEY`, les pages de service sont donc TOTALEMENT fermées : aucune clé ne les ouvre.
    En cas de doute, fermé — c'est le seul réglage qui ne se dégrade pas tout seul avec le temps. */
-const ADMIN_KEY = process.env.ADMIN_KEY || '';
+const ADMIN_KEY = (process.env.ADMIN_KEY || '').trim();   // même nettoyage que SMTP_* : un retour à la ligne collé dans Coolify ne doit pas fermer les pages
+/* ⚠️ ROTATION DE LA CLÉ (13/09, avant la bêta) — voir OVH_SETUP_JOURNAL, fiche ADMIN_KEY.
+   La valeur historique « marci » a été un repli PUBLIÉ dans ce fichier (dépôt public) : toute
+   valeur qui a figuré dans le code ou dans un LISEZ-MOI est à considérer comme connue. La clé
+   vit dans Coolify seulement, et sa valeur ne s'écrit NULLE PART dans ce dossier.
+   Comparaison à temps constant : avec `===`, le temps de réponse dépend du premier caractère faux,
+   ce qui permet de deviner une clé lettre par lettre. Sur un serveur public, on ne laisse pas ça. */
 function cleValide(url) {
   if (!ADMIN_KEY) return false;   // pas de clé configurée = pages de service désactivées
-  try { return (new URL(url, 'http://x').searchParams.get('key') || '') === ADMIN_KEY; } catch (e) { return false; }
+  try {
+    const recue = new URL(url, 'http://x').searchParams.get('key') || '';
+    const a = Buffer.from(recue, 'utf8'), b = Buffer.from(ADMIN_KEY, 'utf8');
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch (e) { return false; }
 }
 function refuser(res) {   // 404 volontaire : on ne confirme pas l'existence de la page
   res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });

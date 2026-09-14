@@ -1,6 +1,6 @@
 # Lot 17 — ce qu'on met en ligne, et rien d'autre
 
-Dossier prêt à envoyer. Version **v10.02** (`sw.js` **v123**).
+Dossier prêt à envoyer. Version **v10.44** (`sw.js` **v165**) — 13/09/2026 : appli Android, confidentialité, suppression de compte, garnison non dépensable (§111 de docs/REPRISE.md).
 
 > ### Ce qui rend ce lot particulier : les IA réfléchissent, et en réfléchissant elles ont réveillé un défaut vieux de plusieurs versions
 >

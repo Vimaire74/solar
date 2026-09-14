@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-09-13 · v10.42';</script><!-- ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE : celle-ci, `SOLAR_BUILD_JS` (online.js) et `SOLAR_BUILD_MOTEUR` (moteur.js). Surveillé par test_versions.js. -->
+<script>window.SOLAR_BUILD_HTML='2026-09-13 · v10.44';</script><!-- ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE : celle-ci, `SOLAR_BUILD_JS` (online.js) et `SOLAR_BUILD_MOTEUR` (moteur.js). Surveillé par test_versions.js. -->
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -1775,7 +1775,11 @@ setInterval(function(){try{if(typeof scSaveGame==='function')scSaveGame();}catch
    + Détection de MISE À JOUR : quand une nouvelle version est déployée, l'app installée s'actualise
    automatiquement (petit bandeau) au lieu de rester coincée sur une vieille version en cache
    → garantit que le multijoueur (online.js) et les visuels restent identiques au web. */
-if ('serviceWorker' in navigator) {
+/* ⚠️ PAS DE SERVICE WORKER DANS L'APPLICATION (Capacitor, 13/09) : ses fichiers sont embarqués,
+   et un service worker qui tenterait de mettre en cache `https://localhost/…` n'apporterait rien
+   sinon des mises à jour fantômes. `window.Capacitor.isNativePlatform()` n'existe que dans l'appli. */
+var _natif = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+if ('serviceWorker' in navigator && !_natif) {
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('sw.js').then(function (reg) {
       // Une nouvelle version du SW est trouvée → on prévient dès qu'elle est prête.
