@@ -1,4 +1,4 @@
-LOT 17 — MISE À JOUR LÉGÈRE (v10.45, sw v166) — 14/09/2026
+LOT 17 — MISE À JOUR LÉGÈRE (v10.47, sw v168) — 14/09/2026 : fenêtres « Blason », réglage Aa (Journal), journal « Coût combat »
 
 Ce dossier ne contient QUE ce qui a changé depuis la version en ligne (v10.39) : 2 Mo au lieu de 70.
 Les images (cartes, planètes) n'ont pas bougé, elles sont déjà sur GitHub.

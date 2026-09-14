@@ -6,7 +6,9 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-09-14 · v10.45';</script><!-- ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE : celle-ci, `SOLAR_BUILD_JS` (online.js) et `SOLAR_BUILD_MOTEUR` (moteur.js). Surveillé par test_versions.js. -->
+<script>window.SOLAR_BUILD_HTML='2026-09-14 · v10.47';</script>
+<script>/* Taille du texte mémorisée (menu Journal → Aa) : appliquée avant le premier rendu, sans à-coup. */
+(function(){try{var t=localStorage.getItem('sc_taille');if(t&&/^(11|13|15|17)$/.test(t))document.documentElement.style.setProperty('--sc-fs',t+'px');}catch(e){}})();</script><!-- ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE : celle-ci, `SOLAR_BUILD_JS` (online.js) et `SOLAR_BUILD_MOTEUR` (moteur.js). Surveillé par test_versions.js. -->
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -26,7 +28,12 @@ html,body{height:100%;height:calc(var(--vh,1vh)*100);height:100dvh;overflow:hidd
 @font-face{font-family:'Exo 2';src:url(assets/fonts/Exo2-Italic.woff2) format('woff2');font-weight:100 900;font-style:italic;font-display:swap}
 @font-face{font-family:'Michroma';src:url(assets/fonts/Michroma.woff2) format('woff2');font-weight:400;font-style:normal;font-display:swap}
 :root{--font-corps:'Exo 2','Segoe UI',system-ui,sans-serif;--font-titre:'Michroma','Exo 2',sans-serif}
-body{background:#070718;color:#c8d8f8;font-family:var(--font-corps);font-size:13px;display:flex;flex-direction:column}
+/* ═══ TAILLE DU TEXTE (Marc, 13-14/09) : réglage DANS le jeu (menu Journal → Aa), mémorisé sur l'appareil
+   (`sc_taille`). Toute l'interface est en em : cette seule valeur fait tout suivre. 13 px = « Normal »,
+   celui que le jeu a toujours eu. Le réglage du téléphone ne compte plus (l'appli Android force le zoom
+   texte à 100 %). */
+:root{--sc-fs:13px}
+body{background:#070718;color:#c8d8f8;font-family:var(--font-corps);font-size:var(--sc-fs);display:flex;flex-direction:column}
 /* Michroma est LARGE : réservée aux titres et libellés courts, jamais au texte courant, et ~15 % plus
    petite que le gras Segoe qu'elle remplace pour tenir dans les mêmes largeurs. */
 .font-titre,#civ-sel h1,.gtitle,#turn-disp,#tech-hdr>span:first-child,.tb-label,.tc-name,.gc-name,.mtab label,
@@ -431,11 +438,11 @@ body{background:#070718;color:#c8d8f8;font-family:var(--font-corps);font-size:13
 #event-announce-modal{position:fixed;inset:0;background:rgba(4,4,18,.88);backdrop-filter:blur(6px);z-index:355;display:flex;align-items:center;justify-content:center}
 .ea-card{background:#0d0d26;border-radius:16px;padding:28px 30px;width:340px;text-align:center;border:2px solid #5a1a7a}
 .ea-label{font-size:.68em;text-transform:uppercase;letter-spacing:2px;color:#9a5aaa;margin-bottom:8px}
-.ea-emoji{font-size:3.2em;margin-bottom:8px}
-.ea-name{font-size:1.1em;font-weight:700;color:#c8d8f8;margin-bottom:8px}
-.ea-desc{font-size:.82em;color:#8898b8;line-height:1.5;margin-bottom:18px}
-.ea-btn{padding:8px 28px;border:1px solid #4a9eff;background:#1a2a4a;color:#c8d8f8;border-radius:8px;cursor:pointer;font-size:.88em}
-.ea-btn:hover{background:#2a3a5a}
+.fen .ea-emoji{font-size:2rem;margin:0}
+.fen .ea-name{margin:0}
+.fen .ea-desc{margin:0}
+.fen .ea-btn{background:#163a6b;border:1px solid #2f6fbf;color:#e8f1ff}
+
 /* Investment modal */
 #invest-modal,#invest2-modal,#espionage-modal,#empath-copy-modal,#dyson-modal{position:fixed;inset:0;background:rgba(4,4,18,.92);backdrop-filter:blur(7px);z-index:370;display:flex;align-items:center;justify-content:center}
 .inv-card{background:#0c0c24;border:2px solid #8a6a1a;border-radius:16px;padding:24px 28px;max-width:560px;width:96%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.9)}
@@ -529,22 +536,24 @@ body.modal-lock #btn-ability,body.modal-lock #btn-undo,body.modal-lock #btn-col,
 .eot-btn:hover{background:linear-gradient(135deg,#256625,#1a4a1a)}
 #event-modal{position:fixed;inset:0;background:rgba(4,4,18,.88);backdrop-filter:blur(6px);z-index:350;display:flex;align-items:center;justify-content:center}
 .evt-card{background:#0c0c24;border:2px solid #5a1a7a;border-radius:16px;padding:30px 36px;max-width:430px;width:92%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.92)}
-.evt-card.competition{border-color:#7a1a1a}
-.evt-card.menace{border-color:#7a4a1a}
-.evt-card.opportunite{border-color:#1a6a3a}
-.evm-emoji{font-size:3.2em;margin-bottom:8px}
-.evm-badge{display:inline-block;padding:3px 12px;border-radius:12px;font-size:.7em;font-weight:700;letter-spacing:.5px;margin-bottom:12px}
-.evm-name{font-size:1.5em;font-weight:700;color:#fff;margin-bottom:16px}
-.evm-result{background:#07071a;border:1px solid #1a1a3a;border-radius:8px;padding:13px 16px;font-size:.9em;color:#c8d8f8;margin-bottom:18px;line-height:1.7;text-align:left}
-.evm-consequence{font-size:.8em;color:#ff9966;margin-bottom:18px;padding:8px 12px;background:#1a0a00;border-radius:6px}
-.evm-btn{padding:11px 36px;background:linear-gradient(135deg,#4a9eff,#2060cc);color:#fff;border:none;border-radius:8px;font-size:.95em;font-weight:700;cursor:pointer}
+.fen.evt-card.competition{border-color:#a33!important}
+.fen.evt-card.menace{border-color:#c77a1a!important}
+.fen.evt-card.opportunite{border-color:#2f9a58!important}
+.fen.evt-card.competition .fen-medal{border-color:#ff6b62;background:#3a1212}
+.fen.evt-card.opportunite .fen-medal{border-color:#5fd08a;background:#0f2a18}
+.fen .evm-emoji{font-size:2rem;margin:0}
+.fen .evm-badge{display:block;padding:0;background:none!important;border:0}
+.fen .evm-name{margin:0}
+.fen .evm-result{background:#0b0d24;border:1px solid #232750;border-radius:10px;padding:10px 12px;margin:0;line-height:1.5}
+.fen .evm-consequence{color:#ff9966;padding:8px 12px;background:#1a0a00;border-radius:10px;margin:0}
+.fen .evm-btn{background:#163a6b;border:1px solid #2f6fbf;color:#e8f1ff}
 #war-modal{position:fixed;inset:0;background:rgba(4,4,18,.92);backdrop-filter:blur(7px);z-index:380;display:flex;align-items:center;justify-content:center}
 .war-card{background:#0c0c24;border:2px solid #9a1a1a;border-radius:16px;padding:30px 36px;max-width:430px;width:92%;text-align:center;box-shadow:0 0 60px rgba(180,30,30,.2),0 20px 60px rgba(0,0,0,.92)}
 .war-emoji{font-size:3.4em;margin-bottom:8px}
 .war-badge{display:inline-block;padding:3px 14px;border-radius:12px;background:#3a0808;border:1px solid #9a1a1a;color:#ff6666;font-size:.72em;font-weight:700;margin-bottom:12px}
 .war-title{font-size:1.5em;font-weight:700;color:#ff8888;margin-bottom:16px}
-.war-body{background:#07071a;border:1px solid #2a1a1a;border-radius:8px;padding:13px 16px;font-size:.9em;color:#c8d8f8;margin-bottom:18px;line-height:1.7;text-align:left}
-.war-result{font-size:.82em;padding:8px 12px;border-radius:6px;margin-bottom:18px}
+.war-body{background:#07071a;border:1px solid #2a1a1a;border-radius:10px;padding:11px 14px;font-size:.92em;color:#c8d8f8;margin:0;line-height:1.55;text-align:left}
+.war-result{font-size:.88em;padding:9px 12px;border-radius:10px;margin:0}
 .war-result.win{background:#0a2a0a;color:#88ee88}
 .war-result.loss{background:#2a0808;color:#ff8888}
 .war-result.draw{background:#1a1a0a;color:#dddd88}
@@ -564,10 +573,10 @@ body.modal-lock #btn-ability,body.modal-lock #btn-undo,body.modal-lock #btn-col,
 .strat-skip:hover{border-color:#4a6a8a;color:#8898b8}
 #discovery-modal{position:fixed;inset:0;background:rgba(4,4,18,.88);backdrop-filter:blur(6px);z-index:360;display:flex;align-items:center;justify-content:center}
 .disc-card{background:#0c0c24;border:2px solid #2a6a3a;border-radius:16px;padding:30px 36px;max-width:360px;width:92%;text-align:center;box-shadow:0 0 40px rgba(30,180,80,.15),0 20px 60px rgba(0,0,0,.9)}
-.disc-emoji{font-size:3.2em;margin-bottom:8px}
-.disc-name{font-size:1.4em;font-weight:700;color:#88ee88;margin-bottom:10px}
-.disc-desc{font-size:.9em;color:#c8d8f8;margin-bottom:20px;padding:10px;background:#07071a;border-radius:8px;border:1px solid #1a2a1a}
-.disc-btn{padding:10px 32px;background:linear-gradient(135deg,#1a6a2a,#0d4a1a);color:#88cc88;border:1px solid #3a9a4a;border-radius:8px;font-size:.95em;font-weight:700;cursor:pointer}
+.fen .disc-emoji{font-size:2rem;margin:0}
+.fen .disc-name{color:#9ff0b3;margin:0}
+.fen .disc-desc{color:#dbe1f7;margin:0;padding:10px 12px;background:#0b0d24;border-radius:10px;border:1px solid #232750}
+.fen .disc-btn{background:#1f7a45;border:1px solid #2f9a58;color:#eafff1}
 /* ── Agenda Selection Modal ── */
 #agenda-sel-modal{position:fixed;inset:0;background:rgba(4,4,18,.92);backdrop-filter:blur(8px);z-index:380;display:flex;align-items:center;justify-content:center}
 .agsel-card{background:#0c0c24;border:2px solid #5a2a8a;border-radius:16px;padding:20px 26px;max-width:780px;width:96%;box-shadow:0 20px 60px rgba(80,0,160,.25),0 0 60px rgba(0,0,0,.9)}
@@ -957,6 +966,75 @@ body{font-size:16px;}
 .ri-materials{background-image:url('data:image/png;base64,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')}
 .ri-science{background-image:url('data:image/png;base64,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')}
 .ri-morale{background-image:url('data:image/png;base64,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')}
+/* ═══════════════════════════════════════════════════════════════════════════════════════
+   FENÊTRES « BLASON » — design A choisi par Marc le 14/09 (REPRISE §112, maquette « Fenêtres de guerre »).
+   L'ADVERSAIRE D'ABORD : son emblème en médaillon qui déborde du cadre, son nom en capitales Michroma,
+   puis seulement le verbe. Marc joue vite et ne lit pas les textes : ce qu'il doit savoir tient dans le
+   médaillon, le nom et les deux boutons (rouge à gauche = poursuivre / refuser, vert à droite = accepter /
+   proposer). Une seule famille pour toutes les fenêtres, assemblée par `fenBlason()` (couche d'affichage,
+   plus bas) ; le corps du jeu (moteur.js) et le mode en ligne (online.js) l'appellent tous les deux.
+   Tons : .fen-war (rouge), .fen-peace (vert), .fen-info (bleu), .fen-event (or), .fen-neutre (gris).
+   ═══════════════════════════════════════════════════════════════════════════════════════ */
+.fen-wrap{width:100%;max-width:470px;padding-top:34px;box-sizing:border-box;margin:0 auto}
+.fen.war-card,.fen.evt-card,.fen.disc-card,.fen.ea-card,.fen.fw-card,.fen.atk-card,.fen.strat-card,.fen.agsel-card,.fen.inv-card,.fen.rtm-card,.fen.rmm-card,.fen.eot-card{padding:44px 16px 14px!important;text-align:center!important;background:#0e1030!important;width:100%!important;max-width:440px!important;border-radius:18px!important;max-height:none!important;border-width:1px!important}
+.fen-wrap.fen-large{max-width:600px}
+.fen-wrap.fen-large .fen{max-width:580px!important}
+.fen .inv-title,.fen .strat-title,.fen .agsel-title,.fen .eot-title{margin:0;color:#fff;font-size:1.15em}
+.fen .inv-sub,.fen .strat-sub,.fen .agsel-sub{margin:0;color:#dbe1f7;font-size:1em}
+.fen .inv-opts,.fen .strat-options,.fen .agsel-agendas{margin:0;max-height:none}
+.fen .agsel-confirm{margin:0;padding:6px 8px}
+.fen .eot-btn{margin:0;padding:6px 8px}
+.fen{overflow:visible!important;position:relative;margin:0 auto;background:#0e1030;border:1px solid #33386b;border-radius:18px;padding:44px 16px 14px;display:flex;flex-direction:column;gap:11px;width:100%;max-width:440px;box-sizing:border-box;box-shadow:0 18px 50px rgba(0,0,0,.65);text-align:center;color:#dbe1f7}
+.fen.fen-war{border-color:#8a2626;box-shadow:0 0 0 1px #3a1010,0 18px 50px rgba(0,0,0,.65)}
+.fen.fen-peace{border-color:#2b5a3a;box-shadow:0 0 0 1px #0f2a18,0 18px 50px rgba(0,0,0,.65)}
+.fen.fen-info{border-color:#2f5fa0;box-shadow:0 0 0 1px #10203a,0 18px 50px rgba(0,0,0,.65)}
+.fen.fen-event{border-color:#7a5a12;box-shadow:0 0 0 1px #2a2008,0 18px 50px rgba(0,0,0,.65)}
+.fen-medal{position:absolute;top:-34px;left:50%;transform:translateX(-50%);width:68px;height:68px;border-radius:50%;background:#1b1e3c;border:3px solid #9aa3c7;display:flex;align-items:center;justify-content:center;font-size:2rem;line-height:1;box-shadow:0 8px 24px rgba(0,0,0,.65)}
+.fen-war .fen-medal{border-color:#ff6b62;background:#3a1212}
+.fen-peace .fen-medal{border-color:#5fd08a;background:#0f2a18}
+.fen-info .fen-medal{border-color:#4a9eff;background:#10203a}
+.fen-event .fen-medal{border-color:#ffd34d;background:#2a2008}
+.fen-kicker{font-family:var(--font-titre);font-size:.6em;letter-spacing:.16em;text-transform:uppercase;color:#9aa3c7}
+.fen-war .fen-kicker{color:#ff6b62}.fen-peace .fen-kicker{color:#5fd08a}.fen-info .fen-kicker{color:#4a9eff}.fen-event .fen-kicker{color:#ffd34d}
+.fen-nation{font-family:var(--font-titre);font-size:1.15em;letter-spacing:.06em;text-transform:uppercase;color:#fff;line-height:1.25;text-wrap:balance;margin-top:-4px}
+.fen-verb{font-size:1.05em;color:#dbe1f7;line-height:1.35;margin-top:-4px}
+.fen-verb b{color:#fff}
+.fen-chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.fen-chips span{background:#0b0d24;border:1px solid #232750;border-radius:999px;padding:4px 10px;font-size:.88em;font-variant-numeric:tabular-nums;color:#c8d0ea}
+.fen-chips b{color:#fff}
+.fen-body{font-size:.95em;color:#9aa3c7;line-height:1.45;text-align:center}
+.fen-body b{color:#e8ecff}
+.fen-body.fen-left{text-align:left}
+.fen-vs{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
+.fen-vs .n{font-family:var(--font-titre);font-size:1.6em;line-height:1}
+.fen-vs .l{font-family:var(--font-titre);font-size:.52em;letter-spacing:.12em;text-transform:uppercase;color:#6a729a;margin-top:5px}
+.fen-vs .x{font-family:var(--font-titre);font-size:.7em;color:#6a729a}
+.fen-vs .them{color:#ff6b62}.fen-vs .me{color:#5fd08a}
+.fen-slider{display:flex;flex-direction:column;gap:6px;background:#0b0d24;border:1px solid #232750;border-radius:12px;padding:10px 12px;text-align:left}
+.fen-slider .row{display:flex;justify-content:space-between;gap:8px;font-size:.88em;color:#9aa3c7}
+.fen-slider .row b{color:#fff;font-size:1.05em;font-variant-numeric:tabular-nums}
+.fen-slider input[type=range]{width:100%;accent-color:#4a9eff;height:28px;margin:0}
+.fen-slider label{display:flex;align-items:center;gap:8px;font-size:.88em;color:#c8d0ea;cursor:pointer}
+.fen-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:2px}
+.fen-btns.fen-one{grid-template-columns:1fr}
+.fen-btns.fen-col{grid-template-columns:1fr}
+.fen-btn{min-height:52px;border-radius:12px;border:1px solid transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 8px;line-height:1.15;cursor:pointer;font-family:var(--font-corps);color:#dbe1f7;background:#0b0d24}
+.fen-btn .k{font-family:var(--font-titre);font-size:.64em;letter-spacing:.12em;text-transform:uppercase}
+.fen-btn .s{font-size:.8em;opacity:.85}
+.fen-btn.ok{background:#1f7a45;border-color:#2f9a58;color:#eafff1}
+.fen-btn.no{background:#8a2626;border-color:#c04444;color:#ffe3e0}
+.fen-btn.go{background:#163a6b;border-color:#2f6fbf;color:#e8f1ff}
+.fen-btn.ghost{background:#0b0d24;border-color:#33386b;color:#9aa3c7}
+.fen-btn:disabled{opacity:.45;cursor:not-allowed}
+.fen-btn:hover:not(:disabled){filter:brightness(1.12)}
+.fen-note{font-size:.8em;color:#6a729a;line-height:1.35}
+/* Le réglage Aa dans le menu Journal */
+#sc-taille{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+#sc-taille .lab{font-family:var(--font-titre);font-size:.55em;letter-spacing:.12em;text-transform:uppercase;color:#9aa3c7;margin-right:2px}
+#sc-taille button{min-width:40px;min-height:36px;border:1px solid #33386b;background:#0b0d24;color:#dbe1f7;border-radius:8px;cursor:pointer;font-weight:700;padding:0 8px}
+#sc-taille button[aria-pressed="true"]{background:#4a9eff;color:#06101f;border-color:#4a9eff}
+#sc-taille button:nth-child(2){font-size:.8em}#sc-taille button:nth-child(3){font-size:.95em}#sc-taille button:nth-child(4){font-size:1.1em}#sc-taille button:nth-child(5){font-size:1.25em}
+
 </style>
 </head>
 <body>
@@ -1177,6 +1255,16 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
       <button type="button" onclick="scAbandonGame()" style="background:linear-gradient(135deg,#7a1f1f,#4a1010);color:#ffd0d0;font-weight:800;font-size:.9em;padding:8px 14px;border-radius:9px;border:2px solid #c85050;box-shadow:0 2px 10px rgba(0,0,0,.45);cursor:pointer">🗑️ Recommencer à zéro</button>
       <a href="regles.html" target="_blank" rel="noopener" style="display:inline-block;background:linear-gradient(135deg,#d09a2e,#a8761a);color:#fff;text-decoration:none;font-weight:800;font-size:.92em;padding:8px 15px;border-radius:9px;border:2px solid #ffd98a;box-shadow:0 2px 10px rgba(0,0,0,.45)">📖 Règles du jeu</a>
     </div>
+    <!-- Aa — TAILLE DU TEXTE (Marc, 13/09 : « il faudrait pouvoir régler la taille de la police sur
+         l'application elle-même pour éviter les problèmes liés au setup du téléphone »). Quatre crans,
+         mémorisés sur l'appareil. Voir `scTaille()` dans la couche d'affichage. -->
+    <div id="sc-taille" style="padding:6px 8px 2px" role="group" aria-label="Taille du texte">
+      <span class="lab">Aa Taille du texte</span>
+      <button type="button" onclick="scTaille(11)" data-fs="11" aria-pressed="false" title="Petit">A</button>
+      <button type="button" onclick="scTaille(13)" data-fs="13" aria-pressed="true" title="Normal">A</button>
+      <button type="button" onclick="scTaille(15)" data-fs="15" aria-pressed="false" title="Grand">A</button>
+      <button type="button" onclick="scTaille(17)" data-fs="17" aria-pressed="false" title="Très grand">A</button>
+    </div>
     <div class="log-tools" style="display:flex;gap:6px;padding:7px;flex-wrap:wrap;border-bottom:1px solid #1a1a3a;background:#080820;position:sticky;top:0;z-index:2">
       <!-- « Envoyer par email » et « .txt » RETIRÉS (Marc, 2026-08-09) : inutiles, « Copier le log » suffit. -->
       <button class="abtn" style="flex:1;min-width:90px" onclick="copyLogText()">📋 Copier le log</button>
@@ -1329,75 +1417,87 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
 </div>
 <div id="action-toast"></div>
 <div id="eot-modal" class="hidden">
-  <div class="eot-card">
-    <div class="eot-title" id="eot-title">📊 Bilan du Tour</div>
-    <div id="eot-body"></div>
-    <button class="eot-btn" onclick="continueAfterEOT()">Tour suivant →</button>
-  </div>
+  <div class="fen-wrap fen-large"><div class="fen fen-info eot-card">
+    <div class="fen-medal" aria-hidden="true">📊</div>
+    <div class="fen-kicker">Fin de tour</div>
+    <div class="fen-nation eot-title" id="eot-title">Bilan du tour</div>
+    <div id="eot-body" style="text-align:left"></div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn ok eot-btn" onclick="continueAfterEOT()"><span class="k">Tour suivant</span></button></div>
+  </div></div>
 </div>
 <div id="accord-modal" class="hidden">
-  <div style="background:#0c0c24;border:2px solid #6b5600;border-radius:14px;padding:18px 22px;max-width:min(94vw,440px);box-shadow:0 16px 50px rgba(0,0,0,.7)">
-    <div style="font-size:1.1em;font-weight:700;color:#ffd34d;text-align:center;margin-bottom:10px">🤝 Accord Commercial</div>
-    <div id="accord-body" style="font-size:.92em;color:#cdd8f0;line-height:1.55"></div>
-    <div style="display:flex;gap:10px;margin-top:16px">
-      <button class="npop-btn" style="flex:1" onclick="document.getElementById('accord-modal').classList.add('hidden')">Annuler</button>
-      <button class="npop-btn" id="accord-confirm" style="flex:1;border-color:#6b5600;color:#ffd34d">Conclure l'accord</button>
+  <div class="fen-wrap"><div class="fen fen-event">
+    <div class="fen-medal" id="accord-emoji" aria-hidden="true">🤝</div>
+    <div class="fen-kicker">Accord commercial</div>
+    <div class="fen-nation" id="accord-nation"></div>
+    <div class="fen-body fen-left" id="accord-body"></div>
+    <div class="fen-btns">
+      <button type="button" class="fen-btn ghost" onclick="document.getElementById('accord-modal').classList.add('hidden')"><span class="k">Annuler</span></button>
+      <button type="button" class="fen-btn ok" id="accord-confirm"><span class="k">Conclure</span><span class="s">l'accord</span></button>
     </div>
-  </div>
+  </div></div>
 </div>
+<!-- ═══ RÉSULTAT DE COMBAT / GUERRE — Blason (14/09). `wm-emoji` et `wm-nation` = l'adversaire (remplis par
+     `showWarModal` en solo et `showWarResultReal` en ligne) ; `wm-title` devient le verbe. -->
 <div id="war-modal" class="hidden">
-  <div class="war-card">
-    <div class="war-emoji" id="wm-emoji">⚔️</div>
-    <div class="war-badge">GUERRE</div>
-    <div class="war-title" id="wm-title"></div>
-    <div class="war-body" id="wm-body"></div>
+  <div class="fen-wrap"><div class="fen fen-war" id="wm-fen">
+    <div class="fen-medal" id="wm-emoji" aria-hidden="true">⚔️</div>
+    <div class="fen-kicker" id="wm-kicker">Guerre</div>
+    <div class="fen-nation" id="wm-nation"></div>
+    <div class="fen-verb" id="wm-title"></div>
+    <div class="fen-body fen-left" id="wm-body" style="background:#0b0d24;border:1px solid #232750;border-radius:10px;padding:10px 12px"></div>
     <div class="war-result hidden" id="wm-result"></div>
-    <button class="war-btn" onclick="dismissWarModal()">Continuer →</button>
-  </div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn go war-btn" style="background:#163a6b;border-color:#2f6fbf;color:#e8f1ff" onclick="dismissWarModal()"><span class="k">Continuer</span></button></div>
+  </div></div>
 </div>
 <div id="event-modal" class="hidden">
-  <div id="evm-card" class="evt-card">
-    <div class="evm-emoji" id="evm-emoji">⭐</div>
-    <div class="evm-badge" id="evm-badge"></div>
-    <div class="evm-name" id="evm-name"></div>
-    <div class="evm-result" id="evm-result"></div>
-    <div class="evm-consequence hidden" id="evm-consequence"></div>
-    <button class="evm-btn" onclick="dismissEventModal()">Continuer →</button>
-  </div>
+  <div class="fen-wrap"><div id="evm-card" class="fen fen-event evt-card">
+    <div class="fen-medal evm-emoji" id="evm-emoji" aria-hidden="true">⭐</div>
+    <div class="fen-kicker evm-badge" id="evm-badge"></div>
+    <div class="fen-nation evm-name" id="evm-name"></div>
+    <div class="fen-body fen-left evm-result" id="evm-result"></div>
+    <div class="fen-note evm-consequence hidden" id="evm-consequence"></div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn go evm-btn" onclick="dismissEventModal()"><span class="k">Continuer</span></button></div>
+  </div></div>
 </div>
 <div id="strategy-modal" class="hidden">
-  <div class="strat-card">
-    <div class="strat-title">🎯 Cartes Stratégie</div>
-    <div class="strat-sub" id="strat-sub">Choisissez une stratégie pour ce tour</div>
+  <div class="fen-wrap fen-large"><div class="fen fen-info strat-card">
+    <div class="fen-medal" aria-hidden="true">🎯</div>
+    <div class="fen-kicker">Début de tour</div>
+    <div class="fen-nation strat-title">Cartes Stratégie</div>
+    <div class="fen-verb strat-sub" id="strat-sub">Choisis une stratégie pour ce tour</div>
     <div class="strat-options" id="strat-options"></div>
-    <button class="agsel-confirm" id="strat-confirm-btn" onclick="confirmStrategy()" disabled>Valider mon choix →</button>
-  </div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn go agsel-confirm" id="strat-confirm-btn" onclick="confirmStrategy()" disabled><span class="k">Valider mon choix</span></button></div>
+  </div></div>
 </div>
 <div id="discovery-modal" class="hidden">
-  <div class="disc-card">
-    <div class="disc-emoji" id="disc-emoji">⭐</div>
-    <div class="disc-name" id="disc-name">Découverte !</div>
-    <div class="disc-desc" id="disc-desc"></div>
-    <button class="disc-btn" onclick="dismissDiscovery()">Continuer →</button>
-  </div>
+  <div class="fen-wrap"><div class="fen fen-peace disc-card">
+    <div class="fen-medal" id="disc-emoji" aria-hidden="true">⭐</div>
+    <div class="fen-kicker">Découverte</div>
+    <div class="fen-nation" id="disc-name">Découverte !</div>
+    <div class="fen-body" id="disc-desc"></div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn ok disc-btn" onclick="dismissDiscovery()"><span class="k">Continuer</span></button></div>
+  </div></div>
 </div>
 <div id="agenda-sel-modal" class="hidden">
-  <div class="agsel-card">
-    <div class="agsel-title">📋 Choix d'Agenda</div>
-    <div class="agsel-sub">Ton objectif secret de la partie.</div>
+  <div class="fen-wrap fen-large"><div class="fen fen-info agsel-card">
+    <div class="fen-medal" aria-hidden="true">📋</div>
+    <div class="fen-kicker">Tour 1</div>
+    <div class="fen-nation agsel-title">Agenda secret</div>
+    <div class="fen-verb agsel-sub">Ton objectif secret de la partie.</div>
     <div class="agsel-context" id="agsel-context"></div>
     <div class="agsel-agendas" id="agsel-agendas"></div>
-    <button class="agsel-confirm" id="agsel-confirm-btn" onclick="confirmAgendaChoice()" disabled>Confirmer mon choix →</button>
-  </div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn go agsel-confirm" id="agsel-confirm-btn" onclick="confirmAgendaChoice()" disabled><span class="k">Confirmer mon choix</span></button></div>
+  </div></div>
 </div>
 <div id="event-announce-modal" class="hidden">
-  <div class="ea-card">
-    <div class="ea-label">⚠️ Événement du prochain tour — préparez-vous</div>
-    <div class="ea-emoji" id="ea-emoji">⭐</div>
-    <div class="ea-name" id="ea-name"></div>
-    <div class="ea-desc" id="ea-desc"></div>
-    <button class="ea-btn" onclick="dismissEventAnnounce()">Compris →</button>
-  </div>
+  <div class="fen-wrap"><div class="fen fen-event ea-card">
+    <div class="fen-medal" id="ea-emoji" aria-hidden="true">⭐</div>
+    <div class="fen-kicker">Événement du prochain tour</div>
+    <div class="fen-nation" id="ea-name"></div>
+    <div class="fen-body" id="ea-desc"></div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn go ea-btn" onclick="dismissEventAnnounce()"><span class="k">Compris</span></button></div>
+  </div></div>
 </div>
 <div id="tech-detail-modal" class="hidden">
   <div class="td-card" id="td-card">
@@ -1433,152 +1533,239 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
   </div>
 </div>
 <div id="invest-modal" class="hidden">
-  <div class="inv-card">
-    <div class="inv-title">💼 Cartes Investissement</div>
-    <div class="inv-sub">Effet + contrepartie dès le tour 3.</div>
+  <div class="fen-wrap fen-large"><div class="fen fen-event inv-card">
+    <div class="fen-medal" aria-hidden="true">💼</div>
+    <div class="fen-kicker">Investissement · niveau 1</div>
+    <div class="fen-nation inv-title">Cartes Investissement</div>
+    <div class="fen-verb inv-sub">Effet + contrepartie dès le tour 3.</div>
     <div class="inv-ai-pick hidden" id="inv-ai-pick"></div>
     <div class="inv-opts" id="inv-opts"></div>
-  </div>
+  </div></div>
 </div>
 <div id="invest2-modal" class="hidden">
-  <div class="inv-card">
-    <div class="inv-title">🧠 Investissements Niveau 2</div>
-    <div class="inv-sub">Effet + contrepartie au tour 7, pendant 3 tours.</div>
+  <div class="fen-wrap fen-large"><div class="fen fen-event inv-card">
+    <div class="fen-medal" aria-hidden="true">🧠</div>
+    <div class="fen-kicker">Investissement · niveau 2</div>
+    <div class="fen-nation inv-title">Investissements Niveau 2</div>
+    <div class="fen-verb inv-sub">Effet + contrepartie au tour 7, pendant 3 tours.</div>
     <div class="inv-ai-pick hidden" id="inv2-ai-pick"></div>
     <div class="inv-opts" id="inv2-opts"></div>
-  </div>
+  </div></div>
 </div>
 <div id="espionage-modal" class="hidden">
-  <div class="inv-card">
-    <div class="inv-title">🕵️ Espionnage — Choisir une branche à copier</div>
-    <div class="inv-sub" id="espionage-modal-sub">Sélectionnez la ligne technologique ennemie dont vous allez copier toutes les cartes acquises.</div>
+  <div class="fen-wrap fen-large"><div class="fen fen-info inv-card">
+    <div class="fen-medal" aria-hidden="true">🕵️</div>
+    <div class="fen-kicker">Espionnage</div>
+    <div class="fen-nation inv-title">Quelle filière copier ?</div>
+    <div class="fen-verb inv-sub" id="espionage-modal-sub">Choisis la ligne technologique ennemie dont tu copieras les cartes acquises.</div>
     <div class="inv-opts" id="espionage-branch-opts"></div>
-  </div>
+  </div></div>
 </div>
 <div id="empath-copy-modal" class="hidden">
-  <div class="inv-card">
-    <div class="inv-title">🧬 Télépathie — Copie tech adverse</div>
-    <div class="inv-sub">Copie une techno ennemie.</div>
+  <div class="fen-wrap fen-large"><div class="fen fen-info inv-card">
+    <div class="fen-medal" aria-hidden="true">🧬</div>
+    <div class="fen-kicker">Télépathie</div>
+    <div class="fen-nation inv-title">Copier une technologie</div>
+    <div class="fen-verb inv-sub">Copie une technologie adverse.</div>
     <div class="inv-opts" id="empath-copy-opts"></div>
-    <button class="eot-btn" style="margin-top:12px" onclick="applyEmpathCopy(null)">Annuler</button>
-  </div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn ghost" onclick="applyEmpathCopy(null)"><span class="k">Annuler</span></button></div>
+  </div></div>
 </div>
 <div id="dyson-modal" class="hidden">
-  <div class="inv-card" style="max-width:480px">
-    <div class="inv-title" id="dyson-title"><i class=ri-energy></i> Sphère de Dyson construite !</div>
+  <div class="fen-wrap fen-large"><div class="fen fen-event inv-card">
+    <div class="fen-medal" aria-hidden="true">⚡</div>
+    <div class="fen-kicker">Sphère de Dyson</div>
+    <div class="fen-nation inv-title" id="dyson-title">Sphère de Dyson construite !</div>
     <div class="inv-sub" id="dyson-sub" style="color:#ffe080;margin-bottom:14px">Votre empire monopolise l'énergie solaire (+5<i class=ri-energy></i>/tour).<br>Les autres nations doivent <strong>accepter</strong> ou c'est <strong>la guerre immédiate</strong>.</div>
-    <div id="dyson-nations" style="margin-bottom:16px"></div>
+    <div id="dyson-nations" style="margin-bottom:8px;text-align:left"></div>
     <div id="dyson-actions"></div>
-  </div>
+  </div></div>
 </div>
-<div id="invest-active-modal" class="hidden" style="position:fixed;inset:0;background:rgba(4,4,18,.88);backdrop-filter:blur(7px);z-index:390;display:flex;align-items:center;justify-content:center">
-  <div style="background:#0d1130;border:2px solid #f0c030;border-radius:14px;padding:28px 32px;max-width:420px;width:90%;text-align:center">
-    <div style="font-size:1.6em;margin-bottom:8px">💼 Investissements activés !</div>
-    <div style="color:#aab0c8;font-size:.85em;margin-bottom:18px">Tour 3 — les effets ci-dessous sont <strong style="color:#f0c030">permanents jusqu'au tour 10</strong>.</div>
-    <div style="background:#111840;border:1px solid #2a3060;border-radius:8px;padding:12px 16px;margin-bottom:10px;text-align:left">
-      <div style="font-size:.72em;color:#7880a0;margin-bottom:4px">TON INVESTISSEMENT</div>
-      <div id="inv-active-your" style="color:#ffe080;font-size:.92em;line-height:1.5"></div>
-    </div>
-    <div style="background:#111840;border:1px solid #2a3060;border-radius:8px;padding:12px 16px;margin-bottom:20px;text-align:left">
-      <div style="font-size:.72em;color:#7880a0;margin-bottom:4px">INVESTISSEMENT IA</div>
-      <div id="inv-active-ai" style="color:#9090b0;font-size:.88em;line-height:1.5"></div>
-    </div>
-    <button onclick="dismissInvestActive()" style="background:#f0c030;color:#0a0a18;font-weight:700;border:none;border-radius:8px;padding:10px 30px;font-size:.95em;cursor:pointer">✓ Compris, je continue</button>
-  </div>
+<div id="invest-active-modal" class="hidden" style="position:fixed;inset:0;background:rgba(4,4,18,.88);backdrop-filter:blur(7px);z-index:390;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:10px">
+  <div class="fen-wrap"><div class="fen fen-event">
+    <div class="fen-medal" aria-hidden="true">💼</div>
+    <div class="fen-kicker">Tour 3</div>
+    <div class="fen-nation">Investissements activés</div>
+    <div class="fen-verb">Les effets ci-dessous sont <b>permanents jusqu'au tour 10</b>.</div>
+    <div class="fen-slider"><div class="row"><span>Ton investissement</span></div><div id="inv-active-your" style="color:#ffe080;line-height:1.5"></div></div>
+    <div class="fen-slider"><div class="row"><span>Investissements adverses</span></div><div id="inv-active-ai" style="color:#c8d0ea;line-height:1.5"></div></div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn go" onclick="dismissInvestActive()"><span class="k">Compris</span><span class="s">je continue</span></button></div>
+  </div></div>
 </div>
 <div id="route-token-modal" class="hidden">
-  <div class="rtm-card">
-    <div class="rtm-title">🛤️ Protection de Route</div>
-    <div class="rtm-info" id="rtm-info"></div>
-    <div class="rtm-btns">
-      <button class="rtm-yes" onclick="confirmRouteToken(true)">⚔️ Déployer 1 jeton</button>
-      <button class="rtm-no" onclick="confirmRouteToken(false)">Laisser non protégée</button>
+  <div class="fen-wrap"><div class="fen fen-info">
+    <div class="fen-medal" aria-hidden="true">🛤️</div>
+    <div class="fen-kicker">Nouvelle route</div>
+    <div class="fen-nation">Protéger la route ?</div>
+    <div class="fen-body" id="rtm-info"></div>
+    <div class="fen-btns rtm-btns">
+      <button type="button" class="fen-btn ghost" onclick="confirmRouteToken(false)"><span class="k">Laisser</span><span class="s">non protégée</span></button>
+      <button type="button" class="fen-btn go" onclick="confirmRouteToken(true)"><span class="k">Protéger</span><span class="s">1 jeton Force</span></button>
     </div>
-  </div>
+  </div></div>
 </div>
 <div id="route-manage-modal" class="hidden">
-  <div class="rmm-card">
-    <div class="rmm-title" id="rmm-title">🛤️ Route</div>
-    <div class="rmm-info" id="rmm-info"></div>
-    <div class="rmm-btns">
-      <button class="rmm-deploy hidden" id="rmm-deploy-btn" onclick="routeManageDeploy()">⚔️ Déployer 1 jeton (1 AC)</button>
-      <button class="rmm-recall hidden" id="rmm-recall-btn" onclick="routeManageRecall()">↩️ Rappeler jeton (1 AC)</button>
-      <button class="rmm-cancel" onclick="routeManageClose()">✕ Fermer</button>
+  <div class="fen-wrap"><div class="fen fen-info">
+    <div class="fen-medal" aria-hidden="true">🛤️</div>
+    <div class="fen-kicker">Route</div>
+    <div class="fen-nation" id="rmm-title">Route</div>
+    <div class="fen-body" id="rmm-info"></div>
+    <div class="fen-btns fen-col rmm-btns">
+      <button type="button" class="fen-btn go hidden" id="rmm-deploy-btn" onclick="routeManageDeploy()"><span class="k">Déployer 1 jeton</span><span class="s">1 AC</span></button>
+      <button type="button" class="fen-btn no hidden" id="rmm-recall-btn" onclick="routeManageRecall()"><span class="k">Rappeler le jeton</span><span class="s">1 AC</span></button>
+      <button type="button" class="fen-btn ghost" onclick="routeManageClose()"><span class="k">Fermer</span></button>
     </div>
-  </div>
+  </div></div>
 </div>
 <div id="forced-war-modal" class="hidden">
-  <div class="fw-card">
-    <div class="fw-title" id="fw-title">⚔️ Guerre Populaire Forcée !</div>
-    <div class="fw-desc" id="fw-desc"></div>
-    <div class="fw-choices" id="fw-choices"></div>
-  </div>
+  <div class="fen-wrap"><div class="fen fen-war" id="fw-fen">
+    <div class="fen-medal" id="fw-emoji" aria-hidden="true">😡</div>
+    <div class="fen-kicker">Guerre populaire — le peuple exige</div>
+    <div class="fen-nation" id="fw-nation"></div>
+    <div class="fen-verb" id="fw-title"></div>
+    <div class="fen-body" id="fw-desc"></div>
+    <div class="fw-choices" id="fw-choices" style="text-align:left"></div>
+  </div></div>
 </div>
-<div id="peace-modal" class="hidden" style="position:fixed;inset:0;background:#0008;z-index:900;display:flex;align-items:center;justify-content:center">
-  <div class="atk-card" style="border-color:#44bb88;max-width:400px;padding:22px 24px">
-    <div class="atk-title" style="color:#55ffbb;font-size:1.1em">🕊️ Négociation de Paix</div>
-    <div id="pm-combatants" style="text-align:center;font-size:1em;margin:10px 0 6px"></div>
-    <div id="pm-declaredby" style="font-size:.8em;color:#8898b8;text-align:center;margin-bottom:12px"></div>
-    <div id="pm-context" style="font-size:.82em;color:#aabbcc;margin-bottom:14px;line-height:1.5"></div>
-    <div style="font-size:.85em;color:#ccd8ee;font-weight:700;margin-bottom:8px">💰 Offre de ressources :</div>
-    <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:6px 8px;align-items:center;margin-bottom:12px">
-      <span><i class=ri-materials></i> Mat. :</span><span></span>
-      <button onclick="adjustPeaceOffer('materials',-1)" style="width:26px;height:26px;background:#12152a;border:1px solid #334;color:#ccc;border-radius:4px;cursor:pointer;font-size:1em">−</button>
-      <span id="pm-mat" style="font-weight:700;color:#ffcc88;min-width:22px;text-align:center">0</span>
-      <button onclick="adjustPeaceOffer('materials',1)" style="width:26px;height:26px;background:#12152a;border:1px solid #334;color:#ccc;border-radius:4px;cursor:pointer;font-size:1em">+</button>
-      <span><i class=ri-energy></i> Én. :</span><span></span>
-      <button onclick="adjustPeaceOffer('energy',-1)" style="width:26px;height:26px;background:#12152a;border:1px solid #334;color:#ccc;border-radius:4px;cursor:pointer;font-size:1em">−</button>
-      <span id="pm-energy" style="font-weight:700;color:#88ccff;min-width:22px;text-align:center">0</span>
-      <button onclick="adjustPeaceOffer('energy',1)" style="width:26px;height:26px;background:#12152a;border:1px solid #334;color:#ccc;border-radius:4px;cursor:pointer;font-size:1em">+</button>
-      <span><i class=ri-science></i> Sav. :</span><span></span>
-      <button onclick="adjustPeaceOffer('science',-1)" style="width:26px;height:26px;background:#12152a;border:1px solid #334;color:#ccc;border-radius:4px;cursor:pointer;font-size:1em">−</button>
-      <span id="pm-science" style="font-weight:700;color:#88ffcc;min-width:22px;text-align:center">0</span>
-      <button onclick="adjustPeaceOffer('science',1)" style="width:26px;height:26px;background:#12152a;border:1px solid #334;color:#ccc;border-radius:4px;cursor:pointer;font-size:1em">+</button>
+<!-- ═══ NÉGOCIATION DE PAIX — fenêtre « Blason » (Marc, 14/09) : l'adversaire d'abord. Les ids `pm-*` sont
+     remplis par `showPeaceModal` (solo) et `showPeaceReal` (online.js). Le bloc d'offre de ressources est
+     conservé tel quel dans sa logique (`adjustPeaceOffer`, `_updatePeaceDisplay`). -->
+<style>
+.pm-offre{display:flex;flex-direction:column;gap:6px}
+.pm-res{display:grid;grid-template-columns:1.6em 1fr auto 2em auto;align-items:center;gap:6px}
+.pm-res .pm-lab{grid-column:1}
+.pm-res button:first-of-type{grid-column:3}
+.pm-res .pm-val{grid-column:4}
+.pm-res button:last-of-type{grid-column:5}
+.pm-res button{width:34px;height:34px;background:#12152a;border:1px solid #33386b;color:#dbe1f7;border-radius:8px;cursor:pointer;font-size:1.1em;line-height:1}
+.pm-val{font-weight:700;min-width:22px;text-align:center;font-variant-numeric:tabular-nums}
+.pm-lab i{width:1.2em;height:1.2em}
+</style>
+<div id="peace-modal" class="hidden" style="position:fixed;inset:0;background:rgba(4,4,18,.86);backdrop-filter:blur(6px);z-index:900;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:10px">
+  <div class="fen-wrap"><div class="fen fen-peace" id="pm-fen">
+    <div class="fen-medal" id="pm-emoji" aria-hidden="true">🕊️</div>
+    <div class="fen-kicker" id="pm-kicker">Négociation de paix</div>
+    <div class="fen-nation" id="pm-nation">Adversaire</div>
+    <div class="fen-verb" id="pm-verb">Proposer la paix ?</div>
+    <div id="pm-combatants" hidden></div>
+    <div class="fen-note" id="pm-declaredby"></div>
+    <div class="fen-body" id="pm-context"></div>
+    <div class="fen-slider">
+      <div class="row"><span>💰 Offre de ressources pour la paix</span></div>
+      <div class="pm-offre"><div class="pm-res"><span class="pm-lab"><i class="ri-materials"></i></span><button type="button" onclick="adjustPeaceOffer('materials',-1)" aria-label="Moins">−</button><span id="pm-mat" class="pm-val" style="color:#ffcc88">0</span><button type="button" onclick="adjustPeaceOffer('materials',1)" aria-label="Plus">+</button></div><div class="pm-res"><span class="pm-lab"><i class="ri-energy"></i></span><button type="button" onclick="adjustPeaceOffer('energy',-1)" aria-label="Moins">−</button><span id="pm-energy" class="pm-val" style="color:#88ccff">0</span><button type="button" onclick="adjustPeaceOffer('energy',1)" aria-label="Plus">+</button></div><div class="pm-res"><span class="pm-lab"><i class="ri-science"></i></span><button type="button" onclick="adjustPeaceOffer('science',-1)" aria-label="Moins">−</button><span id="pm-science" class="pm-val" style="color:#88ffcc">0</span><button type="button" onclick="adjustPeaceOffer('science',1)" aria-label="Plus">+</button></div></div>
+      <div class="row"><span id="pm-total"></span></div>
     </div>
-    <div id="pm-total" style="font-size:.82em;color:#8898b8;margin-bottom:14px"></div>
-    <div class="atk-btns" style="gap:8px">
-      <button onclick="submitPeaceOffer()" style="flex:1;padding:8px;background:#0a2a1a;border:1px solid #44bb88;color:#66ffaa;border-radius:6px;cursor:pointer;font-weight:700;font-size:.9em">🕊️ Proposer la paix</button>
-      <button onclick="rejectPeace()" style="flex:1;padding:8px;background:#2a0a0a;border:1px solid #cc4444;color:#ff8888;border-radius:6px;cursor:pointer;font-weight:700;font-size:.9em">⚔️ Se battre</button>
+    <div class="fen-btns atk-btns">
+      <button type="button" class="fen-btn no" onclick="rejectPeace()"><span class="k">Se battre</span><span class="s">la guerre continue</span></button>
+      <button type="button" class="fen-btn ok" onclick="submitPeaceOffer()"><span class="k">Proposer</span><span class="s">la paix</span></button>
     </div>
-  </div>
+  </div></div>
 </div>
+<!-- ═══ COMBAT DE GUERRE (solo) — Blason (14/09). Les ids wcm-* sont conservés : la logique (choix de cible, curseur,
+     défense) est inchangée ; `fenAdversaire('war-combat-modal')` remplit médaillon et nom à l'ouverture. -->
 <div id="war-combat-modal" class="hidden">
-  <div class="atk-card" style="border-color:#ff8c00;max-width:340px">
-    <div class="atk-title" style="color:#ffb347">⚔️ Combat de Guerre — Tour <span id="wcm-turn"></span></div>
-    <div class="atk-sub" id="wcm-sub"></div>
-    <div class="atk-info" id="wcm-info"></div>
-    <div class="atk-slider-row">
-      <label>Jetons engagés :</label>
-      <input type="range" id="wcm-slider" min="0" max="10" value="0" oninput="_warSliderMode==='defend'?updateWarDefenseSlider():updateWarCombatSlider()">
-      <span id="wcm-slider-val" style="font-weight:700;color:#ffb347;min-width:22px">0</span>
+  <div class="fen-wrap"><div class="fen fen-war" id="wcm-fen">
+    <div class="fen-medal" id="wcm-emoji" aria-hidden="true">⚔️</div>
+    <div class="fen-kicker">Guerre — tour <span id="wcm-turn"></span></div>
+    <div class="fen-nation" id="wcm-nation"></div>
+    <div class="fen-verb" id="wcm-sub"></div>
+    <div class="fen-body fen-left" id="wcm-info"></div>
+    <div class="fen-slider">
+      <div class="row"><span>Jetons engagés</span><b id="wcm-slider-val">0</b></div>
+      <input type="range" id="wcm-slider" min="0" max="10" value="0" aria-label="Jetons engagés" oninput="_warSliderMode==='defend'?updateWarDefenseSlider():updateWarCombatSlider()">
     </div>
-    <div class="atk-power" id="wcm-power" style="color:#ffb347"></div>
-    <div class="atk-btns">
-      <button class="atk-confirm" style="background:#2a1200;border-color:#ff8c00;color:#ffb347" onclick="confirmWarCombat()">⚔️ Engager</button>
-      <button class="atk-cancel" onclick="cancelWarCombat()">↩ Annuler</button>
+    <div class="fen-body" id="wcm-power"></div>
+    <div class="fen-btns atk-btns">
+      <button type="button" class="fen-btn ghost" onclick="cancelWarCombat()"><span class="k">Annuler</span><span class="s">revenir au choix</span></button>
+      <button type="button" class="fen-btn no" onclick="confirmWarCombat()"><span class="k">Engager</span><span class="s">ces jetons</span></button>
     </div>
-  </div>
+  </div></div>
 </div>
 <div id="route-capture-modal" class="hidden">
-  <div class="atk-card" style="border-color:#4a8aff;max-width:340px">
-    <div class="atk-title" style="color:#8fbaff">🛤️ Route conquise — <span id="rcm-title"></span></div>
-    <div class="atk-sub" id="rcm-desc" style="margin:8px 0 12px;color:#c8d8f8;font-size:.85em"></div>
-    <div class="atk-btns" style="flex-direction:column;gap:8px">
-      <button class="atk-confirm" id="rcm-keep" style="background:#0a2a1a;border-color:#44bb88;color:#66ffaa" onclick="routeCaptureChoice(true)">🎖️ La récupérer</button>
-      <button class="atk-cancel" onclick="routeCaptureChoice(false)">💥 La détruire</button>
+  <div class="fen-wrap"><div class="fen fen-war">
+    <div class="fen-medal" aria-hidden="true">🛤️</div>
+    <div class="fen-kicker">Route conquise</div>
+    <div class="fen-nation" id="rcm-title"></div>
+    <div class="fen-body" id="rcm-desc"></div>
+    <div class="fen-btns atk-btns">
+      <button type="button" class="fen-btn no" onclick="routeCaptureChoice(false)"><span class="k">Détruire</span><span class="s">l'adversaire la perd</span></button>
+      <button type="button" class="fen-btn ok" id="rcm-keep" onclick="routeCaptureChoice(true)"><span class="k">Récupérer</span><span class="s">elle devient tienne</span></button>
     </div>
-  </div>
+  </div></div>
 </div>
 <div id="forge-modal" class="hidden">
-  <div class="atk-card" style="border-color:#FFB74D;max-width:340px">
-    <div class="atk-title" style="color:#ffcf8a">💫 Forge Orbitale</div>
-    <div class="atk-sub" style="color:#c8d8f8;font-size:.82em;margin:6px 0 10px">Choisis la lune joviène à améliorer (Nv.1 → Nv.2 · 0 AC, −1<i class=ri-materials></i> −1<i class=ri-energy></i>).</div>
-    <div id="forge-opts"></div>
-    <button class="atk-cancel" onclick="forgeCancel()">↩ Annuler</button>
-  </div>
+  <div class="fen-wrap"><div class="fen fen-event" style="border-color:#c77a1a">
+    <div class="fen-medal" aria-hidden="true">💫</div>
+    <div class="fen-kicker">Pouvoir national</div>
+    <div class="fen-nation">Forge orbitale</div>
+    <div class="fen-body">Choisis la lune joviène à améliorer (Nv.1 → Nv.2 · 0 AC, −1<i class=ri-materials></i> −1<i class=ri-energy></i>).</div>
+    <div id="forge-opts" style="text-align:left"></div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn ghost" onclick="forgeCancel()"><span class="k">Annuler</span></button></div>
+  </div></div>
 </div>
 <script src="moteur.js"></script>
 <script>
+/* ═══════════════════════════════════════════════════════════════════════════════════════
+   FENÊTRES « BLASON » — l'assembleur commun (affichage pur, aucune règle ici).
+   spec = { ton:'war'|'peace'|'info'|'event'|'neutre', emoji:'☠️', kicker:'Assaut surprise',
+            nation:'Ceinturiens', verbe:'attaquent <b>Ganymède</b>', chips:['Combats <b>0 – 1</b>', …],
+            corps:'<p>…</p>' (HTML), milieu:'<…>' (HTML libre : curseur, VS…), note:'…',
+            boutons:[{k:'Poursuivre', s:'la guerre', cls:'no', onclick:'…', id:'…', disabled:true}, …],
+            colonne:true (boutons empilés), id:'…' (id du .fen) }
+   Rend une chaîne HTML. Les appelants (moteur.js en solo, online.js en ligne) s'en servent quand elle
+   existe et gardent leur ancien rendu sinon — le serveur, lui, n'a pas de document.
+   ═══════════════════════════════════════════════════════════════════════════════════════ */
+function fenBlason(spec){
+  var o=spec||{}, esc=function(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};
+  var h='<div class="fen-wrap"><div class="fen fen-'+(o.ton||'neutre')+'"'+(o.id?' id="'+esc(o.id)+'"':'')+'>';
+  if(o.emoji) h+='<div class="fen-medal" aria-hidden="true">'+o.emoji+'</div>';
+  if(o.kicker) h+='<div class="fen-kicker">'+o.kicker+'</div>';
+  if(o.nation) h+='<div class="fen-nation">'+o.nation+'</div>';
+  if(o.verbe) h+='<div class="fen-verb">'+o.verbe+'</div>';
+  if(o.chips&&o.chips.length) h+='<div class="fen-chips">'+o.chips.map(function(c){return '<span>'+c+'</span>';}).join('')+'</div>';
+  if(o.milieu) h+=o.milieu;
+  if(o.corps) h+='<div class="fen-body'+(o.gauche?' fen-left':'')+'">'+o.corps+'</div>';
+  if(o.note) h+='<div class="fen-note">'+o.note+'</div>';
+  if(o.boutons&&o.boutons.length){
+    h+='<div class="fen-btns'+(o.boutons.length===1?' fen-one':'')+(o.colonne?' fen-col':'')+'">';
+    o.boutons.forEach(function(b){
+      h+='<button type="button" class="fen-btn '+(b.cls||'ghost')+'"'+(b.id?' id="'+esc(b.id)+'"':'')+(b.onclick?' onclick="'+esc(b.onclick)+'"':'')+(b.disabled?' disabled':'')+'>'
+        +'<span class="k">'+b.k+'</span>'+(b.s?'<span class="s">'+b.s+'</span>':'')+'</button>';
+    });
+    h+='</div>';
+  }
+  return h+'</div></div>';
+}
+/* Le nom d'une nation pour un médaillon : emoji + nom, « (toi) » si c'est le joueur. */
+function fenNation(nat){ if(!nat||!nat.civ) return {emoji:'⚔️',nom:'?'}; var moi=(typeof G!=='undefined'&&G&&nat===G.player); return {emoji:nat.civ.emoji||'', nom:nat.civ.name+(moi?' (toi)':'')}; }
+/* Remplit le médaillon (`<id>-emoji`) et le nom (`<id>-nation`) d'une fenêtre avec une nation : celle passée,
+   sinon l'ennemi de guerre courant (`guerreAdverseId`). Appelée à l'ouverture des fenêtres de guerre solo. */
+function fenAdversaire(prefix, nat){
+  try{
+    if(!nat){ var id=(typeof guerreAdverseId==='function')?guerreAdverseId():null; if(!id&&typeof G!=='undefined'&&G&&G.warWith) id=G.warWith;
+      nat=id&&typeof allPlayers==='function'?allPlayers().find(function(x){return x&&x.civ&&x.civ.id===id;}):null; }
+    var e=document.getElementById(prefix+'-emoji'), n=document.getElementById(prefix+'-nation');
+    if(e)e.textContent=nat?(nat.civ.emoji||'⚔️'):'⚔️'; if(n)n.textContent=nat?nat.civ.name:'';
+  }catch(err){}
+}
+/* La fenêtre « Dyson » sert à plusieurs messages (moral à 0, Extra-Solaire, Dyson adverse) : le médaillon suit
+   l'emoji de tête du titre, et le titre garde le reste. Observateur d'affichage, sans règle. */
+(function(){ try{
+  var t=document.getElementById('dyson-title'); if(!t||!window.MutationObserver)return;
+  var m=t.parentElement?t.parentElement.querySelector('.fen-medal'):null;
+  var maj=function(){ var s=t.textContent||''; var mm=s.match(/^\s*(\p{Extended_Pictographic}(?:\uFE0F)?)\s*(.*)$/u); if(mm&&m){ m.textContent=mm[1]; if(t.textContent!==mm[2]) t.textContent=mm[2]; } };
+  new MutationObserver(maj).observe(t,{childList:true,characterData:true,subtree:true});
+}catch(e){} })();
+/* Aa — taille du texte (menu Journal). 13 = ce que le jeu a toujours eu. */
+function scTaille(px){
+  px=parseInt(px,10); if(!/^(11|13|15|17)$/.test(String(px))) px=13;
+  document.documentElement.style.setProperty('--sc-fs',px+'px');
+  document.querySelectorAll('#sc-taille button').forEach(function(b){ b.setAttribute('aria-pressed', String(parseInt(b.getAttribute('data-fs'),10)===px)); });
+  try{ localStorage.setItem('sc_taille',String(px)); }catch(e){}
+  try{ if(typeof render==='function'&&typeof G!=='undefined'&&G&&G.player) render(); }catch(e){}
+}
+(function(){ try{ var t=parseInt(localStorage.getItem('sc_taille')||'13',10); document.querySelectorAll('#sc-taille button').forEach(function(b){ b.setAttribute('aria-pressed', String(parseInt(b.getAttribute('data-fs'),10)===t)); }); }catch(e){} })();
+
 /* ============================================================ */
 /* ===============  COUCHE MOBILE / SMALL SCREEN  ============= */
 /* ===============  (présentation uniquement)  =============== */
@@ -1648,6 +1835,11 @@ function uiZoom(d){
    est calé entre les deux (padding de #game-wrap) et les modales s'y inscrivent.
    On mesure offsetHeight (pas getBoundingClientRect) pour rester insensible au
    transform de suivi visualViewport appliqué pendant un pinch. */
+/* Les barres changent de hauteur après la première mesure (la barre du haut se remplit quand la partie est
+   créée, la fenêtre d'agenda s'ouvre AVANT) : on remesure à chaque changement de taille. Sinon le médaillon
+   de la première fenêtre passait sous la barre du haut (vu aux captures du 14/09). */
+(function(){ try{ if(!window.ResizeObserver)return; var ro=new ResizeObserver(function(){ uiSyncBands(); });
+  ['top-bar','bottom-bar'].forEach(function(id){ var e=document.getElementById(id); if(e)ro.observe(e); }); }catch(e){} })();
 function uiSyncBands(){
   try{
     var t=document.getElementById('top-bar'),b=document.getElementById('bottom-bar');

@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-14 · v10.45';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-14 · v10.47';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -516,7 +516,7 @@ function showHitReal(pending){
   if(b)b.innerHTML=o.body||'';
   if(r)r.classList.add('hidden');
   const go=()=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide({}); };
-  const btn=m.querySelector('.war-btn'); if(btn){ btn.textContent='Compris →'; btn.onclick=go; }
+  const btn=m.querySelector('.war-btn'); if(btn){ btn.innerHTML='<span class="k">Compris</span>'; btn.onclick=go; }
   m.classList.remove('hidden');
   return true;
 }
@@ -526,6 +526,13 @@ function showWarResultReal(pending){
   const m=document.getElementById('war-modal'); if(!m) return false;
   const t=document.getElementById('wm-title'), b=document.getElementById('wm-body'), r=document.getElementById('wm-result');
   if(t)t.textContent=o.title||'⚔️ Combat';
+  /* Blason (14/09) : l'adversaire en médaillon. `civs` = [propriétaire, adversaire] ; « Vu par X » si on
+     est le tiers spectateur (préfixe ajouté par le serveur dans ownerName). */
+  try{ const G=scGetG(); const me=(typeof myNation==='function'&&myNation())||G.player; const civs=o.civs||[];
+    const advId=civs.find(c=>c&&me&&me.civ&&c!==me.civ.id)||null;
+    const n=advId?[G.player].concat(G.ais||[]).find(x=>x&&x.civ&&x.civ.id===advId):null;
+    const e=document.getElementById('wm-emoji'), nm=document.getElementById('wm-nation');
+    if(e)e.textContent=n?n.civ.emoji:'⚔️'; if(nm)nm.textContent=n?((window._scPseudo&&window._scPseudo[n.civ.id])||n.civ.name):''; }catch(e){}
   if(b)b.innerHTML=o.body||'';
   if(r){ const res=o.result||null;
     // Même correctif que dans le puits de notices : ces phrases portent les icônes de ressources
@@ -564,9 +571,11 @@ function showRouteCaptureReal(pending){
   if(t)t.textContent='🛤️ '+(o.name||'');
   if(d)d.innerHTML=o.prot?'Tu as <b>brisé la protection</b> ennemie (jeton détruit). 2 jetons engagés : 1 part en récupération. Que faire de la route ?':'Route ennemie <b>non protégée</b>, prise sans coût. Que faire ?';
   const go=(ans)=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide(ans); };
-  const btns=m.querySelectorAll('.atk-btns button');
-  if(btns[0])btns[0].onclick=()=>go({capture:true});
-  if(btns[1])btns[1].onclick=()=>go({capture:false});
+  /* Par RÔLE (Blason : rouge = détruire à gauche, vert = récupérer à droite), plus par rang. */
+  const bKeep=m.querySelector('#rcm-keep')||m.querySelectorAll('.atk-btns button')[0];
+  const bDest=m.querySelector('.fen-btn.no')||m.querySelectorAll('.atk-btns button')[1];
+  if(bKeep)bKeep.onclick=()=>go({capture:true});
+  if(bDest)bDest.onclick=()=>go({capture:false});
   m.classList.remove('hidden');
   return true;
 }
@@ -577,7 +586,9 @@ function showForcedWarReal(pending){
   const title=document.getElementById('fw-title'), desc=document.getElementById('fw-desc'), choices=document.getElementById('fw-choices');
   if(!choices) return false;
   const enemy=(window._scPseudo&&window._scPseudo[o.enemy])||o.enemyName||'l\'ennemi';
-  if(title)title.textContent='⚔️ Guerre Populaire contre '+enemy+' !';
+  /* Blason : médaillon + nom de l'ennemi, le titre devient le verbe. */
+  try{ const G=scGetG(); const n=[G.player].concat(G.ais||[]).find(x=>x&&x.civ&&x.civ.id===o.enemy); const e=document.getElementById('fw-emoji'), nm=document.getElementById('fw-nation'); if(e)e.textContent=n?n.civ.emoji:'😡'; if(nm)nm.textContent=enemy; }catch(e){}
+  if(title)title.textContent='Ton peuple exige la guerre. Choisis ta cible.';
   if(desc)desc.innerHTML='Tension à 10 : le peuple exige que tu attaques <b>'+enemy+'</b> maintenant.';
   const go=(ans)=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide(ans); };
   let html='<div class="fw-choice" id="fw-peace">🕊️ Exiger la paix (tribut si ennemi faible, sinon la guerre continue)</div>';
@@ -608,10 +619,11 @@ function showAccordReal(pending){
   const m=document.getElementById('accord-modal'); if(!m) return false;
   const body=document.getElementById('accord-body'); const conf=document.getElementById('accord-confirm');
   if(!body||!conf) return false;
-  body.innerHTML='Conclure un accord commercial avec <b>'+(o.withName||'cette nation')+'</b>'+(o.nodeName?(' sur <b>'+o.nodeName+'</b>'):'')+' ? (+3 VP chacun, met fin à une guerre)';
+  try{ const G=scGetG(); const n=[G.player].concat(G.ais||[]).find(x=>x&&x.civ&&(x.civ.id===o.withId||x.civ.name===o.withName)); const e=document.getElementById('accord-emoji'), nm=document.getElementById('accord-nation'); if(e)e.textContent=n?n.civ.emoji:'🤝'; if(nm)nm.textContent=o.withName||(n?n.civ.name:''); }catch(e){}
+  body.innerHTML='Conclure un accord commercial'+(o.nodeName?(' sur <b>'+o.nodeName+'</b>'):'')+' ? (+3 VP chacun, met fin à une guerre)';
   const go=(ans)=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide(ans); };
   conf.onclick=()=>go({confirm:true});
-  const cancel=m.querySelector('button.npop-btn'); if(cancel)cancel.onclick=()=>go({confirm:false});
+  const cancel=m.querySelector('button.npop-btn')||m.querySelector('.fen-btn.ghost'); if(cancel)cancel.onclick=()=>go({confirm:false});
   m.classList.remove('hidden');
   return true;
 }
@@ -711,15 +723,22 @@ function showPeaceReal(pending){
   if(G)G._peaceOffer={materials:0,energy:0,science:0};
   const set=(id,html)=>{const e=document.getElementById(id);if(e)e.innerHTML=html;};
   set('pm-combatants','<b>'+(me.civ.emoji||'')+' '+me.civ.name+'</b><span style="color:#556;font-size:.9em"> ⚔️ contre ⚔️ </span><b>'+(atk?atk.civ.emoji:'')+' '+atkName+'</b>');
+  /* Blason (14/09) : médaillon + nom de l'adversaire, avant tout texte. */
+  set('pm-emoji', atk?atk.civ.emoji:'🕊️'); set('pm-nation', esc(atkName));
+  set('pm-kicker', o.isJustDeclared?'Guerre déclarée':('Guerre — tour '+(G&&G.turn?G.turn:'')));
+  set('pm-verb', o.declaredBy==='player'?'Tu as déclaré la guerre. Proposer la paix ?':'Proposer la paix ?');
   set('pm-declaredby', o.declaredBy==='player'?'Guerre déclarée par toi — l\'adversaire répond.':('Guerre déclarée par '+atkName+'.'));
   const vy=(o.vpYou&&o.vpYou.total!==undefined)?o.vpYou.total:(o.vpYou||0);
   const ve=(o.vpEnemy&&o.vpEnemy.total!==undefined)?o.vpEnemy.total:(o.vpEnemy||0);
   set('pm-context','VP — Toi : <b>'+vy+'</b> | Adversaire : <b>'+ve+'</b><br>Offre des ressources pour tenter la paix, ou refuse et combats.');
   if(typeof _updatePeaceDisplay==='function'){try{_updatePeaceDisplay();}catch(e){}}
   const close=()=>{ m.classList.add('hidden'); m.style.display='none'; };
-  const btns=m.querySelectorAll('.atk-btns button');
-  if(btns[0])btns[0].onclick=function(){ const off=(G&&G._peaceOffer)||{materials:0,energy:0,science:0}; close(); if(STATE._realDecide)STATE._realDecide({accept:true,offer:off}); };
-  if(btns[1])btns[1].onclick=function(){ if(!_confirmerGuerreSansMoyens(o))return; close(); if(STATE._realDecide)STATE._realDecide({accept:false}); };
+  /* Les boutons sont désignés par leur RÔLE (.ok / .no), plus par leur rang : l'ordre a changé avec
+     le Blason (rouge à gauche, vert à droite) et un rang aurait inversé paix et guerre. */
+  const bOk=m.querySelector('.fen-btn.ok')||m.querySelectorAll('.atk-btns button')[0];
+  const bNo=m.querySelector('.fen-btn.no')||m.querySelectorAll('.atk-btns button')[1];
+  if(bOk)bOk.onclick=function(){ const off=(G&&G._peaceOffer)||{materials:0,energy:0,science:0}; close(); if(STATE._realDecide)STATE._realDecide({accept:true,offer:off}); };
+  if(bNo)bNo.onclick=function(){ if(!_confirmerGuerreSansMoyens(o))return; close(); if(STATE._realDecide)STATE._realDecide({accept:false}); };
   m.style.display='flex'; m.classList.remove('hidden');
   return true;
 }
@@ -877,11 +896,11 @@ function showEventReal(o, isAnnounce){
     m.classList.remove('hidden'); return true;
   }
   const m=document.getElementById('event-modal'); if(!m) return false;
-  const card=document.getElementById('evm-card'); if(card)card.className='evt-card'+(ev.type?(' '+ev.type):'');
+  const card=document.getElementById('evm-card'); if(card){card.className='fen fen-event evt-card'+(ev.type?(' '+ev.type):''); card.style.borderColor='';}
   const em=document.getElementById('evm-emoji'), bd=document.getElementById('evm-badge'), nm=document.getElementById('evm-name'), rs=document.getElementById('evm-result'), cq=document.getElementById('evm-consequence');
   const T={competition:'COMPÉTITION',menace:'MENACE',opportunite:'OPPORTUNITÉ'};
   if(em)em.textContent=ev.emoji||'🎯';
-  if(bd){bd.textContent=T[ev.type]||'ÉVÉNEMENT';bd.style.background=ev.type==='menace'?'#3a1a08':ev.type==='competition'?'#3a0808':'#0a2a18';bd.style.color=ev.type==='menace'?'#ffbb77':ev.type==='competition'?'#ff7777':'#88e8b0';}
+  if(bd){bd.textContent=T[ev.type]||'ÉVÉNEMENT';bd.style.color=ev.type==='menace'?'#ffb347':ev.type==='competition'?'#ff6b62':ev.type==='opportunite'?'#5fd08a':'#ffd34d';}
   if(nm)nm.textContent=ev.name||'Événement';
   if(rs)rs.innerHTML=o.msg||'—';
   if(cq)cq.classList.add('hidden');
@@ -1360,11 +1379,19 @@ function injectStyles(){
   /* Look NATIF du jeu (carte sombre, bordure violette, police du jeu), inscrit dans la BANDE CENTRALE
      (entre les barres haut/bas) — restaure l'apparence d'origine au lieu du panneau bleu minimaliste. */
   #sc-decision{position:fixed;left:0;right:0;top:var(--topband,0);bottom:var(--botband,0);z-index:375;background:rgba(4,4,18,.92);backdrop-filter:blur(6px);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:8px}
-  #sc-decision .card{background:#0c0c24;border:2px solid #5a1a7a;border-radius:16px;padding:22px 26px;width:min(94vw,440px);max-height:none;margin:auto;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.92);color:#e6ecff;font-family:var(--font-corps,system-ui),sans-serif;text-align:center;box-sizing:border-box}
+  /* Blason (Marc, 14/09) : le panneau générique prend la forme de la famille .fen (index.html) — même
+     cadre, titre en Michroma, boutons de 48 px. Les fenêtres qui ont un adversaire (défense, combat de
+     guerre, paix) sont assemblées par fenBlason avec le médaillon ; celles-ci gardent le cadre commun. */
+  #sc-decision .card{background:#0e1030;border:1px solid #33386b;border-radius:18px;padding:18px 16px 14px;width:min(94vw,470px);max-height:none;margin:auto;overflow:auto;box-shadow:0 18px 50px rgba(0,0,0,.65);color:#dbe1f7;font-family:var(--font-corps,system-ui),sans-serif;text-align:center}
+  #sc-decision .card:has(> .fen-wrap){background:none;border:0;box-shadow:none;padding:0}
+  #sc-decision h2{color:#fff;font-family:var(--font-titre,var(--font-corps)),sans-serif;font-weight:400;font-size:1em;letter-spacing:.06em;text-transform:uppercase;margin:0 0 12px;line-height:1.3}
+  #sc-decision .muted{color:#9aa3c7;font-size:.86em}
+  #sc-decision .opt{display:block;width:100%;text-align:left;margin:7px 0;padding:12px 14px;min-height:48px;border-radius:12px;border:1px solid #33386b;background:#0b0d24;color:#dbe1f7;cursor:pointer;font-size:.95em;line-height:1.3}
+  #sc-decision .opt:hover{border-color:#4a9eff;background:#12143a}
   #sc-decision h2{color:#fff;font-size:1.3em;margin:0 0 14px;font-weight:700}
   #sc-decision .muted{color:#9fb0d0;font-size:.82em}
   #sc-decision .opt{display:block;width:100%;text-align:left;margin:7px 0;padding:11px 13px;border-radius:9px;border:1px solid #2a3a6a;background:#141a30;color:#dce8ff;cursor:pointer;font-size:.92em}
-  #sc-decision .opt:hover{border-color:#7a4aaa;background:#1c2340}`;
+  #sc-decision .fen-btns .opt{margin:0}`;
   document.head.appendChild(s);
 }
 function overlay(inner){
@@ -1944,6 +1971,40 @@ function askLocalDecision(pending){
       const who=(window._scPseudo&&window._scPseudo[o.attacker])||o.attackerName||o.attacker;
       const cible=o.target?((o.target.type==='route'?'🛤️ route ':'🏙️ ')+o.target.name):'tes positions';
       const cc=o.cruiserCost||{materials:5,energy:5};
+      /* ═══ BLASON (Marc, 14/09) : l'assaillant d'abord — médaillon, nom, puis le verbe et deux gros chiffres.
+         Même fenêtre qu'en solo (`showAiAssaultDefenseModal`). Les ids sc-d / sc-dv / sc-dt / sc-cru / sc-ok /
+         sc-none sont inchangés : la logique en dessous est la même. */
+      if(typeof fenBlason==='function'){
+        let _emo='⚔️'; try{ const _G=scGetG(); const _n=[_G.player].concat(_G.ais||[]).find(x=>x&&x.civ&&x.civ.id===o.attacker); if(_n)_emo=_n.civ.emoji||'⚔️'; }catch(e){}
+        const _v0=Math.min(2,max), _base=(o.garrison||0)+(o.empath||0);
+        const _cibleB=o.target?((o.target.type==='route'?'la route ':'')+'<b>'+esc(o.target.name)+'</b>'):'<b>tes positions</b>';
+        const _milieu='<div class="fen-vs">'
+          +'<div><div class="n them">'+(o.threat!==undefined?('≈'+o.threat):'?')+'</div><div class="l">Leur force</div></div><div class="x">VS</div>'
+          +'<div><div class="n me" id="sc-dt">'+(_v0+_base)+'</div><div class="l">Ta défense</div></div></div>'
+          +'<div class="fen-slider">'
+          +'<div class="row"><span>Jetons engagés</span><b><span id="sc-dv">'+_v0+'</span> / '+max+'</b></div>'
+          +'<input type="range" id="sc-d" min="0" max="'+max+'" value="'+_v0+'" aria-label="Jetons engagés en défense">'
+          +'<div class="row"><span>'+(o.navDemi?'½🪨 ½⚡ par jeton (IA de Navigation)':'1🪨 1⚡ par jeton')+' · tu as '+(o.myTokens!==undefined?o.myTokens:max)+' jetons, '+(o.myMat!==undefined?o.myMat:'?')+'🪨 '+(o.myEnergy!==undefined?o.myEnergy:'?')+'⚡</span></div>'
+          +(o.garrison!==undefined?'<div class="row"><span>🏛️ Garnison <b>'+o.garrison+'</b>'+(o.garrisonLabel?' ('+esc(o.garrisonLabel)+')':'')+(o.empath?' · 🔮 +'+o.empath+' Empathes':'')+'</span></div>':'')
+          +(o.cruiser?('<label><input type="checkbox" id="sc-cru"><span>⚓ Déployer le <b>Supercroiseur</b> (+'+(o.cruiserPower||5)+'⚔️, −'+cc.materials+'🪨 −'+cc.energy+'⚡)</span></label>'):'')
+          +'</div>';
+        const _chips=[];
+        if(o.threatDetail) _chips.push(esc(o.threatDetail));
+        if(o.attackerCruiser) _chips.push('⚓ Supercroiseur déployé');
+        if(o.renfort) _chips.push('🤝 Tu partages '+esc(o.target?o.target.name:'ce nœud')+' avec '+esc(o.principal||'le propriétaire'));
+        body=fenBlason({ton:'war', emoji:_emo, kicker:o.renfort?'Renfort — nœud partagé':'Assaut surprise', nation:esc(who),
+          verbe:(o.renfort?'assaillent ':'attaquent ')+_cibleB, chips:_chips, milieu:_milieu,
+          boutons:[{k:o.renfort?'Rien':'Ne rien engager', s:o.renfort?'le propriétaire défend seul':'la garnison seule', cls:'ghost', id:'sc-none'},
+                   {k:o.renfort?'Renforcer':'Défendre', s:'<span id="sc-dbs">avec '+_v0+' jeton'+(_v0>1?'s':'')+'</span>', cls:'no', id:'sc-ok'}]});
+        decisionPanel(body);
+        const sl=document.getElementById('sc-d'), dv=document.getElementById('sc-dv'), dt=document.getElementById('sc-dt'), dbs=document.getElementById('sc-dbs');
+        const cru=()=>{ const c=document.getElementById('sc-cru'); return !!(c&&c.checked); };
+        const maj=()=>{ const v=parseInt(sl.value)||0; dv.textContent=v; if(dt)dt.textContent=v+_base+(cru()?(o.cruiserPower||5):0); if(dbs)dbs.textContent=v>0?('avec '+v+' jeton'+(v>1?'s':'')):'la garnison seule'; };
+        if(sl)sl.oninput=maj; { const c=document.getElementById('sc-cru'); if(c)c.onchange=maj; }
+        document.getElementById('sc-ok').onclick=()=>done({defTokens:parseInt(sl.value)||0, cruiser:cru()});
+        document.getElementById('sc-none').onclick=()=>done({defTokens:0, cruiser:false});
+        return;
+      }
       body='<h2>'+(o.renfort?'🤝 Renfort !':'🛡️ Défense !')+'</h2>'
         /* Défense à deux (Marc, 07/09) : l'hôte d'un nœud partagé est consulté APRÈS le propriétaire ;
            ses jetons s'ajoutent à ceux du principal et à la garnison. */
@@ -1986,6 +2047,9 @@ function askLocalDecision(pending){
       const cru=o.cruiser||{has:false,afford:false,power:5};
       const cols=o.cols||[]; const threat=o.aiThreat;
       const routes=o.routes||[]; const estAgresseur=!!o.estAgresseur;
+      /* Blason (14/09) : l'ennemi en médaillon sur les deux écrans (liste des cibles, puis curseur). */
+      let _enEmo='⚔️'; try{ const _G=scGetG(); const _n=[_G.player].concat(_G.ais||[]).find(x=>x&&x.civ&&(x.civ.id===o.enemy||x.civ.name===o.enemyName)); if(_n)_enEmo=_n.civ.emoji||'⚔️'; }catch(e){}
+      const _blason=(typeof fenBlason==='function');
       const tokenPick=(title,hint,onOk)=>{ // sous-écran : choisir les jetons engagés (+ supercroiseur)
         const limite=(maxF<force)?('<div style="color:#ffcc88;font-size:.82em;margin-bottom:4px">⚠️ Tu possèdes '+force+' jeton(s) mais ne peux en <b>payer</b> que '+maxF+' (1🪨 +1⚡ par jeton engagé).</div>'):'';
         const cruLigne=cru.has
@@ -1993,6 +2057,15 @@ function askLocalDecision(pending){
              +'<input type="checkbox" id="sc-cru" style="width:auto"'+(cru.afford?'':' disabled')+'>'
              +'<span>⚓ Déployer le Supercroiseur <b>+'+(cru.power||5)+'⚔️</b>'+(cru.afford?'':' — ressources insuffisantes')+'</span></label>')
           : '';
+        if(_blason){
+          decisionPanel(fenBlason({ton:'war', emoji:_enEmo, kicker:'Guerre'+(o.warTurnsLeft!==undefined?' · '+o.warTurnsLeft+' tour'+(o.warTurnsLeft>1?'s':'')+' restant'+(o.warTurnsLeft>1?'s':''):''), nation:esc(o.enemyName||'ennemi'),
+            verbe:title, corps:(hint?hint:'')+limite,
+            milieu:'<div class="fen-slider"><div class="row"><span>Jetons engagés</span><b><span id="sc-wcv">'+Math.min(1,maxF)+'</span> / <span id="sc-wcmax">'+maxF+'</span></b></div>'
+              +'<input type="range" id="sc-wc" min="0" max="'+maxF+'" value="'+Math.min(1,maxF)+'" aria-label="Jetons engagés">'
+              +cruLigne.replace('style="display:flex;align-items:center;gap:8px;margin:8px 0;','style="')
+              +'<div id="sc-wclim" class="row" style="color:#ffcc88;min-height:1em"></div></div>',
+            boutons:[{k:'Retour', s:'choisir autre chose', cls:'ghost', id:'sc-wcback'},{k:'Engager', s:'ces jetons', cls:'no', id:'sc-wcok'}]}));
+        } else
         decisionPanel('<h2>'+title+'</h2>'+(hint?'<div class="muted" style="margin-bottom:6px">'+hint+'</div>':'')+limite
           +'<div>Jetons engagés : <b id="sc-wcv">'+Math.min(1,maxF)+'</b> / <b id="sc-wcmax">'+maxF+'</b></div>'
           +'<input type="range" id="sc-wc" min="0" max="'+maxF+'" value="'+Math.min(1,maxF)+'" style="width:100%">'
@@ -2020,9 +2093,9 @@ function askLocalDecision(pending){
         document.getElementById('sc-wcback').onclick=()=>main();
       };
       const main=()=>{
-        let b='<h2>⚔️ Combat de guerre — '+(o.enemyName||'ennemi')+'</h2>';
-        b+='<div class="muted" style="margin-bottom:8px">Jetons engageables : <b>'+maxF+'</b>'+((maxF<force)?(' <span style="color:#ffcc88">(sur '+force+' possédés — limité par tes ressources)</span>'):'')+' · Tour de guerre restant : '+(o.warTurnsLeft||'?')+'</div>';
-        if(threat) b+='<div style="background:#2a1200;border:1px solid #cc6622;border-radius:8px;padding:7px 10px;margin-bottom:8px;color:#ffcfa0;font-size:.85em">🛡️ L\'ennemi menace : <b>'+(threat.type==='colony'?'🏙️ ':'🛤️ ')+threat.name+'</b>. Tu peux <b>défendre</b>.</div>';
+        let b=_blason?'':('<h2>⚔️ Combat de guerre — '+(o.enemyName||'ennemi')+'</h2>');
+        if(!_blason) b+='<div class="muted" style="margin-bottom:8px">Jetons engageables : <b>'+maxF+'</b>'+((maxF<force)?(' <span style="color:#ffcc88">(sur '+force+' possédés — limité par tes ressources)</span>'):'')+' · Tour de guerre restant : '+(o.warTurnsLeft||'?')+'</div>';
+        if(threat&&!_blason) b+='<div style="background:#2a1200;border:1px solid #cc6622;border-radius:8px;padding:7px 10px;margin-bottom:8px;color:#ffcfa0;font-size:.85em">🛡️ L\'ennemi menace : <b>'+(threat.type==='colony'?'🏙️ ':'🛤️ ')+threat.name+'</b>. Tu peux <b>défendre</b>.</div>';
         // Attaquer une colonie ennemie
         if(cols.length){
           b+='<div style="font-weight:700;color:#ff9966;margin:4px 0 3px">⚔️ Attaquer une colonie</div>';
@@ -2051,6 +2124,11 @@ function askLocalDecision(pending){
                         :'🕊️ Tenir position (ne rien engager)')+'</button>';
         /* Et on DIT pourquoi tout est gris, au lieu de laisser croire à une fenêtre cassée. */
         if(maxF<1) b+='<div style="color:#ffcc88;font-size:.82em;margin-top:6px">⚠️ Tu n\'as pas de quoi engager un seul jeton (1🪨 +1⚡ chacun) : aucune attaque n\'est possible ce tour-ci.</div>';
+        if(_blason){
+          b=fenBlason({ton:'war', emoji:_enEmo, kicker:'Guerre'+(o.warTurnsLeft!==undefined?' · '+o.warTurnsLeft+' tour'+(o.warTurnsLeft>1?'s':'')+' restant'+(o.warTurnsLeft>1?'s':''):''), nation:esc(o.enemyName||'ennemi'),
+            verbe:'Que fais-tu ce tour ?', chips:['Engageables <b>'+maxF+'</b>'+((maxF<force)?' / '+force+' possédés':'')].concat(threat?['🛡️ Menace sur <b>'+esc(threat.name||'')+'</b>']:[]),
+            milieu:'<div style="text-align:left">'+b+'</div>'});
+        }
         decisionPanel(b);
         document.querySelectorAll('#sc-decision .opt[data-col]').forEach(btn=>{ if(btn.disabled)return; btn.onclick=()=>{ const c=cols[parseInt(btn.getAttribute('data-col'))]; tokenPick('⚔️ Attaquer '+c.name, (c.isHome?'🏛️ CAPITALE : défendue d\'office par 10 jetons, plus ce que l\'ennemi engage.':'Force ennemie inconnue (garnison + défense).'), (t,cr)=>done({action:'attack', node:c.node, tokens:t, cruiser:cr})); }; });
         document.querySelectorAll('#sc-decision .opt[data-rt]').forEach(btn=>{ if(btn.disabled)return; btn.onclick=()=>done({action:'route', route:parseInt(btn.getAttribute('data-rt'))}); });
@@ -2320,4 +2398,7 @@ function init(){
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
 
 window.SC_ONLINE = { STATE, send, reqState }; // debug console
+/* Banc VISUEL (captures Playwright, `scratchpad/shot3.js`) : ouvrir les fenêtres de décision avec une
+   charge utile fabriquée, sans serveur. Exposé seulement si l'adresse porte `?sc_test=1`. */
+try{ if(/[?&]sc_test=1/.test(location.search)) window.SC_TEST = { askLocalDecision, showPeaceReal, closeDecision, decisionPanel, STATE }; }catch(e){}
 })();

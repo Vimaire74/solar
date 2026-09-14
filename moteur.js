@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-14 · v10.45';
+const SOLAR_BUILD_MOTEUR = '2026-09-14 · v10.47';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -7288,8 +7288,9 @@ function showAccordInfo(nodeId){
       null, (ans)=>{ if(ans&&ans.confirm)proposeAccord(nodeId); });
     return;
   }
+  { const _e=document.getElementById('accord-emoji'), _n=document.getElementById('accord-nation'); if(_e)_e.textContent=ai?ai.civ.emoji:'🤝'; if(_n)_n.textContent=ai?ai.civ.name:''; }   // Blason
   document.getElementById('accord-body').innerHTML=
-    'Accord commercial avec <b>'+nm+'</b> sur <b>'+(node?node.name:nodeId)+'</b>.<br><br>'+
+    'Sur <b>'+(node?node.name:nodeId)+'</b>.<br><br>'+
     '<b>Coût :</b> 1 AC + <b>2<i class=ri-materials></i> donnés</b> à '+(ai?ai.civ.name:'l\'autre nation')+' (toi −2, elle +2).<br>'+
     '<b>Effet immédiat :</b> tension <b>−3 des deux côtés</b>.<br>'+
     '<b>Tant qu\'il tient :</b> +1<i class=ri-materials></i> +1<i class=ri-morale></i>/tour, pas de pénalité de tension pour tes routes sur ses colonies, et tu peux <b>traverser son territoire</b> (routes) pour désenclaver tes colonies.<br><br>'+
@@ -7486,7 +7487,7 @@ function _ouvrirFenetreAssaut(nodeId,attaquant){
   if(!_aUnEcran())return;
   if(attaquant!==G.player||attaquant._isAI)return;
   try{document.getElementById('wcm-turn').textContent=G.turn;}catch(e){}
-  document.getElementById('war-combat-modal').classList.remove('hidden');
+  if(typeof fenAdversaire==='function')fenAdversaire('wcm');document.getElementById('war-combat-modal').classList.remove('hidden');
   _warSelectColonyTarget(nodeId);
 }
 function playerAssaultColony(nodeId,enemyAI,attaquant){
@@ -7719,7 +7720,16 @@ function maybeAiAssaultPlayer(ai,done,defender,prefNode){
   const commit=Math.min(ai.forceTokens,afford);
   showAiAssaultDefenseModal(ai,target,commit,done,defender);
 }
-function _aadUpd(v){document.getElementById('aad-val').textContent=v;document.getElementById('aad-cost').textContent='−'+v+'🪨 −'+v+'⚡';}
+function _aadUpd(v){
+  v=parseInt(v,10)||0;
+  const _val=document.getElementById('aad-val'); if(_val)_val.textContent=v;
+  const _c=document.getElementById('aad-cost');
+  const _h=(typeof G!=='undefined'&&G&&G.player&&typeof hasSpec==='function'&&hasSpec(G.player,'nav2_war'));
+  if(_c)_c.textContent='−'+(_h?Math.floor(v/2):v)+'🪨 −'+(_h?Math.ceil(v/2):v)+'⚡';
+  /* Blason : le gros chiffre « ta défense » suit le curseur (jetons + garnison + empathes + croiseur auto). */
+  const _t=document.getElementById('aad-total'); if(_t){ const _g=parseInt(_t.getAttribute('data-garnison')||'0',10), _e=parseInt(_t.getAttribute('data-empath')||'0',10), _cr=parseInt(_t.getAttribute('data-croiseur')||'0',10); _t.textContent=v+_g+_e+(v>=1?_cr:0); }
+  const _bs=document.getElementById('aad-btn-s'); if(_bs)_bs.textContent=v>0?('avec '+v+' jeton'+(v>1?'s':'')):'la garnison seule';
+}
 function showAiAssaultDefenseModal(ai,target,aiCommit,done,defender){
   const p=defender||G.player;
   /* ═══ LA MENACE ANNONCÉE EST LA PUISSANCE RÉELLE, PAS LE NOMBRE DE JETONS (Marc, 04/09) ═══
@@ -7772,6 +7782,33 @@ function showAiAssaultDefenseModal(ai,target,aiCommit,done,defender){
   const cruAvail=cruiserAvailable(p)&&cruiserAfford(p);
   G._aiAssaultCtx={aiId:ai.civ.id,target,aiCommit,done,aiCru:_aiCruAtt};
   const tgtLabel=target.type==='colony'?('🏙️ Colonie '+target.name+' (Nv.'+(target.obj.level||1)+')'):('🛤️ Route '+target.name);
+  /* ═══ BLASON (Marc, 14/09) : l'adversaire d'abord — médaillon, nom en capitales, puis le verbe.
+     Même fenêtre qu'en ligne (online.js, `defense`), assemblée par `fenBlason` (index.html). */
+  if(typeof fenBlason==='function'){
+    const _who=(typeof fenNation==='function')?fenNation(ai):{emoji:ai.civ.emoji,nom:ai.civ.name};
+    const _cible=target.type==='colony'?('<b>'+target.name+'</b> (Nv.'+(target.obj.level||1)+')'):('la route <b>'+target.name+'</b>');
+    const _cout=(typeof hasSpec==='function'&&hasSpec(p,'nav2_war'))?'½🪨 ½⚡ par jeton (IA de Navigation)':'1🪨 1⚡ par jeton';
+    const _milieu='<div class="fen-vs">'
+      +'<div><div class="n them">'+((getIntelLevel(p)>=2)?_menace:('≈'+_menace))+'</div><div class="l">Leur force</div></div>'
+      +'<div class="x">VS</div>'
+      +'<div><div class="n me" id="aad-total" data-garnison="'+_garn+'" data-empath="'+pEmp+'" data-croiseur="'+(cruAvail?(p.cruiserPower||5):0)+'">'+(_garn+pEmp)+'</div><div class="l">Ta défense</div></div></div>'
+      +'<div class="fen-slider">'
+      +'<div class="row"><span>Jetons engagés</span><b><span id="aad-val">0</span> / '+maxDef+'</b></div>'
+      +'<input type="range" id="aad-slider" min="0" max="'+maxDef+'" value="0" oninput="_aadUpd(this.value)" aria-label="Jetons engagés en défense">'
+      +'<div class="row"><span>Coût <span id="aad-cost">−0🪨 −0⚡</span> · '+_cout+'</span></div>'
+      +'<div class="row"><span>🏛️ Garnison <b>'+_garn+'</b> ('+_garnLabel+')'+(pEmp?' · 🔮 +'+pEmp+' Empathes':'')+'</span></div>'
+      +(cruAvail?'<div class="row"><span>⚓ Supercroiseur +'+(p.cruiserPower||5)+'⚔️ déployé automatiquement dès 1 jeton (5🪨 5⚡)</span></div>':'')
+      +'</div>';
+    const html='<div id="aad-overlay" style="position:fixed;inset:0;background:rgba(4,4,18,.9);z-index:620;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:10px">'
+      +fenBlason({ton:'war', emoji:_who.emoji, kicker:'Assaut surprise', nation:_who.nom,
+        verbe:(_who.nom.indexOf('(toi)')>0?'attaques':'attaquent')+' '+_cible+'<br><span style="font-size:.85em;color:#9aa3c7">'+_detMenace+(getIntelLevel(p)>=2?'':' — estimation')+'</span>',
+        milieu:_milieu,
+        boutons:[{k:'Ne rien engager', s:'la garnison seule', cls:'ghost', onclick:"document.getElementById('aad-slider').value=0;confirmAiAssaultDefense()"},
+                 {k:'Défendre', s:'<span id="aad-btn-s">la garnison seule</span>', cls:'no', onclick:'confirmAiAssaultDefense()'}]})
+      +'</div>';
+    document.body.insertAdjacentHTML('beforeend',html);
+    return;
+  }
   const html='<div id="aad-overlay" style="position:fixed;inset:0;background:rgba(4,4,18,.9);z-index:620;display:flex;align-items:center;justify-content:center">'+
     '<div style="background:#160a0a;border:2px solid #cc4422;border-radius:12px;padding:20px;min-width:300px;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.9)">'+
     '<div style="font-size:1.05em;font-weight:700;color:#ff8866;margin-bottom:8px">🔴 '+ai.civ.emoji+' '+ai.civ.name+' t\'assaille !</div>'+
@@ -8325,7 +8362,8 @@ function triggerGuereeForcee(offendedSide,targetAi){
         });
       return true;
     }
-    document.getElementById('fw-title').textContent='⚔️ Guerre Populaire contre '+fwAi.civ.emoji+' '+fwAi.civ.name+' !';
+    if(typeof fenAdversaire==='function')fenAdversaire('fw',fwAi);
+    document.getElementById('fw-title').textContent='Ton peuple exige la guerre. Choisis ta cible.';
     document.getElementById('fw-desc').innerHTML='Tension à 10 envers '+fwAi.civ.emoji+' '+fwAi.civ.name+' : attaque une de ses routes ou colonies maintenant.';
     document.getElementById('fw-choices').innerHTML=choicesHtml;
     document.getElementById('forced-war-modal').classList.remove('hidden');
@@ -8878,7 +8916,10 @@ function resolveWarCombat(playerCommitted, attaquant){
   const _prix=(p,e)=>{const h=(typeof hasSpec==='function'&&hasSpec(p,'nav2_war'));
     return {m:h?Math.floor(e/2):e, e:h?Math.ceil(e/2):e, demi:h};};
   if(engagedP>0){const _c=_prix(_atk,_atkUsed);
-    addLog('⚔️ Coût combat (toi) : '+_atkUsed+' jeton(s) engagé(s) — −'+_c.m+'<i class=ri-materials></i> −'+_c.e+'<i class=ri-energy></i>'+(_c.demi?' (IA de Navigation : coût divisé par deux)':''),'dim');}
+    /* « (toi) » était écrit en dur : Marc lisait « Coût combat (toi) » pour un assaut Jupitériens →
+       Ceinturiens (14/09). On NOMME l'attaquant (`_evName` ajoute « (toi) » seulement si c'est le
+       joueur) — test_journal_cout_combat.js. */
+    addLog('⚔️ Coût combat — '+_evName(_atk)+' : '+_atkUsed+' jeton(s) engagé(s) — −'+_c.m+'<i class=ri-materials></i> −'+_c.e+'<i class=ri-energy></i>'+(_c.demi?' (IA de Navigation : coût divisé par deux)':''),'dim');}
   if(aiEngaged>0){const _d=_prix(warEnemy,aiEngaged);
     addLog('🛡️ '+warEnemy.civ.emoji+' '+warEnemy.civ.name+' engage '+aiEngaged+' jeton(s) en défense (−'+_d.m+'<i class=ri-materials></i> −'+_d.e+'<i class=ri-energy></i>'+(_d.demi?', coût divisé par deux':'')+').','dim');}
   if(engagedP>0)applyCombatEngage(_atk,_atkUsed,!aWin); // coût + récupération pour _atkUsed jetons (la garnison compte toujours comme défense)
@@ -13095,6 +13136,11 @@ function showWarModal(title,body,result,adverseId,owner){
     return;
   }
   document.getElementById('wm-title').textContent=title;
+  /* Blason (14/09) : médaillon + nom de l'adversaire. `adverseId` explicite, sinon l'ennemi de guerre courant. */
+  { let _adv=(adverseId!==undefined)?adverseId:null; if(_adv===null){ try{ _adv=guerreAdverseId(); }catch(e){ _adv=null; } }
+    const _n=_adv?allPlayers().find(function(x){return x&&x.civ&&x.civ.id===_adv;}):null;
+    const _e=document.getElementById('wm-emoji'), _nm=document.getElementById('wm-nation');
+    if(_e)_e.textContent=_n?_n.civ.emoji:'⚔️'; if(_nm)_nm.textContent=_n?_n.civ.name:''; }
   let fullBody=body;
   // Offre de colonisation post-victoire si colonie ennemie détruite et joueur à portée
   if(G._postWarColonizeOffer){
@@ -13168,6 +13214,11 @@ function showPeaceOfferModal(isJustDeclared,cb){
       null, 'adOffreDePaix');
     return;
   }
+  /* Blason (14/09) : le médaillon et le nom de l'ADVERSAIRE — c'est ce que Marc lit en premier. */
+  { const _e=document.getElementById('pm-emoji'), _n=document.getElementById('pm-nation'), _k=document.getElementById('pm-kicker'), _v=document.getElementById('pm-verb');
+    if(_e)_e.textContent=ai?ai.civ.emoji:'🕊️'; if(_n)_n.textContent=ai?ai.civ.name:'Adversaire';
+    if(_k)_k.textContent=isJustDeclared?'Guerre déclarée':('Guerre — tour '+(G.turn||1));
+    if(_v)_v.innerHTML=declBy==='player'?'Tu as déclaré la guerre. Proposer la paix ?':'Proposer la paix ?'; }
   document.getElementById('pm-combatants').innerHTML=
     `<span style="color:${p.civ.color};font-weight:700">${p.civ.emoji} ${p.civ.name}</span>`+
     `<span style="color:#556;font-size:.9em"> ⚔️ contre ⚔️ </span>`+
@@ -13176,10 +13227,8 @@ function showPeaceOfferModal(isJustDeclared,cb){
     declBy==='player'?'Guerre déclarée par toi — l\'IA répond.':'Guerre déclarée par '+(ai?ai.civ.name:'l\'IA')+'.';
   const pVP=vpAffiche(p);const aVP=vpAffiche(ai||G.ais[0]);
   document.getElementById('pm-context').innerHTML=
-    (isJustDeclared?'<strong>'+G._warDeclareReason+'</strong><br><br>':'')+
-    'VP actuels — Toi : <strong>'+pVP+'</strong> | IA : <strong>'+aVP+'</strong><br>'+
-    'Tu peux offrir des ressources pour tenter d\'éviter (ou stopper) la guerre.<br>'+
-    '<span style="color:#667;font-size:.9em">L\'IA accepte selon sa situation et ton offre.</span>';
+    (isJustDeclared?'<b>'+G._warDeclareReason+'</b><br>':'')+
+    'VP — toi <b>'+pVP+'</b> · eux <b>'+aVP+'</b>. Tu peux offrir des ressources pour obtenir la paix ; ils acceptent selon leur situation et ton offre.';
   _updatePeaceDisplay();
   document.getElementById('peace-modal').style.display='flex';
   document.getElementById('peace-modal').classList.remove('hidden');
@@ -13357,7 +13406,7 @@ function _showAssaultPicker(ai,cols){
   document.getElementById('wcm-slider').parentElement.style.display='none';
   document.getElementById('wcm-power').style.display='none';
   document.getElementById('war-combat-modal').querySelector('.atk-btns').style.display='none';
-  document.getElementById('war-combat-modal').classList.remove('hidden');
+  if(typeof fenAdversaire==='function')fenAdversaire('wcm');document.getElementById('war-combat-modal').classList.remove('hidden');
 }
 function _warContinueNoAttack(){
   document.getElementById('war-combat-modal').classList.add('hidden');
@@ -13518,7 +13567,7 @@ function showWarCombatModal(cb){
   document.getElementById('wcm-slider').parentElement.style.display='none';
   document.getElementById('wcm-power').style.display='none';
   document.getElementById('war-combat-modal').querySelector('.atk-btns').style.display='none';
-  document.getElementById('war-combat-modal').classList.remove('hidden');
+  if(typeof fenAdversaire==='function')fenAdversaire('wcm');document.getElementById('war-combat-modal').classList.remove('hidden');
 }
 function _getReachableWarTargets(player,ai){
   // Voisins directs (distance=1 entre n'importe quel nœud joueur et nœud IA) → tout ce qui est ≤4 hops
@@ -13758,7 +13807,7 @@ function updateWarCombatSlider(){
   if(_slv)_slv.style.color=_aff?'#ffb347':'#ff5555';
   /* ⚠️ ET ON BLOQUE LA VALIDATION (Marc, 03/09 : « tu peux pas valider en rouge, ça doit bloquer »).
      Sans cela, le joueur partirait encore au combat avec un chiffre que le moteur rognerait. */
-  const _btn=document.querySelector('#war-combat-modal .atk-confirm');
+  const _btn=document.querySelector('#war-combat-modal .fen-btn.no')||document.querySelector('#war-combat-modal .atk-confirm');   // Blason : le bouton « Engager »
   if(_btn){ _btn.disabled=!_aff; _btn.title=_aff?'':'Trop cher : baisse les jetons ou range le croiseur.'; }
   document.getElementById('wcm-power').innerHTML='Ta puissance : <strong>'+pPow+'</strong>⚔️ <span style="color:#7880a0;font-size:.85em">('+committed+' jetons'+(emp?' +'+emp+' Empathes':'')+(cruPow?' +'+cruPow+' Croiseur':'')+')</span>'+
     '<br><span style="color:'+(_aff?'#ffaa66':'#ff5555')+';font-weight:700">Coût : −'+committed+'<i class=ri-materials></i> −'+committed+'<i class=ri-energy></i>'+(cruOn?' (+5<i class=ri-materials></i> 5<i class=ri-energy></i> croiseur)':'')+'</span>';
@@ -13956,10 +14005,10 @@ function showEventModal(ev,msg){
     return;
   }
   const typeColors={competition:'#9a2222',menace:'#9a5a22',opportunite:'#226a42'};const typeBg={competition:'#3a0808',menace:'#3a1a08',opportunite:'#083a18'};const typeLabels={competition:'Compétition',menace:'Menace',opportunite:'Opportunité'};
-  const card=document.getElementById('evm-card');card.className='evt-card '+(ev.type||'');card.style.borderColor=typeColors[ev.type]||'#5a1a7a';
+  const card=document.getElementById('evm-card');card.className='fen fen-event evt-card '+(ev.type||'');card.style.borderColor='';   // Blason : la couleur vient de la classe de type
   document.getElementById('evm-emoji').textContent=ev.emoji;
-  const badge=document.getElementById('evm-badge');badge.textContent=typeLabels[ev.type]||ev.type;badge.style.background=typeBg[ev.type]||'#2a0a3a';badge.style.color=typeColors[ev.type]||'#cc88ff';badge.style.border='1px solid '+(typeColors[ev.type]||'#5a1a7a');
-  document.getElementById('evm-name').textContent=ev.emoji+' '+ev.name;document.getElementById('evm-result').innerHTML=msg;
+  const badge=document.getElementById('evm-badge');badge.textContent=typeLabels[ev.type]||ev.type;badge.style.color=typeColors[ev.type]?({competition:'#ff6b62',menace:'#ffb347',opportunite:'#5fd08a'})[ev.type]:'#ffd34d';   // Blason : kicker coloré, sans fond
+  document.getElementById('evm-name').textContent=ev.name;document.getElementById('evm-result').innerHTML=msg;   // l'emoji est déjà dans le médaillon
   const consEl=document.getElementById('evm-consequence');const good=['remportes','domines','protège','Égalité','Science !'].some(k=>msg.includes(k));const bad=['perds','perd','Défaite','−'].some(k=>msg.includes(k));
   if(msg.includes('te protéger')){consEl.textContent='🛡️ Tu as réussi à te protéger !';consEl.style.color='#88ee88';consEl.classList.remove('hidden');}
   else if(bad&&!good){consEl.textContent='⚠️ Impact négatif.';consEl.style.color='#ff8866';consEl.classList.remove('hidden');}
@@ -14083,7 +14132,7 @@ function showEventAnnounce(ev,onDone){
   const el=document.getElementById('event-announce-modal');
   el.style.borderColor=typeColors[ev.type]||'#5a1a7a';
   el.classList.remove('hidden');
-  el.querySelector('.ea-card').style.borderColor=typeColors[ev.type]||'#5a1a7a';
+  { const _c=el.querySelector('.ea-card'); if(_c){ _c.style.borderColor=({competition:'#a33',menace:'#c77a1a',opportunite:'#2f9a58'})[ev.type]||''; } }   // Blason : couleur du type sur le cadre
   _eventAnnounceCb=(typeof onDone==='function')?onDone:null;   // une FONCTION seulement ; un NOM est déjà rangé dans G
 }
 let _eventAnnounceCb=null;
