@@ -1,0 +1,10 @@
+LOT 17 — MISE À JOUR LÉGÈRE (v10.45, sw v166) — 14/09/2026
+
+Ce dossier ne contient QUE ce qui a changé depuis la version en ligne (v10.39) : 2 Mo au lieu de 70.
+Les images (cartes, planètes) n'ont pas bougé, elles sont déjà sur GitHub.
+
+Sur GitHub, à la RACINE du dépôt : Add file → Upload files, puis glisser d'un coup TOUT LE CONTENU
+de ce dossier (les 8 fichiers + les dossiers `assets` et `server`, PAS ce LISEZ-MOI).
+GitHub garde les chemins : `assets/fonts/…` se range dans le dossier assets existant, `server/…`
+remplace les trois fichiers du serveur. Commit changes.
+Puis Coolify : Redeploy du site statique ET du serveur live.

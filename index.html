@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-09-13 · v10.44';</script><!-- ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE : celle-ci, `SOLAR_BUILD_JS` (online.js) et `SOLAR_BUILD_MOTEUR` (moteur.js). Surveillé par test_versions.js. -->
+<script>window.SOLAR_BUILD_HTML='2026-09-14 · v10.45';</script><!-- ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE : celle-ci, `SOLAR_BUILD_JS` (online.js) et `SOLAR_BUILD_MOTEUR` (moteur.js). Surveillé par test_versions.js. -->
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -18,7 +18,27 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;height:calc(var(--vh,1vh)*100);height:100dvh;overflow:hidden}
-body{background:#070718;color:#c8d8f8;font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;display:flex;flex-direction:column}
+/* ═══ POLICES — décision de Marc du 14/09 (REPRISE §112) : corps Exo 2, titres Michroma ═══
+   Embarquées dans assets/fonts/ (licence OFL, fichiers dans le dossier) : le jeu marche hors ligne et
+   dans l'appli, donc JAMAIS chargées depuis Google. Précachées par sw.js. `font-display:swap` : le
+   texte s'affiche tout de suite avec la police de repli, puis bascule. */
+@font-face{font-family:'Exo 2';src:url(assets/fonts/Exo2.woff2) format('woff2');font-weight:100 900;font-style:normal;font-display:swap}
+@font-face{font-family:'Exo 2';src:url(assets/fonts/Exo2-Italic.woff2) format('woff2');font-weight:100 900;font-style:italic;font-display:swap}
+@font-face{font-family:'Michroma';src:url(assets/fonts/Michroma.woff2) format('woff2');font-weight:400;font-style:normal;font-display:swap}
+:root{--font-corps:'Exo 2','Segoe UI',system-ui,sans-serif;--font-titre:'Michroma','Exo 2',sans-serif}
+body{background:#070718;color:#c8d8f8;font-family:var(--font-corps);font-size:13px;display:flex;flex-direction:column}
+/* Michroma est LARGE : réservée aux titres et libellés courts, jamais au texte courant, et ~15 % plus
+   petite que le gras Segoe qu'elle remplace pour tenir dans les mêmes largeurs. */
+.font-titre,#civ-sel h1,.gtitle,#turn-disp,#tech-hdr>span:first-child,.tb-label,.tc-name,.gc-name,.mtab label,
+.eot-title,.evm-name,.war-title,.strat-title,.disc-name,.agsel-title,.inv-title,.fw-title,.atk-title,.rtm-title,.rmm-title,
+.ea-name,.td-name,.toast-title,.dip-hdr,.lv-h3,#sc-ov h2,#sc-decision h2{font-family:var(--font-titre);font-weight:400;letter-spacing:.02em}
+.evm-name,.war-title,.disc-name{font-size:1.2em}
+.eot-title,.strat-title,.agsel-title,.inv-title,.fw-title,.ea-name,.td-name{font-size:1em}
+#civ-sel h1{font-size:1.35em;letter-spacing:.12em}
+.gtitle{font-size:.82em;letter-spacing:.1em}
+.tc-name{font-size:.92em}
+.tb-label{font-size:.6em}
+.mtab label{letter-spacing:.06em}
 .overlay{position:fixed;inset:0;background:rgba(5,5,20,.97);display:flex;align-items:center;justify-content:center;z-index:100}
 .hidden{display:none!important}
 #civ-sel{flex-direction:column;gap:10px;align-items:center}
@@ -886,7 +906,7 @@ body.vue-carte #top-bar,body.vue-carte #bottom-bar{border-radius:0;}
    ============================================================================ */
 /* 1) Texte plus confortable (base +~25 %). À ajuster si besoin. */
 body{font-size:16px;}
-.mtab label{font-size:.58em;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}      /* libellés d'onglets : plus compacts + jamais de débordement (zoom texte mobile) */
+.mtab label{font-size:.5em;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}   /* Michroma est large : .58em coupait « JOURNAL » sur 390 px */      /* libellés d'onglets : plus compacts + jamais de débordement (zoom texte mobile) */
 .mtb-line1 #turn-disp{font-size:1em;}
 .mtb-line1 #phase-disp{font-size:.82em;}
 #ac-disp{font-size:1em;}

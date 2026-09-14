@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-13 · v10.44';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-14 · v10.45';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -1346,7 +1346,7 @@ function injectStyles(){
   if (document.getElementById('sc-online-css')) return;
   const s=document.createElement('style'); s.id='sc-online-css';
   s.textContent = `
-  #sc-ov{position:fixed;inset:0;z-index:9000;background:rgba(4,6,18,.96);color:#cdd9f5;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:12px 0}
+  #sc-ov{position:fixed;inset:0;z-index:9000;background:rgba(4,6,18,.96);color:#cdd9f5;font-family:var(--font-corps,system-ui),sans-serif;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:12px 0}
   #sc-ov .card{background:#0d1426;border:1px solid #26406e;border-radius:14px;padding:22px 24px;width:min(92vw,420px);max-height:92dvh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.6)}
   #sc-ov h2{margin:0 0 14px;font-size:1.2em;color:#bcd3ff}
   #sc-ov input,#sc-ov select{width:100%;box-sizing:border-box;margin:6px 0;padding:9px 11px;border-radius:8px;border:1px solid #2c4a7e;background:#091020;color:#dce8ff;font-size:.95em}
@@ -1360,7 +1360,7 @@ function injectStyles(){
   /* Look NATIF du jeu (carte sombre, bordure violette, police du jeu), inscrit dans la BANDE CENTRALE
      (entre les barres haut/bas) — restaure l'apparence d'origine au lieu du panneau bleu minimaliste. */
   #sc-decision{position:fixed;left:0;right:0;top:var(--topband,0);bottom:var(--botband,0);z-index:375;background:rgba(4,4,18,.92);backdrop-filter:blur(6px);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:8px}
-  #sc-decision .card{background:#0c0c24;border:2px solid #5a1a7a;border-radius:16px;padding:22px 26px;width:min(94vw,440px);max-height:none;margin:auto;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.92);color:#e6ecff;font-family:system-ui,sans-serif;text-align:center;box-sizing:border-box}
+  #sc-decision .card{background:#0c0c24;border:2px solid #5a1a7a;border-radius:16px;padding:22px 26px;width:min(94vw,440px);max-height:none;margin:auto;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.92);color:#e6ecff;font-family:var(--font-corps,system-ui),sans-serif;text-align:center;box-sizing:border-box}
   #sc-decision h2{color:#fff;font-size:1.3em;margin:0 0 14px;font-weight:700}
   #sc-decision .muted{color:#9fb0d0;font-size:.82em}
   #sc-decision .opt{display:block;width:100%;text-align:left;margin:7px 0;padding:11px 13px;border-radius:9px;border:1px solid #2a3a6a;background:#141a30;color:#dce8ff;cursor:pointer;font-size:.92em}
@@ -1486,7 +1486,7 @@ function concedePanelHTML(html){
   p.style.cssText='position:fixed;left:0;right:0;top:0;bottom:0;z-index:8600;background:rgba(4,4,18,.94);'
     +'backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:10px;overflow-y:auto';
   p.innerHTML='<div style="background:#0c0c24;border:2px solid #c85050;border-radius:16px;padding:22px 26px;'
-    +'width:min(94vw,460px);color:#e6ecff;font-family:system-ui,sans-serif;text-align:center;'
+    +'width:min(94vw,460px);color:#e6ecff;font-family:var(--font-corps,system-ui),sans-serif;text-align:center;'
     +'box-shadow:0 20px 60px rgba(0,0,0,.92);box-sizing:border-box">'+html+'</div>';
   return p;
 }
