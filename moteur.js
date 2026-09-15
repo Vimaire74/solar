@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-15 · v10.48';
+const SOLAR_BUILD_MOTEUR = '2026-09-15 · v10.55';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -2928,18 +2928,12 @@ function showAgendaSelModal(){
   const rLine=([r,a])=>a!==0?`<span class="agsel-res" style="color:${a<0?'#ff6b6b':'#7fe0a0'}">${rEmoji(r)} ${a>0?'+':''}${a}</span>`:'';
   const gainStr=Object.entries(_net).filter(([,a])=>a!==0).map(rLine).join('');
   const resStr=`<i class=ri-energy></i>${p.res.energy} <i class=ri-materials></i>${p.res.materials} <i class=ri-science></i>${p.res.science} <i class=ri-morale></i>${p.res.morale}`;
-  ctx.innerHTML=`
-    <div class="agsel-ctx-box">
-      <div class="agsel-ctx-label">Vos ressources</div>
-      <div class="agsel-ctx-val">${resStr}</div>
-    </div>
-    <div class="agsel-ctx-box">
-      <div class="agsel-ctx-label">Revenus prévus/tour</div>
-      <div class="agsel-ctx-val">${gainStr||'—'}</div>
-    </div>
-    <div class="agsel-ctx-box">
-      <div class="agsel-ctx-label">Prochain événement</div>
-      <div class="agsel-ctx-val">${evT2?evT2.emoji+' T.2 — '+evT2.preview:'Aucun'}</div>
+  /* Marc, 14/09 : « tu n'as pas besoin de montrer les ressources et le revenu » (on les voit en haut) —
+     seul le prochain événement reste, sur toute la largeur et sur UNE ligne. */
+  void resStr; void gainStr;
+  ctx.innerHTML=`<div class="agsel-ctx-box agsel-ctx-wide" title="${evT2?String(evT2.name||'')+' — '+String(evT2.preview||'').replace(/<[^>]+>/g,'').replace(/"/g,'&quot;'):''}">
+      <span class="agsel-ctx-label">Prochain événement</span>
+      <span class="agsel-ctx-val">${evT2?evT2.emoji+' T.2 — <b>'+(evT2.name||'')+'</b> · '+evT2.preview:'Aucun'}</span>
     </div>`;
   // Rendu des 5 agendas
   const cont=document.getElementById('agsel-agendas');
@@ -4491,10 +4485,34 @@ function _usureDeGuerre(w){
 /* Toutes les guerres en cours, une fois chacune. Appelée à l'ouverture du tour ET à la déclaration,
    pour que la guerre déclenchée au tour 1 se paie dès le tour 1. */
 function usureDesGuerres(){ for(const w of (G.wars||[])) _usureDeGuerre(w); }
+/* ═══ ROUTES ORPHELINES — RÈGLE (Marc, 15/09, partie FE37) ═══
+   « Les routes tombent si l'une d'elles n'est pas au moins connectée à une colonie à toi. » Jusqu'ici la
+   seule rupture codée était celle de la déclaration de guerre (14.4) : les Martiens ont gardé Europe→Titan
+   et Titan→Triton trois tours après avoir perdu Titan ET Triton — la capture venait APRÈS la déclaration,
+   et plus rien ne réévaluait. Désormais, au début de chaque tour, toute route dont AUCUNE extrémité n'est
+   à sa nation (capitale comprise, même occupée — le chemin du retour, comme en 14.4) tombe et son jeton
+   revient. Une route avec UNE extrémité à soi (l'autre libre ou étrangère) tient : elle ne rapporte rien
+   si l'autre bout est étranger, mais elle existe. test_routes_orphelines.js */
+function tomberRoutesOrphelines(){
+  for(const p of allPlayers()){
+    if(!p||!p.civ||!Array.isArray(p.routes)||!p.routes.length)continue;
+    const chezMoi=id=>id===p.civ.home||(p.colonies||[]).some(c=>c.nodeId===id);
+    const tombees=p.routes.filter(r=>!chezMoi(r.from)&&!chezMoi(r.to));
+    if(!tombees.length)continue;
+    p.routes=p.routes.filter(r=>!tombees.includes(r));
+    let jetons=0; tombees.forEach(r=>{jetons+=(r.tokens||0);});
+    if(jetons>0)p.forceTokens=(p.forceTokens||0)+jetons;
+    if(typeof updateConnections==='function')updateConnections(p);
+    const _nn=id=>(NODES[id]&&NODES[id].name)||id;
+    addLog('🛤️ '+p.civ.emoji+' '+p.civ.name+' : '+tombees.length+' route(s) abandonnée(s) — plus aucune extrémité à lui ('
+      +tombees.map(r=>_nn(r.from)+'→'+_nn(r.to)).join(', ')+')'+(jetons>0?' — '+jetons+' jeton(s) Force rendu(s)':'')+'.','red');
+  }
+}
 function _startTurnPrep(){
   if(G._prepDoneTurn===G.turn)return; // une seule préparation par tour
   G._prepDoneTurn=G.turn;
   usureDesGuerres();   // AVANT tout le reste : le moral du tour part déjà entamé
+  tomberRoutesOrphelines();   // routes sans extrémité à soi (Marc, 15/09)
   if(typeof enforceCaps==='function')enforceCaps(); // écrêtage : correction des excès du tour précédent (après entretien)
   G.phase='actions';G.turnActions=[];G.aiActions=[];G._raidsThisTurn=[];
   /* ⚠️ CES COMPTEURS SONT PAR NATION — les remettre à zéro sur G.player SEUL ne réinitialisait que
@@ -5481,10 +5499,10 @@ function startInterleaved(){
 function _ilEl(){
   let b=document.getElementById('il-window');
   if(!b){ b=document.createElement('div'); b.id='il-window';
-    b.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:350;padding:12px 20px;border-radius:14px;background:linear-gradient(180deg,rgba(152,20,26,.97),rgba(108,10,16,.97));border:2px solid #ff6b6b;box-shadow:0 10px 40px rgba(120,0,0,.55);pointer-events:none;max-width:min(88vw,420px);text-align:center;color:#fff';
+    b.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:350;padding:12px 50px 12px 20px;border-radius:14px;background:linear-gradient(180deg,rgba(152,20,26,.97),rgba(108,10,16,.97));border:2px solid #ff6b6b;box-shadow:0 10px 40px rgba(120,0,0,.55);pointer-events:none;max-width:min(88vw,420px);text-align:center;color:#fff';
     const x=document.createElement('button'); x.id='il-window-close'; x.textContent='✕'; x.title='Fermer';
     x.setAttribute('onclick','_ilDismiss()');
-    x.style.cssText='position:absolute;top:5px;right:7px;width:30px;height:30px;line-height:27px;padding:0;border-radius:50%;border:1px solid #ff9a9a;background:#7a1015;color:#fff;font-size:16px;cursor:pointer;pointer-events:auto;z-index:2';
+    x.style.cssText='position:absolute;top:4px;right:6px;width:40px;height:40px;line-height:37px;padding:0;border-radius:50%;border:1px solid #ff9a9a;background:#7a1015;color:#fff;font-size:20px;cursor:pointer;pointer-events:auto;z-index:2';   // 40 px : taille d'un doigt (Marc, 13/09)
     b.appendChild(x);
     const c=document.createElement('div'); c.id='il-window-content'; b.appendChild(c);
     document.body.appendChild(b); }
@@ -5496,8 +5514,11 @@ function _ilTransitionOpen(){
   for(const id of ids){ const el=document.getElementById(id); if(el && !el.classList.contains('hidden') && el.style.display!=='none') return true; }
   return false;
 }
-function _ilShow(lines){ if(_ilTransitionOpen()){ _ilHide(); return; } const b=_ilEl(); const c=document.getElementById('il-window-content'); if(c)c.innerHTML=lines.map(l=>'<div style="margin:6px 0;font-size:1.0em;font-weight:600;color:#fff">'+l+'</div>').join(''); b.style.display=lines.length?'block':'none'; }
-function _ilHide(){ if(typeof G!=='undefined'&&G)clearTimeout(G._ilHideTimer); const b=document.getElementById('il-window'); if(b)b.style.display='none'; }
+function _ilShow(lines){ if(_ilTransitionOpen()){ _ilHide(); return; }
+  /* Blason B (Marc, 15/09) : la carte « dépêches » remplace la fenêtre rouge centrée. Repli : l'ancienne. */
+  if(typeof fenDepechesMontrer==='function'){ if(lines&&lines.length) fenDepechesMontrer(lines,{kicker:'Tour des autres nations'}); else fenDepechesFermer(); return; }
+  const b=_ilEl(); const c=document.getElementById('il-window-content'); if(c)c.innerHTML=lines.map(l=>'<div style="margin:6px 0;font-size:1.0em;font-weight:600;color:#fff">'+l+'</div>').join(''); b.style.display=lines.length?'block':'none'; }
+function _ilHide(){ if(typeof G!=='undefined'&&G)clearTimeout(G._ilHideTimer); const b=document.getElementById('il-window'); if(b)b.style.display='none'; if(typeof fenDepechesFermer==='function')fenDepechesFermer(); }
 // Masquer le bouton « Fin de Tour » tant qu'un choix de début (agenda / stratégie) est ouvert — évite les clics par erreur.
 function _syncEndBtn(){
   const b=document.getElementById('btn-end'); if(!b)return;
@@ -7109,8 +7130,11 @@ function useAbility(nat){
   for(const[r,a]of Object.entries(ab.cost)){if((p.res[r]||0)<a){addLog('⚠️ Ressources insuffisantes.','red');return;}}
   // Jupitérien — Forge Orbitale : le joueur CHOISIT la lune joviène à améliorer (modale). Pas d'auto-sélection ni de coût dans le vide.
   if(p.civ.id==='jupiteriens'){
-    const eligible=p.colonies.filter(c=>['io','europe','ganymede','callisto'].includes(c.nodeId)&&c.level===1&&c.connected);
-    if(!eligible.length){if(_n===G.player)addLog('⚠️ Aucune lune joviène de niveau 1 connectée à améliorer — elles sont déjà au niveau max (ou non reliées) : Io, Europe, Ganymède, Callisto.','red');return;}
+    /* RÈGLE (Marc, 15/09) : la Forge travaille sur TOUTE lune jovienne de niveau 1, reliée ou non par
+       une route. Le filtre `c.connected` n'était écrit nulle part dans les règles ; il empêchait
+       d'améliorer une lune fraîchement colonisée et pas encore reliée. test_forge_non_connectee.js */
+    const eligible=p.colonies.filter(c=>['io','europe','ganymede','callisto'].includes(c.nodeId)&&c.level===1);
+    if(!eligible.length){if(_n===G.player)addLog('⚠️ Aucune lune joviène de niveau 1 à améliorer — Io, Europe, Ganymède, Callisto sont déjà au niveau 2 ou plus (ou pas colonisées).','red');return;}
     /* ⚠️ UNE NATION TENUE PAR L'ORDINATEUR NE CLIQUE PAS. C'est le motif §64, quatrième fois : la
        fenêtre appartenait à l'ANCIENNE enveloppe du joueur, et depuis que le cerveau `tacticien`
        passe par `appliquerCoup` (`case 'pouvoir'`), elle s'ouvrait chez Marc pour le pouvoir d'une
@@ -7155,7 +7179,7 @@ function _forgeUpgrade(nodeId,nat){
   const _local=(p===G.player);   // seul le joueur local a un écran à rafraîchir
   if(_local){const m=document.getElementById('forge-modal'); if(m)m.classList.add('hidden');}
   if(p.abilityUsed){if(_local)render();return;}
-  const col=p.colonies.find(c=>c.nodeId===nodeId&&c.level===1&&['io','europe','ganymede','callisto'].includes(c.nodeId)&&c.connected);
+  const col=p.colonies.find(c=>c.nodeId===nodeId&&c.level===1&&['io','europe','ganymede','callisto'].includes(c.nodeId)); // reliée ou non (Marc, 15/09)
   if(!col){if(_local){addLog('⚠️ Cette lune n\'est plus améliorable.','red');render();}return;}
   if(_local)saveUndo();
   p.acLeft-=ab.ac;for(const[r,a]of Object.entries(ab.cost))p.res[r]-=a;p.abilityUsed=true;
@@ -7273,7 +7297,7 @@ function doRaidTarget(aiId,nodeId,pillard){
        n'est toujours pas affiché au moment du raid, c'est visible seulement dans le journal »).
        On envoie donc une NOTICE, qui elle traverse le réseau, comme pour les réponses d'accord. */
     const _butin=stolen.length?stolen.join(' '):'';
-    gainToast(p.civ.name+' — raid sur '+target.civ.name+' : '+(stolen.length?'+'+stolen.join(' +'):'aucun butin'));
+    gainToast(p.civ.name+' — raid sur '+target.civ.name+' : '+(stolen.length?stolen.join(' '):'aucun butin'));   // chaque butin porte déjà son « + » (« ++1⚡ », 14/09)
     if(_decisionActive()){
       _emitNotice('raid_result', p,
         {title:'💰 Raid sur '+target.civ.emoji+' '+target.civ.name,
@@ -7828,8 +7852,8 @@ function showAiAssaultDefenseModal(ai,target,aiCommit,done,defender){
       +(cruAvail?'<div class="row"><span>⚓ Supercroiseur +'+(p.cruiserPower||5)+'⚔️ déployé automatiquement dès 1 jeton (5🪨 5⚡)</span></div>':'')
       +'</div>';
     const html='<div id="aad-overlay" style="position:fixed;inset:0;background:rgba(4,4,18,.9);z-index:620;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:10px">'
-      +fenBlason({ton:'war', emoji:_who.emoji, kicker:'Assaut surprise', nation:_who.nom,
-        verbe:(_who.nom.indexOf('(toi)')>0?'attaques':'attaquent')+' '+_cible+'<br><span style="font-size:.85em;color:#9aa3c7">'+_detMenace+(getIntelLevel(p)>=2?'':' — estimation')+'</span>',
+      +fenBlason({ton:'war', emoji:_who.emoji, kicker:'attaqué par', prep:true, nation:_who.nom,
+        verbe:'Assaut surprise — '+(_who.nom.indexOf('(toi)')>0?'attaques':'attaquent')+' '+_cible+'<br><span style="font-size:.85em;color:#9aa3c7">'+_detMenace+(getIntelLevel(p)>=2?'':' — estimation')+'</span>',
         milieu:_milieu,
         boutons:[{k:'Ne rien engager', s:'la garnison seule', cls:'ghost', onclick:"document.getElementById('aad-slider').value=0;confirmAiAssaultDefense()"},
                  {k:'Défendre', s:'<span id="aad-btn-s">la garnison seule</span>', cls:'no', onclick:'confirmAiAssaultDefense()'}]})
@@ -7839,7 +7863,7 @@ function showAiAssaultDefenseModal(ai,target,aiCommit,done,defender){
   }
   const html='<div id="aad-overlay" style="position:fixed;inset:0;background:rgba(4,4,18,.9);z-index:620;display:flex;align-items:center;justify-content:center">'+
     '<div style="background:#160a0a;border:2px solid #cc4422;border-radius:12px;padding:20px;min-width:300px;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.9)">'+
-    '<div style="font-size:1.05em;font-weight:700;color:#ff8866;margin-bottom:8px">🔴 '+ai.civ.emoji+' '+ai.civ.name+' t\'assaille !</div>'+
+    '<div style="font-size:1.05em;font-weight:700;color:#ff8866;margin-bottom:8px">'+ai.civ.emoji+' '+ai.civ.name+' t\'assaille !</div>'+
     '<div style="font-size:.85em;color:#cc9988;margin-bottom:6px">Cible : <strong style="color:#ffbbaa">'+tgtLabel+'</strong></div>'+
     '<div style="font-size:.82em;color:#cc9988;margin-bottom:12px">Force d\'attaque : <strong style="color:#ff9977">'+shownThreat+'</strong>'
       +'<span style="color:#a08878;font-size:.9em"> ('+_detMenace+')</span>. Combien de jetons engages-tu en défense ? <span style="color:#7880a0">('+((typeof hasSpec==='function'&&hasSpec(p,'nav2_war'))?'½<i class=ri-materials></i> ½<i class=ri-energy></i> / jeton — IA de Navigation':'1<i class=ri-materials></i> 1<i class=ri-energy></i> / jeton')+')</span>'+
@@ -8188,9 +8212,11 @@ function updateTension(){
        ensemble. La garde regarde CES DEUX nations — pas « suis-je en guerre », qui ne les
        concerne pas. */
     if(tensEff(x.civ.id,y.civ.id)>=10&&!_warBetween(x.civ.id,y.civ.id)){
-      if(guerrePopulaireAuto(x,y)) return;   // au dernier tour la guerre est refusée : on continue le tour normalement
+      guerrePopulaireAuto(x,y);   // et on CONTINUE : les autres couples ont le même droit ce tour-ci (FE37)
     }
   }
+  { const _d=fluxDonnees(); _d.guerrePopFenetre=false; }   // nouveau tour : aucune fenêtre ouverte (drapeau jamais laissé collé)
+  _guerrePopSuivante();   // file du tour précédent, s'il en reste (fenêtre fermée sans passer par la suite)
   for(const ai of G.ais){
     if(_warBetween(_moiId(),ai.civ.id))continue;   // même règle que ci-dessus, couple par couple
     let addP=_tensionVers(G.player,ai), addA=_tensionVers(ai,G.player);
@@ -8209,10 +8235,12 @@ function updateTension(){
        suivant — cinq colonies prises ainsi dans la partie 0C10 — pendant que les IA, elles,
        devaient attendre. Une règle qui ne s'applique qu'à un camp n'est pas une règle. */
     const _warWithThis=!!(_warBetween(_moiId(),ai.civ.id)); // déjà en guerre avec CETTE nation → pas de guerre populaire en plus
-    if(pt>=10&&!_warWithThis){ if(triggerGuereeForcee('player',ai)) return; }
+    /* Plus de `return` : voir `_guerrePopDemander`. Le joueur offensé ouvre une fenêtre (une seule à la
+       fois, les suivantes attendent) ; l'IA offensée agit tout de suite, sans écran. */
+    if(pt>=10&&!_warWithThis){ _guerrePopDemander('player',ai); continue; }
     // Effets tension IA → joueur
     const at=tensEff(ai.civ.id,'player');
-    if(at>=10&&!_warWithThis){ if(triggerGuereeForcee('ai',ai)) return; }
+    if(at>=10&&!_warWithThis){ _guerrePopDemander('ai',ai); }
   }
   // Compat aliases
   G.playerTension=G.ais.reduce((mx,ai)=>Math.max(mx,getTens('player',ai.civ.id)),0);
@@ -8244,7 +8272,44 @@ function updateTension(){
    `_forcedWarCb` était une variable de module : perdue à la sauvegarde, et partagée entre toutes
    les parties d'un même processus serveur. */
 function _guerrePopSuite(nom){ fluxDonnees().suiteGuerrePop=(typeof nom==='string'&&nom)?nom:null; }
-function _guerrePopSuiteJouer(){ const d=fluxDonnees(), nom=d.suiteGuerrePop; d.suiteGuerrePop=null; if(nom){fluxAppeler(nom);return true;} return false; }
+function _guerrePopSuiteJouer(){
+  const d=fluxDonnees();
+  d.guerrePopFenetre=false;                 // la fenêtre du joueur vient de se fermer
+  if(_guerrePopSuivante()) return true;     // un autre peuple attendait son tour : sa fenêtre s'ouvre AVANT la suite
+  const nom=d.suiteGuerrePop; d.suiteGuerrePop=null; if(nom){fluxAppeler(nom);return true;} return false; }
+/* ═══ LES GUERRES POPULAIRES D'UN MÊME TOUR SONT EN FILE, PLUS « PREMIÈRE ARRIVÉE, SEULE SERVIE » ═══
+   Partie FE37 (Marc, 15/09) : au tour 4, les Ceinturiens montent à 10 envers Jupitériens (espionnage) ;
+   au tour 5, la tension de Jupitériens envers Martiens atteint 10 la première → fenêtre de guerre forcée
+   → `return` dans `updateTension` → les Ceinturiens ne sont jamais examinés. Tour 6 : Terriens → 10 →
+   `return`, idem. Puis les Ceinturiens sont en guerre ailleurs (tension effective −6) : leur guerre
+   n'a jamais eu lieu. Marc lisait « il devrait me déclarer la guerre tout de suite… un mélange des
+   nations ». Ce n'était pas un mélange : un `return` par déclenchement.
+   Désormais : tout ce qui se règle sans écran (IA↔IA, IA offensée par le joueur) est joué dans la
+   boucle ; ce qui ouvre une FENÊTRE au joueur n'est ouvert qu'une fois à la fois — pendant qu'elle
+   est ouverte, les couples suivants attendent dans `guerresPopEnAttente` (données du flux, donc
+   sauvegardées) et sont réexaminés à sa fermeture, avec la règle du moment (tension effective ≥ 10,
+   pas déjà en guerre ensemble). Une file non vidée est reprise au tour suivant. Une seule fenêtre à
+   la fois, parce que ses boutons lisent `G.warWith` : deux fenêtres ouvertes viseraient la même nation.
+   test_guerres_populaires_file.js */
+function _guerrePopDemander(side, ai){
+  const d=fluxDonnees();
+  if(d.guerrePopFenetre){ (d.guerresPopEnAttente=d.guerresPopEnAttente||[]).push(ai.civ.id); return false; }
+  const ok=triggerGuereeForcee(side, ai);
+  if(ok&&side==='player'&&G.player&&!G.player._isAI) d.guerrePopFenetre=true;   // fenêtre (solo) ou question (en ligne) ouverte
+  return ok;
+}
+function _guerrePopSuivante(){
+  const d=fluxDonnees(); const file=Array.isArray(d.guerresPopEnAttente)?d.guerresPopEnAttente:[];
+  while(file.length){
+    const id=file.shift(); d.guerresPopEnAttente=file.slice();
+    const ai=(G.ais||[]).find(a=>a&&a.civ&&a.civ.id===id);
+    if(!ai||_warBetween(_moiId(),ai.civ.id)) continue;
+    const pt=tensEff('player',ai.civ.id), at=tensEff(ai.civ.id,'player');
+    if(pt<10&&at<10) continue;                          // la pression est retombée entre-temps
+    if(_guerrePopDemander(pt>=10?'player':'ai', ai)) return true;
+  }
+  d.guerresPopEnAttente=null; return false;
+}
 function _guerrePopEnAttente(){ return !!fluxDonnees().suiteGuerrePop; }
 /* ═══════ GUERRE POPULAIRE — LE NOYAU, ENTRE DEUX NATIONS NOMMÉES ═══════
    Quand la tension d'une nation envers une autre atteint 10, son peuple exige la guerre. Cette
@@ -10595,7 +10660,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
       if((ai.res.energy||0)>=3&&(ai.res.materials||0)>=2){ai.res.energy-=2;ai.acLeft+=1;ai.acMax=(ai.acMax||ai.acLeft)+1;ai.abilityUsed=true;
         G.aiActions.push({emoji:'💫',name:'Surtension',desc:'+1 AC'});}
     }else if(ai.civ.id==='jupiteriens'){ // Forge Orbitale : améliore une lune joviène 1→2 gratuitement (sans AC ni science)
-      const _col=ai.colonies.find(c=>['io','europe','ganymede','callisto'].includes(c.nodeId)&&c.level===1&&c.connected);
+      const _col=ai.colonies.find(c=>['io','europe','ganymede','callisto'].includes(c.nodeId)&&c.level===1); // reliée ou non (Marc, 15/09)
       if(_col&&(ai.res.materials||0)>=3&&(ai.res.energy||0)>=3){ai.res.materials-=1;ai.res.energy-=1;_col.level=2;updateConnections(ai);ai.abilityUsed=true;
         G.aiActions.push({emoji:'💫',name:'Forge Orbitale',desc:NODES[_col.nodeId].name+' Nv.2'});}
     }
@@ -13245,8 +13310,8 @@ function showPeaceOfferModal(isJustDeclared,cb){
   /* Blason (14/09) : le médaillon et le nom de l'ADVERSAIRE — c'est ce que Marc lit en premier. */
   { const _e=document.getElementById('pm-emoji'), _n=document.getElementById('pm-nation'), _k=document.getElementById('pm-kicker'), _v=document.getElementById('pm-verb');
     if(_e)_e.textContent=ai?ai.civ.emoji:'🕊️'; if(_n)_n.textContent=ai?ai.civ.name:'Adversaire';
-    if(_k)_k.textContent=isJustDeclared?'Guerre déclarée':('Guerre — tour '+(G.turn||1));
-    if(_v)_v.innerHTML=declBy==='player'?'Tu as déclaré la guerre. Proposer la paix ?':'Proposer la paix ?'; }
+    if(_k){_k.textContent='contre';_k.classList.add('fen-prep');}   // « contre TERRIENS » (Marc, 15/09)
+    if(_v)_v.innerHTML=(isJustDeclared?'Guerre déclarée. ':'')+(declBy==='player'?'Tu as déclaré la guerre. Proposer la paix ?':'Proposer la paix ?'); }
   document.getElementById('pm-combatants').innerHTML=
     `<span style="color:${p.civ.color};font-weight:700">${p.civ.emoji} ${p.civ.name}</span>`+
     `<span style="color:#556;font-size:.9em"> ⚔️ contre ⚔️ </span>`+
@@ -13503,7 +13568,15 @@ function showWarCombatModal(cb){
     const _warObj=_warBetween(_moiId(),G.warWith); const _focus=_warObj&&_warObj.focusColony;
     const _cols=_reach.map(c=>({node:c.nodeId, name:NODES[c.nodeId]?.name||c.nodeId, emoji:NODES[c.nodeId]?.emoji||'', level:c.level,
       isHome:(_ai&&c.nodeId===_ai.civ.home), isFocus:(c.nodeId===_focus),
+      /* Garnison RÉELLE de la colonie (1, ou 10 pour une capitale) : c'est la règle, pas un secret. */
+      garrison:(_ai&&typeof garrisonOf==='function')?garrisonOf(_ai,c.nodeId):((_ai&&c.nodeId===_ai.civ.home)?10:1),
       dist:Math.min.apply(null,_p.colonies.map(pc=>getNodeDistance(pc.nodeId,c.nodeId)))}));
+    /* ═══ LA FORCE ENNEMIE N'ÉTAIT JAMAIS ENVOYÉE EN LIGNE (Marc, FE37, 15/09) ═══
+       Le solo affiche `perceivedForce` (exacte avec Réseau Orbital, ±3 sinon) ; la question en ligne
+       ne portait rien et le client écrivait « Force ennemie inconnue ». Marc, Réseau Orbital en poche,
+       a engagé 14 jetons contre 1. On envoie ce que le solo montre — ni plus (le brouillard reste),
+       ni moins. */
+    const _enF=(_ai&&typeof perceivedForce==='function')?perceivedForce(_p,_ai):null;
     const _routes=_ai?_ai.routes.map((r,i)=>({i, from:r.from, to:r.to, name:(NODES[r.from]?.name||r.from)+'→'+(NODES[r.to]?.name||r.to), protected:(r.tokens||0)>=1, cost:(r.tokens||0)>=1?2:1})):[];
     /* PLAFOND D'ENGAGEMENT ANNONCÉ AU CLIENT. Le moteur n'accepte que `min(jetons, payables)`
        (1🪨+1⚡ par jeton) : si la fenêtre proposait davantage, l'engagement était rogné en silence
@@ -13523,6 +13596,7 @@ function showWarCombatModal(cb){
     const _cruOk=_cruHas&&(typeof cruiserAfford==='function')&&cruiserAfford(_p);
     _emitDecision('war_combat', _p,
       {enemy:(_ai?_ai.civ.id:null), enemyName:(_ai?_ai.civ.name:'IA'), warTurnsLeft:G.warTurnsLeft, myForce:_p.forceTokens||0,
+       enemyForce:_enF?{val:_enF.val, exact:!!_enF.exact}:null,
        maxEngage:_maxEng, maxEngageAvecCroiseur:_maxEngCru,
        cruiser:{has:!!_cruHas, afford:!!_cruOk, power:(_p.cruiserPower||5), cost:(typeof cruiserCost==='function')?cruiserCost(_p):null},
        /* ═══════ ON PEUT TOUJOURS SE RETIRER — SINON LA PARTIE SE FIGE ═══════
@@ -14462,6 +14536,12 @@ function _showPlayerHitModal(){
   const hits=(G&&G._ilPlayerHits)||[];
   if(!hits.length){return;}
   const old=document.getElementById('sc-attack-notice');if(old)old.remove();
+  /* Blason B (Marc, 15/09) : « attaqué par NATION » en rouge, même famille que les fenêtres de guerre. */
+  if(typeof fenAttaques==='function'){
+    document.body.insertAdjacentHTML('beforeend','<div id="sc-attack-notice" style="position:fixed;inset:0;background:rgba(4,4,18,.86);z-index:650;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:48px 10px 10px">'
+      +fenAttaques(hits,{onclick:'_ackPlayerHits()'})+'</div>');
+    return;
+  }
   const rows=hits.map(h=>'<div style="background:#1a0e12;border:1px solid #7a2a2a;border-radius:9px;padding:10px 12px;margin-bottom:8px;text-align:left">'+
       '<div style="font-weight:700;color:#ffb3a3;margin-bottom:3px">⚔️ '+h.title+'</div>'+
       (h.body?'<div style="font-size:.88em;color:#e6d0d0;line-height:1.45">'+h.body+'</div>':'')+
@@ -14545,13 +14625,21 @@ function drawConnections(){
      ni route constructible, ni adjacence — seulement des durées de trajet. Les cacher ne change
      donc rien au jeu, et l'état est rangé dans `G` pour survivre à une sauvegarde. */
   const _pos=id=>NODES[id]||PLANETS_DECO.find(p=>p.name==={terre:'Terre',mars:'Mars',jupiter:'Jupiter'}[id]);
-  if(G.mapDistances!==false)for(const[a,b] of [['terre','mars'],['mars','jupiter'],['jupiter','eris']]){const A=_pos(a),B=_pos(b);if(!A||!B)continue;const c=_curve(A,B);s+=`<path d="M ${A.x} ${A.y} Q ${c.cx.toFixed(1)} ${c.cy.toFixed(1)} ${B.x} ${B.y}" fill="none" stroke="#FFD54F" stroke-width="2.3" stroke-opacity=".5" stroke-dasharray="2,7" stroke-linecap="round"/>`;const px=0.25*A.x+0.5*c.cx+0.25*B.x,py=0.25*A.y+0.5*c.cy+0.25*B.y;s+=_pill(px,py,_range(DUR[[a,b].sort().join('|')]??_days(A,B)),true);}
+  _mapDistBouton();   // le bouton suit toujours l'état réel (bug du « bouton resté bleu », 15/09)
+  if(!_mapDistOff())for(const[a,b] of [['terre','mars'],['mars','jupiter'],['jupiter','eris']]){const A=_pos(a),B=_pos(b);if(!A||!B)continue;const c=_curve(A,B);s+=`<path d="M ${A.x} ${A.y} Q ${c.cx.toFixed(1)} ${c.cy.toFixed(1)} ${B.x} ${B.y}" fill="none" stroke="#FFD54F" stroke-width="2.3" stroke-opacity=".5" stroke-dasharray="2,7" stroke-linecap="round"/>`;const px=0.25*A.x+0.5*c.cx+0.25*B.x,py=0.25*A.y+0.5*c.cy+0.25*B.y;s+=_pill(px,py,_range(DUR[[a,b].sort().join('|')]??_days(A,B)),true);}
   document.getElementById('connections').innerHTML=s;
 }
 /* Bascule des distances entre capitales (lignes jaunes). Rien de plus qu'un affichage. */
+/* ⚠️ LE RÉGLAGE VIVAIT DANS `G` — ET `G` EST REMPLACÉ À CHAQUE SYNCHRO EN LIGNE. Marc, 15/09 : « une fois cliqué,
+   les routes reviennent au tour suivant et le bouton reste bleu ». L'état serveur ne connaît pas
+   `mapDistances` : les traits revenaient, mais le bouton (DOM) gardait sa classe `off` — désynchronisés.
+   C'est un choix d'AFFICHAGE, propre à l'appareil : il vit dans localStorage, comme la taille Aa, et
+   `renderMap` remet le bouton en accord à chaque dessin. */
+function _mapDistOff(){ try{ return localStorage.getItem('sc_mapdist')==='off'; }catch(e){ return false; } }
+function _mapDistBouton(){ try{ const b=document.getElementById('mz-dist'); if(b){ const off=_mapDistOff(); b.classList.toggle('off',off); b.title=(off?'Afficher':'Masquer')+' les distances entre capitales'; } }catch(e){} }
 function toggleDistances(){
-  G.mapDistances = (G.mapDistances===false);
-  try{ const b=document.getElementById('mz-dist'); if(b){ b.classList.toggle('off', G.mapDistances===false); b.title = (G.mapDistances===false?'Afficher':'Masquer')+' les distances entre capitales'; } }catch(e){}
+  try{ localStorage.setItem('sc_mapdist', _mapDistOff()?'on':'off'); }catch(e){}
+  _mapDistBouton();
   if(typeof renderMap==='function')renderMap();
 }
 /* ============================================================ CIV SELECTION ============================================================ */

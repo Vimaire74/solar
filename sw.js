@@ -9,7 +9,7 @@
      interceptées, elles passent directement. Rien n'est mis en cache du serveur de jeu.
    - HORS-LIGNE : le solo reste jouable ; en navigation hors-ligne on sert index.html depuis le cache.
    Le numéro de version ci-dessous purge les anciens caches à chaque mise à jour du SW. */
-const VERSION = 'v169-2026-09-15';
+const VERSION = 'v176-2026-09-15';
 const HTML_CACHE = 'sc-html-' + VERSION;     // documents + scripts (network-first)
 const ASSET_CACHE = 'sc-assets-' + VERSION;  // images, icônes, PDF (cache-first)
 
@@ -23,7 +23,8 @@ const SHELL = [
   './assets/pwa/manifest.webmanifest',
   './assets/pwa/icon-192.png', './assets/pwa/icon-512.png', './assets/pwa/icon-maskable-512.png',
   /* Polices embarquées (§112) : sans elles hors ligne, le jeu retomberait sur la police système. */
-  './assets/fonts/Exo2.woff2', './assets/fonts/Exo2-Italic.woff2', './assets/fonts/Michroma.woff2'
+  './assets/fonts/Exo2.woff2', './assets/fonts/Exo2-Italic.woff2', './assets/fonts/Michroma.woff2',
+  './assets/fond_accueil_phone.jpg', './assets/fond_accueil_desk.jpg'
 ];
 
 self.addEventListener('install', (e) => {

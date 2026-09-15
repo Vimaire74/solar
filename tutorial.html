@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-09-15 · v10.48';</script>
+<script>window.SOLAR_BUILD_HTML='2026-09-15 · v10.55';</script>
 <script>/* Taille du texte mémorisée (menu Journal → Aa) : appliquée avant le premier rendu, sans à-coup. */
 (function(){try{var t=localStorage.getItem('sc_taille');if(t&&/^(11|13|15|17)$/.test(t))document.documentElement.style.setProperty('--sc-fs',t+'px');}catch(e){}})();</script><!-- ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE : celle-ci, `SOLAR_BUILD_JS` (online.js) et `SOLAR_BUILD_MOTEUR` (moteur.js). Surveillé par test_versions.js. -->
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
@@ -149,8 +149,11 @@ body{background:#070718;color:#c8d8f8;font-family:var(--font-corps);font-size:va
 .scc-chip.vp{background:#2a230a;border:1px solid #5a4a1a;color:#ffe08a}
 .scc-btn{border:none;cursor:pointer;border-radius:10px;font-family:inherit;font-weight:700;transition:transform .1s,filter .1s}
 .scc-btn:hover{filter:brightness(1.12)}.scc-btn:active{transform:scale(.94)}
-.scc-undo{width:38px;height:38px;flex:0 0 auto;font-size:18px;line-height:1;background:#151a38;color:#9fb0d0;border:1px solid #2a3a5a}
-.scc-ok{height:38px;flex:0 0 auto;padding:0 14px;font-size:13px;line-height:1;white-space:nowrap;background:#3ecf8e;color:#04240f}
+/* ANN (rouge) / OK (vert) : deux touches pour le doigt (Marc, 13/09 : « le bouton annuler en bas est trop
+   petit », « deux touches facilement cliquables ANN / OK, en rouge et vert »). Même famille que les
+   boutons Blason (.fen-btn.no / .ok). */
+.scc-undo{min-width:68px;height:46px;flex:0 0 auto;padding:0 12px;font-family:var(--font-titre,inherit);font-size:13px;letter-spacing:.06em;line-height:1;background:#7a1d24;color:#ffd7d2;border:1px solid #c0392b}
+.scc-ok{min-width:68px;height:46px;flex:0 0 auto;padding:0 14px;font-family:var(--font-titre,inherit);font-size:13px;letter-spacing:.06em;line-height:1;white-space:nowrap;background:#1f7a45;color:#e8ffef;border:1px solid #3ecf8e}
 #solar-svg{width:100%;height:100%;transition:all .35s}
 .panel-nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(10,10,34,.85);border:1px solid #2a3a6a;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#4a9eff;font-size:.9em;z-index:10;transition:all .2s}
 .panel-nav:hover{background:#1a2a5a;border-color:#4a9eff}
@@ -587,6 +590,10 @@ body.modal-lock #btn-ability,body.modal-lock #btn-undo,body.modal-lock #btn-col,
 .agsel-ctx-label{color:#4a9eff;font-size:.85em;margin-bottom:4px;font-weight:700}
 .agsel-ctx-val{color:#c8d8f8;line-height:1.5}
 .agsel-res{background:#1a1a3a;border-radius:4px;padding:2px 6px;font-size:.9em;display:inline-block;margin:1px 2px}
+/* Prochain événement sur toute la largeur, UNE ligne (Marc, 14/09) ; le texte complet est dans `title`. */
+.agsel-ctx-wide{display:flex;gap:8px;align-items:baseline;white-space:nowrap;overflow:hidden;flex:1 1 100%}
+.agsel-ctx-wide .agsel-ctx-label{flex:0 0 auto;margin:0}
+.agsel-ctx-wide .agsel-ctx-val{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .agsel-agendas{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:14px}
 .agsel-ag{width:138px;padding:11px 10px;background:#0f0f2a;border:2px solid #2a2a5a;border-radius:10px;cursor:pointer;text-align:center;transition:all .2s;position:relative}
 .agsel-ag:hover{border-color:#c080ff;background:#1a1040;transform:translateY(-2px);box-shadow:0 0 12px rgba(192,128,255,.2)}
@@ -996,6 +1003,21 @@ body{font-size:16px;}
 .fen-event .fen-medal{border-color:#ffd34d;background:#2a2008}
 .fen-kicker{font-family:var(--font-titre);font-size:.6em;letter-spacing:.16em;text-transform:uppercase;color:#9aa3c7}
 .fen-war .fen-kicker{color:#ff6b62}.fen-peace .fen-kicker{color:#5fd08a}.fen-info .fen-kicker{color:#4a9eff}.fen-event .fen-kicker{color:#ffd34d}
+/* Kicker « préposition » (Marc, 15/09) : « contre » / « attaqué par » en MINUSCULES au-dessus du grand nom,
+   pour qu'on lise « guerre CONTRE les Terriens » et non « je suis Terriens » (FE37). */
+.fen-kicker.fen-prep{text-transform:none;letter-spacing:.12em;font-size:.72em}
+/* ═══ DÉPÊCHES (Blason B, Marc 15/09) : « ce que les autres ont fait » — carte flottante, pas de voile.
+   Ton bleu (info) pour les actions ordinaires, rouge (war) seulement quand c'est toi qu'on frappe. */
+#sc-depeches{position:fixed;top:calc(var(--topband,56px) + 34px);left:50%;transform:translateX(-50%);width:min(92vw,420px);z-index:360;display:none;pointer-events:none}
+#sc-depeches .fen{pointer-events:auto;box-shadow:0 18px 50px rgba(0,0,0,.65)}
+#sc-depeches .fen-medal{cursor:default}
+.fen-dep{text-align:left;background:#0b0d24;border:1px solid #232750;border-radius:10px;padding:4px 10px;font-size:.92em}
+.fen-dep>div{display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid #1d2350}
+.fen-dep>div:first-child{border-top:0}
+.fen-dep .m{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:14px;background:#0f1130;border:2px solid var(--c,#4a9eff);flex:0 0 auto}
+.fen-dep b{color:#fff;font-weight:600}
+.fen-cd{width:22px;height:22px;border-radius:50%;background:conic-gradient(#7fb3ff 0 var(--p,100%),#1f3a66 var(--p,100%) 100%);box-shadow:inset 0 0 0 3px #163a6b;display:inline-block;vertical-align:middle;margin-right:8px;flex:0 0 auto}
+.fen-btn.go.fen-compris{background:#163a6b;border-color:#2f6fbf;color:#e8f1ff;display:flex;align-items:center;justify-content:center}
 .fen-nation{font-family:var(--font-titre);font-size:1.15em;letter-spacing:.06em;text-transform:uppercase;color:#fff;line-height:1.25;text-wrap:balance;margin-top:-4px}
 .fen-verb{font-size:1.05em;color:#dbe1f7;line-height:1.35;margin-top:-4px}
 .fen-verb b{color:#fff}
@@ -1039,68 +1061,85 @@ body{font-size:16px;}
 </head>
 <body>
 <style>
-#civ-sel{overflow-y:auto}
-.lv-pdf{display:inline-block;margin:2px 0 12px;color:#8fd0ff;text-decoration:none;font-weight:700;border:1px solid #2c4a7e;border-radius:8px;padding:6px 12px}
-#lv-auth{max-width:330px;margin:6px auto 4px;background:#0d1426;border:1px solid #26406e;border-radius:14px;padding:16px}
+/* ═══ ACCUEIL « SOLAR » (15/09, §124) — image de fond, logo Michroma, carte en verre dépoli ═══ */
+#civ-sel{overflow-y:auto;padding:0;gap:0;justify-content:flex-start;align-items:stretch;
+  background:#070718 url(assets/fond_accueil_phone.jpg) center 30%/cover no-repeat}
+#civ-sel::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(7,7,24,.55) 0%,rgba(7,7,24,0) 18%,rgba(7,7,24,0) 46%,rgba(7,7,24,.8) 68%,rgba(7,7,24,.94) 100%)}
+#lv-panel{position:relative;z-index:1;min-height:100%;display:flex;flex-direction:column;align-items:center;gap:8px;padding:max(22px,env(safe-area-inset-top,0px)) 16px max(14px,env(safe-area-inset-bottom,0px));box-sizing:border-box;width:100%}
+#civ-sel .lv-logo{font-family:var(--font-titre);font-weight:400;font-size:2em;letter-spacing:.24em;margin:0 0 0 .24em;color:#fff;text-shadow:0 0 22px rgba(74,158,255,.55),0 2px 10px rgba(0,0,0,.8)}
+.lv-links{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;font-size:.86em}
+.lv-links a{color:#bcd3ff;text-decoration:none;border-bottom:1px solid rgba(188,211,255,.25);padding-bottom:1px}
+#lv-auth{width:100%;max-width:340px;margin-top:auto;background:rgba(11,13,36,.72);border:1px solid rgba(74,158,255,.35);border-radius:16px;padding:14px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 18px 50px rgba(0,0,0,.6);box-sizing:border-box}
 .lv-tabs{display:flex;gap:6px;margin-bottom:10px}
-.lv-tabs button{flex:1;padding:8px;border:1px solid #26406e;background:#0a1326;color:#9fb6e6;border-radius:8px;cursor:pointer;font-weight:700}
-.lv-tabs button.lv-on{background:#1f4fa0;color:#fff;border-color:#3a6abf}
-#lv-auth input{width:100%;box-sizing:border-box;margin:5px 0;padding:9px 11px;border-radius:8px;border:1px solid #2c4a7e;background:#091020;color:#dce8ff}
-/* Œil « afficher le mot de passe » : ancré DANS le champ. Le conteneur relatif est indispensable —
-   les champs faisant width:100%, un bouton posé à côté passe à la ligne et se décale (bug vu par
-   Marc sur mobile). Zone de touche de 40 px : confortable au doigt. */
+.lv-tabs button{flex:1;padding:10px 4px;border:1px solid #2a3a6a;background:#0b0d24;color:#9fb0d0;border-radius:9px;cursor:pointer;font-family:var(--font-titre);font-size:.66em;letter-spacing:.08em;text-transform:uppercase}
+.lv-tabs button.lv-on{background:#163a6b;color:#e8f1ff;border-color:#2f6fbf}
+#lv-auth input{width:100%;box-sizing:border-box;margin:4px 0;padding:11px 12px;border-radius:9px;border:1px solid #232750;background:#0b0d24;color:#dce8ff;font-family:var(--font-corps);font-size:.95em}
+/* Œil « afficher le mot de passe » : ancré DANS le champ (zone de touche 40 px). */
 .lv-pass-wrap{position:relative;display:block}
 .lv-pass-wrap input{padding-right:46px}
 #lv-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;
   display:flex;align-items:center;justify-content:center;background:transparent;border:0;
   color:#8fb0e0;font-size:1.15em;cursor:pointer;padding:0;line-height:1}
 #lv-eye:active{color:#cfe4ff}
-.lv-go{width:100%;margin-top:8px;padding:10px;border:0;border-radius:8px;background:linear-gradient(135deg,#2f6fd0,#1f4fa0);color:#fff;font-weight:700;cursor:pointer}
+.lv-souvenir{display:flex;align-items:center;gap:7px;font-size:.82em;color:#9fb0d0;margin:6px 2px 2px;cursor:pointer}
+.lv-go{width:100%;margin-top:6px;padding:13px;border:1px solid #7fb3ff;border-radius:10px;background:linear-gradient(135deg,#2f6fd0,#1f4fa0);color:#fff;cursor:pointer;font-family:var(--font-titre);font-size:.72em;letter-spacing:.1em;text-transform:uppercase}
 .lv-solo{width:100%;margin-top:6px;padding:8px;border:0;border-radius:8px;background:#16223c;color:#9fb6e6;cursor:pointer}
 .lv-err{color:#ff8c8c;font-size:.85em;min-height:1.1em}
-.lv-h3{color:#8fb8ff;margin:12px 0 6px}
-#lv-nations{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:780px;margin:0 auto 8px}
-.lv-nat{width:180px;background:#111527;border:1px solid #232d49;border-radius:10px;padding:9px 11px;text-align:left;font-size:.72em;color:#c2ccdf}
-.lv-nat h4{font-size:1.15em;margin:0 0 3px;color:#e6ecf7}
-.lv-nat .r{margin:2px 0}.lv-nat .tag{color:#8fb8ff;font-weight:700}
+.lv-pied{font-size:.72em;color:#9fb0d0;opacity:.85;text-align:center}
+.lv-pdf{color:#8fd0ff;text-decoration:none;font-weight:700}
+/* Ordinateur : l'image occupe la gauche, la carte est à droite, le logo et les liens dans la carte. */
+@media (min-width:900px){
+  #civ-sel{background-image:url(assets/fond_accueil_desk.jpg);background-position:center}
+  #civ-sel::before{background:linear-gradient(90deg,rgba(7,7,24,0) 0%,rgba(7,7,24,0) 52%,rgba(7,7,24,.6) 72%,rgba(7,7,24,.86) 100%)}
+  #lv-panel{align-items:flex-end;justify-content:center;padding:28px 48px}
+  #lv-panel .lv-logo,#lv-panel .lv-links,#lv-panel .lv-pied{width:360px;box-sizing:border-box;text-align:center;margin-left:0}
+  #lv-panel .lv-logo{font-size:1.6em;margin-bottom:2px}
+  #lv-auth{margin-top:8px;max-width:360px}
+}
+/* Mode solo (caché) : les cartes de nation gardent leur look, sur un fond lisible. */
+#lv-solo-pick{position:relative;z-index:1;background:rgba(7,7,24,.92);padding:14px 12px;border-radius:14px;margin:0 16px 16px}
 #sc-online-btn{display:none!important}
 </style>
 <div id="civ-sel" class="overlay">
-  <h1>🌌 SOLAR</h1>
   <!-- ⚠️ CECI est le VRAI écran d'accueil / de connexion, celui que voit le joueur au démarrage.
        `screenAuth()` dans online.js est un SECOND écran, visible seulement si on annule une partie.
        Toute information destinée à l'écran de connexion doit être ajoutée ICI (piège vécu : le
-       numéro de version et le lien tutoriel avaient été mis dans online.js et n'apparaissaient pas). -->
-  <div class="lv-links" style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:2px 0 4px">
-    <a href="tutorial.html" style="color:#8fc8ff;text-decoration:none;font-size:.9em">🎓 Découvrir le jeu — tutoriel</a>
-    <a href="regles.html" style="color:#8fc8ff;text-decoration:none;font-size:.9em">📖 Règles du jeu</a>
-    <a href="confidentialite.html" style="color:#8fc8ff;text-decoration:none;font-size:.9em">🔒 Confidentialité</a>
-  </div>
-  <a class="lv-pdf" href="Solar_Conquest_Livret.pdf" target="_blank" rel="noopener">📖 Livret de règles (PDF)</a>
-  <div id="lv-build" style="font-size:.72em;opacity:.7;color:#9fb0d0;margin-top:2px"></div>
-  <div id="lv-auth">
-    <div class="lv-tabs">
-      <button type="button" id="lv-tab-login" class="lv-on" onclick="lvMode('login')">Se connecter</button>
-      <button type="button" id="lv-tab-reg" onclick="lvMode('register')">Créer un compte</button>
+       numéro de version et le lien tutoriel avaient été mis dans online.js et n'apparaissaient pas).
+       ═══ REFONTE 15/09 (maquette validée par Marc, §124) : image de fond (vaisseau), logo Michroma,
+       carte de connexion en verre dépoli poussée EN BAS sur téléphone / À DROITE sur ordinateur.
+       Le jeu s'appelle « SOLAR » tout court (Marc). Plus AUCUNE fiche de nation ici : le choix des
+       nations n'a sa place qu'à la création d'une partie (online.js `screenCreate`). -->
+  <div id="lv-panel">
+    <h1 class="lv-logo">SOLAR</h1>
+    <div class="lv-links">
+      <a href="tutorial.html">🎓 Tutoriel</a>
+      <a href="regles.html">📖 Règles</a>
+      <a href="confidentialite.html">🔒 Confidentialité</a>
     </div>
-    <!-- enterkeyhint : le clavier mobile affiche « Aller » au lieu de « Entrée », et la touche
-         valide vraiment le formulaire (voir lvKey ci-dessous). -->
-    <input id="lv-user" type="email" placeholder="Email" autocomplete="email" enterkeyhint="next" onkeydown="lvKey(event)">
-    <!-- Le champ mot de passe est dans un conteneur POSITIONNÉ : sans lui, le bouton œil part à la
-         ligne suivante (les champs font width:100%) et se retrouve n'importe où. -->
-    <div class="lv-pass-wrap">
-      <input id="lv-pass" type="password" placeholder="Mot de passe" autocomplete="current-password" enterkeyhint="go" onkeydown="lvKey(event)">
-      <button type="button" id="lv-eye" onclick="lvEye()" title="Afficher / masquer le mot de passe" aria-label="Afficher ou masquer le mot de passe">👁</button>
+    <div id="lv-auth">
+      <div class="lv-tabs">
+        <button type="button" id="lv-tab-login" class="lv-on" onclick="lvMode('login')">Se connecter</button>
+        <button type="button" id="lv-tab-reg" onclick="lvMode('register')">Créer un compte</button>
+      </div>
+      <!-- enterkeyhint : le clavier mobile affiche « Aller » au lieu de « Entrée », et la touche
+           valide vraiment le formulaire (voir lvKey ci-dessous). -->
+      <input id="lv-user" type="email" placeholder="Ton adresse email" autocomplete="email" enterkeyhint="next" onkeydown="lvKey(event)">
+      <!-- Le champ mot de passe est dans un conteneur POSITIONNÉ : sans lui, le bouton œil part à la
+           ligne suivante (les champs font width:100%) et se retrouve n'importe où. -->
+      <div class="lv-pass-wrap">
+        <input id="lv-pass" type="password" placeholder="Mot de passe" autocomplete="current-password" enterkeyhint="go" onkeydown="lvKey(event)">
+        <button type="button" id="lv-eye" onclick="lvEye()" title="Afficher / masquer le mot de passe" aria-label="Afficher ou masquer le mot de passe">👁</button>
+      </div>
+      <label class="lv-souvenir">
+        <input type="checkbox" id="lv-remember" checked style="width:auto;margin:0;accent-color:#4a9eff"> Se souvenir de moi
+      </label>
+      <div class="lv-err" id="lv-err"></div>
+      <button type="button" class="lv-go" id="lv-go" onclick="lvSubmit()">Se connecter →</button>
+      <button type="button" class="lv-solo" onclick="lvSolo()" style="display:none">Jouer en solo (hors-ligne)</button>
     </div>
-    <label style="display:flex;align-items:center;gap:7px;font-size:.82em;color:#9fb0d0;margin:6px 2px 2px;cursor:pointer">
-      <input type="checkbox" id="lv-remember" checked style="width:auto;margin:0;accent-color:#4a9eff"> Se souvenir de moi
-    </label>
-    <div class="lv-err" id="lv-err"></div>
-    <button type="button" class="lv-go" id="lv-go" onclick="lvSubmit()">Se connecter →</button>
-    <button type="button" class="lv-solo" onclick="lvSolo()" style="display:none">Jouer en solo (hors-ligne)</button>
+    <div class="lv-pied"><span id="lv-build"></span> <a class="lv-pdf" href="Solar_Conquest_Livret.pdf" target="_blank" rel="noopener">📖 Livret PDF</a></div>
   </div>
-  <h3 class="lv-h3">Les nations</h3>
-  <div id="lv-nations"></div>
   <div id="lv-solo-pick" class="hidden">
     <div id="difficulty-sel" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:8px 0">
       <button class="diff-btn active" id="diff-easy" onclick="setDifficulty('easy')">🟢 Facile<br><small>1 adv.</small></button>
@@ -1186,17 +1225,7 @@ async function lvTryAutoLogin(){
    donc tout appel placé dedans serait du code mort dès que la couche en ligne est chargée. */
 document.addEventListener('DOMContentLoaded',()=>{ lvShowBuild(); setTimeout(()=>{ lvShowBuild(); if(typeof lvTryAutoLogin==='function')lvTryAutoLogin(); },300); });
 function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidden');document.getElementById('lv-auth').style.display='none';document.getElementById('lv-solo-pick').scrollIntoView({behavior:'smooth'});}
-function lvRenderNations(){
-  const box=document.getElementById('lv-nations');if(!box||typeof CIVS==='undefined')return;
-  const home={lune:'Lune',phobos:'Phobos',io:'Io',eris:'Éris'},inc={terriens:'1⚡ 2🪨',martiens:'1⚡ 2🪨',jupiteriens:'4⚡ 1🪨',ceinturiens:'1⚡ 1🪨'};
-  box.innerHTML=Object.values(CIVS).map(function(c){var s=c.start;return '<div class="lv-nat"><h4>'+c.emoji+' '+c.name+'</h4>'
-    +'<div class="r"><span class="tag">Base :</span> '+(home[c.home]||c.home)+'</div>'
-    +'<div class="r"><span class="tag">Départ :</span> '+s.energy+'⚡ '+s.materials+'🪨 '+s.science+'🔬 '+s.morale+'❤️ · ⚔️'+c.startForce+'</div>'
-    +'<div class="r"><span class="tag">Pouvoir :</span> '+c.active.name+'</div>'
-    +'<div class="r" style="color:#9fb0d0">'+c.active.desc+'</div>'
-    +'<div class="r"><span class="tag">Revenu ~ :</span> '+(inc[c.id]||'—')+'/tour</div></div>';}).join('');
-}
-if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener('load',lvRenderNations);
+
 </script>
 <div id="end-scr" class="overlay hidden">
   <h1 id="end-title">🏆 Fin de Partie</h1>
@@ -1412,8 +1441,8 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
 </div>
 <div id="sc-confirm">
   <div id="sc-confirm-label"></div>
-  <button class="scc-btn scc-undo" onclick="scConfirmCancel()" title="Annuler / revenir en arrière">↩</button>
-  <button class="scc-btn scc-ok" onclick="scConfirmValidate()">✓ Valider</button>
+  <button class="scc-btn scc-undo" onclick="scConfirmCancel()" title="Annuler / revenir en arrière" aria-label="Annuler">ANN</button>
+  <button class="scc-btn scc-ok" onclick="scConfirmValidate()" aria-label="Valider">OK</button>
 </div>
 <div id="action-toast"></div>
 <div id="eot-modal" class="hidden">
@@ -1644,7 +1673,7 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
 <div id="peace-modal" class="hidden" style="position:fixed;inset:0;background:rgba(4,4,18,.86);backdrop-filter:blur(6px);z-index:900;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:10px">
   <div class="fen-wrap"><div class="fen fen-peace" id="pm-fen">
     <div class="fen-medal" id="pm-emoji" aria-hidden="true">🕊️</div>
-    <div class="fen-kicker" id="pm-kicker">Négociation de paix</div>
+    <div class="fen-kicker fen-prep" id="pm-kicker">contre</div>
     <div class="fen-nation" id="pm-nation">Adversaire</div>
     <div class="fen-verb" id="pm-verb">Proposer la paix ?</div>
     <div id="pm-combatants" hidden></div>
@@ -1666,7 +1695,7 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
 <div id="war-combat-modal" class="hidden">
   <div class="fen-wrap"><div class="fen fen-war" id="wcm-fen">
     <div class="fen-medal" id="wcm-emoji" aria-hidden="true">⚔️</div>
-    <div class="fen-kicker">Guerre — tour <span id="wcm-turn"></span></div>
+    <div class="fen-kicker fen-prep">contre<span id="wcm-turn" hidden></span></div>
     <div class="fen-nation" id="wcm-nation"></div>
     <div class="fen-verb" id="wcm-sub"></div>
     <div class="fen-body fen-left" id="wcm-info"></div>
@@ -1719,7 +1748,7 @@ function fenBlason(spec){
   var o=spec||{}, esc=function(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};
   var h='<div class="fen-wrap"><div class="fen fen-'+(o.ton||'neutre')+'"'+(o.id?' id="'+esc(o.id)+'"':'')+'>';
   if(o.emoji) h+='<div class="fen-medal" aria-hidden="true">'+o.emoji+'</div>';
-  if(o.kicker) h+='<div class="fen-kicker">'+o.kicker+'</div>';
+  if(o.kicker) h+='<div class="fen-kicker'+(o.prep?' fen-prep':'')+'">'+o.kicker+'</div>';
   if(o.nation) h+='<div class="fen-nation">'+o.nation+'</div>';
   if(o.verbe) h+='<div class="fen-verb">'+o.verbe+'</div>';
   if(o.chips&&o.chips.length) h+='<div class="fen-chips">'+o.chips.map(function(c){return '<span>'+c+'</span>';}).join('')+'</div>';
@@ -1740,6 +1769,69 @@ function fenBlason(spec){
 function fenNation(nat){ if(!nat||!nat.civ) return {emoji:'⚔️',nom:'?'}; var moi=(typeof G!=='undefined'&&G&&nat===G.player); return {emoji:nat.civ.emoji||'', nom:nat.civ.name+(moi?' (toi)':'')}; }
 /* Remplit le médaillon (`<id>-emoji`) et le nom (`<id>-nation`) d'une fenêtre avec une nation : celle passée,
    sinon l'ennemi de guerre courant (`guerreAdverseId`). Appelée à l'ouverture des fenêtres de guerre solo. */
+/* ═══ DÉPÊCHES — Blason B (Marc, 15/09 : « je préfère le blason ») ═══
+   Une seule fonction pour le SOLO (tours des IA, ex-`il-window` rouge) et l'EN LIGNE (actions des autres,
+   ex-`#sc-logtoast` rouge). Carte flottante sous la barre du haut, sans voile : la carte reste jouable.
+   `lignes` : textes bruts (« Martiens achète X », « 🔴 Martiens — 💫 Surtension »). On reconnaît la nation par
+   son NOM, on lui rend son médaillon et sa couleur. `opts.duree` (ms) : fermeture automatique avec anneau ;
+   sans durée, c'est l'appelant qui ferme (`fenDepechesFermer`). */
+function fenDepecheLigne(txt){
+  var t=String(txt==null?'':txt).replace(/<[^>]+>/g,'').replace(/^\u{1F916}\s*/u,'').trim();
+  var noms=(typeof CIVS!=='undefined')?Object.keys(CIVS).map(function(k){return CIVS[k];}):[];
+  var nat=null, reste=t;
+  for(var i=0;i<noms.length;i++){ var c=noms[i]; var re=new RegExp('^[^A-Za-zÀ-ÿ]*'+c.name+'\\s*(?:[—–-]\\s*)?'); if(re.test(t)){ nat=c; reste=t.replace(re,''); break; } }
+  /* Émojis décoratifs retirés du reste (Marc, 08/08 : pas d'émoji dans cette fenêtre) — le « − » (U+2212) est conservé. */
+  reste=reste.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{20E3}\u{200D}]/gu,'').replace(/\s{2,}/g,' ').trim();
+  return {nat:nat, texte:reste||t};
+}
+function fenDepeches(lignes, opts){
+  var o=opts||{}, esc=function(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+  var rows=(lignes||[]).map(fenDepecheLigne).filter(function(r){return r.texte;});
+  if(!rows.length) return '';
+  var nats=[]; rows.forEach(function(r){ if(r.nat&&nats.indexOf(r.nat)<0) nats.push(r.nat); });
+  var une=(nats.length===1)?nats[0]:null;
+  var corps='<div class="fen-dep">'+rows.map(function(r){
+    return '<div><span class="m" style="--c:'+(r.nat?r.nat.color:'#4a9eff')+'">'+(r.nat?r.nat.emoji:'📡')+'</span><span>'+(r.nat?'<b>'+esc(r.nat.name)+'</b> ':'')+esc(r.texte)+'</span></div>';
+  }).join('')+'</div>';
+  var btn='<div class="fen-btns fen-one"><button type="button" class="fen-btn go fen-compris" onclick="fenDepechesFermer()">'+(o.duree?'<span class="fen-cd" id="sc-dep-cd"></span>':'')+'<span class="k">Compris</span></button></div>';
+  return fenBlason({ton:o.ton||'info', emoji:une?une.emoji:'📡', kicker:o.kicker||'Pendant ton attente', prep:!!o.prep,
+    nation:une?esc(une.name):(nats.length>1?nats.length+' nations':'Les autres nations'),
+    verbe:o.verbe||(une?'a joué':'ont joué'), milieu:corps+btn});
+}
+function fenDepechesMontrer(lignes, opts){
+  var o=opts||{};
+  var p=document.getElementById('sc-depeches');
+  if(!p){ p=document.createElement('div'); p.id='sc-depeches'; document.body.appendChild(p); }
+  var html=fenDepeches(lignes,o); if(!html){ fenDepechesFermer(); return null; }
+  p.innerHTML=html; p.style.display='block';
+  clearInterval(p._cd); clearTimeout(p._timer);
+  if(o.duree){
+    var t0=Date.now(), d=o.duree, cd=document.getElementById('sc-dep-cd');
+    p._cd=setInterval(function(){ var r=Math.max(0,1-(Date.now()-t0)/d); if(cd)cd.style.setProperty('--p',Math.round(r*100)+'%'); if(r<=0)clearInterval(p._cd); },100);
+    p._timer=setTimeout(fenDepechesFermer,d);
+  }
+  return p;
+}
+function fenDepechesFermer(){ var p=document.getElementById('sc-depeches'); if(!p)return; clearInterval(p._cd); clearTimeout(p._timer); p.style.display='none'; p.innerHTML=''; }
+/* « On t'attaque » — même famille, ton rouge : l'attaquant en médaillon quand le titre le nomme. */
+function fenAttaques(hits, opts){
+  var o=opts||{}, esc=function(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+  var noms=(typeof CIVS!=='undefined')?Object.keys(CIVS).map(function(k){return CIVS[k];}):[];
+  var nats=[]; (hits||[]).forEach(function(h){ var t=String(h.title||''); for(var i=0;i<noms.length;i++){ if(t.indexOf(noms[i].name)>=0&&nats.indexOf(noms[i])<0){ nats.push(noms[i]); break; } } });
+  var une=(nats.length===1)?nats[0]:null;
+  var corps='<div class="fen-dep">'+(hits||[]).map(function(h){
+    var t=String(h.title||'').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu,'').trim();
+    return '<div style="display:block"><div style="font-weight:700;color:#ffb3a3">'+esc(t)+'</div>'+(h.body?'<div style="font-size:.9em;color:#e6d0d0;line-height:1.45">'+h.body+'</div>':'')+'</div>';
+  }).join('')+'</div>';
+  /* Cette fenêtre reçoit aussi des NOUVELLES qui ne sont pas des coups (accord signé, ordre du tour, pacte) :
+     le rouge et « attaqué par » ne valent que si un titre parle d'attaque, de pillage, de prise ou d'espionnage. */
+  var coup=(hits||[]).some(function(h){ return /pill|attaq|prend |détruit|espionn|assaill|tombe|capital/i.test(String(h.title||'')+' '+String(h.body||'')); });
+  if(!coup) return fenBlason({ton:'info', emoji:'📡', kicker:'Nouvelles', nation:'Pour toi', verbe:o.verbe||'Pendant ton attente',
+    milieu:corps, boutons:[{k:'Compris', cls:'go', onclick:o.onclick||''}]});
+  return fenBlason({ton:'war', emoji:une?une.emoji:'⚔️', kicker:une?'attaqué par':'Guerre', prep:!!une,
+    nation:une?esc(une.name):'On t\'attaque', verbe:o.verbe||((hits||[]).length>1?'Plusieurs coups portés contre toi':'Un coup porté contre toi'),
+    milieu:corps, boutons:[{k:'Compris', cls:'go', onclick:o.onclick||''}]});
+}
 function fenAdversaire(prefix, nat){
   try{
     if(!nat){ var id=(typeof guerreAdverseId==='function')?guerreAdverseId():null; if(!id&&typeof G!=='undefined'&&G&&G.warWith) id=G.warWith;
@@ -1825,8 +1917,9 @@ function uiApplyMZ(){
   if(l2)l2.textContent=uiMZ.toFixed(1).replace(/\.0$/,'')+'×';
 }
 function uiZoom(d){
-  /* Échelle d'origine : 1× = la carte remplit la hauteur du cadre, jusqu'à 4×. */
-  uiMZ=Math.max(1,Math.min(4,Math.round((uiMZ+d*0.5)*10)/10));
+  /* Échelle d'origine : 1× = la carte remplit la hauteur du cadre, jusqu'à 5× (Marc, 15/09 : 4× ne suffit
+     pas sur mobile). */
+  uiMZ=Math.max(1,Math.min(5,Math.round((uiMZ+d*0.5)*10)/10));
   uiApplyMZ();
 }
 

@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-15 · v10.48';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-15 · v10.55';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -513,6 +513,14 @@ function showHitReal(pending){
   const m=document.getElementById('war-modal'); if(!m) return false;
   const t=document.getElementById('wm-title'), b=document.getElementById('wm-body'), r=document.getElementById('wm-result');
   if(t)t.textContent=o.title||'⚔️ Tu es attaqué';
+  /* Cette fenêtre partage `#war-modal` avec le résultat de combat : sans cela elle gardait le médaillon
+     et le nom du DERNIER combat (Martiens, puis Ceinturiens…) — l'un des « il me fait passer pour »
+     de D538. Ici le titre dit tout : médaillon neutre, pas de nom. */
+  try{ const e=document.getElementById('wm-emoji'), nm=document.getElementById('wm-nation'), kk=document.getElementById('wm-kicker');
+    /* Blason B : si le titre nomme la nation qui te frappe → « attaqué par NATION » ; sinon médaillon neutre. */
+    let n=null; try{ const G=scGetG(); const t=String(o.title||''); n=[G.player].concat(G.ais||[]).find(x=>x&&x.civ&&t.indexOf(x.civ.name)>=0&&x.civ.id!==STATE.myCiv)||null; }catch(e){}
+    if(e)e.textContent=n?n.civ.emoji:'⚔️'; if(nm)nm.textContent=n?n.civ.name:'';
+    if(kk){ kk.textContent=n?'attaqué par':'Guerre'; kk.classList.toggle('fen-prep',!!n); } }catch(e){}
   if(b)b.innerHTML=o.body||'';
   if(r)r.classList.add('hidden');
   const go=()=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide({}); };
@@ -531,8 +539,9 @@ function showWarResultReal(pending){
   try{ const G=scGetG(); const me=(typeof myNation==='function'&&myNation())||G.player; const civs=o.civs||[];
     const advId=civs.find(c=>c&&me&&me.civ&&c!==me.civ.id)||null;
     const n=advId?[G.player].concat(G.ais||[]).find(x=>x&&x.civ&&x.civ.id===advId):null;
-    const e=document.getElementById('wm-emoji'), nm=document.getElementById('wm-nation');
-    if(e)e.textContent=n?n.civ.emoji:'⚔️'; if(nm)nm.textContent=n?((window._scPseudo&&window._scPseudo[n.civ.id])||n.civ.name):''; }catch(e){}
+    const e=document.getElementById('wm-emoji'), nm=document.getElementById('wm-nation'), kk=document.getElementById('wm-kicker');
+    if(e)e.textContent=n?n.civ.emoji:'⚔️'; if(nm)nm.textContent=n?((window._scPseudo&&window._scPseudo[n.civ.id])||n.civ.name):'';
+    if(kk){ kk.textContent=n?'contre':'Guerre'; kk.classList.toggle('fen-prep',!!n); } }catch(e){}
   if(b)b.innerHTML=o.body||'';
   if(r){ const res=o.result||null;
     // Même correctif que dans le puits de notices : ces phrases portent les icônes de ressources
@@ -725,8 +734,8 @@ function showPeaceReal(pending){
   set('pm-combatants','<b>'+(me.civ.emoji||'')+' '+me.civ.name+'</b><span style="color:#556;font-size:.9em"> ⚔️ contre ⚔️ </span><b>'+(atk?atk.civ.emoji:'')+' '+atkName+'</b>');
   /* Blason (14/09) : médaillon + nom de l'adversaire, avant tout texte. */
   set('pm-emoji', atk?atk.civ.emoji:'🕊️'); set('pm-nation', esc(atkName));
-  set('pm-kicker', o.isJustDeclared?'Guerre déclarée':('Guerre — tour '+(G&&G.turn?G.turn:'')));
-  set('pm-verb', o.declaredBy==='player'?'Tu as déclaré la guerre. Proposer la paix ?':'Proposer la paix ?');
+  set('pm-kicker', 'contre');   // « contre TERRIENS » (Marc, 15/09) — la classe fen-prep est dans le HTML
+  set('pm-verb', (o.isJustDeclared?'Guerre déclarée. ':'')+(o.declaredBy==='player'?'Tu as déclaré la guerre. Proposer la paix ?':'Proposer la paix ?'));
   set('pm-declaredby', o.declaredBy==='player'?'Guerre déclarée par toi — l\'adversaire répond.':('Guerre déclarée par '+atkName+'.'));
   const vy=(o.vpYou&&o.vpYou.total!==undefined)?o.vpYou.total:(o.vpYou||0);
   const ve=(o.vpEnemy&&o.vpEnemy.total!==undefined)?o.vpEnemy.total:(o.vpEnemy||0);
@@ -758,9 +767,11 @@ function showAgendaReal(pending){
     // NET (après entretien) — même source que la barre du haut ; un revenu négatif s'affiche en rouge.
     const _net=(typeof _netIncome==='function')?_netIncome(p):preview;
     const gainStr=Object.keys(_net).filter(k=>_net[k]!==0).map(k=>'<span class="agsel-res" style="color:'+(_net[k]<0?'#ff6b6b':'#7fe0a0')+'">'+rE(k)+' '+(_net[k]>0?'+':'')+_net[k]+'</span>').join('') || '—';
-    if(ctx) ctx.innerHTML='<div class="agsel-ctx-box"><div class="agsel-ctx-label">Vos ressources</div><div class="agsel-ctx-val">'+resStr+'</div></div>'
-      +'<div class="agsel-ctx-box"><div class="agsel-ctx-label">Revenus prévus/tour</div><div class="agsel-ctx-val">'+gainStr+'</div></div>'
-      +'<div class="agsel-ctx-box"><div class="agsel-ctx-label">Prochain événement</div><div class="agsel-ctx-val">'+(evNext?(evNext.emoji+' '+evNext.preview):'Aucun')+'</div></div>';
+    /* Marc, 14/09 : plus de ressources ni de revenus ici (visibles en haut) — le prochain événement seul, sur
+       toute la largeur, une ligne. */
+    void resStr; void gainStr;
+    if(ctx) ctx.innerHTML='<div class="agsel-ctx-box agsel-ctx-wide" title="'+(evNext?esc(String(evNext.name||'')+' — '+String(evNext.preview||'').replace(/<[^>]+>/g,'')):'')+'">'
+      +'<span class="agsel-ctx-label">Prochain événement</span> <span class="agsel-ctx-val">'+(evNext?(evNext.emoji+' T.'+((G.turn||1)+1)+' — <b>'+esc(evNext.name||'')+'</b> · '+evNext.preview):'Aucun')+'</span></div>';
   }catch(e){ if(ctx) ctx.innerHTML=''; }
   cont.innerHTML=opts.map(ag=>'<div class="agsel-ag" id="agsel-ag-'+ag.id+'" onclick="selectAgenda(\''+ag.id+'\')">'
     +'<div class="agsel-ag-emoji">'+(ag.emoji||'')+'</div>'
@@ -851,15 +862,26 @@ function showLogToast(txts){
   if(!lignes.length) return;
   const wait=(window._scGreenUntil||0)-Date.now();
   if(wait>0){ setTimeout(()=>{ try{ showLogToast(txts); }catch(e){} }, wait+120); return; }
+  /* Blason B (Marc, 15/09) : carte « dépêches » flottante, médaillon par nation, COMPRIS avec anneau (8 s).
+     On garde les 4 dernières lignes, comme le toast rouge qu'elle remplace. */
+  if(typeof fenDepechesMontrer==='function'){
+    window._scDepBuf=(window._scDepBuf||[]).concat(lignes).slice(-4);
+    const p0=fenDepechesMontrer(window._scDepBuf,{kicker:'Pendant ton attente',duree:8000});
+    if(p0){ clearTimeout(window._scDepReset); window._scDepReset=setTimeout(()=>{ window._scDepBuf=[]; },8200); return; }
+  }
   let p=document.getElementById('sc-logtoast');
   /* Moitié de la largeur disponible, centré, DANS la zone de jeu — plus sous la barre du haut, qu'il
      recouvrait. `--topband` est la hauteur mesurée de cette barre. */
   if(!p){ injectStyles(); p=el('<div id="sc-logtoast" style="position:fixed;top:calc(var(--topband,56px) + 46px);left:50%;transform:translateX(-50%);'
-    +'width:min(50%,420px);z-index:8650;background:#2a0e14;border:2px solid #c0392b;border-radius:12px;padding:9px 13px;'
-    +'color:#ffd7d2;font:600 .82em/1.5 system-ui;box-shadow:0 8px 28px rgba(0,0,0,.55);display:none;text-align:left"></div>');
+    +'width:min(50%,420px);z-index:8650;background:#2a0e14;border:2px solid #c0392b;border-radius:12px;padding:9px 46px 9px 13px;'
+    +'color:#ffd7d2;font:600 .82em/1.5 var(--font-corps,system-ui);box-shadow:0 8px 28px rgba(0,0,0,.55);display:none;text-align:left"></div>');
+    /* Bouton ✕ de la taille d'un doigt : on peut fermer AVANT la fin du délai (Marc, 13/09). */
+    const x=el('<button type="button" aria-label="Fermer" style="position:absolute;top:4px;right:6px;width:40px;height:40px;border-radius:50%;border:1px solid #ff9a9a;background:#7a1015;color:#fff;font-size:20px;line-height:37px;padding:0;cursor:pointer">✕</button>');
+    x.onclick=()=>{ clearTimeout(p._timer); p.style.display='none'; p._buf=[]; };
+    p.appendChild(x); const body=el('<div id="sc-logtoast-body"></div>'); p.appendChild(body);
     document.body.appendChild(p); }
   p._buf=(p._buf||[]).concat(lignes).slice(-4);
-  p.innerHTML=p._buf.join('<br>');
+  { const body=document.getElementById('sc-logtoast-body'); if(body) body.innerHTML=p._buf.join('<br>'); else p.innerHTML=p._buf.join('<br>'); }
   p.style.display='block';
   clearTimeout(p._timer);
   p._timer=setTimeout(()=>{ p.style.display='none'; p._buf=[]; }, 5000);
@@ -1373,17 +1395,52 @@ function injectStyles(){
   if (document.getElementById('sc-online-css')) return;
   const s=document.createElement('style'); s.id='sc-online-css';
   s.textContent = `
-  #sc-ov{position:fixed;inset:0;z-index:9000;background:rgba(4,6,18,.96);color:#cdd9f5;font-family:var(--font-corps,system-ui),sans-serif;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:12px 0}
-  #sc-ov .card{background:#0d1426;border:1px solid #26406e;border-radius:14px;padding:22px 24px;width:min(92vw,420px);max-height:92dvh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.6)}
-  #sc-ov h2{margin:0 0 14px;font-size:1.2em;color:#bcd3ff}
-  #sc-ov input,#sc-ov select{width:100%;box-sizing:border-box;margin:6px 0;padding:9px 11px;border-radius:8px;border:1px solid #2c4a7e;background:#091020;color:#dce8ff;font-size:.95em}
-  #sc-ov button{cursor:pointer;border:0;border-radius:8px;padding:9px 14px;font-weight:700;font-size:.92em}
-  #sc-ov .pri{background:linear-gradient(135deg,#2f6fd0,#1f4fa0);color:#fff;width:100%;margin-top:8px}
-  #sc-ov .sec{background:#16223c;color:#9fb6e6;margin-top:6px}
-  #sc-ov .err{color:#ff8c8c;font-size:.85em;min-height:1.1em;margin-top:6px}
-  #sc-ov .muted{color:#7187b4;font-size:.82em}
-  #sc-ov .row{display:flex;gap:8px}#sc-ov .row>*{flex:1}
-  #sc-status{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:8500;background:#0d1426cc;border:1px solid #26406e;border-radius:10px;padding:6px 14px;color:#bcd3ff;font:600 .82em system-ui;backdrop-filter:blur(4px)}
+  /* ═══ ÉCRANS D'ENTRÉE (15/09, §124) : même image de fond que l'accueil, carte en verre dépoli, Blason. ═══ */
+  #sc-ov{position:fixed;inset:0;z-index:9000;color:#cdd9f5;font-family:var(--font-corps,system-ui),sans-serif;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:max(46px,env(safe-area-inset-top,0px)) 12px 24px;box-sizing:border-box;
+    background:#070718 url(assets/fond_accueil_phone.jpg) center 30%/cover no-repeat}
+  #sc-ov::before{content:'';position:fixed;inset:0;pointer-events:none;background:rgba(7,7,24,.78)}
+  @media (min-width:900px){ #sc-ov{background-image:url(assets/fond_accueil_desk.jpg);background-position:center} }
+  #sc-ov .card{position:relative;background:rgba(11,13,36,.82);border:1px solid rgba(74,158,255,.35);border-radius:16px;padding:30px 16px 16px;width:min(92vw,420px);box-shadow:0 18px 50px rgba(0,0,0,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);margin-top:28px}
+  #sc-ov .fen-medal{position:absolute;left:50%;top:-27px;transform:translateX(-50%);width:54px;height:54px;border-radius:50%;display:grid;place-items:center;font-size:26px;background:#0b0d24;border:2px solid #4a9eff;box-shadow:0 0 0 3px #070718}
+  #sc-ov .fen-kicker{font-family:var(--font-titre,inherit);font-size:.6em;letter-spacing:.16em;text-transform:uppercase;color:#4a9eff;text-align:center}
+  #sc-ov .fen-kicker.gauche{text-align:left;margin:10px 0 6px}
+  #sc-ov h2{margin:0;font-family:var(--font-titre,inherit);font-weight:400;font-size:1.15em;letter-spacing:.06em;color:#fff;text-align:center}
+  #sc-ov .sous{color:#8f98bf;font-size:.86em;text-align:center;margin:2px 0 10px}
+  #sc-ov input,#sc-ov select{width:100%;box-sizing:border-box;margin:5px 0;padding:11px 12px;border-radius:9px;border:1px solid #232750;background:#0b0d24;color:#dce8ff;font-family:var(--font-corps,system-ui);font-size:.95em}
+  #sc-ov button{cursor:pointer;border:1px solid #2a3a6a;border-radius:10px;padding:12px 14px;font-family:var(--font-titre,inherit);font-size:.7em;letter-spacing:.08em;text-transform:uppercase;color:#c8d4ff;background:#0b0d24}
+  #sc-ov .pri{background:linear-gradient(135deg,#2f6fd0,#1f4fa0);border-color:#7fb3ff;color:#fff;width:100%;margin-top:8px}
+  #sc-ov .sec{width:100%;margin-top:6px}
+  #sc-ov .err{color:#ff8c8c;font-size:.85em;min-height:1.1em;margin-top:6px;text-align:center}
+  #sc-ov .muted{color:#8f98bf;font-size:.82em}
+  #sc-ov .row{display:flex;gap:8px;align-items:center}#sc-ov .row>*{flex:1}
+  #sc-ov .liens{display:flex;justify-content:center;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:.8em}
+  #sc-ov .liens a,#sc-ov .liens span{color:#8f98bf;text-decoration:none;cursor:pointer}
+  #sc-ov .liens a:hover{color:#bcd3ff}
+  /* Sièges de « Nouvelle partie » : médaillon, nom, base, sélecteur, ⓘ ; détail replié (Marc : caché au départ). */
+  #sc-ov .siege{background:#0b0d24;border:1px solid #232750;border-radius:12px;padding:8px 8px 8px 10px;margin:8px 0}
+  #sc-ov .siege .haut{display:flex;align-items:center;gap:9px}
+  #sc-ov .siege .medal2{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:18px;background:#0f1130;border:2px solid var(--c,#4a9eff);flex:0 0 auto;cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  #sc-ov .siege .nom{flex:1;font-weight:600;color:#fff;line-height:1.2}
+  #sc-ov .siege .nom small{display:block;font-weight:400;color:#8f98bf;font-size:.8em}
+  #sc-ov .siege select{width:auto;flex:0 0 auto;margin:0;padding:9px 8px;font-family:var(--font-titre,inherit);font-size:.62em;letter-spacing:.04em;text-transform:uppercase;color:#c8d4ff;background:#131740;border-color:#2a3a6a;max-width:38vw}
+  #sc-ov .siege select.moi{background:#163a6b;border-color:#2f6fbf;color:#e8f1ff}
+  #sc-ov .siege .i{width:32px;height:32px;padding:0;border-radius:50%;border:1px solid #2a3a6a;display:grid;place-items:center;font-family:var(--font-titre,inherit);font-size:.7em;color:#4a9eff;background:transparent;flex:0 0 auto;text-transform:none}
+  #sc-ov .siege .det{display:none;margin-top:8px;padding-top:8px;border-top:1px solid #1d2350;font-size:.86em;line-height:1.45}
+  #sc-ov .siege.on .det{display:block}
+  #sc-ov .siege.on .i{background:#163a6b;color:#fff}
+  #sc-ov .siege .r{display:flex;flex-wrap:wrap;gap:5px;margin:2px 0 6px}
+  #sc-ov .siege .r span{background:#131740;border:1px solid #232750;border-radius:999px;padding:2px 8px;font-size:.92em}
+  #sc-ov .siege p{margin:3px 0;color:#dfe6ff}#sc-ov .siege p b{color:#ffb15a}#sc-ov .siege p.m{color:#8f98bf}
+  #sc-ov .astuce{text-align:center;color:#8f98bf;font-size:.78em;margin-top:8px}
+  /* Reprendre une partie : une ligne par partie, corbeille à côté. */
+  #sc-ov .rep{display:flex;gap:6px;align-items:stretch;margin:6px 0}
+  #sc-ov .rep .sc-reprise{flex:1 1 auto;width:auto;min-width:0;text-align:left;white-space:normal;margin:0;padding:10px 12px;text-transform:none;letter-spacing:0;font-family:var(--font-corps,system-ui);font-size:.9em}
+  #sc-ov .rep .sc-reprise b{font-family:var(--font-titre,inherit);font-size:.86em;letter-spacing:.04em}
+  #sc-ov .rep .sc-suppr{margin:0;padding:0 12px;flex:0 0 auto;width:auto;border-color:#7a2a2a;color:#ff9999;font-size:1em}
+  #sc-ov .btns2{display:flex;gap:8px;margin-top:10px}#sc-ov .btns2 button{flex:1;margin:0}
+  /* Pastille d'état EN BAS À DROITE, au-dessus de la barre d'onglets (Marc, FE37 : en haut elle couvrait
+     le numéro de tour et les AC). --botband est posée par uiSyncBands (hauteur réelle de la barre). */
+  #sc-status{position:fixed;bottom:calc(var(--botband,64px) + 58px);left:8px;right:auto;transform:none;z-index:8500;background:#0d1426cc;border:1px solid #26406e;border-radius:10px;padding:4px 10px;color:#bcd3ff;font:600 .72em var(--font-corps,system-ui);backdrop-filter:blur(4px);max-width:62vw;text-align:left}
   /* Look NATIF du jeu (carte sombre, bordure violette, police du jeu), inscrit dans la BANDE CENTRALE
      (entre les barres haut/bas) — restaure l'apparence d'origine au lieu du panneau bleu minimaliste. */
   #sc-decision{position:fixed;left:0;right:0;top:var(--topband,0);bottom:var(--botband,0);z-index:375;background:rgba(4,4,18,.92);backdrop-filter:blur(6px);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:8px}
@@ -1674,7 +1731,10 @@ function screenAuth(mode){
   const isReg = mode==='register';
   let savedUser=''; try{ savedUser=localStorage.getItem('sc_ws_user')||''; }catch(e){}
   overlay(`
-    <h2>${isReg?'Créer un compte':'Connexion'} — Solar</h2>
+    <div class="fen-medal">🚀</div>
+    <div class="fen-kicker">Solar</div>
+    <h2>${isReg?'Créer un compte':'Connexion'}</h2>
+    <div class="sous">&nbsp;</div>
     <input id="sc-u" type="email" inputmode="email" placeholder="Ton adresse email" autocomplete="email" enterkeyhint="next" value="${savedUser}">
     <div style="position:relative">
       <input id="sc-p" type="password" placeholder="Mot de passe (min. 6)" autocomplete="${isReg?'new-password':'current-password'}" enterkeyhint="go" style="padding-right:44px">
@@ -1685,12 +1745,8 @@ function screenAuth(mode){
     <button class="pri" id="sc-go">${isReg?'Créer le compte':'Se connecter'}</button>
     <button class="sec" id="sc-alt">${isReg?"J'ai déjà un compte":'Créer un compte'}</button>
     <button class="sec" id="sc-close">↩ Retour au jeu solo</button>
-    <div style="margin-top:10px;text-align:center;font-size:.85em">
-      <a href="tutorial.html" style="color:#8fc8ff;text-decoration:none">🎓 Découvrir le jeu — tutoriel</a>
-      <span style="color:#3a4a6a"> · </span>
-      <a href="regles.html" style="color:#8fc8ff;text-decoration:none">📖 Règles</a>
-      <span style="color:#3a4a6a"> · </span>
-      <a href="confidentialite.html" style="color:#8fc8ff;text-decoration:none">🔒 Confidentialité</a>
+    <div class="liens">
+      <a href="tutorial.html">🎓 Tutoriel</a><a href="regles.html">📖 Règles</a><a href="confidentialite.html">🔒 Confidentialité</a>
     </div>
     <div class="muted" style="font-size:.72em;opacity:.7;margin-top:9px;text-align:center">${_buildLabel()}</div>
   `);
@@ -1738,15 +1794,13 @@ function _ligneReprise(p){
   const urgent = p.aMoiDeJouer;
   /* La corbeille est À CÔTÉ du bouton, jamais DEDANS : un bouton dans un bouton n'est pas du HTML
      valide et le clic partirait au mauvais endroit. (Marc, 04/09 : « supprimer les parties test ».) */
-  return '<div style="display:flex;gap:6px;align-items:stretch;margin:6px 0">'
-    +'<button class="'+(urgent?'pri':'sec')+' sc-reprise" data-code="'+esc(p.code)+'"'
-    +' style="flex:1;text-align:left;white-space:normal;margin:0;padding:10px 12px">'
-    +'<div style="font-weight:700">'+(urgent?'▶ À TOI DE JOUER — ':'')+'Partie '+esc(p.code)+' · '+tour+'</div>'
-    +'<div style="font-size:.85em;opacity:.9;margin-top:3px">'+joueurs+'</div>'
-    +'<div style="font-size:.78em;opacity:.65;margin-top:3px">dernière activité : '+_dateFr(p.maj)+'</div>'
+  return '<div class="rep">'
+    +'<button class="'+(urgent?'pri':'sec')+' sc-reprise" data-code="'+esc(p.code)+'">'
+    +'<div>'+(urgent?'▶ À TOI DE JOUER — ':'')+'<b>'+esc(p.code)+'</b> · '+tour+'</div>'
+    +'<div style="font-size:.88em;opacity:.9;margin-top:3px">'+joueurs+'</div>'
+    +'<div style="font-size:.8em;opacity:.65;margin-top:3px">dernière activité : '+_dateFr(p.maj)+'</div>'
     +'</button>'
-    +'<button class="sec sc-suppr" data-code="'+esc(p.code)+'" title="Supprimer cette partie"'
-    +' style="margin:0;padding:0 12px;flex:0 0 auto;border-color:#7a2a2a;color:#ff9999">🗑</button>'
+    +'<button class="sec sc-suppr" data-code="'+esc(p.code)+'" title="Supprimer cette partie">🗑</button>'
     +'</div>';
 }
 function screenLobby(){
@@ -1758,23 +1812,24 @@ function screenLobby(){
      et la partie devenait introuvable — alors qu'elle vivait toujours côté serveur. */
   const parties = Array.isArray(STATE.parties) ? STATE.parties : [];
   const bloc = parties.length
-    ? ('<div style="margin:6px 0 2px;font-weight:700">Reprendre une partie</div>'
-       + parties.map(_ligneReprise).join('')
-       + '<div style="border-top:1px solid #2a3a6a;margin:12px 0 8px"></div>')
+    ? ('<div class="fen-kicker gauche">Reprendre une partie</div>'
+       + parties.map(_ligneReprise).join(''))
     : '';
+  /* Blason (15/09, §124) : médaillon, « Bonjour », le prénom de l'adresse en grand, l'adresse en dessous. */
+  const _prenom=(()=>{ const u=String(STATE.user||''); const m=u.split('@')[0]||u; return m.charAt(0).toUpperCase()+m.slice(1); })();
   overlay(`
-    <h2>Bonjour ${STATE.user}</h2>
+    <div class="fen-medal">👋</div>
+    <div class="fen-kicker">Bonjour</div>
+    <h2>${esc(_prenom)}</h2>
+    <div class="sous">${esc(STATE.user||'')}</div>
     ${bloc}
-    <button class="pri" id="sc-create">Créer une partie</button>
-    <div class="row"><input id="sc-code" placeholder="Code d'invitation"><button class="sec" id="sc-join">Rejoindre</button></div>
+    <button class="pri" id="sc-create" style="margin-top:12px">Créer une partie</button>
+    <div class="row" style="margin-top:8px"><input id="sc-code" placeholder="Code d'invitation" style="margin:0"><button class="sec" id="sc-join" style="margin:0;flex:0 0 auto;width:auto">Rejoindre</button></div>
     <div class="err" id="sc-err"></div>
-    <button class="sec" id="sc-refresh">🔄 Rafraîchir mes parties</button>
-    <button class="sec" id="sc-logout">Se déconnecter</button>
-    <button class="sec" id="sc-close">↩ Retour au jeu solo</button>
     <!-- Supprimer son compte DEPUIS l'appli : exige par Apple (5.1.1) et Google Play. Discret,
          mais present la ou l'on gere son compte — pas cache dans une page de reglement. -->
-    <div style="margin-top:8px;text-align:center;font-size:.8em">
-      <a href="#" id="sc-suppr-compte" style="color:#c88;text-decoration:none">Supprimer mon compte</a>
+    <div class="liens">
+      <span id="sc-refresh">🔄 Rafraîchir</span><span id="sc-logout">Se déconnecter</span><span id="sc-close">↩ Solo</span><a href="#" id="sc-suppr-compte" style="color:#c88">Supprimer mon compte</a>
     </div>
     <!-- ATTENTION : ce bloc est dans un gabarit JS. Pas de guillemet oblique ici, il refermerait
          le gabarit et casserait tout le fichier (erreur commise en écrivant ce commentaire).
@@ -1783,12 +1838,8 @@ function screenLobby(){
          voit plus : on arrive directement ICI. C'est donc cet ecran-la qui est la fenetre de
          connexion pour un joueur qui revient. Les deux le portent maintenant : un lien d'aide doit
          etre la ou l'on hesite, pas la ou l'on tape. -->
-    <div style="margin-top:10px;text-align:center;font-size:.85em">
-      <a href="tutorial.html" style="color:#8fc8ff;text-decoration:none">🎓 Découvrir le jeu — tutoriel</a>
-      <span style="color:#3a4a6a"> · </span>
-      <a href="regles.html" style="color:#8fc8ff;text-decoration:none">📖 Règles</a>
-      <span style="color:#3a4a6a"> · </span>
-      <a href="confidentialite.html" style="color:#8fc8ff;text-decoration:none">🔒 Confidentialité</a>
+    <div class="liens">
+      <a href="tutorial.html">🎓 Tutoriel</a><a href="regles.html">📖 Règles</a><a href="confidentialite.html">🔒 Confidentialité</a>
     </div>
     <!-- La version ICI aussi (Marc, 13/09) : un joueur dont le compte est memorise arrive
          directement sur cet ecran et devait se deconnecter pour lire le numero de version. -->
@@ -1842,25 +1893,67 @@ function screenSupprimerCompte(){
     send({t:'supprimer_compte', pass});
   };
 }
+/* Fiche d'une nation, depuis `CIVS` (rien à maintenir à la main) : base, départ, jetons, capacité, passif,
+   bonus tech. Repliée par défaut (Marc, 15/09) : ⓘ, survol du médaillon, ou appui long au doigt. */
+function _ficheNation(id){
+  try{
+    const c=(typeof CIVS!=='undefined')?CIVS[id]:null; if(!c) return '';
+    const home={lune:'Lune',phobos:'Phobos',io:'Io',eris:'Éris'}[c.home]||c.home;
+    const st=c.start||{};
+    const tb=(typeof TECH_BRANCHES!=='undefined'&&TECH_BRANCHES[c.techBonus])?TECH_BRANCHES[c.techBonus].label:c.techBonus;
+    return '<div class="r"><span>Départ '+(st.energy||0)+'⚡ '+(st.materials||0)+'🪨 '+(st.science||0)+'🔬 '+(st.morale||0)+'❤️</span><span>⚔️ '+(c.startForce||0)+' jetons</span><span>🏠 '+esc(home)+'</span></div>'
+      +'<p><b>'+esc(c.active.name)+'</b> — '+c.active.desc+'</p>'
+      +'<p class="m">'+c.passive+(tb?' · Bonus tech : '+esc(tb)+' −1🔬':'')+'</p>';
+  }catch(e){ return ''; }
+}
+function _siegesInteractifs(){
+  document.querySelectorAll('#sc-ov .siege').forEach(sg=>{
+    const m=sg.querySelector('.medal2'), i=sg.querySelector('.i'); let t=null;
+    const toggle=()=>sg.classList.toggle('on');
+    if(i) i.onclick=toggle;
+    if(m){
+      m.onclick=toggle;
+      m.addEventListener('mouseenter',()=>{ try{ if(matchMedia('(hover:hover)').matches) sg.classList.add('on'); }catch(e){} });
+      m.addEventListener('mouseleave',()=>{ try{ if(matchMedia('(hover:hover)').matches) sg.classList.remove('on'); }catch(e){} });
+      m.addEventListener('touchstart',()=>{ t=setTimeout(()=>sg.classList.add('on'),350); },{passive:true});
+      m.addEventListener('touchend',()=>clearTimeout(t),{passive:true});
+      m.addEventListener('touchmove',()=>clearTimeout(t),{passive:true});
+      m.addEventListener('contextmenu',e=>e.preventDefault());
+    }
+    const sel=sg.querySelector('select'); if(sel){ const maj=()=>sel.classList.toggle('moi',sel.value==='host'); sel.onchange=maj; maj(); }
+  });
+}
 function screenCreate(){
-  const rows = CIVS_LIST.map(([id,label],i)=>`
-    <div class="row" style="align-items:center">
-      <span style="flex:1.3">${label}</span>
-      <select data-civ="${id}">
-        <option value="none">— absente —</option>
-        <option value="host"${i===0?' selected':''}>Moi (hôte)</option>
-        <option value="open">Humain (à rejoindre)</option>
-        <option value="ai"${i>0?' selected':''}>IA</option>
-      </select>
-    </div>`).join('');
+  const rows = CIVS_LIST.map(([id,label],i)=>{
+    const c=(typeof CIVS!=='undefined')?CIVS[id]:null;
+    const home=c?({lune:'Lune',phobos:'Phobos',io:'Io',eris:'Éris'}[c.home]||c.home):'';
+    return `
+    <div class="siege">
+      <div class="haut">
+        <div class="medal2" style="--c:${c?c.color:'#4a9eff'}" title="Fiche de la nation">${c?c.emoji:label.split(' ')[0]}</div>
+        <div class="nom">${c?esc(c.name):label}<small>Base : ${esc(home)}</small></div>
+        <select data-civ="${id}">
+          <option value="none">— absente —</option>
+          <option value="host"${i===0?' selected':''}>Moi</option>
+          <option value="open">Humain</option>
+          <option value="ai"${i>0?' selected':''}>IA</option>
+        </select>
+        <button type="button" class="i" aria-label="Fiche de la nation">i</button>
+      </div>
+      <div class="det">${_ficheNation(id)}</div>
+    </div>`; }).join('');
   overlay(`
-    <h2>Nouvelle partie</h2>
+    <div class="fen-medal">🚀</div>
+    <div class="fen-kicker">Nouvelle partie</div>
+    <h2>Les sièges</h2>
+    <div class="sous">Choisis ta nation, et qui joue les autres.</div>
     ${rows}
+    <div class="astuce">ⓘ ou appui long sur un médaillon : base, ressources de départ, capacité.</div>
     <div class="err" id="sc-err"></div>
-    <button class="pri" id="sc-make">Créer</button>
-    <button class="sec" id="sc-back">Retour</button>
+    <div class="btns2"><button class="sec" id="sc-back">Retour</button><button class="pri" id="sc-make">Créer</button></div>
   `);
   _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
+  _siegesInteractifs();
   document.getElementById('sc-make').onclick = ()=>{
     let myCiv=null; const seats=[];
     document.querySelectorAll('#sc-ov select[data-civ]').forEach(s=>{
@@ -1883,9 +1976,11 @@ function renderWait(){
     return `<div>${civLabel(s.civId)} — ${who}</div>`;
   }).join('');
   const allSeated = g.seats.every(s=>s.ai || s.user);
-  overlay(`<h2>Salle d'attente</h2>
-    <div>Code : <b style="font-size:1.2em;letter-spacing:2px">${g.code}</b> <span class="muted">(partage-le)</span></div>
-    <div id="sc-players" style="margin:12px 0">${list}</div>
+  overlay(`<div class="fen-medal">⏳</div>
+    <div class="fen-kicker">Salle d'attente</div>
+    <h2 style="letter-spacing:.2em">${g.code}</h2>
+    <div class="sous">Code d'invitation — partage-le.</div>
+    <div id="sc-players" style="margin:12px 0;line-height:1.7">${list}</div>
     <div class="err" id="sc-err"></div>
     ${STATE.isHost ? `<button class="pri" id="sc-start"${allSeated?'':' disabled style="opacity:.5"'}>Démarrer la partie</button>` : '<div class="muted">En attente que l&rsquo;hôte démarre…</div>'}
     <button class="sec" id="sc-leave">Quitter</button>`);
@@ -1951,7 +2046,9 @@ function decisionPanel(html){
 function closeDecision(){ const p=document.getElementById('sc-decision'); if(p) p.style.display='none'; STATE._reduite=null; hideResumeChip(); }
 function showResumeChip(){
   let c=document.getElementById('sc-resume');
-  if(!c){ c=el('<button id="sc-resume" style="position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:8900;background:linear-gradient(135deg,#2f6fd0,#1f4fa0);color:#fff;border:0;border-radius:10px;padding:10px 18px;font:700 .9em system-ui;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.5)">▶ Reprendre (choix en attente)</button>'); document.body.appendChild(c);
+  /* Un petit ▶ bleu, rond, en bas à DROITE de la carte, sans texte (Marc, 15/09) : l'ancien bandeau
+     « Reprendre (choix en attente) » barrait le menu du bas. */
+  if(!c){ c=el('<button id="sc-resume" aria-label="Reprendre le choix en attente" title="Reprendre le choix en attente" style="position:fixed;right:10px;bottom:calc(var(--botband,64px) + 58px);width:52px;height:52px;z-index:8900;background:linear-gradient(135deg,#2f6fd0,#1f4fa0);color:#fff;border:2px solid #7fb3ff;border-radius:50%;padding:0;font:700 22px/48px system-ui;text-align:center;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.55)">▶</button>'); document.body.appendChild(c);
     c.onclick=()=>scRestaurerFenetre(); }
   c.style.display='block';
 }
@@ -2000,8 +2097,8 @@ function askLocalDecision(pending){
         if(o.threatDetail) _chips.push(esc(o.threatDetail));
         if(o.attackerCruiser) _chips.push('⚓ Supercroiseur déployé');
         if(o.renfort) _chips.push('🤝 Tu partages '+esc(o.target?o.target.name:'ce nœud')+' avec '+esc(o.principal||'le propriétaire'));
-        body=fenBlason({ton:'war', emoji:_emo, kicker:o.renfort?'Renfort — nœud partagé':'Assaut surprise', nation:esc(who),
-          verbe:(o.renfort?'assaillent ':'attaquent ')+_cibleB, chips:_chips, milieu:_milieu,
+        body=fenBlason({ton:'war', emoji:_emo, kicker:'attaqué par', prep:true, nation:esc(who),
+          verbe:(o.renfort?'Renfort — nœud partagé — assaillent ':'Assaut surprise — attaquent ')+_cibleB, chips:_chips, milieu:_milieu,
           boutons:[{k:o.renfort?'Rien':'Ne rien engager', s:o.renfort?'le propriétaire défend seul':'la garnison seule', cls:'ghost', id:'sc-none'},
                    {k:o.renfort?'Renforcer':'Défendre', s:'<span id="sc-dbs">avec '+_v0+' jeton'+(_v0>1?'s':'')+'</span>', cls:'no', id:'sc-ok'}]});
         decisionPanel(body);
@@ -2058,6 +2155,17 @@ function askLocalDecision(pending){
       /* Blason (14/09) : l'ennemi en médaillon sur les deux écrans (liste des cibles, puis curseur). */
       let _enEmo='⚔️'; try{ const _G=scGetG(); const _n=[_G.player].concat(_G.ais||[]).find(x=>x&&x.civ&&(x.civ.id===o.enemy||x.civ.name===o.enemyName)); if(_n)_enEmo=_n.civ.emoji||'⚔️'; }catch(e){}
       const _blason=(typeof fenBlason==='function');
+      /* Tour de guerre (comme en solo : 1/2 puis 2/2) et FORCE ENNEMIE — exacte avec Réseau Orbital, ±3
+         sinon (Marc, FE37 : « on ne peut pas voir la force ennemie alors que j'ai la technologie »). */
+      const _chipsGuerre=()=>{ const c=[];
+        if(o.warTurnsLeft!==undefined) c.push('Tour de guerre <b>'+(o.warTurnsLeft>=2?'1':'2')+'/2</b>');
+        if(o.enemyForce) c.push('Force ennemie <b>'+(o.enemyForce.exact?'':'~')+o.enemyForce.val+'⚔️</b>'+(o.enemyForce.exact?' (renseignement exact)':' (±3, sans renseignement)'));
+        return c; };
+      /* Ce que le défenseur peut aligner : garnison de la colonie (règle connue : 1, ou 10 pour une
+         capitale) + ce qu'il engage, borné par sa force (exacte ou estimée). */
+      const _defenseTexte=(c)=>{ const g=(c.garrison!==undefined)?c.garrison:(c.isHome?10:1);
+        const f=o.enemyForce; const fx=f?((f.exact?'':'~')+f.val):'?';
+        return (c.isHome?'🏛️ CAPITALE : ':'')+'Défense = garnison <b>'+g+'</b> + ce que l\'ennemi engage (il a <b>'+fx+'</b> jeton'+((f&&f.val>1)?'s':'')+(f&&!f.exact?', estimation ±3':'')+'). Fourchette : <b>'+g+'</b> à <b>'+(f?(g+f.val):'?')+'</b>⚔️'+(f&&f.exact?' — renseignement exact.':'.'); };
       const tokenPick=(title,hint,onOk)=>{ // sous-écran : choisir les jetons engagés (+ supercroiseur)
         const limite=(maxF<force)?('<div style="color:#ffcc88;font-size:.82em;margin-bottom:4px">⚠️ Tu possèdes '+force+' jeton(s) mais ne peux en <b>payer</b> que '+maxF+' (1🪨 +1⚡ par jeton engagé).</div>'):'';
         const cruLigne=cru.has
@@ -2066,8 +2174,8 @@ function askLocalDecision(pending){
              +'<span>⚓ Déployer le Supercroiseur <b>+'+(cru.power||5)+'⚔️</b>'+(cru.afford?'':' — ressources insuffisantes')+'</span></label>')
           : '';
         if(_blason){
-          decisionPanel(fenBlason({ton:'war', emoji:_enEmo, kicker:'Guerre'+(o.warTurnsLeft!==undefined?' · '+o.warTurnsLeft+' tour'+(o.warTurnsLeft>1?'s':'')+' restant'+(o.warTurnsLeft>1?'s':''):''), nation:esc(o.enemyName||'ennemi'),
-            verbe:title, corps:(hint?hint:'')+limite,
+          decisionPanel(fenBlason({ton:'war', emoji:_enEmo, kicker:'contre', prep:true, nation:esc(o.enemyName||'ennemi'),
+            verbe:title, chips:_chipsGuerre(), corps:(hint?hint:'')+limite,
             milieu:'<div class="fen-slider"><div class="row"><span>Jetons engagés</span><b><span id="sc-wcv">'+Math.min(1,maxF)+'</span> / <span id="sc-wcmax">'+maxF+'</span></b></div>'
               +'<input type="range" id="sc-wc" min="0" max="'+maxF+'" value="'+Math.min(1,maxF)+'" aria-label="Jetons engagés">'
               +cruLigne.replace('style="display:flex;align-items:center;gap:8px;margin:8px 0;','style="')
@@ -2133,12 +2241,12 @@ function askLocalDecision(pending){
         /* Et on DIT pourquoi tout est gris, au lieu de laisser croire à une fenêtre cassée. */
         if(maxF<1) b+='<div style="color:#ffcc88;font-size:.82em;margin-top:6px">⚠️ Tu n\'as pas de quoi engager un seul jeton (1🪨 +1⚡ chacun) : aucune attaque n\'est possible ce tour-ci.</div>';
         if(_blason){
-          b=fenBlason({ton:'war', emoji:_enEmo, kicker:'Guerre'+(o.warTurnsLeft!==undefined?' · '+o.warTurnsLeft+' tour'+(o.warTurnsLeft>1?'s':'')+' restant'+(o.warTurnsLeft>1?'s':''):''), nation:esc(o.enemyName||'ennemi'),
-            verbe:'Que fais-tu ce tour ?', chips:['Engageables <b>'+maxF+'</b>'+((maxF<force)?' / '+force+' possédés':'')].concat(threat?['🛡️ Menace sur <b>'+esc(threat.name||'')+'</b>']:[]),
+          b=fenBlason({ton:'war', emoji:_enEmo, kicker:'contre', prep:true, nation:esc(o.enemyName||'ennemi'),
+            verbe:'Que fais-tu ce tour ?', chips:_chipsGuerre().concat(['Engageables <b>'+maxF+'</b>'+((maxF<force)?' / '+force+' possédés':'')]).concat(threat?['🛡️ Menace sur <b>'+esc(threat.name||'')+'</b>']:[]),
             milieu:'<div style="text-align:left">'+b+'</div>'});
         }
         decisionPanel(b);
-        document.querySelectorAll('#sc-decision .opt[data-col]').forEach(btn=>{ if(btn.disabled)return; btn.onclick=()=>{ const c=cols[parseInt(btn.getAttribute('data-col'))]; tokenPick('⚔️ Attaquer '+c.name, (c.isHome?'🏛️ CAPITALE : défendue d\'office par 10 jetons, plus ce que l\'ennemi engage.':'Force ennemie inconnue (garnison + défense).'), (t,cr)=>done({action:'attack', node:c.node, tokens:t, cruiser:cr})); }; });
+        document.querySelectorAll('#sc-decision .opt[data-col]').forEach(btn=>{ if(btn.disabled)return; btn.onclick=()=>{ const c=cols[parseInt(btn.getAttribute('data-col'))]; tokenPick('⚔️ Attaquer '+c.name, _defenseTexte(c), (t,cr)=>done({action:'attack', node:c.node, tokens:t, cruiser:cr})); }; });
         document.querySelectorAll('#sc-decision .opt[data-rt]').forEach(btn=>{ if(btn.disabled)return; btn.onclick=()=>done({action:'route', route:parseInt(btn.getAttribute('data-rt'))}); });
         const dfn=document.getElementById('sc-wc-def'); if(dfn) dfn.onclick=()=>tokenPick('🛡️ Défense', 'Jetons engagés en défense de tes colonies.', (t,cr)=>done({action:'defend', tokens:t, cruiser:cr}));
         const hld=document.getElementById('sc-wc-hold'); if(hld) hld.onclick=()=>done({action:'hold'});
@@ -2408,5 +2516,5 @@ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded'
 window.SC_ONLINE = { STATE, send, reqState }; // debug console
 /* Banc VISUEL (captures Playwright, `scratchpad/shot3.js`) : ouvrir les fenêtres de décision avec une
    charge utile fabriquée, sans serveur. Exposé seulement si l'adresse porte `?sc_test=1`. */
-try{ if(/[?&]sc_test=1/.test(location.search)) window.SC_TEST = { askLocalDecision, showPeaceReal, closeDecision, decisionPanel, STATE, installIntercepts }; }catch(e){}
+try{ if(/[?&]sc_test=1/.test(location.search)) window.SC_TEST = { askLocalDecision, showPeaceReal, closeDecision, decisionPanel, STATE, installIntercepts, screenAuth, screenLobby, screenCreate, renderWait }; }catch(e){}
 })();

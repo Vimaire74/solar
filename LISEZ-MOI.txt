@@ -1,11 +1,12 @@
-LOT 17 — MISE À JOUR LÉGÈRE (v10.48, sw v169) — 15/09/2026 : « Calmer la Population » marche enfin en ligne
+LOT 17 — MISE À JOUR LÉGÈRE (v10.55, sw v176) — 15/09/2026 : fenêtres de guerre « contre NATION », force ennemie en ligne, routes orphelines, Calmer la Population, Forge
 
-Ce dossier ne contient QUE ce qui a changé depuis la version en ligne : 5 fichiers
-(index.html, moteur.js, online.js, sw.js, tutorial.html). Les polices, les images et les fichiers
-du dossier server/ n'ont pas changé.
+Ce dossier ne contient QUE ce qui a changé depuis la version en ligne : 6 fichiers à la racine
+(index.html, moteur.js, online.js, sw.js, tutorial.html, regles.html) + 1 fichier serveur (server/game-core.js)
++ 2 images dans assets/ (fond_accueil_desk.jpg, fond_accueil_phone.jpg — le fond du nouvel écran d'accueil).
+Sur GitHub : glisser aussi le dossier assets (il fusionne avec celui du dépôt).
 
-Sur GitHub, à la RACINE du dépôt : Add file → Upload files, glisser les 5 fichiers (pas ce LISEZ-MOI),
-Commit changes. Puis Coolify : vérifier que les DEUX ressources se redéploient (solar-game.com ET
+Sur GitHub, à la RACINE du dépôt : Add file → Upload files, glisser les 6 fichiers de la racine ET le
+dossier server (il fusionne avec celui du dépôt), pas ce LISEZ-MOI, Commit changes. Puis Coolify : vérifier que les DEUX ressources se redéploient (solar-game.com ET
 live.solar-game.com) — moteur.js contient les règles et le serveur le lit aussi. Si l'une ne s'est
 pas redéployée toute seule : Redeploy à la main.
 
@@ -14,3 +15,34 @@ Changement de cette version (partie D538 du 14/09) :
   se passait, aucun message. Le choix de la nation se fait maintenant sur ton écran, et le serveur
   revalide tout (AC, ressources, cible) avant de toucher à la tension. Bench : server/test_calmer_population.js.
 - Le journal écrit « 🌍 Terriens calme sa tension vers 🔴 Martiens » (nom, plus l'identifiant en minuscule).
+- Forge Orbitale (Jupitériens) : améliore désormais une lune jovienne de niveau 1 même NON reliée par
+  une route (avant : seules les lunes connectées étaient proposées). Bench : server/test_forge_non_connectee.js.
+
+Partie FE37 (15/09) :
+- Fenêtres de guerre : le grand nom est l'ADVERSAIRE, désormais annoncé par « contre » (ou « attaqué par »)
+  au-dessus — plus de confusion « je suis Ceinturiens ». « Tour de guerre 1/2 » remplace « 0 tour restant ».
+- En ligne, la fenêtre de combat montre la force ennemie (exacte avec Réseau Orbital, ±3 sinon) et, par
+  colonie, la fourchette « garnison + ce qu'il peut engager ».
+- La pastille « En attente des autres joueurs… » passe en bas à droite, elle ne couvre plus le tour et les AC.
+- NOUVELLE RÈGLE : au début de chaque tour, une route dont aucune extrémité n'est à toi (capitale comprise)
+  tombe, jeton rendu (regles.html mis à jour). Bench : server/test_routes_orphelines.js.
+- Guerres populaires : quand plusieurs peuples exigent la guerre le même tour, TOUTES sont servies (avant,
+  seule la première l'était — c'est pourquoi le Ceinturien de FE37 n'a jamais déclaré la guerre). Le joueur
+  ne reçoit qu'une fenêtre à la fois ; les suivantes attendent qu'il ait répondu. Bench : server/test_guerres_populaires_file.js.
+- Ergonomie : « Reprendre (choix en attente) » devient un petit ▶ bleu rond en bas à droite de la carte ;
+  la barre Valider/Annuler a deux grandes touches ANN (rouge) / OK (vert) ; les fenêtres rouges (IA en
+  solo, actions des autres en ligne) ont un ✕ de 40 px pour fermer avant la fin du délai ; « ++1⚡ » et le
+  double emoji « 🔴 🔴 Martiens » corrigés.
+- « Dépêches » (Blason B) : ce que les autres nations font (tours des IA en solo, actions des autres en
+  ligne) s'affiche dans une carte Blason bleue flottante — médaillon par nation, COMPRIS avec anneau de 8 s en
+  ligne — à la place de la fenêtre rouge. « On t'attaque » devient une carte rouge « attaqué par NATION » ;
+  les simples nouvelles (accord signé, ordre du tour) une carte bleue « Nouvelles ».
+- Agenda secret : plus de cases ressources/revenus, le prochain événement sur toute la largeur en une ligne.
+  Zoom carte jusqu'à 5×. Le bouton qui masque les distances entre capitales (traits jaunes) garde son état
+  d'un tour à l'autre (réglage de l'appareil). Règles : nœud partagé inattaquable seulement sous pacte de
+  non-agression, pas sous accord commercial.
+- NOUVEL ÉCRAN D'ACCUEIL « SOLAR » (maquette validée) : image de fond (ton vaisseau), logo Michroma, carte de
+  connexion en verre dépoli (en bas sur téléphone, à droite sur ordinateur). Plus de fiches de nations à
+  l'accueil : elles sont dans « Nouvelle partie », cachées, révélées au ⓘ, au survol ou à l'appui long du
+  médaillon. Écrans « Bonjour », « Nouvelle partie », « Salle d'attente », connexion secondaire : même fond,
+  cartes Blason, polices du jeu.

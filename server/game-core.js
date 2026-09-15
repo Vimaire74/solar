@@ -277,7 +277,7 @@ const ACTIONS = {
     const G = sb.__G, p = G.player;
     if (p && p.civ && p.civ.id === 'jupiteriens') {
       // Forge Orbitale : choisir une lune joviène Nv.1 connectée (pas de modale headless) → repli auto sur la 1re.
-      const el = (p.colonies || []).filter(c => ['io', 'europe', 'ganymede', 'callisto'].includes(c.nodeId) && c.level === 1 && c.connected);
+      const el = (p.colonies || []).filter(c => ['io', 'europe', 'ganymede', 'callisto'].includes(c.nodeId) && c.level === 1); // reliée ou non (Marc, 15/09)
       if (el.length && typeof sb._forgeUpgrade === 'function') sb._forgeUpgrade(el[0].nodeId);
       else if (typeof sb.useAbility === 'function') sb.useAbility(); // journalise « aucune lune améliorable »
     } else if (typeof sb.useAbility === 'function') sb.useAbility();
