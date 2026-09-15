@@ -6,9 +6,9 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-09-15 · v10.55';</script>
+<script>window.SOLAR_BUILD_HTML='2026-09-16 · v10.62';</script>
 <script>/* Taille du texte mémorisée (menu Journal → Aa) : appliquée avant le premier rendu, sans à-coup. */
-(function(){try{var t=localStorage.getItem('sc_taille');if(t&&/^(11|13|15|17)$/.test(t))document.documentElement.style.setProperty('--sc-fs',t+'px');}catch(e){}})();</script><!-- ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE : celle-ci, `SOLAR_BUILD_JS` (online.js) et `SOLAR_BUILD_MOTEUR` (moteur.js). Surveillé par test_versions.js. -->
+(function(){try{var t=localStorage.getItem('sc_taille');var m={'11':'14','13':'16','15':'18','17':'20'};if(m[t]){t=m[t];localStorage.setItem('sc_taille',t);}if(t&&/^(14|16|18|20)$/.test(t))document.documentElement.style.setProperty('--sc-fs',t+'px');}catch(e){}})();</script><!-- ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE : celle-ci, `SOLAR_BUILD_JS` (online.js) et `SOLAR_BUILD_MOTEUR` (moteur.js). Surveillé par test_versions.js. -->
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -29,10 +29,12 @@ html,body{height:100%;height:calc(var(--vh,1vh)*100);height:100dvh;overflow:hidd
 @font-face{font-family:'Michroma';src:url(assets/fonts/Michroma.woff2) format('woff2');font-weight:400;font-style:normal;font-display:swap}
 :root{--font-corps:'Exo 2','Segoe UI',system-ui,sans-serif;--font-titre:'Michroma','Exo 2',sans-serif}
 /* ═══ TAILLE DU TEXTE (Marc, 13-14/09) : réglage DANS le jeu (menu Journal → Aa), mémorisé sur l'appareil
-   (`sc_taille`). Toute l'interface est en em : cette seule valeur fait tout suivre. 13 px = « Normal »,
-   celui que le jeu a toujours eu. Le réglage du téléphone ne compte plus (l'appli Android force le zoom
-   texte à 100 %). */
-:root{--sc-fs:13px}
+   (`sc_taille`). Toute l'interface est en em : cette seule valeur fait tout suivre. 16 px = « Normal »,
+   celui que le jeu a toujours eu (le bloc « overrides mobile » en fin de feuille posait `body{font-size:16px}`
+   et écrasait la variable — bug jusqu'en v10.61, Marc 15/09 : « les tailles ne marchent plus »). Ce bloc
+   lit maintenant la variable. Crans : 14 / 16 / 18 / 20. Le réglage du téléphone ne compte plus (l'appli
+   Android force le zoom texte à 100 %). */
+:root{--sc-fs:16px}
 body{background:#070718;color:#c8d8f8;font-family:var(--font-corps);font-size:var(--sc-fs);display:flex;flex-direction:column}
 /* Michroma est LARGE : réservée aux titres et libellés courts, jamais au texte courant, et ~15 % plus
    petite que le gras Segoe qu'elle remplace pour tenir dans les mêmes largeurs. */
@@ -78,20 +80,6 @@ body{background:#070718;color:#c8d8f8;font-family:var(--font-corps);font-size:va
    à droite, sous le bouton Capacité : la hauteur de la barre redevient exactement ce qu'elle était.
    Et pour qu'il ne recouvre rien, la deuxième ligne se réserve la place à droite (`padding-right`)
    uniquement quand le badge est allumé. Ni superposition, ni décalage. */
-#a-toi-badge{display:none;position:absolute;right:9px;bottom:5px;z-index:2;
-  background:linear-gradient(135deg,#1f7a3a,#146030);color:#eafff0;border:1px solid #35a35c;
-  border-radius:6px;padding:2px 7px;font:800 .55em/1.1 system-ui;letter-spacing:.08em;
-  white-space:nowrap;pointer-events:none;}
-#a-toi-badge.on{display:block;}
-/* Le bouton se place à GAUCHE du badge, dans la même bande, hors du flux : la barre du haut ne
-   change donc pas de hauteur, et la deuxième ligne réserve déjà la place à droite. */
-#passer-btn{display:none;position:absolute;right:62px;bottom:5px;z-index:2;
-  background:linear-gradient(135deg,#7a3f1f,#5a2d14);color:#ffe0cc;border:1px solid #b5673a;
-  border-radius:6px;padding:2px 8px;font:800 .55em/1.1 system-ui;letter-spacing:.08em;
-  white-space:nowrap;cursor:pointer;}
-#passer-btn:active{transform:scale(.96);}
-#passer-btn.on{display:block;}
-#top-bar.a-toi .mtb-line2{padding-right:118px;}   /* place réservée pour le badge ET le bouton */
 
 #top-bar{display:flex;align-items:center;gap:10px;padding:6px 14px;background:#0a0a22;border-bottom:1px solid #1a1a3a;flex-shrink:0;min-height:38px}
 .gtitle{font-weight:700;font-size:.95em;color:#4a9eff;letter-spacing:2px}
@@ -609,8 +597,7 @@ body.modal-lock #btn-ability,body.modal-lock #btn-undo,body.modal-lock #btn-col,
 /* ======================  SURCHARGE MOBILE / SMALL SCREEN  ============= */
 /* ===================================================================== */
 html{background:#020208;height:100%;}
-body{max-width:var(--appw,480px);margin:0 auto;height:100dvh;height:100vh;position:relative;overflow:hidden;font-size:14px;box-shadow:0 0 50px #000;display:flex;flex-direction:column;padding:10px 0 calc(10px + env(safe-area-inset-bottom,0));}
-#top-bar{border-radius:12px 12px 0 0;}
+body{max-width:var(--appw,480px);margin:0 auto;height:100dvh;height:100vh;position:relative;overflow:hidden;font-size:var(--sc-fs,16px);box-shadow:0 0 50px #000;display:flex;flex-direction:column;padding:10px 0 calc(10px + env(safe-area-inset-bottom,0));}
 #bottom-bar{border-radius:0 0 12px 12px;overflow:hidden;}
 /* revenu inline dans la barre de ressources */
 .tres .ti{font-size:.74em;font-weight:600;margin-left:3px;}
@@ -626,17 +613,6 @@ body{max-width:var(--appw,480px);margin:0 auto;height:100dvh;height:100vh;positi
 .btn-go{width:100%;padding:14px;font-size:1.05em;}
 
 /* ---------- Barre du haut fixe ---------- */
-#top-bar{flex-direction:column;align-items:stretch;gap:4px;padding:6px 9px 6px;min-height:unset;flex-shrink:0;z-index:30;}
-.mtb-line1{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
-.mtb-line1 #turn-disp{min-width:unset;font-size:.82em;}
-.mtb-line1 #ac-disp,.mtb-line1 #gov-disp{margin-left:0;}
-.mtb-line1 #phase-disp{min-width:unset;font-size:.68em;}
-#top-bar .cbt-tooltip{top:auto;bottom:calc(100% + 6px);}
-.mtb-cap{margin-left:auto;padding:5px 10px;font-size:.78em;flex-shrink:0;}
-#btn-undo.mtb-undo{margin-left:6px;padding:5px 12px;font-size:.8em;flex-shrink:0;}
-.mtb-line2{display:flex;flex-direction:column;gap:3px;}
-#top-bar .top-res{display:flex!important;gap:5px;margin:0!important;flex-wrap:wrap;}
-#top-bar .tres{font-size:.8em;padding:2px 5px;}
 #top-income{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:.72em;color:#7fae8c;padding:1px 2px;}
 #top-income .ti-label{color:#5a7a66;text-transform:uppercase;letter-spacing:.5px;font-size:.86em;}
 #top-income .ti-chip{font-weight:700;}
@@ -693,7 +669,7 @@ body{max-width:var(--appw,480px);margin:0 auto;height:100dvh;height:100vh;positi
    étroite, où leur mise en page a été pensée. Élargir le CADRE seul ne servait à rien : `body` porte
    `overflow:hidden` et coupait tout ce qui dépassait de la colonne. */
 body.vue-carte{--appw:100vw;}
-body.vue-carte #top-bar,body.vue-carte #bottom-bar{border-radius:0;}
+body.vue-carte #bottom-bar{border-radius:0;}
 #mp-map.active{position:relative;}   /* repère pour les boutons de zoom, ancrés au panneau */
 /* ⚠️ NE PAS METTRE `#map-wrap` EN `grid` (ni en `flex`).
    J'avais essayé, pour centrer la carte après un dézoom. Mais la carte se dimensionne avec
@@ -898,12 +874,6 @@ body.vue-carte #top-bar,body.vue-carte #bottom-bar{border-radius:0;}
 .eot-card,.evt-card,.war-card,.agsel-card,.strat-card,.inv-card,.ea-card,.disc-card,.fw-card,.atk-card,.debug-card,.rtm-card,.rmm-card,.td-card,#invest-active-modal>div,#peace-modal>div,#dyson-modal .inv-card,#accord-modal>div{max-width:100%!important;width:100%!important;max-height:none!important;margin:auto!important;box-sizing:border-box!important;}
 #agenda-sel-modal .agsel-sub,#agenda-sel-modal .agsel-context,#agenda-sel-modal .agsel-agendas{margin-bottom:8px!important;}
 /* Barre du haut compacte (mobile) : pas de label "Actions" (non cliquable), libellés courts, tailles réduites */
-#phase-disp{display:none!important;}
-.mtb-line1{gap:5px!important;}
-.mtb-line1 #turn-disp{font-size:.74em!important;min-width:unset!important;}
-.mtb-line1 #ac-disp{font-size:.78em!important;padding:1px 6px!important;}
-.mtb-line1 #gov-disp{font-size:.76em!important;}
-.mtb-line1 .abtn{font-size:.78em!important;padding:3px 7px!important;}
 /* écran de sélection de nation : contenu centré, largeur portable */
 #civ-sel h1,#civ-sel p,#civ-sel-main,#civ-sel .btn-go{max-width:456px;margin-left:auto;margin-right:auto;width:100%;}
 #civ-sel p{max-width:420px;}
@@ -920,15 +890,9 @@ body.vue-carte #top-bar,body.vue-carte #bottom-bar{border-radius:0;}
    — Bloc volontairement en fin de feuille pour gagner en priorité et rester
      facile à retrouver / ajuster. Réglages "confortables" de départ.
    ============================================================================ */
-/* 1) Texte plus confortable (base +~25 %). À ajuster si besoin. */
-body{font-size:16px;}
+/* 1) Texte : lit le réglage Aa (16 px = ce que ce bloc imposait en dur avant v10.62). */
+body{font-size:var(--sc-fs,16px);}
 .mtab label{font-size:.5em;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}   /* Michroma est large : .58em coupait « JOURNAL » sur 390 px */      /* libellés d'onglets : plus compacts + jamais de débordement (zoom texte mobile) */
-.mtb-line1 #turn-disp{font-size:1em;}
-.mtb-line1 #phase-disp{font-size:.82em;}
-#ac-disp{font-size:1em;}
-#gov-disp{font-size:.9em;}
-#top-bar .tres{font-size:.86em;}
-.cbt-pill{font-size:.92em;}
 
 /* 2) Carte = 90 % de l'espace entre les barres haut/bas ; les 10 % restants pour la barre de zoom sous la carte */
 #mp-map.active{display:flex;flex-direction:column;justify-content:flex-start;flex:1;min-height:0;}
@@ -1051,12 +1015,138 @@ body{font-size:16px;}
 .fen-btn:hover:not(:disabled){filter:brightness(1.12)}
 .fen-note{font-size:.8em;color:#6a729a;line-height:1.35}
 /* Le réglage Aa dans le menu Journal */
-#sc-taille{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-#sc-taille .lab{font-family:var(--font-titre);font-size:.55em;letter-spacing:.12em;text-transform:uppercase;color:#9aa3c7;margin-right:2px}
-#sc-taille button{min-width:40px;min-height:36px;border:1px solid #33386b;background:#0b0d24;color:#dbe1f7;border-radius:8px;cursor:pointer;font-weight:700;padding:0 8px}
-#sc-taille button[aria-pressed="true"]{background:#4a9eff;color:#06101f;border-color:#4a9eff}
-#sc-taille button:nth-child(2){font-size:.8em}#sc-taille button:nth-child(3){font-size:.95em}#sc-taille button:nth-child(4){font-size:1.1em}#sc-taille button:nth-child(5){font-size:1.25em}
 
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════
+   v10.62 — BARRE DU HAUT « CONSOLE À VOYANTS » + PANNEAUX JOURNAL / EMPIRE / DIPLO EN BLASON
+   (maquettes validées par Marc le 16/09 : option B pour la barre). En fin de feuille : ce bloc
+   gagne sur les surcharges mobiles plus haut. La barre reste `position:fixed` (règle plus haut).
+   Largeurs tenues pour 390 px AVEC Michroma : nation en .66em, tour en Exo 2, pas de coût sur
+   le bouton Pouvoir, `À TOI` en .5em — tout `white-space:nowrap`, rien ne déborde.
+   ═══════════════════════════════════════════════════════════════════════════════════════ */
+#top-bar{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:10px 10px 9px;min-height:unset;border:0;border-bottom:1px solid #2f3a7a;border-radius:0 0 18px 18px;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.018) 0 2px,transparent 2px 4px),linear-gradient(180deg,#1a1f4d 0%,#0f1334 40%,#0a0d28 100%);
+  box-shadow:0 12px 28px rgba(0,0,0,.7)}
+#top-bar::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;border-radius:0;background:linear-gradient(90deg,transparent,#ffd34d 20%,#ffd34d 80%,transparent);box-shadow:0 0 10px rgba(255,211,77,.7);pointer-events:none}
+.tb-l1{display:flex;align-items:center;gap:7px;min-width:0;padding-top:2px}
+#top-bar .cbt-wrap{display:inline-flex;align-items:center;gap:7px;flex:1 1 auto;min-width:0;position:relative;cursor:help}
+.cbt-medal{width:34px;height:34px;border-radius:50%;background:#0b0d24;border:2px solid var(--cc,#4a9eff);display:grid;place-items:center;font-size:17px;line-height:1;flex:0 0 auto;box-shadow:0 0 12px var(--cc,#4a9eff)}
+.cbt-nom{font-family:var(--font-titre);font-size:.66em;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#top-bar .cbt-tooltip{top:calc(100% + 8px);bottom:auto;left:0;z-index:5}
+#top-bar #turn-disp{font-family:var(--font-corps);font-size:.82em;font-weight:600;color:#ffd34d;white-space:nowrap;min-width:0;margin:0;flex:0 0 auto}
+#top-bar #ac-disp{margin:0;padding:3px 7px;border-radius:5px;background:#0f2a4a;color:#7ec8ff;border:1px solid #1d4d8a;font-weight:700;font-size:.8em;white-space:nowrap;flex:0 0 auto;line-height:1.1}
+#top-bar #gov-disp{margin:0;padding:3px 7px;border-radius:5px;background:#2a1040;color:#d9a6ff;border:1px solid #5a2a80;font-weight:700;font-size:.8em;white-space:nowrap;flex:0 0 auto;line-height:1.1}
+.tb-l2{background:#04051a;border:1px solid #131736;border-radius:10px;padding:5px;box-shadow:inset 0 3px 10px rgba(0,0,0,.95)}
+#top-bar .top-res{display:grid!important;grid-template-columns:repeat(4,1fr);gap:5px;margin:0!important;flex-wrap:nowrap}
+#top-bar .tres{display:block;position:relative;background:linear-gradient(180deg,#0b0d2a,#070818);border:1px solid #1a1e44;border-radius:6px;padding:5px 3px 5px;text-align:center;line-height:1.05;font-size:1em;min-width:0;gap:0}
+#top-bar .tres::after{content:"";position:absolute;left:18%;right:18%;bottom:-1px;height:2px;border-radius:2px;background:var(--v,#4a9eff);box-shadow:0 0 8px var(--v,#4a9eff)}
+#top-bar .tres.energy{--v:#ffd34d}#top-bar .tres.materials{--v:#e6a35a}#top-bar .tres.science{--v:#4ad4ff}#top-bar .tres.morale{--v:#ff7d9a}
+#top-bar .tres .tv{display:block;font-size:1.15em;font-weight:800;min-width:0;text-align:center;color:var(--v,#f2f5ff);font-variant-numeric:tabular-nums}
+#top-bar .tres .tv i{width:.95em;height:.95em;vertical-align:-.12em;margin-left:2px}
+#top-bar .tres .ti{display:block;font-size:.66em;margin:3px 0 0;font-weight:600;text-align:center;min-width:0}
+.tb-l3{display:flex;align-items:center;gap:6px;min-width:0}
+.tb-puce{font-weight:700;font-size:.8em;padding:3px 7px;border-radius:4px;white-space:nowrap;flex:0 0 auto;line-height:1.1}
+.tb-puce.vp{background:#221a05;color:#ffd34d;border:1px solid #6b5600}
+.tb-puce.jet{background:#2a0a0a;color:#ff9999;border:1px solid #7a2a2a;display:inline-flex;align-items:center;gap:4px}
+.tb-puce.jet i{display:inline-block;width:.7em;height:.7em;background:#e33;border-radius:2px}
+.tb-esp{flex:1 1 0;min-width:4px}
+#btn-ability.tb-pouvoir{display:inline-flex;align-items:center;gap:5px;height:32px;margin:0;padding:0 9px 0 7px;border-radius:4px;background:#0b0d24;border:1.5px solid var(--cc,#4a9eff);color:var(--cc,#4a9eff);font-family:var(--font-titre);font-size:.54em;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;flex:0 0 auto;cursor:pointer;line-height:1;box-shadow:none;transition:filter .15s}
+#btn-ability.tb-pouvoir .k{font-size:1.3em;line-height:1}
+#btn-ability.tb-pouvoir:hover:not(:disabled){filter:brightness(1.2)}
+#btn-ability.tb-pouvoir:disabled,#btn-ability.tb-pouvoir.used{opacity:.42;cursor:not-allowed}
+#tb-etat{display:inline-flex;flex:0 0 auto;min-width:0;max-width:46%}
+#a-toi-badge{display:none;position:static;font-family:var(--font-titre);font-size:.5em;letter-spacing:.1em;color:#0a2a12;background:#5fd08a;padding:0 7px;height:32px;align-items:center;border-radius:4px;white-space:nowrap;border:0;pointer-events:none;overflow:hidden;text-overflow:ellipsis;min-width:0;line-height:1}
+#a-toi-badge.on{display:inline-flex}
+#a-toi-badge[data-etat="autre"]{background:#3a1212;color:#ff9d95;border:1px solid #8a2626;font-family:var(--font-corps);font-size:.72em;letter-spacing:0;text-transform:none;font-weight:700}
+#a-toi-badge[data-etat="calme"]{background:transparent;border:0;color:#8f98bf;font-family:var(--font-corps);font-size:.76em;letter-spacing:0;text-transform:none;font-weight:600}
+#tb-etat.avec-passer #a-toi-badge{border-radius:4px 0 0 4px}
+#passer-btn{display:none;position:static;font-family:var(--font-titre);font-size:.54em;letter-spacing:.08em;height:32px;padding:0 10px;border-radius:0 4px 4px 0;background:#163a6b;border:1px solid #2f6fbf;border-left:0;color:#e8f1ff;white-space:nowrap;cursor:pointer;align-items:center;line-height:1;margin:0}
+#passer-btn.on{display:inline-flex}
+#passer-btn:active{transform:scale(.97)}
+/* ─── Panneaux : le verre Blason ─── */
+#mp-journal,#mp-empire,#mp-diplo{background:#070718;}
+#right-panel,#left-panel{padding:10px 10px 0;}
+#mp-diplo{padding:0 0 max(calc(var(--botband,84px) + env(safe-area-inset-bottom,0px) + 32px), 170px);}
+.rps,.ps,.war-section,.score-bar{background:rgba(11,13,36,.82);border:1px solid rgba(74,158,255,.35);border-radius:14px;padding:12px 12px 11px;margin:0 0 10px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.rps h4,.ps h4,.war-section h4{font-family:var(--font-titre);font-size:.58em;letter-spacing:.16em;text-transform:uppercase;color:#4a9eff;margin:0 0 9px;display:flex;align-items:center;gap:8px;font-weight:400}
+.rps h4::after,.ps h4::after,.war-section h4::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(74,158,255,.35),transparent)}
+.war-section h4{color:#ff6b62}.war-section h4::after{background:linear-gradient(90deg,rgba(255,107,98,.4),transparent)}
+.score-bar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:12px 14px}
+.score-name{font-size:.72em;color:#8f98bf}
+.score-vp{font-family:var(--font-titre);font-size:.95em;color:#ffd34d;margin-top:2px}
+.score-vs{font-family:var(--font-titre);font-size:.55em;letter-spacing:.2em;color:#8f98bf}
+.civ-hdr .cn{font-family:var(--font-titre);font-size:.72em;letter-spacing:.08em;text-transform:uppercase;color:#f2f5ff}
+.civ-hdr .ce{width:34px;height:34px;border-radius:50%;background:#0b0d24;border:2px solid #4a9eff;display:grid;place-items:center;font-size:17px;line-height:1}
+.res-grid{gap:5px;background:#04051a;border:1px solid #131736;border-radius:10px;padding:5px;box-shadow:inset 0 3px 10px rgba(0,0,0,.95)}
+.rbox{position:relative;background:linear-gradient(180deg,#0b0d2a,#070818);border:1px solid #1a1e44;border-radius:6px;padding:6px 3px 6px}
+.rbox .rn{font-size:.62em;color:#8f98bf;font-weight:600}
+.rbox .rv{font-size:1.1em;font-weight:800}
+.gov-dot{width:24px;height:24px;font-size:.66em}
+.ft-dot{width:16px;height:16px;border-radius:4px}
+.col-list{font-size:.86em;color:#c8d8f8;line-height:1.9}
+.dip-help{font-size:.78em;color:#8f98bf;margin:0 0 10px;line-height:1.4}
+.dip-nation{background:#0b0d24;border:1px solid #232750;border-radius:12px;padding:10px 11px;margin-bottom:8px}
+.dip-hdr{font-family:var(--font-titre);font-size:.66em;letter-spacing:.06em;text-transform:uppercase;color:#f2f5ff;font-weight:400}
+.dip-nom{display:inline-flex;align-items:center;gap:8px;min-width:0}
+.dip-medal{width:30px;height:30px;border-radius:50%;background:#0f1130;border:2px solid #4a9eff;display:grid;place-items:center;font-size:15px;line-height:1;flex:0 0 auto;font-family:var(--font-corps)}
+.dip-status{font-family:var(--font-titre);font-size:.74em;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:6px;border:1px solid;font-weight:400}
+.dip-status.ok{border-color:#1f7a45}.dip-status.war{border-color:#8a2626}.dip-status.warm{border-color:#6b5600}.dip-status.hot{border-color:#7a3a10}
+.dip-force{font-size:.8em;color:#c8d8f8}
+.dip-row{font-size:.78em}
+.dip-bar{height:7px;border:1px solid #232750;background:#0b0d24}
+#pirate-status{font-size:.84em;color:#ffb0a8;background:#1e0c0c;border:1px solid #5a1f1f;border-radius:10px;padding:7px 10px;margin-top:8px!important}
+#pirate-status:empty{display:none}
+.evt-box{font-size:.86em;line-height:1.45}
+/* ─── Journal ─── */
+.jr-card{position:relative;background:rgba(11,13,36,.82);border:1px solid rgba(74,158,255,.35);border-radius:14px;padding:12px 12px 11px;margin:10px 10px 6px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.jr-kicker{font-family:var(--font-titre);font-size:.58em;letter-spacing:.16em;text-transform:uppercase;color:#4a9eff;margin:0 0 9px;display:flex;align-items:center;gap:8px}
+.jr-kicker::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(74,158,255,.35),transparent)}
+.jr-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.jr-row2{margin-top:8px;justify-content:space-between}
+#sc-taille{display:inline-flex;gap:4px;align-items:center}
+#sc-taille button{width:36px;height:36px;border-radius:9px;background:#0b0d24;border:1px solid #232750;color:#f2f5ff;font-weight:700;cursor:pointer;font-family:var(--font-corps);padding:0;line-height:1}
+#sc-taille button:nth-child(1){font-size:.78em}#sc-taille button:nth-child(2){font-size:.92em}#sc-taille button:nth-child(3){font-size:1.08em}#sc-taille button:nth-child(4){font-size:1.24em}
+#sc-taille button[aria-pressed="true"]{background:#163a6b;border-color:#4a9eff;color:#fff}
+.jr-btn{height:36px;padding:0 12px;border-radius:9px;border:1px solid #232750;background:#0b0d24;color:#c8d8f8;cursor:pointer;font-family:var(--font-corps);font-weight:600;font-size:.86em;display:inline-flex;align-items:center;gap:6px;text-decoration:none;white-space:nowrap;line-height:1}
+.jr-btn.go{background:#163a6b;border-color:#2f6fbf;color:#e8f1ff;margin-left:auto}
+.jr-btn.danger{background:transparent;border-color:#5a1f1f;color:#ff9d95;font-size:.8em;height:32px}
+.jr-btn:hover{filter:brightness(1.15)}
+#mp-journal .log-legend{font-size:.8em;color:#8f98bf;margin:4px 12px 4px;padding:0}
+#mp-journal #log-content{padding:4px 10px 12px;}
+.log-tour{font-family:var(--font-titre);font-size:.56em;letter-spacing:.16em;text-transform:uppercase;color:#ffd34d;display:flex;align-items:center;gap:8px;margin:12px 0 6px}
+.log-tour::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,#6b5600,transparent)}
+#mp-journal .log-e{font-size:.9em;line-height:1.4;padding:5px 0 5px 9px;border-left:2px solid var(--nc,#1a1e44);border-bottom:0;margin-bottom:3px;color:#c8d8f8}
+#mp-journal .log-e.gold{background:#1a1408;border-left-color:#ffd34d;border-radius:0 8px 8px 0;color:#ffe9a8}
+#mp-journal .log-e.red{background:#1e0c0c;border-left-color:#ff6b62;border-radius:0 8px 8px 0;color:#ffb0a8}
+#mp-journal .log-e.green{color:#bfe8c8}
+#mp-journal .log-e.dim{color:#8f98bf}
+#mp-journal .log-e.log-sous{font-size:.84em;color:#8f98bf;padding-left:21px;margin-top:-4px;border-left-color:transparent}
+/* ─── Détail d'une technologie en Blason (point 7) ─── */
+#tech-detail-modal .td-card{background:rgba(11,13,36,.94);border:1px solid rgba(74,158,255,.45);box-shadow:0 18px 50px rgba(0,0,0,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.td-branch{font-family:var(--font-titre);font-size:.58em;letter-spacing:.14em;text-transform:uppercase;color:#4a9eff}
+.td-name{color:#f2f5ff}
+.td-tier-badge,.td-taken-badge{font-family:var(--font-titre);font-size:.58em;letter-spacing:.1em;text-transform:uppercase;background:rgba(7,7,24,.75);border:1px solid rgba(74,158,255,.35)}
+.td-buy{font-family:var(--font-titre);font-size:.72em;letter-spacing:.1em;text-transform:uppercase;border-radius:12px;min-height:52px}
+.td-buy.can{background:#1f7a45;border:1px solid #2f9a58;color:#eafff1}
+.td-buy.can:hover{filter:brightness(1.12);background:#1f7a45}
+.td-close{font-family:var(--font-titre);font-size:.62em;letter-spacing:.1em;text-transform:uppercase;border-radius:12px;min-height:44px;border-color:#33386b;color:#9aa3c7;background:#0b0d24}
+/* ─── Fond étoilé autour de la colonne de jeu sur grand écran (point 7) ─── */
+@media (min-width:600px){
+  /* Les barres fixes suivent la colonne de jeu (480 px, ou toute la largeur en vue carte) au lieu de
+     traverser tout l'écran : le fond étoilé s'affiche autour. Pas de transform ici (le suivi du
+     pinch-zoom en pose un). */
+  #top-bar,#bottom-bar{left:max(0px,calc(50vw - var(--appw,480px)/2));right:max(0px,calc(50vw - var(--appw,480px)/2));}
+  html{background-color:#020208;background-image:
+    radial-gradient(1px 1px at 13px 27px,rgba(255,255,255,.75) 50%,transparent 51%),
+    radial-gradient(1px 1px at 97px 141px,rgba(255,255,255,.5) 50%,transparent 51%),
+    radial-gradient(1.5px 1.5px at 171px 61px,rgba(200,220,255,.8) 50%,transparent 51%),
+    radial-gradient(1px 1px at 51px 203px,rgba(255,255,255,.45) 50%,transparent 51%),
+    radial-gradient(1px 1px at 233px 115px,rgba(255,255,255,.6) 50%,transparent 51%),
+    radial-gradient(1.5px 1.5px at 129px 249px,rgba(255,230,180,.7) 50%,transparent 51%),
+    radial-gradient(1px 1px at 289px 31px,rgba(255,255,255,.5) 50%,transparent 51%),
+    radial-gradient(1px 1px at 311px 197px,rgba(255,255,255,.4) 50%,transparent 51%);
+    background-size:340px 290px,340px 290px,470px 410px,470px 410px,530px 610px,530px 610px,710px 530px,710px 530px;}
+}
 </style>
 </head>
 <body>
@@ -1239,26 +1329,32 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
   </div>
   <div id="end-log-confirm" style="display:none;font-size:.8em;color:#88ff88;margin-top:6px">✅ Log copié dans le presse-papier !</div>
 </div>
+<!-- ═══ BARRE DU HAUT « CONSOLE À VOYANTS » (v10.62, maquette B validée par Marc le 16/09) ═══
+     Trois lignes FIXES : (1) médaillon + nation, tour, AC, gouvernement ; (2) les quatre ressources en
+     quatre tuiles de largeur égale — le moral ne peut plus passer à la ligne (demande §116.5) ; (3) VP et
+     jetons à gauche, bouton « Pouvoir » (ex-Capacité) et « À TOI · Passer » à droite. Les ids historiques
+     sont conservés : le moteur (renderTopBar, uiFillIncome) et online.js (badgeTour) les remplissent. -->
 <div id="top-bar" style="display:none">
-  <div class="mtb-line1">
+  <div class="tb-l1">
     <span id="civ-badge-top" class="cbt-wrap"></span>
     <span id="turn-disp">Tour 1/10</span>
     <div id="ac-disp">2 AC</div>
-    <div id="gov-disp">🏛️ Nv.1</div>
-    <span id="phase-disp">Actions</span>
-    <button class="abtn mtb-cap" id="btn-ability" onclick="useAbility()">💫 Cap.</button>
+    <div id="gov-disp">🏛️ 1</div>
+    <span id="phase-disp" hidden></span>
   </div>
-  <div class="mtb-line2">
+  <div class="tb-l2">
     <div class="top-res" id="top-res"></div>
-    <div id="top-income"></div>
-    <!-- « À TOI » : DANS la barre du haut, à droite, sous le bouton Capacité (demande de Marc).
-         Posé ici et pas en flottant : un élément flottant se superpose forcément à quelque chose. -->
-    <span id="a-toi-badge">À TOI</span>
-    <!-- Passer son tour d'action. Demande de Marc (2026-08-08) : « parfois on ne peut plus rien
-         jouer » — plus d'AC, plus de ressources, plus de case atteignable. Le bouton « Fin de Tour »
-         du jeu existait mais il faut le chercher ; ici il est juste à côté du badge, là où l'œil est
-         déjà quand c'est à toi. Il n'apparaît QUE pendant ton tour d'action. -->
-    <button id="passer-btn" type="button">PASSER</button>
+    <div id="top-income" hidden></div>
+  </div>
+  <div class="tb-l3">
+    <span class="tb-puce vp" id="tb-vp" title="Score VP estimé">🏆 0</span>
+    <span class="tb-puce jet" id="tb-jet" title="Jetons Force engageables (net) — utilisables en guerre ou pour un raid. Exclut la garnison des colonies, les jetons posés sur les routes et ceux en récupération.">0 <i></i></span>
+    <span class="tb-esp"></span>
+    <button class="tb-pouvoir" id="btn-ability" type="button" onclick="useAbility()"><span class="k">✦</span><span>Pouvoir</span></button>
+    <!-- « À TOI » : DANS la barre du haut (demande de Marc). En ligne, `badgeTour` (online.js) l'allume
+         en vert (à toi) ou en rouge (« LE MARTIEN JOUE ») ; en solo, renderTopBar. PASSER n'apparaît
+         que pendant TON tour d'action en ligne (renonce à UNE action, pas à la manche). -->
+    <span id="tb-etat"><span id="a-toi-badge">À TOI</span><button id="passer-btn" type="button">Passer</button></span>
   </div>
 </div>
 <div id="game-wrap" style="display:none">
@@ -1266,7 +1362,7 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
   <div class="m-panel" id="mp-diplo">
   <div id="left-panel">
     <div class="war-section">
-      <h4 style="font-size:.7em;text-transform:uppercase;color:#7880a0;letter-spacing:1px;margin-bottom:5px">⚔️ Guerre & Pirates</h4>
+      <h4>⚔️ Guerre &amp; Pirates</h4>
       <div id="war-risk-display"></div>
       <div id="pirate-status" style="margin-top:5px;font-size:.68em;color:#ff8888"></div>
     </div>
@@ -1280,26 +1376,27 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
   </div>
   </div>
   <div class="m-panel" id="mp-journal">
-    <div style="padding:8px 8px 0;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-      <button type="button" onclick="scAbandonGame()" style="background:linear-gradient(135deg,#7a1f1f,#4a1010);color:#ffd0d0;font-weight:800;font-size:.9em;padding:8px 14px;border-radius:9px;border:2px solid #c85050;box-shadow:0 2px 10px rgba(0,0,0,.45);cursor:pointer">🗑️ Recommencer à zéro</button>
-      <a href="regles.html" target="_blank" rel="noopener" style="display:inline-block;background:linear-gradient(135deg,#d09a2e,#a8761a);color:#fff;text-decoration:none;font-weight:800;font-size:.92em;padding:8px 15px;border-radius:9px;border:2px solid #ffd98a;box-shadow:0 2px 10px rgba(0,0,0,.45)">📖 Règles du jeu</a>
-    </div>
-    <!-- Aa — TAILLE DU TEXTE (Marc, 13/09 : « il faudrait pouvoir régler la taille de la police sur
-         l'application elle-même pour éviter les problèmes liés au setup du téléphone »). Quatre crans,
-         mémorisés sur l'appareil. Voir `scTaille()` dans la couche d'affichage. -->
-    <div id="sc-taille" style="padding:6px 8px 2px" role="group" aria-label="Taille du texte">
-      <span class="lab">Aa Taille du texte</span>
-      <button type="button" onclick="scTaille(11)" data-fs="11" aria-pressed="false" title="Petit">A</button>
-      <button type="button" onclick="scTaille(13)" data-fs="13" aria-pressed="true" title="Normal">A</button>
-      <button type="button" onclick="scTaille(15)" data-fs="15" aria-pressed="false" title="Grand">A</button>
-      <button type="button" onclick="scTaille(17)" data-fs="17" aria-pressed="false" title="Très grand">A</button>
-    </div>
-    <div class="log-tools" style="display:flex;gap:6px;padding:7px;flex-wrap:wrap;border-bottom:1px solid #1a1a3a;background:#080820;position:sticky;top:0;z-index:2">
-      <!-- « Envoyer par email » et « .txt » RETIRÉS (Marc, 2026-08-09) : inutiles, « Copier le log » suffit. -->
-      <button class="abtn" style="flex:1;min-width:90px" onclick="copyLogText()">📋 Copier le log</button>
-      <!-- CONCÉDER : n'apparaît qu'EN LIGNE (online.js le démasque). En solo il n'y a personne à qui
-           concéder, et le bouton « Recommencer à zéro » ci-dessus fait déjà l'affaire. -->
-      <button class="abtn" id="conceder-btn" type="button" style="flex:1;min-width:90px;display:none;background:linear-gradient(135deg,#7a1f1f,#4a1010);border-color:#c85050;color:#ffd0d0;font-weight:800" onclick="scConcede()">🏳️ Concéder la victoire</button>
+    <!-- Carte « Réglages » (v10.62, maquette validée) : Aa, Règles, Copier, et le bouton de fin selon
+         la partie — solo : « Recommencer la partie » ; en ligne avec d'autres humains : « Admettre sa
+         défaite » (ex-Concéder, vote des autres) et, pour le créateur, « Renoncer à jouer » (une IA
+         reprend son rôle, sans vote). online.js (`concederVisible`) choisit lesquels montrer. -->
+    <div class="jr-card" id="jr-reglages">
+      <div class="jr-kicker">Réglages</div>
+      <div class="jr-row">
+        <div id="sc-taille" role="group" aria-label="Taille du texte">
+          <button type="button" onclick="scTaille(14)" data-fs="14" aria-pressed="false" title="Petit">A</button>
+          <button type="button" onclick="scTaille(16)" data-fs="16" aria-pressed="true" title="Normal">A</button>
+          <button type="button" onclick="scTaille(18)" data-fs="18" aria-pressed="false" title="Grand">A</button>
+          <button type="button" onclick="scTaille(20)" data-fs="20" aria-pressed="false" title="Très grand">A</button>
+        </div>
+        <a class="jr-btn go" href="regles.html" target="_blank" rel="noopener">📖 Règles</a>
+      </div>
+      <div class="jr-row jr-row2">
+        <button class="jr-btn" type="button" onclick="copyLogText()">📋 Copier le log</button>
+        <button class="jr-btn danger" id="recommencer-btn" type="button" onclick="scAbandonGame()">🔄 Recommencer la partie</button>
+        <button class="jr-btn danger" id="conceder-btn" type="button" style="display:none" onclick="scConcede()">🏳️ Admettre sa défaite</button>
+        <button class="jr-btn danger" id="renoncer-btn" type="button" style="display:none" title="Une IA reprend mon rôle" onclick="scRenoncer()">🤖 Renoncer à jouer</button>
+      </div>
     </div>
     <div id="log-legend" class="log-legend"></div><div id="log-content" class="open"></div>
   </div>
@@ -1381,7 +1478,7 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
       <div class="score-a"><div class="score-name" id="score-a-label">IA</div><div class="score-vp" id="score-a">0</div></div>
     </div>
     <div class="rps">
-      <h4>Votre Civilisation</h4>
+      <h4>Ta nation</h4>
       <div class="civ-hdr" id="r-civ-hdr"></div>
       <div class="res-grid" id="r-res"></div>
       <div id="r-ability" style="margin-top:8px;font-size:.76em;line-height:1.4"></div>
@@ -1798,6 +1895,13 @@ function fenDepeches(lignes, opts){
     nation:une?esc(une.name):(nats.length>1?nats.length+' nations':'Les autres nations'),
     verbe:o.verbe||(une?'a joué':'ont joué'), milieu:corps+btn});
 }
+/* DURÉE D'AFFICHAGE SELON LE NOMBRE DE NATIONS (Marc, 15/09) : à 2 nations il y a moins à lire, à 4 davantage.
+   Base = 3 nations ; 2 → −3 s ; 4 → +3 s. Jamais moins de 2 s. */
+function fenDepechesDuree(base){
+  var n=0; try{ n=(typeof allPlayers==='function')?allPlayers().length:((typeof G!=='undefined'&&G&&G.player)?1+(G.ais||[]).length:0); }catch(e){}
+  var d=base+((n>=4)?3000:(n===2?-3000:0));
+  return Math.max(2000,d);
+}
 function fenDepechesMontrer(lignes, opts){
   var o=opts||{};
   var p=document.getElementById('sc-depeches');
@@ -1806,7 +1910,7 @@ function fenDepechesMontrer(lignes, opts){
   p.innerHTML=html; p.style.display='block';
   clearInterval(p._cd); clearTimeout(p._timer);
   if(o.duree){
-    var t0=Date.now(), d=o.duree, cd=document.getElementById('sc-dep-cd');
+    var t0=Date.now(), d=fenDepechesDuree(o.duree), cd=document.getElementById('sc-dep-cd');
     p._cd=setInterval(function(){ var r=Math.max(0,1-(Date.now()-t0)/d); if(cd)cd.style.setProperty('--p',Math.round(r*100)+'%'); if(r<=0)clearInterval(p._cd); },100);
     p._timer=setTimeout(fenDepechesFermer,d);
   }
@@ -1848,15 +1952,15 @@ function fenAdversaire(prefix, nat){
   var maj=function(){ var s=t.textContent||''; var mm=s.match(/^\s*(\p{Extended_Pictographic}(?:\uFE0F)?)\s*(.*)$/u); if(mm&&m){ m.textContent=mm[1]; if(t.textContent!==mm[2]) t.textContent=mm[2]; } };
   new MutationObserver(maj).observe(t,{childList:true,characterData:true,subtree:true});
 }catch(e){} })();
-/* Aa — taille du texte (menu Journal). 13 = ce que le jeu a toujours eu. */
+/* Aa — taille du texte (menu Journal). 16 = ce que le jeu a toujours eu. */
 function scTaille(px){
-  px=parseInt(px,10); if(!/^(11|13|15|17)$/.test(String(px))) px=13;
+  px=parseInt(px,10); if(!/^(14|16|18|20)$/.test(String(px))) px=16;
   document.documentElement.style.setProperty('--sc-fs',px+'px');
   document.querySelectorAll('#sc-taille button').forEach(function(b){ b.setAttribute('aria-pressed', String(parseInt(b.getAttribute('data-fs'),10)===px)); });
   try{ localStorage.setItem('sc_taille',String(px)); }catch(e){}
   try{ if(typeof render==='function'&&typeof G!=='undefined'&&G&&G.player) render(); }catch(e){}
 }
-(function(){ try{ var t=parseInt(localStorage.getItem('sc_taille')||'13',10); document.querySelectorAll('#sc-taille button').forEach(function(b){ b.setAttribute('aria-pressed', String(parseInt(b.getAttribute('data-fs'),10)===t)); }); }catch(e){} })();
+(function(){ try{ var t=parseInt(localStorage.getItem('sc_taille')||'16',10); document.querySelectorAll('#sc-taille button').forEach(function(b){ b.setAttribute('aria-pressed', String(parseInt(b.getAttribute('data-fs'),10)===t)); }); }catch(e){} })();
 
 /* ============================================================ */
 /* ===============  COUCHE MOBILE / SMALL SCREEN  ============= */
@@ -2033,15 +2137,17 @@ function uiFillIncome(){
   var res=[['energy','<i class=ri-energy></i>','energy'],['materials','<i class=ri-materials></i>','materials'],['science','<i class=ri-science></i>','science'],['morale','<i class=ri-morale></i>','morale']];
   var el=document.getElementById('top-res');
   if(el){
+    /* v10.62 : quatre tuiles (chiffre + icône, revenu dessous). VP et jetons sont sur la ligne 3. */
     el.innerHTML=res.map(function(o){
       var val=p.res[o[0]]||0;var inc=g[o[0]]||0;
-      var sign=inc>0?'+':'';var icol=inc>0?'#5fd08a':inc<0?'#ff7a7a':'#6a7a8a';
-      return '<div class="tres res-tag '+o[2]+'"><span class="tv">'+val+'</span>'+o[1]+
-        '<span class="ti" style="color:'+icol+'">('+sign+inc+'/t)</span></div>';
-    }).join('')
-      +'<div class="tres res-tag vp-tag" style="background:#221a05;border-color:#6b5600;color:#ffd34d" title="Score VP estimé">🏆<span class="tv" style="color:#ffd34d;margin-left:3px">'+calcVP(p).total+'</span></div>'
-      +'<div class="tres res-tag" style="background:#2a0a0a;border:1px solid #7a2a2a" title="Jetons Force ENGAGEABLES (net) — utilisables en guerre ou pour un raid. Exclut la garnison des colonies, les jetons posés sur les routes et ceux en récupération."><span class="tv" style="color:#ff9999;min-width:0">'+((typeof engageableTokens==='function')?engageableTokens(p):(p.forceTokens||0))+'</span><span style="display:inline-block;width:.72em;height:.72em;background:#e33;border-radius:2px;margin-left:4px;vertical-align:-1px"></span></div>';
+      var sign=inc>0?'+':'';var icol=inc>0?'#5fd08a':inc<0?'#ff7a7a':'#8f98bf';
+      return '<div class="tres res-tag '+o[2]+'"><span class="tv">'+val+o[1]+'</span>'+
+        '<span class="ti" style="color:'+icol+'">'+sign+inc+' /t</span></div>';
+    }).join('');
   }
+  var vp=document.getElementById('tb-vp'); if(vp){ try{ vp.textContent='🏆 '+calcVP(p).total; }catch(e){} }
+  var jt=document.getElementById('tb-jet');
+  if(jt){ try{ jt.innerHTML=((typeof engageableTokens==='function')?engageableTokens(p):(p.forceTokens||0))+' <i></i>'; }catch(e){ jt.innerHTML=(p.forceTokens||0)+' <i></i>'; } }
   _wireRevTip();
   var ti=document.getElementById('top-income');
   if(ti)ti.innerHTML='';

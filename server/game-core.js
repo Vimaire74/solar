@@ -15,7 +15,9 @@ function setRecorder(r){ _REC = r || null; }
 function makeEl(id) {
   const el = {
     _id: id || null,
-    style: new Proxy({}, { get: () => '', set: () => true }), dataset: {}, children: [],
+    /* v10.62 : `setProperty` & co. doivent être des fonctions — renderTopBar les appelait et faisait
+       tomber toute action serveur (« ba.style.setProperty is not a function »). */
+    style: new Proxy({}, { get: (t, k) => (k === 'setProperty' || k === 'removeProperty' || k === 'getPropertyValue') ? (() => '') : '', set: () => true }), dataset: {}, children: [],
     classList: {
       add(c){ if(_REC && c==='hidden' && el._id) _REC.close(el._id); },
       remove(c){ if(_REC && c==='hidden' && el._id) _REC.open(el._id, el); },

@@ -1,16 +1,42 @@
-LOT 17 — MISE À JOUR LÉGÈRE (v10.55, sw v176) — 15/09/2026 : fenêtres de guerre « contre NATION », force ennemie en ligne, routes orphelines, Calmer la Population, Forge
+LOT 17 — MISE À JOUR LÉGÈRE (v10.62, sw v183) — 16/09/2026 : barre du haut « console », panneaux Blason, Aa réparé, « Pouvoir », « Renoncer à jouer », Techs stable — et tout le v10.61 (fenêtres « contre NATION », routes orphelines, Calmer la Population…)
 
-Ce dossier ne contient QUE ce qui a changé depuis la version en ligne : 6 fichiers à la racine
-(index.html, moteur.js, online.js, sw.js, tutorial.html, regles.html) + 1 fichier serveur (server/game-core.js)
-+ 2 images dans assets/ (fond_accueil_desk.jpg, fond_accueil_phone.jpg — le fond du nouvel écran d'accueil).
+Ce dossier ne contient QUE ce qui a changé depuis la version en ligne : 7 fichiers à la racine
+(index.html, moteur.js, online.js, sw.js, tutorial.html, tutorial.js, regles.html) + 2 fichiers serveur (server/game-core.js
+ET server/server.js — nouveau message « renoncer ») + 2 images dans assets/ (fond_accueil_desk.jpg,
+fond_accueil_phone.jpg — le fond de l'écran d'accueil, déjà en ligne si tu as envoyé le v10.61).
 Sur GitHub : glisser aussi le dossier assets (il fusionne avec celui du dépôt).
 
-Sur GitHub, à la RACINE du dépôt : Add file → Upload files, glisser les 6 fichiers de la racine ET le
+Sur GitHub, à la RACINE du dépôt : Add file → Upload files, glisser les 7 fichiers de la racine ET le
 dossier server (il fusionne avec celui du dépôt), pas ce LISEZ-MOI, Commit changes. Puis Coolify : vérifier que les DEUX ressources se redéploient (solar-game.com ET
 live.solar-game.com) — moteur.js contient les règles et le serveur le lit aussi. Si l'une ne s'est
 pas redéployée toute seule : Redeploy à la main.
 
-Changement de cette version (partie D538 du 14/09) :
+Changements du 16/09 (v10.62, maquettes validées par Marc) :
+- BARRE DU HAUT refaite (« console à voyants ») : trois lignes fixes — médaillon + nation, tour, AC,
+  gouvernement ; les QUATRE ressources en quatre tuiles (le moral ne passe plus à la ligne), revenu écrit
+  dessous avec un voyant de couleur ; VP et jetons à gauche, bouton « Pouvoir » (ex-« Capacité », renommé
+  partout : jeu, infobulles, règles) et « À TOI · Passer » à droite. Rien ne déborde à 390 px.
+- Panneaux JOURNAL, EMPIRE, DIPLO relookés en Blason (cartes de verre, titres Michroma, médaillons).
+  Journal : carte « Réglages » en tête (Aa, Règles, Copier, bouton de fin), lignes groupées par tour sous
+  un séparateur « TOUR n », dernière action en haut, filet coloré à gauche à la place du préfixe
+  « T1 Terriens », lignes « ↳ paie » rangées sous leur action.
+- Boutons de fin de partie : solo → « Recommencer la partie » ; en ligne avec d'autres humains →
+  « Admettre sa défaite » (ex-Concéder, vote des autres) et, pour le créateur, « Renoncer à jouer »
+  (une IA reprend son rôle tout de suite, sans vote — NOUVEAU message serveur, d'où server/server.js).
+- Réglage Aa réparé : il ne faisait rien depuis sa création (une règle CSS de fin de feuille imposait
+  16 px). Crans 14 / 16 / 18 / 20, « Normal » = l'aspect d'avant, anciennes valeurs migrées.
+- Menu Techs : la liste ne remonte plus en haut quand une autre nation joue (vieille critique des amis
+  de Marc) — elle garde sa position ; seul un changement de rivière repart du haut.
+- Journal, cosmétique : « GUERRE DÉCLARÉE » s'écrit AVANT les lignes d'usure ; plus de faux « Route non
+  protégée » après « Route protégée gratuitement (IA de Navigation) » (et la question du jeton n'est plus
+  posée en ligne à une nation qui a l'IA de Navigation) ; l'assaut d'une IA dit « jetons Force engagés
+  à la résolution du combat » au lieu de « (aucune ressource) ». Bench : server/test_journal_cosmetique.js.
+- Détail d'une technologie en Blason ; bulle verte de gain fermable d'un toucher (croix) ; sur ordinateur,
+  fond étoilé autour de la colonne de jeu et barres du haut/bas alignées sur la colonne.
+- Serveur (game-core.js) : le style factice des éléments accepte setProperty (sinon toute action
+  serveur tombait avec la nouvelle barre).
+
+Changement du 15/09 (partie D538 du 14/09) :
 - En ligne, la carte civique « Calmer la Population » plantait sur le serveur (TypeError) : rien ne
   se passait, aucun message. Le choix de la nation se fait maintenant sur ton écran, et le serveur
   revalide tout (AC, ressources, cible) avant de toucher à la tension. Bench : server/test_calmer_population.js.
@@ -46,3 +72,13 @@ Partie FE37 (15/09) :
   l'accueil : elles sont dans « Nouvelle partie », cachées, révélées au ⓘ, au survol ou à l'appui long du
   médaillon. Écrans « Bonjour », « Nouvelle partie », « Salle d'attente », connexion secondaire : même fond,
   cartes Blason, polices du jeu.
+- « En attente des autres joueurs… » ne s'affiche plus quand il n'y a que des ordinateurs en face ; il
+  disparaît dès qu'une question t'est posée ; « Coup envoyé… » s'efface seul après 2,5 s.
+- Durée des dépêches (actions des autres) selon le nombre de nations : 2 nations −3 s, 3 nations inchangé
+  (8 s en ligne), 4 nations +3 s.
+- Dépêches : plus de lignes de détail (conditions de vie, découverte, colonie éloignée, paysage) — elles restent
+  dans le journal.
+- Fenêtre de paix quand l'adversaire vient de déclarer la guerre : « Paix ou guerre ? » / NATION / « Ils t'ont
+  déclaré la guerre. Que veux-tu faire ? » (plus de « contre » ni de ligne redondante).
+- Dépêches : seulement les résumés d'action (« Martiens colonise Vesta »), plus les lignes de détail qui les
+  précèdent ; le journal garde tout.

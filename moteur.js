@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-15 · v10.55';
+const SOLAR_BUILD_MOTEUR = '2026-09-16 · v10.62';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -2869,7 +2869,7 @@ function _scAbilityAvailable(){
 function _scAbilityReminderOpen(){return typeof document!=='undefined'&&!!document.getElementById('sc-ability-reminder');}
 function _scShowAbilityReminder(){
   if(typeof document==='undefined'||_scAbilityReminderOpen())return;
-  const p=G.player;const name=_SC_ABNAME[p.civ.id]||'ta capacité gratuite';
+  const p=G.player;const name=_SC_ABNAME[p.civ.id]||'ton pouvoir gratuit';
   // Le rappel apparaît maintenant quand il te reste ENCORE des actions (à 1 AC) : le bouton de refus ne doit
   // donc PAS passer le tour — il referme simplement la fenêtre et te laisse jouer. Textes adaptés.
   const _reste=(p.acLeft||0);
@@ -2880,7 +2880,7 @@ function _scShowAbilityReminder(){
   document.body.insertAdjacentHTML('beforeend',
     '<div id="sc-ability-reminder" style="position:fixed;inset:0;background:rgba(4,4,18,.85);z-index:620;display:flex;align-items:center;justify-content:center">'+
       '<div style="background:#0f0f2a;border:1px solid #4a9eff;border-radius:12px;padding:22px;min-width:300px;max-width:400px;text-align:center">'+
-        '<div style="font-size:1.05em;font-weight:700;color:#c8d8f8;margin-bottom:8px">💫 Capacité gratuite non utilisée</div>'+
+        '<div style="font-size:1.05em;font-weight:700;color:#c8d8f8;margin-bottom:8px">✦ Pouvoir gratuit non utilisé</div>'+
         '<div style="font-size:.9em;color:#9fb0d0;margin-bottom:16px">'+_msg+'</div>'+
         '<button onclick="_scAbilityReminderUse()" style="padding:9px 18px;margin:0 5px;background:#3ecf8e;color:#04240f;border:none;border-radius:9px;font-weight:700;cursor:pointer">💫 Utiliser</button>'+
         '<button onclick="_scAbilityReminderSkip()" style="padding:9px 18px;margin:0 5px;background:#1a1a2a;color:#9fb0d0;border:1px solid #3a3a5a;border-radius:9px;font-weight:700;cursor:pointer">'+_skip+'</button>'+
@@ -5616,7 +5616,7 @@ function interleaveStep(){
         if(_scAbilityAvailable()){ render(); _scShowAbilityReminder(); _armPlayerStuckWatch(); return; }
         return passTurnIL();
       }
-      clearTimeout(G._ilHideTimer); G._ilHideTimer=setTimeout(_ilHide,2000); render(); _scMaybeStuck(); _armPlayerStuckWatch(); return;
+      clearTimeout(G._ilHideTimer); G._ilHideTimer=setTimeout(_ilHide,(typeof fenDepechesDuree==='function')?fenDepechesDuree(2000):2000); render(); _scMaybeStuck(); _armPlayerStuckWatch(); return;   // 2 s, +3 s à 4 nations (Marc, 15/09)
     }
     if(actor._remoteHuman){ // EN LIGNE : nation d'un joueur humain DISTANT → la couche en ligne gère son tour
       if(actor.acLeft<=0){ actor._passedRound=true; G._ilIdx++; continue; }
@@ -7026,7 +7026,11 @@ function confirmRouteToken(deploy){
     _pendingRouteObj.tokens=1;G.player.forceTokens--;
     addLog('⚔️ Jeton déployé sur route '+NODES[_pendingRouteObj.from]?.name+'→'+NODES[_pendingRouteObj.to]?.name,'green');
     updateConnections(G.player);
-  }else if(!deploy){
+  }else if(!deploy&&_pendingRouteObj){
+    /* FE37 T7 (Marc, 15/09) : « Route protégée gratuitement (IA de Navigation) » puis « Route non
+       protégée » pour la MÊME route. En ligne, le serveur appelait confirmRouteToken(false) après
+       chaque route, y compris quand l'IA de Navigation avait déjà posé son jeton gratuit — la ligne
+       ne décrivait rien. Sans route en attente du choix, il n'y a rien à dire. */
     addLog('⚠️ Route non protégée — cargos vulnérables aux pirates.','dim');
   }
   _pendingRouteObj=null;scArmConfirm('🛤️ Route',[{kind:'pt',icon:rEmoji('materials'),val:1}]);render();
@@ -7124,7 +7128,7 @@ function useAbility(nat){
 
   if(G.phase!=='actions')return;
   if(_scGuard())return;
-  if(_n.abilityUsed){addLog('⚠️ Capacité déjà utilisée ce tour.','red');return;}
+  if(_n.abilityUsed){addLog('⚠️ Pouvoir déjà utilisé ce tour.','red');return;}
   const p=_n,ab=p.civ.active;
   if(p.acLeft<ab.ac){addLog('⚠️ Pas assez d\'AC.','red');return;}
   for(const[r,a]of Object.entries(ab.cost)){if((p.res[r]||0)<a){addLog('⚠️ Ressources insuffisantes.','red');return;}}
@@ -8678,9 +8682,10 @@ function declarerGuerre(agresseur, cible, raison, declaredBy, opts){
      causes. Le prélèvement lui-même est inchangé — « dès que la guerre est enclenchée au tour 1 ». */
   /* Guerre populaire (5B38, 07/09) : l'usure attend de savoir si la guerre a vraiment lieu — voir
      `encaisserPenalitesPopulaires`. */
-  if(opts.penalitesDifferees) w.penalitesDifferees=true; else _usureDeGuerre(w);
   addLog('🚨 GUERRE DÉCLARÉE : '+agresseur.civ.emoji+' '+agresseur.civ.name+' contre '
     +cible.civ.emoji+' '+cible.civ.name+' — '+raison,'red');
+  /* v10.62 : l'appel était AVANT l'addLog malgré le commentaire (Marc l'a relevé deux fois, §113 et §120.13). */
+  if(opts.penalitesDifferees) w.penalitesDifferees=true; else _usureDeGuerre(w);
   annoncerGuerreAuxTiers(agresseur,cible,raison);
   return w;
 }
@@ -10629,7 +10634,11 @@ function _doAITurnInterne(aiPlayer,oneShot){
       for(const r of ['energy','materials','science']){ if(cost[r])parts.push('−'+cost[r]+rEmoji(r)); }
       if(cost.force)parts.push('−'+cost.force+' jeton'+(cost.force>1?'s':'')+' Force');
       for(const r of ['energy','materials','science']){ if(gain[r])parts.push('+'+gain[r]+rEmoji(r)); }
-      addLog('   ↳ '+ai.civ.emoji+' '+ai.civ.name+' paie : '+(acP?acP+' AC':'0 AC')+(parts.length?(' '+parts.join(' ')):' (aucune ressource)'),'dim');
+      /* Un assaut ne dépense ses jetons qu'à la résolution du combat (après la fenêtre de défense) :
+         « (aucune ressource) » était donc faux et trompeur (§120.13). On le dit tel quel. */
+      let _assaut=false; try{ for(let i=fromIdx;i<G.aiActions.length;i++){ const e=G.aiActions[i]; if(e&&(e.war||/assaut|attaque/i.test(String(e.name||'')))){ _assaut=true; break; } } }catch(e){}
+      const _suffixe=parts.length?(' '+parts.join(' ')):(_assaut?' — jetons Force engagés à la résolution du combat':' (aucune ressource)');
+      addLog('   ↳ '+ai.civ.emoji+' '+ai.civ.name+' paie : '+(acP?acP+' AC':'0 AC')+_suffixe,'dim');
     }
   }
   function _aiStep(fn){const bAc=ai.acLeft,bRes=_aiSnapRes(),i0=G.aiActions.length;const r=fn();_aiRec(bAc,bRes,i0);return r;}
@@ -12214,24 +12223,47 @@ function renderTopBar(){
   const costStr=civ.active.ac>0||Object.keys(civ.active.cost||{}).length>0
     ?(civ.active.ac>0?civ.active.ac+' AC':'')+(Object.entries(civ.active.cost||{}).map(([r,a])=>a+{energy:'<i class=ri-energy></i>',materials:'<i class=ri-materials></i>',science:'<i class=ri-science></i>',morale:'<i class=ri-morale></i>'}[r]).join(''))
     :'Gratuit';
+  /* v10.62 « console à voyants » (maquette B validée par Marc le 16/09) : médaillon aux couleurs de
+     la nation + nom en Michroma ; l'infobulle (survol / clic) garde le passif et le pouvoir. */
   document.getElementById('civ-badge-top').innerHTML=
-    `<span class="cbt-pill" style="background:${civ.color}22;border-color:${civ.color}55;color:${civ.color}">${civ.emoji} ${civ.name}</span>`+
+    `<span class="cbt-medal" style="--cc:${civ.color};border-color:${civ.color}">${civ.emoji}</span>`+
+    `<span class="cbt-nom" style="color:${civ.color}">${civ.name}</span>`+
     `<span class="cbt-tooltip">`+
       `<strong style="font-size:.9em">${civ.emoji} ${civ.name}</strong>`+
       `<span class="cbt-sep"></span>`+
-      `<span class="cbt-label">Capacité passive</span>`+
+      `<span class="cbt-label">Pouvoir passif</span>`+
       `<span class="cbt-val">${civ.passive}</span>`+
       `<span class="cbt-sep"></span>`+
-      `<span class="cbt-label">Capacité active — ${civ.active.name} (${costStr})</span>`+
+      `<span class="cbt-label">Pouvoir — ${civ.active.name} (${costStr})</span>`+
       `<span class="cbt-val">${civ.active.desc}</span>`+
     `</span>`;
   document.getElementById('turn-disp').textContent='Tour '+G.turn+'/'+G.maxTurns;
   document.getElementById('phase-disp').textContent={actions:'⚡ Actions',ai:'🤖 IA joue…',over:'Terminé'}[G.phase]||'';
+  /* Bouton « Pouvoir » : couleur de la nation, grisé si déjà utilisé ce tour (le `disabled` de phase
+     est posé par renderActions). Le coût n'est plus écrit dessus (place) : il est dans l'infobulle,
+     dans Empire et dans la fenêtre du pouvoir. */
+  { const ba=document.getElementById('btn-ability');
+    /* `style.cssText` et non `style.setProperty` : le bac à sable du serveur (game-core `makeEl`) n'a
+       qu'un style factice, et renderTopBar s'y exécute à chaque action. */
+    if(ba){ try{ ba.style.cssText='--cc:'+civ.color; }catch(e){} ba.classList.toggle('used',!!p.abilityUsed);
+      ba.title=civ.active.name+' ('+costStr.replace(/<[^>]+>/g,'')+')'; } }
+  /* État du tour en SOLO (en ligne c'est `badgeTour` d'online.js qui pilote le même badge) :
+     « À TOI » vert pendant tes actions, « IA jouent… » discret pendant le tour des ordinateurs. */
+  try{
+    const enLigne=!!(window.SC_ONLINE&&window.SC_ONLINE.STATE&&window.SC_ONLINE.STATE.started);
+    const b=document.getElementById('a-toi-badge');
+    if(b&&!enLigne){
+      if(G.phase==='actions'){ b.textContent='À TOI'; b.dataset.etat='moi'; b.classList.add('on'); }
+      else if(G.phase==='ai'){ b.textContent='IA jouent…'; b.dataset.etat='calme'; b.classList.add('on'); }
+      else if(G.phase==='over'){ b.textContent='Terminé'; b.dataset.etat='calme'; b.classList.add('on'); }
+      else b.classList.remove('on');
+    }
+  }catch(e){}
   /* NB : #top-res est rendu par uiFillIncome() (appelée plus bas) — un seul rendu, sinon le second
      écrase silencieusement le premier (c'est ce qui rendait le revenu net invisible pendant des jours). */
   _wireRevTip();
   document.getElementById('ac-disp').textContent=p.acLeft+'/'+p.acMax+' AC';
-  document.getElementById('gov-disp').textContent='🏛️ Nv.'+p.gov_level+' ('+p.gov_pts+'pts)';
+  { const gd=document.getElementById('gov-disp'); gd.textContent='🏛️ '+p.gov_level; gd.title='Gouvernement niveau '+p.gov_level+' — '+p.gov_pts+' pts'; }
   if(typeof uiFillIncome==='function')uiFillIncome();
   if(typeof uiSyncBands==='function')uiSyncBands();
   if(typeof _syncEndBtn==='function')_syncEndBtn();
@@ -12269,7 +12301,7 @@ function renderWarRisk(){
       ?'<i class=ri-energy></i>'+(ai.res.energy||0)+' <i class=ri-materials></i>'+(ai.res.materials||0)+' <i class=ri-science></i>'+(ai.res.science||0)+' <i class=ri-morale></i>'+(ai.res.morale||0)+' · '+ai.colonies.length+' col · '+ai.routes.length+' route'+(ai.routes.length>1?'s':'')+' · ~'+vpAffiche(ai)+' VP'
       :ai.colonies.length+' col · '+ai.routes.length+' route'+(ai.routes.length>1?'s':'')+' · ~'+vpAffiche(ai)+' VP <span style="color:#5a6a8a">· éco &amp; moral : tech requise</span>';
     const cruLine=croiseurLigne(ai);
-    tensHtml+=`<div class="dip-nation"><div class="dip-hdr"><span>${ai.civ.emoji} ${ai.civ.name}</span>${status}</div>`+
+    tensHtml+=`<div class="dip-nation"><div class="dip-hdr"><span class="dip-nom"><span class="dip-medal" style="border-color:${ai.civ.color||'#4a9eff'}">${ai.civ.emoji}</span>${ai.civ.name}</span>${status}</div>`+
       `<div class="dip-force">${forceLine}${cruLine?'<br>'+cruLine:''}</div>`+
       `<div class="dip-force" style="color:#8a98b8;font-size:.92em">${ecoLine}</div>`+
       _bar('Moi → eux',pt,moralWarn)+
@@ -12666,19 +12698,23 @@ function techScrollTo(id){
 let _riviereActive='tech';
 function techRiviere(nom){
   _riviereActive=(nom==='civ'||nom==='mil')?nom:'tech';
-  _appliquerRiviere();
+  _appliquerRiviere(true);   // changement de page voulu par le joueur : on repart du haut
 }
-function _appliquerRiviere(){
+/* `remonter` : true seulement quand le JOUEUR change de rivière. Chaque rendu (tour d'une autre nation,
+   synchro en ligne) passait ici et remettait la liste en haut — « c'est pénible à force » (Marc, 16/09,
+   vieille critique de ses amis). Le rendu conserve maintenant la position (voir renderTechTree). */
+function _appliquerRiviere(remonter){
   for(const r of ['tech','civ','mil']){
     const el=document.getElementById('riv-'+r);
     if(el) el.style.display=(r===_riviereActive)?'':'none';
     const b=document.getElementById('riv-btn-'+r);
     if(b){ b.style.opacity=(r===_riviereActive)?'1':'.45'; b.style.outline=(r===_riviereActive)?'2px solid #ffffff55':'none'; }
   }
-  const body=document.getElementById('tech-body'); if(body) body.scrollTop=0;
+  if(remonter){ const body=document.getElementById('tech-body'); if(body) body.scrollTop=0; }
 }
 function renderTechTree(){
   const body=document.getElementById('tech-body');
+  const _scrollAvant=body?body.scrollTop:0;
   const compact=getTechAreaMode()==='compact';
   let html='<div id="riv-tech">';
   for(const[branchId,branch]of Object.entries(TECH_BRANCHES)){
@@ -12860,7 +12896,8 @@ function renderTechTree(){
   html+='<div id="riv-mil" style="display:none"><div id="sec-mil"></div>'
       + renderNonBranchRow('⚔️ Militaire',milCards,6) + '</div>';
   body.innerHTML=html;
-  _appliquerRiviere();   // ⚠️ après chaque rendu : sinon on retombe sur les trois rivières visibles
+  _appliquerRiviere(false);   // ⚠️ après chaque rendu : sinon on retombe sur les trois rivières visibles
+  if(_scrollAvant) body.scrollTop=_scrollAvant;   // même page, même endroit
   const unlocked=Object.values(G.branchTiers).filter(t=>t>0).length;
   document.getElementById('branch-progress-summary').textContent=unlocked+'/6 branches';
 }
@@ -12872,7 +12909,7 @@ function renderRight(){
    const _cost=_ab?((_ab.ac||0)+' AC'+(Object.keys(_ab.cost||{}).length?(' '+Object.entries(_ab.cost).map(([r,v])=>'−'+v+_rE(r)).join(' ')):' (gratuit)')):'';
    const _abEl=document.getElementById('r-ability');
    if(_abEl)_abEl.innerHTML=(p.civ.passive?('<div style="color:#9fb4d6"><b>Passif :</b> '+p.civ.passive+'</div>'):'')
-     +(_ab?('<div style="margin-top:5px;color:#ffd9a0"><b>💫 '+_ab.name+'</b> <span style="color:#8fb0d8">('+_cost+')</span>'+(p.abilityUsed?' <span style="color:#ff8888">· déjà utilisée</span>':'')+'<div style="color:#9aa8c4;margin-top:1px">'+(_ab.desc||'')+'</div></div>'):'');}
+     +(_ab?('<div style="margin-top:5px;color:#ffd9a0"><b style="color:'+(p.civ.color||'#ffd9a0')+'">✦ Pouvoir · '+_ab.name+'</b> <span style="color:#8fb0d8">('+_cost+')</span>'+(p.abilityUsed?' <span style="color:#ff8888">· déjà utilisé ce tour</span>':'')+'<div style="color:#9aa8c4;margin-top:1px">'+(_ab.desc||'')+'</div></div>'):'');}
   const res=[['energy','<i class=ri-energy></i>','Énergie','#FFD700'],['materials','<i class=ri-materials></i>','Mat.','#FFA040'],['science','<i class=ri-science></i>','Savoir','#40D0FF'],['morale','<i class=ri-morale></i>','Moral','#FF6080']];
   const _netR=_netIncome(p);
   document.getElementById('r-res').innerHTML=res.map(([r,e,n,col])=>{const nv=_netR[r]||0;const nc=nv<0?'#ff6b6b':nv>0?'#7fe0a0':'#8898b8';return`<div class="rbox"><div class="rn" style="color:${col}">${e} ${n}</div><div class="rv" style="color:${col}">${p.res[r]||0}</div><div style="font-size:.66em;font-weight:700;color:${nc}" title="Revenu net estimé par tour (revenus − entretien)">${nv>0?'+':''}${nv}/t</div></div>`;}).join('');
@@ -13310,14 +13347,17 @@ function showPeaceOfferModal(isJustDeclared,cb){
   /* Blason (14/09) : le médaillon et le nom de l'ADVERSAIRE — c'est ce que Marc lit en premier. */
   { const _e=document.getElementById('pm-emoji'), _n=document.getElementById('pm-nation'), _k=document.getElementById('pm-kicker'), _v=document.getElementById('pm-verb');
     if(_e)_e.textContent=ai?ai.civ.emoji:'🕊️'; if(_n)_n.textContent=ai?ai.civ.name:'Adversaire';
-    if(_k){_k.textContent='contre';_k.classList.add('fen-prep');}   // « contre TERRIENS » (Marc, 15/09)
-    if(_v)_v.innerHTML=(isJustDeclared?'Guerre déclarée. ':'')+(declBy==='player'?'Tu as déclaré la guerre. Proposer la paix ?':'Proposer la paix ?'); }
+    /* Marc, 15/09 : quand l'ADVERSAIRE vient de déclarer la guerre, cette fenêtre EST l'annonce — kicker « Paix ou
+       guerre ? », le nom, puis « Ils t'ont déclaré la guerre. Que veux-tu faire ? ». Sinon « contre NATION ». */
+    const _declParAdv=isJustDeclared&&declBy!=='player';
+    if(_k){ _k.textContent=_declParAdv?'Paix ou guerre ?':'contre'; _k.classList.toggle('fen-prep',!_declParAdv); }
+    if(_v)_v.innerHTML=_declParAdv?'Ils t\'ont déclaré la guerre. Que veux-tu faire ?':(declBy==='player'?'Tu as déclaré la guerre. Proposer la paix ?':'Proposer la paix ?'); }
   document.getElementById('pm-combatants').innerHTML=
     `<span style="color:${p.civ.color};font-weight:700">${p.civ.emoji} ${p.civ.name}</span>`+
     `<span style="color:#556;font-size:.9em"> ⚔️ contre ⚔️ </span>`+
     `<span style="color:${ai?ai.civ.color:'#888'};font-weight:700">${ai?ai.civ.emoji:''} ${ai?ai.civ.name:'IA'}</span>`;
   document.getElementById('pm-declaredby').textContent=
-    declBy==='player'?'Guerre déclarée par toi — l\'IA répond.':'Guerre déclarée par '+(ai?ai.civ.name:'l\'IA')+'.';
+    declBy==='player'?'Guerre déclarée par toi — l\'IA répond.':(isJustDeclared?'':'Guerre déclarée par '+(ai?ai.civ.name:'l\'IA')+'.');   // redondant quand le verbe le dit déjà
   const pVP=vpAffiche(p);const aVP=vpAffiche(ai||G.ais[0]);
   document.getElementById('pm-context').innerHTML=
     (isJustDeclared?'<b>'+G._warDeclareReason+'</b><br>':'')+
@@ -14375,6 +14415,35 @@ function _logPrefixe(e){
        + '<span style="color:'+coul+';font-weight:700;font-size:.85em">'+nom+'</span>'
        + '<span style="opacity:.45"> │ </span>';
 }
+/* ═══ RENDU DU JOURNAL (v10.62, maquette validée par Marc) ═══
+   Une seule fonction pour le solo (addLog) et l'en-ligne (refreshJournal d'online.js).
+   Le journal est stocké et affiché DERNIÈRE ACTION EN HAUT (Marc : « ça évite de scroller »). Les lignes
+   sont groupées par tour sous un séparateur « TOUR n » ; le préfixe « T1 Terriens │ » disparaît, remplacé
+   par un filet coloré à gauche (la couleur de la nation qui agit). Les lignes « ↳ paie » sont rangées
+   en retrait sous leur action. Le message lui-même est inchangé : rapports texte et toasts n'en savent rien. */
+function _journalCouleur(e){
+  try{ for(const p of [G.player].concat(G.ais||[])){ if(p&&p.civ&&p.civ.id===e.civ) return p.civ.color||'#8faacc'; } }catch(err){}
+  return '#3a4470';   // Système
+}
+function _journalHTML(log){
+  if(!Array.isArray(log)) return '';
+  let out='',tourCourant=null,enAttente=[];
+  const ligne=(e,msg,cls,sous)=>'<div class="log-e '+cls+(sous?' log-sous':'')+'" style="--nc:'+_journalCouleur(e)+'">'+_logColorNations(msg.replace(/^\s+/,''))+'</div>';
+  /* Le tableau est du plus récent au plus ancien. Une ligne « ↳ paie » est écrite APRÈS son action,
+     donc elle la précède ici : on la garde en attente et on la range SOUS l'action qui suit. */
+  for(const e of log){
+    if(!e) continue;
+    const msg=(typeof e==='object')?String(e.msg||''):String(e);
+    const cls=(typeof e==='object'&&e.cls)?e.cls:'';
+    if(/^\s*↳/.test(msg)){ enAttente.push({e,msg,cls}); continue; }
+    const turn=(typeof e==='object'&&e.turn!==undefined&&e.turn!==null)?e.turn:null;
+    if(turn!==null&&turn!==tourCourant){ tourCourant=turn; out+='<div class="log-tour">Tour '+turn+'</div>'; }
+    out+=ligne(e,msg,cls,false);
+    while(enAttente.length){ const s=enAttente.pop(); out+=ligne(s.e,s.msg,s.cls,true); }
+  }
+  while(enAttente.length){ const s=enAttente.pop(); out+=ligne(s.e,s.msg,s.cls,true); }
+  return out;
+}
 function addLog(msg,cls=''){
   /* Pendant une simulation de l'IA, le moteur joue des coups qui n'auront pas lieu : les journaliser
      raconterait au joueur une partie imaginaire. Voir `simulerCoup`. */
@@ -14394,7 +14463,7 @@ function addLog(msg,cls=''){
   /* Chaque ligne affiche discrètement son tour et sa nation. Le journal en jeu devient lisible
      comme un compte rendu de partie : « T3 Martiens │ … ». Même information que dans /debug et
      dans le rapport copié — un seul format, trois endroits. */
-  if(el)el.innerHTML=G.log.map(e=>`<div class="log-e ${e.cls}">${_logPrefixe(e)}${_logColorNations(e.msg)}</div>`).join('');
+  if(el)el.innerHTML=_journalHTML(G.log);
 }
 // Peut-on encore jouer une action ce tour ? (utilisé pour détecter un blocage « plus de ressources »)
 function _scCanPlayerAct(){

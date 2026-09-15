@@ -1825,6 +1825,22 @@ wss.on('connection', (ws) => {
           break;
         }
 
+        case 'renoncer': { // {t:'renoncer'} — le CRÉATEUR de la partie cède sa nation à une IA, sans vote (Marc, 16/09)
+          if (!requireAuth() || !requireGame()) break;
+          const g = games.get(sess.game);
+          const s = seatOf(g, ws) || seatOf(g, sess.user);
+          if (!g.driver || !s) return err('pas dans cette partie');
+          if (g.host !== sess.user) return err('seul le créateur de la partie peut renoncer à jouer');
+          if (g.status !== 'playing') return err('la partie n\'est pas en cours');
+          if (s.ai) return err('ce siège est déjà tenu par une IA');
+          journaliserPartie(g, '🤖 ' + nomSiege(g, s.civId) + ' renonce à jouer — une IA reprend ' + nomNation(g, s.civId) + '.', 'gold');
+          remplacerParIA(g, s.civId, '(a renoncé à jouer)');
+          /* Même épilogue côté clients que la concession tranchée « IA » : le partant voit « Tu as quitté
+             la partie », les autres un toast. */
+          broadcast(g, { t: 'concede_done', issue: 'ia', civId: s.civId, motif: 'renonce' });
+          break;
+        }
+
         case 'concede_choice': { // {t:'concede_choice', choix:'ia'|'stop'} — avis d'un joueur restant
           if (!requireAuth() || !requireGame()) break;
           const g = games.get(sess.game);

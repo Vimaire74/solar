@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-15 · v10.55';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-16 · v10.62';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -385,13 +385,18 @@ function refreshJournal(g){
   try {
     const el = document.getElementById('log-content');
     if (!el || !g || !Array.isArray(g.log)) return;
+    /* v10.62 : même rendu qu'en solo (séparateurs « TOUR n », filet coloré, sous-lignes « ↳ paie »). */
+    if (typeof window._journalHTML === 'function') { el.innerHTML = window._journalHTML(g.log); return; }
     const color = (window._logColorNations) ? window._logColorNations : (s=>s);
     el.innerHTML = g.log.map(e => '<div class="log-e '+(e.cls||'')+'">'+color((e&&e.msg)||'')+'</div>').join('');
   } catch(e){}
 }
 
 // ───────────────────────── Décisions (routées par le serveur) ─────────────────────────
+/* Y a-t-il au moins un autre joueur HUMAIN dans cette partie ? */
+function _autresHumains(){ try{ return !!(STATE.game&&STATE.game.seats&&STATE.game.seats.some(x=>x&&!x.ai&&x.civId!==STATE.myCiv)); }catch(e){ return false; } }
 function onDecision(pending){
+  hideStatus();   // une question pour toi : on n'attend personne
   /* ⚠️ NE JAMAIS JETER UNE DÉCISION. Avant, un `return` sec ici faisait DISPARAÎTRE toute fenêtre
      arrivant pendant qu'une autre attendait une réponse — c'est ainsi qu'une victoire au combat
      obtenue juste après la Sphère de Dyson ne s'affichait pas du tout (bug signalé le 2026-08-01).
@@ -419,7 +424,9 @@ function onDecision(pending){
     STATE._answering = false;
     STATE._enCours = null;
     showWaitBlock();
-    status('En attente des autres joueurs…');
+    /* « En attente des autres joueurs… » n'a de sens que s'il y a d'AUTRES HUMAINS (Marc, 15/09 : « ça
+       reste affiché même si je joue contre les IA »). Les ordinateurs répondent dans l'instant. */
+    if(_autresHumains()) status('En attente des autres joueurs…'); else hideStatus();
     // Fenêtre suivante de la file, s'il y en a une (voir la note en tête de onDecision).
     if(STATE._queue && STATE._queue.length){ const nx=STATE._queue.shift(); setTimeout(()=>onDecision(nx), 60); }
   };
@@ -734,9 +741,13 @@ function showPeaceReal(pending){
   set('pm-combatants','<b>'+(me.civ.emoji||'')+' '+me.civ.name+'</b><span style="color:#556;font-size:.9em"> ⚔️ contre ⚔️ </span><b>'+(atk?atk.civ.emoji:'')+' '+atkName+'</b>');
   /* Blason (14/09) : médaillon + nom de l'adversaire, avant tout texte. */
   set('pm-emoji', atk?atk.civ.emoji:'🕊️'); set('pm-nation', esc(atkName));
-  set('pm-kicker', 'contre');   // « contre TERRIENS » (Marc, 15/09) — la classe fen-prep est dans le HTML
-  set('pm-verb', (o.isJustDeclared?'Guerre déclarée. ':'')+(o.declaredBy==='player'?'Tu as déclaré la guerre. Proposer la paix ?':'Proposer la paix ?'));
-  set('pm-declaredby', o.declaredBy==='player'?'Guerre déclarée par toi — l\'adversaire répond.':('Guerre déclarée par '+atkName+'.'));
+  /* Marc, 15/09 : si l'adversaire VIENT de déclarer la guerre, cette fenêtre est l'annonce elle-même :
+     « Paix ou guerre ? » / NATION / « Ils t'ont déclaré la guerre. Que veux-tu faire ? ». Sinon « contre NATION ». */
+  const _declParAdv=!!o.isJustDeclared&&o.declaredBy!=='player';
+  set('pm-kicker', _declParAdv?'Paix ou guerre ?':'contre');
+  try{ document.getElementById('pm-kicker').classList.toggle('fen-prep',!_declParAdv); }catch(e){}
+  set('pm-verb', _declParAdv?'Ils t\'ont déclaré la guerre. Que veux-tu faire ?':(o.declaredBy==='player'?'Tu as déclaré la guerre. Proposer la paix ?':'Proposer la paix ?'));
+  set('pm-declaredby', o.declaredBy==='player'?'Guerre déclarée par toi — l\'adversaire répond.':(o.isJustDeclared?'':'Guerre déclarée par '+atkName+'.'));
   const vy=(o.vpYou&&o.vpYou.total!==undefined)?o.vpYou.total:(o.vpYou||0);
   const ve=(o.vpEnemy&&o.vpEnemy.total!==undefined)?o.vpEnemy.total:(o.vpEnemy||0);
   set('pm-context','VP — Toi : <b>'+vy+'</b> | Adversaire : <b>'+ve+'</b><br>Offre des ressources pour tenter la paix, ou refuse et combats.');
@@ -837,7 +848,10 @@ function showResultToast(){ /* volontairement vide */ }
    Désormais : une ligne par action, « Nation — verbe complément », rien d'autre. Les coûts restent
    dans le journal, consultable à froid. Rien n'est affiché pour TA propre nation : tu viens de le
    faire, tu le sais. */
-const _TOAST_IGNORE=/^↳|paie\s*:|^💰|^📊|^⚙️/;
+/* Lignes de DÉTAIL écartées des dépêches (Marc, 15/09 : « pas d'indications sur les bonus reçus au moment d'une
+   colonisation, ça fait des infos en trop ») — elles restent dans le journal : 🏠 conditions de vie, 🗺️ découverte,
+   ⚠️ colonie éloignée, 🌅 paysage remarquable, ⬆️ détail d'amélioration. */
+const _TOAST_IGNORE=/^↳|paie\s*:|^💰|^📊|^⚙️|^🏠|^🗺️|^⚠️|^🌅|^⬆️/;
 function _toastLigne(t){
   let x=String(t||'').replace(/<[^>]+>/g,'').trim();
   if(!x||_TOAST_IGNORE.test(x)) return null;
@@ -856,8 +870,20 @@ function _toastLigne(t){
   if(m) x=m[2]+' — '+m[3];
   return x;
 }
-function showLogToast(txts){
-  const lignes=(txts||[]).map(_toastLigne).filter(Boolean)
+/* ═══ SEULEMENT LES ACTIONS, DANS L'ORDRE (Marc, 15/09) ═══
+   Le journal écrit les DÉTAILS avant le résumé (« Colonie éloignée… », « Colonie sur Vesta connectée », puis
+   « 🤖 Martiens colonise Vesta ») : lu tel quel, l'ordre paraît inversé et il y a trop d'informations. Les
+   dépêches ne gardent que le résumé d'action : les lignes 🤖 pour une nation tenue par l'ordinateur ; pour un
+   humain (pas de ligne 🤖), les seules lignes d'ACTION (colonie, route, achat, amélioration, raid, pouvoir,
+   accord, capture). Tout le reste reste dans le journal. */
+function _lignesActions(txts){
+  const brut=(txts||[]).map(t=>String((t&&t.msg)||t||'').replace(/<[^>]+>/g,'').trim()).filter(Boolean);
+  const ia=brut.filter(t=>/^\u{1F916}/u.test(t));
+  if(ia.length) return ia;
+  return brut.filter(t=>/^(🏗️|🛤️ Route [^p]|✅|💼|⬆️|⚔️ Raid|💫|🤝|🏴|🕊️ Mission|🧬|🕵️)/u.test(t) && !_TOAST_IGNORE.test(t));
+}
+function showLogToast(txts, tout){
+  const lignes=(tout?(txts||[]):_lignesActions(txts)).map(_toastLigne).filter(Boolean)
     .filter(l=>!(STATE.myCiv && l.indexOf(civLabel(STATE.myCiv).replace(/^\S+\s*/,''))===0));  // rien sur MA nation
   if(!lignes.length) return;
   const wait=(window._scGreenUntil||0)-Date.now();
@@ -867,7 +893,7 @@ function showLogToast(txts){
   if(typeof fenDepechesMontrer==='function'){
     window._scDepBuf=(window._scDepBuf||[]).concat(lignes).slice(-4);
     const p0=fenDepechesMontrer(window._scDepBuf,{kicker:'Pendant ton attente',duree:8000});
-    if(p0){ clearTimeout(window._scDepReset); window._scDepReset=setTimeout(()=>{ window._scDepBuf=[]; },8200); return; }
+    if(p0){ clearTimeout(window._scDepReset); window._scDepReset=setTimeout(()=>{ window._scDepBuf=[]; },((typeof fenDepechesDuree==='function')?fenDepechesDuree(8000):8000)+200); return; }
   }
   let p=document.getElementById('sc-logtoast');
   /* Moitié de la largeur disponible, centré, DANS la zone de jeu — plus sous la barre du haut, qu'il
@@ -894,11 +920,13 @@ function showGainToast(html){
   if(!html) return;
   let p=document.getElementById('sc-gaintoast');
   if(!p){ p=el('<div id="sc-gaintoast" style="position:fixed;right:12px;bottom:calc(var(--botband,84px) + 14px);'
-    +'z-index:8660;max-width:min(60vw,340px);background:#0d2a16;border:2px solid #3fbf6a;border-radius:12px;padding:9px 13px;'
-    +'color:#d6ffe4;font:600 .82em/1.5 system-ui;box-shadow:0 8px 28px rgba(0,0,0,.55);display:none;text-align:left"></div>');
+    +'z-index:8660;max-width:min(60vw,340px);background:#0d2a16;border:2px solid #3fbf6a;border-radius:12px;padding:9px 34px 9px 13px;'
+    +'color:#d6ffe4;font:600 .82em/1.5 var(--font-corps,system-ui);box-shadow:0 8px 28px rgba(0,0,0,.55);display:none;text-align:left;cursor:pointer"></div>');
+    /* v10.62 (point 7) : une croix et un toucher n'importe où la ferment tout de suite. */
+    p.onclick=()=>{ p.style.display='none'; p._buf=[]; clearTimeout(p._timer); };
     document.body.appendChild(p); }
   p._buf=(p._buf||[]).concat([html]).slice(-3);
-  p.innerHTML=p._buf.join('<br>');
+  p.innerHTML='<span aria-label="Fermer" style="position:absolute;top:4px;right:8px;font-size:1.25em;line-height:1;color:#9fe0b4">✕</span>'+p._buf.join('<br>');
   p.style.display='block';
   window._scGreenUntil=Date.now()+5000;   // le toast rouge attend son tour (ils se chevauchaient)
   clearTimeout(p._timer);
@@ -988,7 +1016,7 @@ function showNotice(m){
        `showLogToast`, pas `showRedToast` — et il prend un TABLEAU de lignes brutes, qu'il filtre
        et met en forme lui-même. Un `typeof === 'function'` en garde-fou aurait masqué l'erreur :
        le pillé n'aurait simplement rien vu, et personne ne l'aurait su avant une partie réelle. */
-    if(o.perte) showLogToast([t + ' — ' + corps.replace(/<[^>]+>/g, '')]);
+    if(o.perte) showLogToast([t + ' — ' + corps.replace(/<[^>]+>/g, '')], true);
     else showGainToast('<b>' + t + '</b><br>' + corps);
     return;
   }
@@ -1081,7 +1109,7 @@ function sendAction(action){
   bandeauATonTour(false);   // ← tu viens de jouer : le badge s'éteint sans attendre un message du serveur
   window._scOnPass=null; window._scOnSkip=null;
   send({t:'act', action});
-  showWaitBlock(); status('Coup envoyé…');
+  showWaitBlock(); statusBref('Coup envoyé…');
   // anti-flicker : redemander l'état autoritaire rapidement (le round-trip est court),
   // pour que le plateau reflète le résultat réel sans rester sur l'affichage local périmé.
   setTimeout(()=>reqState(true), 120);
@@ -1190,7 +1218,10 @@ function installIntercepts(){
           if(fn==='applyCalmTension'){ try{ const o=document.getElementById('calm-overlay'); if(o)o.remove(); }catch(e){} }
           if(fn==='doEstablishRoute'){
             const me=myNation();
-            if(me && me.forceTokens>0){ askRouteToken(action); return; }
+            /* IA de Navigation (`route_force_free`) : le moteur pose le jeton gratuitement, la question
+               n'a pas lieu d'être — et sa réponse « non » écrivait « Route non protégée » à tort (FE37 T7). */
+            const _gratuit = me && typeof window.hasSpec==='function' && (function(){ try{ return hasSpec(me,'route_force_free'); }catch(e){ return false; } })();
+            if(me && me.forceTokens>0 && !_gratuit){ askRouteToken(action); return; }
             action.token=false;
           }
           sendAction(action);
@@ -1287,12 +1318,12 @@ function installIntercepts(){
     // Boutons ✓ Valider / ↩ Annuler : en ligne, valident/annulent l'action tenue par le SERVEUR.
     if(typeof window.scConfirmValidate==='function' && !window.scConfirmValidate._scOff){
       const o=window.scConfirmValidate;
-      window.scConfirmValidate=function(){ if(STATE.started){ hideConfirmBar(); STATE._confirmPending=false; send({t:'confirm'}); showWaitBlock(); status('Validé…'); return; } return o.apply(this,arguments); };
+      window.scConfirmValidate=function(){ if(STATE.started){ hideConfirmBar(); STATE._confirmPending=false; send({t:'confirm'}); showWaitBlock(); statusBref('Validé…'); return; } return o.apply(this,arguments); };
       window.scConfirmValidate._scOff=true;
     }
     if(typeof window.scConfirmCancel==='function' && !window.scConfirmCancel._scOff){
       const o=window.scConfirmCancel;
-      window.scConfirmCancel=function(){ if(STATE.started){ hideConfirmBar(); STATE._confirmPending=false; send({t:'undo'}); showWaitBlock(); status('Annulé — retour en arrière…'); return; } return o.apply(this,arguments); };
+      window.scConfirmCancel=function(){ if(STATE.started){ hideConfirmBar(); STATE._confirmPending=false; send({t:'undo'}); showWaitBlock(); statusBref('Annulé — retour en arrière…'); return; } return o.apply(this,arguments); };
       window.scConfirmCancel._scOff=true;
     }
     ['selectInvestment','selectInvestment2'].forEach(function(fn){
@@ -1422,7 +1453,7 @@ function injectStyles(){
   #sc-ov .siege .medal2{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:18px;background:#0f1130;border:2px solid var(--c,#4a9eff);flex:0 0 auto;cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
   #sc-ov .siege .nom{flex:1;font-weight:600;color:#fff;line-height:1.2}
   #sc-ov .siege .nom small{display:block;font-weight:400;color:#8f98bf;font-size:.8em}
-  #sc-ov .siege select{width:auto;flex:0 0 auto;margin:0;padding:9px 8px;font-family:var(--font-titre,inherit);font-size:.62em;letter-spacing:.04em;text-transform:uppercase;color:#c8d4ff;background:#131740;border-color:#2a3a6a;max-width:38vw}
+  #sc-ov .siege select{width:auto;flex:0 0 auto;margin:0;padding:9px 8px;font-family:var(--font-titre,inherit);font-size:.62em;letter-spacing:.04em;text-transform:uppercase;color:#c8d4ff;background:#131740;border-color:#2a3a6a;max-width:42vw}
   #sc-ov .siege select.moi{background:#163a6b;border-color:#2f6fbf;color:#e8f1ff}
   #sc-ov .siege .i{width:32px;height:32px;padding:0;border-radius:50%;border:1px solid #2a3a6a;display:grid;place-items:center;font-family:var(--font-titre,inherit);font-size:.7em;color:#4a9eff;background:transparent;flex:0 0 auto;text-transform:none}
   #sc-ov .siege .det{display:none;margin-top:8px;padding-top:8px;border-top:1px solid #1d2350;font-size:.86em;line-height:1.45}
@@ -1470,6 +1501,8 @@ function overlay(inner){
 function hideOverlay(){ const ov=document.getElementById('sc-ov'); if(ov) ov.style.display='none'; }
 function status(txt){ let b=document.getElementById('sc-status'); if(!b){ injectStyles(); b=el('<div id="sc-status"></div>'); document.body.appendChild(b);} b.textContent=txt; b.style.display='block'; }
 function hideStatus(){ const b=document.getElementById('sc-status'); if(b) b.style.display='none'; }
+/* Message FUGACE (« Coup envoyé… ») : s'efface seul après 2,5 s — sinon il restait pendant tout le tour des IA. */
+function statusBref(txt){ status(txt); clearTimeout(window._scStatusBref); window._scStatusBref=setTimeout(hideStatus,2500); }
 // #6 : plus de voile plein écran qui bloque TOUT. On laisse le joueur regarder librement (carte, journal,
 // empire, diplo, détail des techs, survol des ressources). Seules les ACTIONS CONCRÈTES sont bloquées
 // (via les interceptions, message « pas ton tour »). showWaitBlock ne fait plus qu'afficher un statut discret.
@@ -1557,7 +1590,23 @@ function hideAbsence(){ const b=document.getElementById('sc-absence'); if(b) b.r
    ⚠️ Cette fenêtre a son PROPRE calque (#sc-concede), délibérément séparé de #sc-decision.
    Une concession peut tomber pendant qu'on a une question de jeu à l'écran : réutiliser le
    calque des décisions écraserait cette question, et le joueur ne la reverrait jamais. */
-function concederVisible(oui){ const b=document.getElementById('conceder-btn'); if(b) b.style.display = oui ? 'block' : 'none'; }
+/* Quels boutons de fin dans la carte Réglages du Journal (Marc, 16/09) :
+     · solo, ou en ligne sans autre humain → « Recommencer la partie » (en ligne : quitte la partie serveur) ;
+     · en ligne avec d'autres humains → « Admettre sa défaite » (ex-Concéder : les autres votent) et, pour
+       le CRÉATEUR de la partie, « Renoncer à jouer » (une IA reprend son rôle, sans vote). */
+function concederVisible(oui){
+  const humains = oui && _autresHumains();
+  const show=(id,on)=>{ const b=document.getElementById(id); if(b) b.style.display = on ? '' : 'none'; };
+  show('conceder-btn', humains);
+  show('renoncer-btn', humains && !!STATE.isHost);
+  show('recommencer-btn', !humains);
+}
+window.scRenoncer = function(){
+  if(!STATE.game || !STATE.started){ alert('Aucune partie en cours.'); return; }
+  const ok = confirm('RENONCER À JOUER\n\nUne IA reprend ta nation immédiatement et la partie continue sans toi. Tu ne pourras pas revenir.\n\nConfirmer ?');
+  if(!ok) return;
+  send({t:'renoncer'});
+};
 window.scConcede = function(){
   if(!STATE.game || !STATE.started){ alert('Aucune partie en cours.'); return; }
   const ok = confirm('CONCÉDER LA VICTOIRE\n\n'
@@ -1686,15 +1735,15 @@ function badgeTour(qui){
   const tb=document.getElementById('top-bar');
   const vieux=document.getElementById('sc-a-toi'); if(vieux)vieux.remove();   // résidu d'une version précédente
   if(!b) return;
+  /* v10.62 : le badge vit dans la ligne 3 de la nouvelle barre ; ses couleurs sont en CSS (data-etat). */
+  { const te=document.getElementById('tb-etat'); if(te) te.classList.toggle('avec-passer', !!(_pb&&_pb.classList.contains('on'))); }
   if(!qui){ b.classList.remove('on'); if(tb)tb.classList.remove('a-toi'); return; }
   if(qui==='moi'){
-    b.textContent='À TOI';
-    b.style.background='linear-gradient(135deg,#1f7a3a,#146030)';
-    b.style.borderColor='#35a35c';
+    b.textContent='À TOI'; b.dataset.etat='moi';
+  }else if(_estIA(qui)){
+    b.textContent='IA joue…'; b.dataset.etat='calme';
   }else{
-    b.textContent=(_estIA(qui) ? 'IA JOUE' : ((_SINGULIER[qui]||String(qui).toUpperCase())+' JOUE'));
-    b.style.background='linear-gradient(135deg,#8f2b2b,#6b1d1d)';
-    b.style.borderColor='#c05555';
+    b.textContent=(_SINGULIER[qui]||String(qui).toUpperCase())+' JOUE'; b.dataset.etat='autre';
   }
   b.classList.add('on');
   if(tb) tb.classList.add('a-toi');
@@ -1908,9 +1957,8 @@ function _ficheNation(id){
 }
 function _siegesInteractifs(){
   document.querySelectorAll('#sc-ov .siege').forEach(sg=>{
-    const m=sg.querySelector('.medal2'), i=sg.querySelector('.i'); let t=null;
+    const m=sg.querySelector('.medal2'); let t=null;   // plus de bouton ⓘ (Marc, 15/09 : « ça casse la largeur »)
     const toggle=()=>sg.classList.toggle('on');
-    if(i) i.onclick=toggle;
     if(m){
       m.onclick=toggle;
       m.addEventListener('mouseenter',()=>{ try{ if(matchMedia('(hover:hover)').matches) sg.classList.add('on'); }catch(e){} });
@@ -1938,7 +1986,6 @@ function screenCreate(){
           <option value="open">Humain</option>
           <option value="ai"${i>0?' selected':''}>IA</option>
         </select>
-        <button type="button" class="i" aria-label="Fiche de la nation">i</button>
       </div>
       <div class="det">${_ficheNation(id)}</div>
     </div>`; }).join('');
@@ -1948,7 +1995,7 @@ function screenCreate(){
     <h2>Les sièges</h2>
     <div class="sous">Choisis ta nation, et qui joue les autres.</div>
     ${rows}
-    <div class="astuce">ⓘ ou appui long sur un médaillon : base, ressources de départ, capacité.</div>
+    <div class="astuce">Appui long sur un médaillon pour les valeurs de départ des nations.</div>
     <div class="err" id="sc-err"></div>
     <div class="btns2"><button class="sec" id="sc-back">Retour</button><button class="pri" id="sc-make">Créer</button></div>
   `);

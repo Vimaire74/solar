@@ -466,8 +466,8 @@ const STEPS=[
   tx:"<b>Moral ❤️</b> à 1 : revenus <b>÷ 2</b>. À 0 : plus de revenus. Il remonte avec les techs Spiritualité, les actions civiles, les colonies améliorées."},
 
  {lab:'Pouvoir gratuit', glow:'btn-ability', pos:'top', trig:'💫',
-  tx:"Chaque nation a un <b>pouvoir gratuit</b> (0 AC, 1×/tour) : 🌍 Diplomatie Verte, 🔴 Surtension (+1 AC), ☠️ Commerce avec les pirates, 🟠 Forge Orbitale. <b>Clique 💫</b> pour lancer Diplomatie Verte.",
-  hint:"Clique 💫"},
+  tx:"Chaque nation a un <b>pouvoir gratuit</b> (0 AC, 1×/tour) : 🌍 Diplomatie Verte, 🔴 Surtension (+1 AC), ☠️ Commerce avec les pirates, 🟠 Forge Orbitale. <b>Touche le bouton ✦ Pouvoir</b> (barre du haut) pour lancer Diplomatie Verte.",
+  hint:"Touche ✦ Pouvoir"},
 
  {lab:'Valider / annuler chaque action', pos:'top', onShow:function(){ _confirmOn=true; },
   tx:"Après chaque action, une fenêtre en bas à droite résume le gain : <b>✓ Valider</b> ou <b>↩ Annuler</b>. Tant que tu n'as pas validé, tu peux revenir en arrière. Seuls <b>raids et combats</b> sont définitifs."},
