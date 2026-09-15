@@ -1,10 +1,16 @@
-LOT 17 — MISE À JOUR LÉGÈRE (v10.47, sw v168) — 14/09/2026 : fenêtres « Blason », réglage Aa (Journal), journal « Coût combat »
+LOT 17 — MISE À JOUR LÉGÈRE (v10.48, sw v169) — 15/09/2026 : « Calmer la Population » marche enfin en ligne
 
-Ce dossier ne contient QUE ce qui a changé depuis la version en ligne (v10.39) : 2 Mo au lieu de 70.
-Les images (cartes, planètes) n'ont pas bougé, elles sont déjà sur GitHub.
+Ce dossier ne contient QUE ce qui a changé depuis la version en ligne : 5 fichiers
+(index.html, moteur.js, online.js, sw.js, tutorial.html). Les polices, les images et les fichiers
+du dossier server/ n'ont pas changé.
 
-Sur GitHub, à la RACINE du dépôt : Add file → Upload files, puis glisser d'un coup TOUT LE CONTENU
-de ce dossier (les 8 fichiers + les dossiers `assets` et `server`, PAS ce LISEZ-MOI).
-GitHub garde les chemins : `assets/fonts/…` se range dans le dossier assets existant, `server/…`
-remplace les trois fichiers du serveur. Commit changes.
-Puis Coolify : Redeploy du site statique ET du serveur live.
+Sur GitHub, à la RACINE du dépôt : Add file → Upload files, glisser les 5 fichiers (pas ce LISEZ-MOI),
+Commit changes. Puis Coolify : vérifier que les DEUX ressources se redéploient (solar-game.com ET
+live.solar-game.com) — moteur.js contient les règles et le serveur le lit aussi. Si l'une ne s'est
+pas redéployée toute seule : Redeploy à la main.
+
+Changement de cette version (partie D538 du 14/09) :
+- En ligne, la carte civique « Calmer la Population » plantait sur le serveur (TypeError) : rien ne
+  se passait, aucun message. Le choix de la nation se fait maintenant sur ton écran, et le serveur
+  revalide tout (AC, ressources, cible) avant de toucher à la tension. Bench : server/test_calmer_population.js.
+- Le journal écrit « 🌍 Terriens calme sa tension vers 🔴 Martiens » (nom, plus l'identifiant en minuscule).

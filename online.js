@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-14 · v10.47';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-15 · v10.48';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -1152,12 +1152,20 @@ function installIntercepts(){
           // Forge Orbitale (Jupitériens) : le pouvoir ouvre une modale de CHOIX de lune → on la laisse
           // s'ouvrir localement (orig) ; le clic sur la lune appellera _forgeUpgrade (intercepté → envoi).
           if(fn==='useAbility'){ const me=myNation(); if(me && me.civ && me.civ.id==='jupiteriens'){ return orig.apply(this, arguments); } }
+          /* « Calmer la Population » (carte civique cm_calm) : comme la Forge, elle ouvre d'abord une
+             fenêtre de CHOIX (quelle nation apaiser). On la laisse s'ouvrir localement (orig) ; le clic
+             sur la nation appelle `applyCalmTension`, interceptée → envoyée au serveur avec la cible.
+             Avant, `buyMarket('cm_calm')` partait tel quel au serveur, qui n'a pas d'écran pour la
+             fenêtre de choix et plantait (TypeError) : la carte n'a jamais marché en ligne (D538). */
+          if(fn==='buyMarket'){ try{ const c=(typeof CIVIC_MARKET!=='undefined')?CIVIC_MARKET.find(x=>x.id===arguments[0]):null; if(c&&c.calmAction){ return orig.apply(this, arguments); } }catch(e){} }
           const action=INTENT_MAP[fn](Array.prototype.slice.call(arguments));
           if(!action) return; // interception annulée (ex. modale d'attaque vide)
           // Forge Orbitale : la version LOCALE de _forgeUpgrade fermait la modale de choix de lune ; comme on
           // n'exécute PAS orig (on envoie juste l'intention), il faut fermer la modale nous-mêmes — sinon elle
           // reste affichée par-dessus le jeu (bug #24 : « popup Forge qui se réaffiche, je ne vois plus le jeu »).
           if(fn==='_forgeUpgrade'){ try{ const m=document.getElementById('forge-modal'); if(m)m.classList.add('hidden'); }catch(e){} }
+          // Même raison pour la fenêtre de choix de « Calmer la Population » : c'est orig qui la fermait.
+          if(fn==='applyCalmTension'){ try{ const o=document.getElementById('calm-overlay'); if(o)o.remove(); }catch(e){} }
           if(fn==='doEstablishRoute'){
             const me=myNation();
             if(me && me.forceTokens>0){ askRouteToken(action); return; }
@@ -2400,5 +2408,5 @@ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded'
 window.SC_ONLINE = { STATE, send, reqState }; // debug console
 /* Banc VISUEL (captures Playwright, `scratchpad/shot3.js`) : ouvrir les fenêtres de décision avec une
    charge utile fabriquée, sans serveur. Exposé seulement si l'adresse porte `?sc_test=1`. */
-try{ if(/[?&]sc_test=1/.test(location.search)) window.SC_TEST = { askLocalDecision, showPeaceReal, closeDecision, decisionPanel, STATE }; }catch(e){}
+try{ if(/[?&]sc_test=1/.test(location.search)) window.SC_TEST = { askLocalDecision, showPeaceReal, closeDecision, decisionPanel, STATE, installIntercepts }; }catch(e){}
 })();

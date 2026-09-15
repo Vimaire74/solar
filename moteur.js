@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-14 · v10.47';
+const SOLAR_BUILD_MOTEUR = '2026-09-15 · v10.48';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -4407,9 +4407,26 @@ function applyCalmTension(aiId,mode,amount){
     _playerStratDone();
     return;
   }
+  /* ═══ MODE CIVIQUE : LE SERVEUR REVALIDE AVANT DE TOUCHER À QUOI QUE CE SOIT ═══
+     En ligne, cette fonction arrive par `call` avec les arguments du client. `buyMarket` a vérifié
+     AC et ressources sur l'écran du joueur, mais le serveur est l'autorité : on refait les
+     contrôles ici, AVANT la baisse de tension (elle était appliquée d'abord, le débit ensuite —
+     un refus aurait laissé la tension baissée gratuitement). Le montant est celui de la carte,
+     pas celui reçu. Les autres modes (Stratégie, Diplomatie) n'ont pas de sens sans écran : en
+     ligne ils passent par la question `strategy_calm`. */
+  if(_decisionActive()&&mode!=='civic'){ addLog('⚠️ Apaisement : mode invalide en ligne.','red'); return; }
+  if(mode==='civic'){
+    amount=3;
+    const p=G.player;
+    if(G.phase!=='actions'){ addLog('⚠️ Calmer la Population : impossible hors phase d\'actions.','red'); return; }
+    if(!(G.ais||[]).some(a=>a&&a.civ&&a.civ.id===aiId)){ addLog('⚠️ Calmer la Population : nation invalide.','red'); return; }
+    if((p.acLeft||0)<1){ addLog('⚠️ Pas assez d\'AC (besoin 1).','red'); return; }
+    if((p.res.materials||0)<1||(p.res.energy||0)<1){ addLog('⚠️ Pas assez de ressources (besoin 1<i class=ri-materials></i> 1<i class=ri-energy></i>).','red'); return; }
+  }
   const prev=getTens('player',aiId);
   setTens('player',aiId,Math.max(0,prev-amount));
-  addLog('🕊️ Calme vers '+aiId+' : tension −'+amount+' ('+prev+' → '+getTens('player',aiId)+'/10)','gold');
+  const _vers=(G.ais||[]).find(a=>a&&a.civ&&a.civ.id===aiId); // le NOM, pas l'identifiant (« jupiteriens » en minuscule dans D538)
+  addLog('🕊️ '+G.player.civ.emoji+' '+G.player.civ.name+' calme sa tension vers '+(_vers?_vers.civ.emoji+' '+_vers.civ.name:aiId)+' : −'+amount+' ('+prev+' → '+getTens('player',aiId)+'/10)','gold');
   if(mode==='civic'){
     // Action civique : payer le coût, donner +1 moral
     const p=G.player;
@@ -6627,7 +6644,18 @@ function buyMarket(cardId){
   if(G.player.acLeft<1){addLog('⚠️ Pas assez d\'AC (besoin 1).','red');return;}
   for(const[r,a]of Object.entries(card.cost)){if((G.player.res[r]||0)<a){addLog('⚠️ Pas assez de '+rLabel(r)+' (besoin '+a+').','red');return;}}
   // Calmer la Population : ouvre popup de choix de nation avant débit (−3 tension)
-  if(card.calmAction){closePopup();showCalmPopup('civic',3);return;}
+  /* ⚠️ EN LIGNE, CETTE CARTE N'A JAMAIS MARCHÉ (partie D538, 14/09). Le client envoyait
+     `buyMarket('cm_calm')` au serveur, qui arrivait ici et appelait `showCalmPopup` →
+     `document.body.insertAdjacentHTML` n'existe pas dans le faux `document` du serveur → TypeError,
+     action refusée, rien de dit au joueur. Le choix de la nation se fait maintenant SUR L'ÉCRAN du
+     joueur (online.js laisse passer `buyMarket` pour cette carte), et c'est `applyCalmTension`
+     qui part au serveur, avec la cible. Ici, sans écran, on refuse proprement — un mot de la
+     liste du pilote (« impossible ») pour que le joueur GARDE la main. test_calmer_population.js */
+  if(card.calmAction){
+    closePopup();
+    if(!_aUnEcran()){ addLog('⚠️ Calmer la Population : choix de la nation impossible sans écran — rien dépensé.','red'); return; }
+    showCalmPopup('civic',3); return;
+  }
   saveUndo();
   G.player.acLeft-=1;
   G.player.spentThisTurn+=1+Object.values(card.cost).reduce((s,v)=>s+v,0);
