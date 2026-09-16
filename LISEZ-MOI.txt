@@ -1,4 +1,4 @@
-LOT 17 — MISE À JOUR LÉGÈRE (v10.62, sw v183) — 16/09/2026 : barre du haut « console », panneaux Blason, Aa réparé, « Pouvoir », « Renoncer à jouer », Techs stable — et tout le v10.61 (fenêtres « contre NATION », routes orphelines, Calmer la Population…)
+LOT 17 — MISE À JOUR LÉGÈRE (v10.63, sw v184) — 16/09/2026 : ⚠️ CHANGEMENT DE RÈGLE (raid à 2 jetons pour tout le monde), le joueur qui perd une colonie est prévenu, bilan qui ne déborde plus, largeur constante sur ordinateur — et tout le v10.62 (barre « console », panneaux Blason, Aa, « Pouvoir »)
 
 Ce dossier ne contient QUE ce qui a changé depuis la version en ligne : 7 fichiers à la racine
 (index.html, moteur.js, online.js, sw.js, tutorial.html, tutorial.js, regles.html) + 2 fichiers serveur (server/game-core.js
@@ -10,6 +10,30 @@ Sur GitHub, à la RACINE du dépôt : Add file → Upload files, glisser les 7 f
 dossier server (il fusionne avec celui du dépôt), pas ce LISEZ-MOI, Commit changes. Puis Coolify : vérifier que les DEUX ressources se redéploient (solar-game.com ET
 live.solar-game.com) — moteur.js contient les règles et le serveur le lit aussi. Si l'une ne s'est
 pas redéployée toute seule : Redeploy à la main.
+
+⚠️ CHANGEMENT DE RÈGLE (16/09, v10.63) — LES CEINTURIENS PERDENT LE RAID À 1 JETON
+Marc, après la partie 96F6 : « c'est peut-être un peu fort, il a déjà plusieurs avantages donc supprime
+ce pouvoir partout où tu le trouves. » Le raid coûte désormais 2 jetons Force à TOUTES les nations, et
+le seuil de jetons exigé pour lancer un assaut est le même pour tout le monde. Les Ceinturiens gardent
+leurs autres avantages : +1⚡/tour, immunité aux pirates, Éris et Pluton à 2 VP au niveau 1, et le
+pouvoir « Commerce avec les pirates ». La fiche de la nation, le panneau Empire et regles.html ont été
+mis à jour. Banc : server/test_raid_deux_jetons.js.
+
+Corrections du 16/09 (v10.63), toutes vues dans la partie 96F6 :
+- LE JOUEUR QUI PERD UNE COLONIE EST ENFIN PRÉVENU. Quand un humain prenait la colonie d'un AUTRE HUMAIN,
+  le dépossédé ne recevait aucun message écrit pour lui : le seul qui lui parvenait était celui du
+  vainqueur, préfixé « Vu par X » — Laurent a donc lu « Vu par Ceinturiens — Tu CAPTURES Cérès — elle est
+  à toi ! » en perdant Cérès. Il reçoit maintenant « 🔴 Martiens prend Titan / Ta colonie Titan (Nv.2)
+  tombe — combat 8 contre 2. Tu perds le jeton de garnison et 2❤️ ». Le chemin des IA était déjà correct.
+  Banc : server/test_perte_colonie_prevenue.js.
+- LE BILAN DE TOUR NE DÉBORDE PLUS. La description de l'IA de Navigation sortait du cadre de 596 px
+  (ligne de 940 px dans une carte de 378 px). Banc : server/pw_bench_bilan_largeur.js.
+- LARGEUR CONSTANTE SUR ORDINATEUR. La carte occupait toute la fenêtre et les quatre autres onglets
+  480 px : le cadre sautait à chaque changement d'onglet. Tous les onglets ont maintenant la même
+  largeur (plafonnée à 1100 px), avec les textes limités à une largeur de lecture confortable.
+  Sur téléphone, rien ne change.
+- JOURNAL : « ⚠️ Déjà au maximum de 5 AC » est écrit APRÈS l'annonce de la carte Stratégie qu'il
+  commente, plus avant (les deux lignes se contredisaient).
 
 Changements du 16/09 (v10.62, maquettes validées par Marc) :
 - BARRE DU HAUT refaite (« console à voyants ») : trois lignes fixes — médaillon + nation, tour, AC,

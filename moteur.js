@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-16 · v10.62';
+const SOLAR_BUILD_MOTEUR = '2026-09-16 · v10.63';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -88,7 +88,12 @@ const CIVS={
   ceinturiens:{id:'ceinturiens',name:'Ceinturiens',emoji:'☠️',color:'#AB47BC',
     start:{energy:6,materials:4,science:1,morale:2},startForce:3,home:'eris',
     techBonus:'navigation',
-    passive:'Raids coûtent 1 jeton Force (au lieu de 2). +1<i class=ri-energy></i>/tour (réserves de la ceinture). Immunisés contre les pirates.',
+    /* ⚠️ « Raids coûtent 1 jeton au lieu de 2 » RETIRÉ le 16/09 (Marc, après la partie 96F6 : « c'est
+       peut-être un peu fort, il a déjà plusieurs avantages donc supprime ce pouvoir partout où tu le
+       trouves »). Le rabais s'appliquait aussi au SEUIL de jetons exigé pour lancer un assaut — les deux
+       sont partis ensemble. Ce qui reste : +1⚡/tour, immunité aux pirates, Éris et Pluton à 2 VP au
+       niveau 1, et le pouvoir « Commerce avec les pirates ». Banc : server/test_raid_deux_jetons.js. */
+    passive:'+1<i class=ri-energy></i>/tour (réserves de la ceinture). Immunisés contre les pirates.',
     active:{name:'Commerce avec les pirates',desc:'Gratuit, 1×/tour : 75% → +2 ressources aléatoires, 20% → +1, 5% → rien',ac:0,cost:{}}},
 };
 const PLANETS_DECO=[
@@ -4308,6 +4313,7 @@ function _applyStratTo(nat,card){
   if(card.force){nat.forceTokens+=card.force;nat.stratForceBonus=(nat.stratForceBonus||0)+card.force;}
   if(card.forceKeep){nat.forceTokens+=card.forceKeep;} // conservable (non temporaire)
   if(card.warRisk)G.warRisk=Math.max(0,G.warRisk+(card.warRisk));
+  let _avertAC=null;                 // avertissement retenu, écrit APRÈS l'annonce de la carte
   if(card.acBonus||card.spec||card.combatBonus||card.upkeepDiscount){
     nat.stratBonus={acBonus:card.acBonus||0,spec:card.spec||null,combatBonus:card.combatBonus||0,upkeepDiscount:card.upkeepDiscount||0};
     // L'AC est déjà calculé avant le draft → on ajoute ici le bonus AC de la carte Stratégie choisie.
@@ -4318,10 +4324,16 @@ function _applyStratTo(nat,card){
       nat.acMax=Math.min(5,_before+card.acBonus);
       const _gain=nat.acMax-_before;                 // ce qui a VRAIMENT été accordé (0 si déjà à 5)
       nat.acLeft=Math.min(nat.acMax,(nat.acLeft||0)+_gain);
-      if(_gain<=0&&nat===G.player)addLog('⚠️ Déjà au maximum de 5 AC — le bonus de la carte Stratégie ne s\'applique pas.','dim');
+      /* ⚠️ L'AVERTISSEMENT APRÈS L'ANNONCE, PAS AVANT (Marc, 16/09, partie 96F6 T10). On lisait
+         « Déjà au maximum de 5 AC — le bonus ne s'applique pas » PUIS « Stratégie : Mobilisation —
+         +1 AC ce tour » : la mise en garde précédait la carte qu'elle commente, et les deux lignes
+         se contredisaient. Même motif que l'usure de guerre écrite avant la déclaration (§130).
+         On retient la phrase et on l'écrit sous l'annonce. */
+      if(_gain<=0&&nat===G.player)_avertAC='⚠️ Déjà au maximum de 5 AC — le bonus de cette carte ne s\'applique pas.';
     }
   }else nat.stratBonus=null;
   addLog((nat===G.player?'🎯 Stratégie : ':'🎯 '+nat.civ.emoji+' '+nat.civ.name+' — Stratégie : ')+card.name+' — '+card.desc, nat===G.player?'gold':'dim');
+  if(_avertAC)addLog(_avertAC,'dim');
   return false;
 }
 let _selectedStratId=null;
@@ -7236,7 +7248,7 @@ function doRaidTarget(aiId,nodeId,pillard){
   try{
     if(!G||G.phase!=='actions')return;
     var p=pillard||G.player;
-    var tc=p.civ.id==='ceinturiens'?1:2;
+    var tc=2;                       // 16/09 : plus de rabais ceinturien (voir CIVS.ceinturiens)
     var enCost=0;
     /* `G.ais` disait « les autres » : correct par hasard tant que le pillard EST la nation active,
        faux dès qu'on passe un pillard explicite. On cherche parmi toutes les nations sauf lui. */
@@ -7480,7 +7492,7 @@ function attackColony(nodeId,attaquant){
   if(estNoeudPartage(nodeId))addLog('⚔️ '+(node?node.name:nodeId)+' est partagé — l\'assaut rompt la cohabitation.','red');
   /* Capitale assaillable : voir la note dans breakAccordAndAttack(). Sa défense de 10 jetons
      (garrisonOf) suffit à la rendre difficile ; l'interdire n'a plus lieu d'être. */
-  const tc=p.civ.id==='ceinturiens'?1:2;
+  const tc=2;                       // 16/09 : seuil identique pour toutes les nations
   if(p.acLeft<1){addLog('⚠️ Assaut : besoin 1 AC.','red');return;}
   if(engageableTokens(p)<tc){addLog('⚠️ Assaut : besoin d’au moins '+tc+' jeton(s) Force engageable(s) (la garnison ne compte pas).','red');return;}
   if(Math.min(p.res.materials||0,p.res.energy||0)<1){addLog('⚠️ Assaut : il faut du <i class=ri-materials></i> et de l’<i class=ri-energy></i> pour engager des jetons.','red');return;}
@@ -9069,6 +9081,21 @@ function resolveWarCombat(playerCommitted, attaquant){
         const newLvl=capturerNoeud(_atk,targetId);
         txt='🏴 Victoire ! Tu CAPTURES '+NODES[targetId].name+' (Nv.'+newLvl+') — elle est à toi ! (+2 VP, population hostile −2<i class=ri-morale></i>)';
         addLog('🏴 '+NODES[targetId].name+' capturée sur '+_proprio.civ.emoji+' '+_proprio.civ.name+' ! (Nv.'+newLvl+', −2<i class=ri-morale></i> ennemi)','gold');
+        /* ═══ ET ON PRÉVIENT CELUI QUI LA PERD (Marc, 16/09, partie 96F6) ═══
+           « Laurent a pas eu de message au tour 10 en perdant Cérès dans mon attaque, il a pas su
+           qu'il avait perdu la colonie. » Le `txt` ci-dessus est celui de L'ASSAILLANT ; le seul canal
+           qui atteignait le dépossédé était la notice collective `war_result`, envoyée aux deux camps
+           avec le texte du vainqueur préfixé « 👁️ Vu par X ». Laurent lisait donc « Vu par Ceinturiens
+           — Tu CAPTURES Cérès — elle est à toi ! » : rien ne lui disait qu'il la perdait.
+           Le chemin de l'ORDINATEUR prévenait déjà correctement (`doAIAssault`) ; c'est le chemin
+           humain contre humain qui n'avait pas sa notification — celui qui ne sert qu'en ligne.
+           `notifyNationHit` ne fait rien pour une nation tenue par l'ordinateur, et route le message
+           au bon joueur quand une décision est en cours (notice `raid_hit`, individuelle).
+           Banc : server/test_perte_colonie_prevenue.js */
+        try{ notifyNationHit(_proprio,
+          _atk.civ.emoji+' '+_atk.civ.name+' prend '+NODES[targetId].name,
+          'Ta colonie <b>'+NODES[targetId].name+'</b> (Nv.'+newLvl+') tombe — combat '+pPow+' contre '+aPow
+          +'. Tu perds le jeton de garnison et 2<i class=ri-morale></i>.'); }catch(e){}
       }else{txt='Victoire ! (+2 VP, IA −2 jetons, −1<i class=ri-morale></i>)';addLog('⚔️ Combat : victoire ('+pPow+' vs '+aPow+') +2 VP','gold');}
     }else{txt='Victoire ! (+2 VP, IA −2 jetons, −1<i class=ri-morale></i>)';addLog('⚔️ Combat : victoire ('+pPow+' vs '+aPow+') +2 VP','gold');}
     cls='win';
@@ -10001,7 +10028,7 @@ function coupsPossibles(nat){
   }
   /* RAID, ASSAUT, ACCORD — sur chaque colonie adverse, nommément. */
   {
-    const jetons=nat.civ.id==='ceinturiens'?1:2;
+    const jetons=2;                 // 16/09 : seuil identique pour toutes les nations
     for(const o of allPlayers()){
       if(o===nat||!o.civ)continue;
       for(const col of (o.colonies||[])){
@@ -12931,7 +12958,7 @@ function renderRight(){
     return'<span class="ft-dot cd" title="En récupération"></span>';
   }).join('');
   document.getElementById('r-force').innerHTML=`<div class="force-display">${dots}</div>`+
-    `<div class="force-info"><strong>${freeAvail}</strong> engageable(s)${garrison>0?' · '+garrison+' garnison':''}${onRoute>0?' · '+onRoute+' route(s)':''}${onCd>0?' · '+onCd+' récupération':''} | Raid : −1 AC, −${p.civ.id==='ceinturiens'?'1':'2'} jeton(s)</div>`+
+    `<div class="force-info"><strong>${freeAvail}</strong> engageable(s)${garrison>0?' · '+garrison+' garnison':''}${onRoute>0?' · '+onRoute+' route(s)':''}${onCd>0?' · '+onCd+' récupération':''} | Raid : −1 AC, −2 jeton(s)</div>`+
     `<div class="force-legend" style="font-size:.66em;color:#8898b8;margin-top:4px;display:flex;gap:9px;flex-wrap:wrap;align-items:center"><span><span class="ft-dot avail" style="width:9px;height:9px;vertical-align:-1px"></span> dispo</span><span><span class="ft-dot reserved" style="width:9px;height:9px;vertical-align:-1px"></span> garnison colonies</span><span><span class="ft-dot deployed" style="width:9px;height:9px;vertical-align:-1px"></span> routes</span><span><span class="ft-dot cd" style="width:9px;height:9px;vertical-align:-1px"></span> récupération</span></div>`
     /* ═══ CE QUI S'AJOUTE AU COMBAT SANS ÊTRE UN JETON ═══
        Marc, 083E : « dans le comptage des jetons Force, ce serait bien d'ajouter une ligne si on a
@@ -13015,7 +13042,7 @@ function renderActions(){
   {const _bu=document.getElementById('btn-undo');if(_bu)_bu.disabled=!active||undoStack.length===0;}
   document.getElementById('btn-col').classList.toggle('on',mode==='colonize');
   document.getElementById('btn-route').classList.toggle('on',mode==='route');
-  if(active){const p=G.player;const tc=p.civ.id==='ceinturiens'?1:2;document.getElementById('btn-raid').disabled=p.acLeft<1||engageableTokens(p)<tc;}
+  if(active){const p=G.player;const tc=2;document.getElementById('btn-raid').disabled=p.acLeft<1||engageableTokens(p)<tc;}
   else document.getElementById('btn-raid').disabled=true;
 }
 /* ══════════════════════════════════════════════════════════════════════════════════════════════
@@ -13093,11 +13120,11 @@ function showNodePopup(nodeId){
       const accordOk=!_accBlocked&&G.player.acLeft>=1&&(G.player.res.materials||0)>=2;
       const _accTitle=_accBlocked?(_atWar?'Impossible — en guerre':'Tensions trop élevées ('+_tens+'/10)'):'1AC · 2<i class=ri-materials></i> donnés';
       acts.innerHTML+=`<button class="npop-btn" ${accordOk?'':'disabled'} onclick="showAccordInfo('${nodeId}')">🤝 Accord Commercial<br><small>${_accTitle}</small></button>`;
-      const tc=G.player.civ.id==='ceinturiens'?1:2;const atkOk=G.player.acLeft>=1&&G.player.forceTokens>=tc;
+      const tc=2;const atkOk=G.player.acLeft>=1&&G.player.forceTokens>=tc;
       acts.innerHTML+=`<button class="npop-btn" style="border-color:#9a1a1a;color:#ff8888" ${atkOk?'':'disabled'} onclick="attackColony('${nodeId}')">💥 Attaquer<br><small>1AC -${tc}⚔ — DÉCLENCHE GUERRE</small></button>`;
     }else{
       // Accord actif : commerce & transit autorisés, PAS de colonisation partagée. On peut rompre l'accord pour attaquer.
-      const tc=G.player.civ.id==='ceinturiens'?1:2;const atkOk=G.player.acLeft>=1&&G.player.forceTokens>=tc;
+      const tc=2;const atkOk=G.player.acLeft>=1&&G.player.forceTokens>=tc;
       acts.innerHTML+=`<div style="font-size:.82em;color:#9ad89a;margin:4px 0">🤝 Accord actif — commerce & transit autorisés.</div>`;
       /* ⚠️ CE BOUTON ÉTAIT ÉCRIT DEUX FOIS. Le second, sous un `if(!G.warState)`, appelait exactement
          la même fonction avec un libellé différent : hors guerre, la fenêtre affichait donc DEUX
@@ -13115,7 +13142,7 @@ function showNodePopup(nodeId){
   if(pCol||nodeId===G.player.civ.home){const _rc=routeCost(G.player);const ac=_rc.ac,mat=_rc.mat,force=_rc.force||0;for(const adj of node.conn){const already=G.player.routes.find(r=>(r.from===nodeId&&r.to===adj)||(r.from===adj&&r.to===nodeId));if(!already){const ok=G.player.acLeft>=ac&&(G.player.res.materials||0)>=mat&&G.player.forceTokens>=force;acts.innerHTML+=`<button class="npop-btn" ${ok?'':'disabled'} onclick="doEstablishRoute('${nodeId}','${adj}');closePopup();render()">🛤 → ${NODES[adj].emoji} ${NODES[adj].name}<br><small>−${ac} AC −${mat}<i class=ri-materials></i>${force>0?' −'+force+' jeton(s)':''}</small></button>`;}}}
   // Raid contextuel : disponible sur toute colonie ennemie présente sur ce nœud
   if(aCol&&aColAI&&G.phase==='actions'){
-    const _rtc=G.player.civ.id==='ceinturiens'?1:2;
+    const _rtc=2;
     const _renC=0; // v18 : raids sans coût énergie
     const _rok=G.player.acLeft>=1&&G.player.forceTokens>=_rtc;
     /* Une colonie ne se pille qu'une fois par tour, par qui que ce soit (Marc, 04/09) : le bouton
@@ -13529,7 +13556,7 @@ function rejectPeace(){
   _showAssaultPicker(ai,cols);
 }
 function _showAssaultPicker(ai,cols){
-  const p=G.player; const tc=p.civ.id==='ceinturiens'?1:2; const avail=p.forceTokens||0; const canAssault=avail>=tc;
+  const p=G.player; const tc=2; const avail=p.forceTokens||0; const canAssault=avail>=tc;
   document.getElementById('wcm-sub').textContent='⚔️ Guerre vs '+ai.civ.emoji+' '+ai.civ.name+' — choisis une colonie à assaillir ce tour :';
   document.getElementById('wcm-info').innerHTML=
     '<div style="margin-bottom:8px;font-size:.85em;color:'+(canAssault?'#9ad89a':'#ff9a9a')+'">⚔️ Jetons Force disponibles : <strong>'+avail+'</strong> · un assaut coûte '+tc+' jeton(s)'+(canAssault?'':' — insuffisant : tu ne peux pas assaillir de colonie ce tour')+'</div>'
@@ -14482,7 +14509,7 @@ function _scCanPlayerAct(){
     }
   }
   // b) raid possible (coûte des jetons Force, pas de ressources)
-  const tokCost = (p.civ.id==='ceinturiens')?1:2;
+  const tokCost = 2;
   if((p.acLeft||0)>=1 && (p.forceTokens||0)>=tokCost && G.ais && G.ais.length>0) return true;
   return false;                                                  // vraiment rien à faire ce tour
 }

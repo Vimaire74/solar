@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-09-16 · v10.62';</script>
+<script>window.SOLAR_BUILD_HTML='2026-09-16 · v10.63';</script>
 <script>/* Taille du texte mémorisée (menu Journal → Aa) : appliquée avant le premier rendu, sans à-coup. */
 (function(){try{var t=localStorage.getItem('sc_taille');var m={'11':'14','13':'16','15':'18','17':'20'};if(m[t]){t=m[t];localStorage.setItem('sc_taille',t);}if(t&&/^(14|16|18|20)$/.test(t))document.documentElement.style.setProperty('--sc-fs',t+'px');}catch(e){}})();</script><!-- ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE : celle-ci, `SOLAR_BUILD_JS` (online.js) et `SOLAR_BUILD_MOTEUR` (moteur.js). Surveillé par test_versions.js. -->
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
@@ -511,17 +511,25 @@ body.modal-lock #btn-ability,body.modal-lock #btn-undo,body.modal-lock #btn-col,
 .atk-cancel{padding:8px 14px;background:none;border:1px solid #2a3a5a;color:#7880a0;border-radius:7px;cursor:pointer;font-size:.88em}
 /* Defense modal (IA defender — pour futur mode 2 joueurs, pour l'instant IA auto) */
 #eot-modal{position:fixed;inset:0;background:rgba(4,4,18,.82);backdrop-filter:blur(5px);z-index:300;display:flex;align-items:center;justify-content:center}
-.eot-card{background:#0c0c24;border:2px solid #2a3a6a;border-radius:14px;padding:22px 26px;max-width:490px;width:92%;max-height:82vh;overflow-y:auto;box-shadow:0 18px 56px rgba(0,0,0,.92)}
+.eot-card{background:#0c0c24;border:2px solid #2a3a6a;border-radius:14px;padding:22px 26px;max-width:490px;width:92%;max-height:82vh;overflow-y:auto;overflow-x:hidden;box-shadow:0 18px 56px rgba(0,0,0,.92)}
 .eot-title{font-size:1.25em;font-weight:700;color:#ffd700;text-align:center;margin-bottom:16px;letter-spacing:1px}
 .eot-section{margin-bottom:14px}
 .eot-section h4{font-size:.7em;text-transform:uppercase;color:#7880a0;letter-spacing:1px;margin-bottom:7px;border-bottom:1px solid #1a1a3a;padding-bottom:4px}
-.eot-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #0f0f22;font-size:.8em;line-height:1.4}
+/* ⚠️ UNE LIGNE DE BILAN NE DOIT JAMAIS SORTIR DU CADRE (Marc, 16/09, partie 96F6).
+   `.eot-gain` portait `white-space:nowrap`, et aucun enfant n'avait `min-width:0` : un élément
+   flex ne rétrécit pas sous sa largeur de contenu. Avec la description de l'IA de Navigation
+   (« +2 jetons Force. Coût de guerre ÷2 (division exacte : …) »), la ligne mesurait 940 px dans
+   une carte de 378 px — mesuré au banc. Désormais : la ligne peut passer à la ligne, chaque
+   enfant peut rétrécir, et seul le COÛT (court par nature : « −1 AC 3🔬 1⚡ ») reste insécable.
+   Banc : server/pw_bench_bilan_largeur.js */
+.eot-item{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 0;border-bottom:1px solid #0f0f22;font-size:.8em;line-height:1.4}
+.eot-item>*{min-width:0}
 .eot-item:last-child{border-bottom:none}
 .eot-icon{font-size:1.2em;flex-shrink:0;width:22px;text-align:center}
-.eot-name{flex:1;font-weight:600;color:#c8d8f8}
-.eot-paid{color:#ff8888;font-size:.85em;white-space:nowrap}
-.eot-gain{color:#88e888;font-size:.85em;white-space:nowrap}
-.eot-desc{color:#6878a0;font-size:.78em}
+.eot-name{flex:1 1 auto;font-weight:600;color:#c8d8f8;overflow-wrap:anywhere}
+.eot-paid{color:#ff8888;font-size:.85em;white-space:nowrap;flex:0 0 auto}
+.eot-gain{color:#88e888;font-size:.85em;flex:1 1 150px;overflow-wrap:anywhere;text-align:right}
+.eot-desc{color:#6878a0;font-size:.78em;flex:1 1 100%;overflow-wrap:anywhere}
 .eot-empty{color:#5a6a8a;font-size:.76em;font-style:italic}
 .eot-btn{display:block;width:100%;margin-top:18px;padding:12px;background:linear-gradient(135deg,#1a5a1a,#0d3a0d);border:1px solid #3a8a3a;color:#88cc88;border-radius:8px;font-size:1em;font-weight:700;cursor:pointer;text-align:center}
 .eot-btn:hover{background:linear-gradient(135deg,#256625,#1a4a1a)}
@@ -665,9 +673,14 @@ body{max-width:var(--appw,480px);margin:0 auto;height:100dvh;height:100vh;positi
    toucher au reste de la mise en page. `calc(50% - 50vw)` est la marge négative qui
    ramène le bord gauche du bloc au bord gauche de l'écran, quelle que soit la
    largeur de la colonne — donc valable sur téléphone, tablette et ordinateur. */
-/* La carte prend toute la largeur de la fenêtre ; les menus et les cartes tech gardent la colonne
-   étroite, où leur mise en page a été pensée. Élargir le CADRE seul ne servait à rien : `body` porte
-   `overflow:hidden` et coupait tout ce qui dépassait de la colonne. */
+/* ⚠️ PLUS DE SAUT DE LARGEUR ENTRE LA CARTE ET LES AUTRES ONGLETS (Marc, 16/09, partie 96F6 :
+   « la fenêtre est normalement large avec la carte mais se réduit pour être de la taille d'un
+   écran de téléphone pour les autres menus »). Mesuré à 1280 px : carte 1280, les quatre autres
+   480. La carte gardait sa règle à part depuis qu'elle a eu droit à toute la fenêtre ; depuis
+   v10.62 les barres du haut et du bas suivent `--appw`, et le saut se voyait sur tout l'écran.
+   Désormais la largeur est la MÊME partout (voir le bloc « v10.62 » en fin de feuille, qui la fixe
+   sur grand écran) ; ce qui reste propre à la vue carte est son fond bord à bord.
+   Sur téléphone rien ne change : `--appw` y vaut déjà la largeur de l'écran. */
 body.vue-carte{--appw:100vw;}
 body.vue-carte #bottom-bar{border-radius:0;}
 #mp-map.active{position:relative;}   /* repère pour les boutons de zoom, ancrés au panneau */
@@ -1132,9 +1145,15 @@ body{font-size:var(--sc-fs,16px);}
 .td-close{font-family:var(--font-titre);font-size:.62em;letter-spacing:.1em;text-transform:uppercase;border-radius:12px;min-height:44px;border-color:#33386b;color:#9aa3c7;background:#0b0d24}
 /* ─── Fond étoilé autour de la colonne de jeu sur grand écran (point 7) ─── */
 @media (min-width:600px){
-  /* Les barres fixes suivent la colonne de jeu (480 px, ou toute la largeur en vue carte) au lieu de
-     traverser tout l'écran : le fond étoilé s'affiche autour. Pas de transform ici (le suivi du
-     pinch-zoom en pose un). */
+  /* ─── UNE SEULE LARGEUR POUR TOUS LES ONGLETS (16/09) ───
+     La carte a besoin de place, les textes non : on donne la MÊME largeur de cadre à tout le monde
+     (plafonnée — au-delà, une carte plus large n'apporte rien et les lignes deviennent illisibles),
+     et on limite la largeur de LECTURE à l'intérieur des trois panneaux de texte. Plus de saut au
+     changement d'onglet, et les barres, qui suivent `--appw`, ne bougent plus non plus. */
+  :root,body,body.vue-carte{--appw:min(100vw,1100px);}
+  #mp-journal>*,#mp-empire #right-panel,#mp-diplo #left-panel{max-width:640px;margin-left:auto;margin-right:auto;}
+  /* Les barres fixes suivent la colonne de jeu au lieu de traverser tout l'écran : le fond étoilé
+     s'affiche autour. Pas de transform ici (le suivi du pinch-zoom en pose un). */
   #top-bar,#bottom-bar{left:max(0px,calc(50vw - var(--appw,480px)/2));right:max(0px,calc(50vw - var(--appw,480px)/2));}
   html{background-color:#020208;background-image:
     radial-gradient(1px 1px at 13px 27px,rgba(255,255,255,.75) 50%,transparent 51%),
