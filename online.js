@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-16 · v10.67';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-17 · v10.70';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -1208,7 +1208,9 @@ function installIntercepts(){
              sur la nation appelle `applyCalmTension`, interceptée → envoyée au serveur avec la cible.
              Avant, `buyMarket('cm_calm')` partait tel quel au serveur, qui n'a pas d'écran pour la
              fenêtre de choix et plantait (TypeError) : la carte n'a jamais marché en ligne (D538). */
-          if(fn==='buyMarket'){ try{ const c=(typeof CIVIC_MARKET!=='undefined')?CIVIC_MARKET.find(x=>x.id===arguments[0]):null; if(c&&c.calmAction){ return orig.apply(this, arguments); } }catch(e){} }
+          /* Même chemin pour la Mission diplomatique (cm_diplomatie, 17/09) : fenêtre de choix locale,
+             puis `applyCalmTension(id,'civic_diplo')` part au serveur, qui applique `diplomatieCivique`. */
+          if(fn==='buyMarket'){ try{ const c=(typeof CIVIC_MARKET!=='undefined')?CIVIC_MARKET.find(x=>x.id===arguments[0]):null; if(c&&(c.calmAction||c.diploAction)){ return orig.apply(this, arguments); } }catch(e){} }
           const action=INTENT_MAP[fn](Array.prototype.slice.call(arguments));
           if(!action) return; // interception annulée (ex. modale d'attaque vide)
           // Forge Orbitale : la version LOCALE de _forgeUpgrade fermait la modale de choix de lune ; comme on

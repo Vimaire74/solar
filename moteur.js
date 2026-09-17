@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-16 · v10.67';
+const SOLAR_BUILD_MOTEUR = '2026-09-17 · v10.70';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -62,12 +62,6 @@ const TECH_BRANCHES={
   mines_energie:{label:'Mines & Énergie',emoji:'⛏️',civBonus:'jupiteriens',color:'#FFA726'},
   empathes:{label:'Empathes',emoji:'🔮',civBonus:null,color:'#CE93D8'},
 };
-const MAP_PANELS=[
-  {name:'Zone Interne',vb:'0 0 390 320'},
-  {name:'Zone Joviène',vb:'370 50 255 240'},
-  {name:'Zone Saturnienne',vb:'570 50 235 240'},
-  {name:'Zone Externe',vb:'700 50 295 245'},
-];
 const PIRATE_PATH=['eris','pluto','triton','titan','ganymede','callisto','vesta','ceres'];
 const CIVS={
   terriens:{id:'terriens',name:'Terriens',emoji:'🌍',color:'#4CAF50',
@@ -96,59 +90,70 @@ const CIVS={
     passive:'+1<i class=ri-energy></i>/tour (réserves de la ceinture). Immunisés contre les pirates.',
     active:{name:'Commerce avec les pirates',desc:'Gratuit, 1×/tour : 75% → +2 ressources aléatoires, 20% → +1, 5% → rien',ac:0,cost:{}}},
 };
+/* ═══ LE PLATEAU (v10.70, Marc 17/09 — REPRISE §141) : QUART DE DISQUE, SOLEIL EN BAS À GAUCHE ═══
+   Le Soleil est en `MAP_SUN` (coin inférieur gauche du carré 1920 × 1920) et chaque corps est à une
+   distance du Soleil qui suit le LOGARITHME de sa distance réelle : r = 500 + 340 · ln(UA).
+   L'ordre et les rapports sont donc vrais (Pluton au-delà de Neptune, Éris hors de Kuiper), ce que
+   l'ancienne bande ne respectait pas. L'ANGLE, lui, est libre — les planètes ne sont jamais
+   alignées — et on le choisit pour la lecture des routes. Les lunes sont des ENCARTS hors échelle
+   autour de leur planète, seul leur ORDRE est respecté : à l'échelle, Callisto serait à 26 rayons
+   de Jupiter et la Lune à 60 rayons de la Terre.
+   `ua` et `deg` sont l'origine des `x,y` (calculés dans prototype_carte_quart.html) ; `x,y` sont
+   écrits en clair pour que le moteur n'ait rien à calculer et que les bancs lisent des nombres.
+   `r` est le rayon DESSINÉ : les quatre géantes sont à l'échelle entre elles (Jupiter 62, Saturne
+   52, Uranus 26, Neptune 25), les rocheuses sont grossies sinon elles disparaissent. `lunes` sert
+   à tracer le cercle d'encart et `nation` le fanion de capitale (si la nation joue).
+   ⚠️ Les coordonnées des NŒUDS (table NODES) suivent la même logique : planète + décalage de lune
+   (Lune +66,−36 · Phobos −78,+58 · Déimos −37,−81 · Io −184,−29 · Europe −89,−190 · Ganymède
+   +80,−221 · Callisto +231,−108 · Encelade −150,−60 · Titan +110,−220 · Triton −60,−130). Les lunes
+   de Jupiter sont sur un ARC d'un même côté, à 190–255 de la planète : plus près, les « + » des
+   routes internes tombaient sur les lunes voisines, et des lunes de part et d'autre font passer
+   leurs routes À TRAVERS Jupiter. Une route qui frôle un disque est contournée AUTOMATIQUEMENT
+   (voir `routeGeom`), il n'y a plus de réglage à la main. */
 const PLANETS_DECO=[
-  {name:'Mercure',color:'#B0A090',x:150,y:440,r:10,img:'mercure',ir:20},{name:'Vénus',color:'#E0C060',x:250,y:315,r:16,img:'venus',ir:33},
-  {name:'Terre',color:'#4CAF50',x:375,y:520,r:18,img:'terre',ir:35},{name:'Mars',color:'#ef5350',x:515,y:300,r:14,img:'mars',ir:29},
-  {name:'Jupiter',color:'#FF9800',x:960,y:330,r:30,img:'jupiter',ir:62},{name:'Saturne',color:'#FFD54F',x:1120,y:545,r:28,img:'saturne',ir:56},
-  {name:'Uranus',color:'#80DEEA',x:1460,y:315,r:16,img:'uranus',ir:32},{name:'Neptune',color:'#3F51B5',x:1660,y:505,r:15,img:'neptune',ir:31},
+  {id:'mercure',name:'Mercure',color:'#B0A090',ua:0.39,deg:55,x:153,y:1723,r:10,info:'0,39 UA · 88 j'},
+  {id:'venus',name:'Vénus',color:'#E0C060',ua:0.72,deg:25,x:402,y:1706,r:19,info:'0,72 UA · 225 j'},
+  {id:'terre',name:'Terre',color:'#4CAF50',ua:1,deg:70,x:221,y:1400,r:20,info:'1 UA · 365 j',nation:'Terriens',lunes:['lune']},
+  {id:'mars',name:'Mars',color:'#ef5350',ua:1.52,deg:35,x:576,y:1502,r:13,info:'1,52 UA · 687 j',nation:'Martiens',lunes:['phobos','deimos']},
+  {id:'jupiter',name:'Jupiter',color:'#FF9800',ua:5.2,deg:45,x:800,y:1120,r:62,info:'5,2 UA · 11,9 ans',nation:'Jupitériens',lunes:['io','europe','ganymede','callisto']},
+  {id:'saturne',name:'Saturne',color:'#FFD54F',ua:9.5,deg:22,x:1223,y:1396,r:52,info:'9,5 UA · 29,5 ans',ring:true,lunes:['encelade','titan']},
+  {id:'uranus',name:'Uranus',color:'#80DEEA',ua:19.2,deg:60,x:802,y:567,r:26,info:'19,2 UA · 84 ans'},
+  {id:'neptune',name:'Neptune',color:'#3F51B5',ua:30.1,deg:40,x:1320,y:805,r:25,info:'30,1 UA · 165 ans',lunes:['triton']},
 ];
-/* ⚠️ LES COORDONNÉES DE CETTE TABLE SONT AUSSI LA MISE EN PAGE DE LA CARTE SYSTÈME.
-   Déplacer un nœud ne change aucune règle, mais change ce que le joueur peut LIRE : les routes sont
-   des segments entre ces points, et les planètes décoratives (`PLANETS_DECO`) sont des disques que
-   ces segments peuvent traverser. Trois repositionnements le 2026-08-14, à la demande de Marc qui
-   regardait la carte en direct, chacun vérifié par le calcul de la distance segment↔disque :
-     · Phobos 552,282 → 555,260 — monté de 22 px. Sa route vers Déimos frôlait Mars à 3 px du
-       centre (rayon 29) : elle passe maintenant à 14. Celle vers la Lune traversait déjà Mars
-       avant ce changement (20 px) et y reste — c'est le prix à payer pour monter Phobos, la Lune
-       étant très en dessous à gauche.
-     · Europe 1060,352 → 1072,266 — la route depuis Vesta traversait le disque de Jupiter (17 px du
-       centre, rayon 62). Elle passe désormais à 77, soit 15 px au-dessus du bord.
-     · Callisto 1052,425 → 1052,397 — montée plus modestement : la route Ganymède→Titan passait à
-       21 px de Callisto (rayon 16), elle passe à 43. Les deux voies vers Titan se distinguent. */
 const NODES={
   // strategic:'full'=+1jeton/tour / 'half'=50%
   // Colonisation colonie 'remote' → −1<i class=ri-morale></i> one-time | Niv.1 → +1<i class=ri-morale></i> toutes | Niv.2 → +1<i class=ri-morale></i> si attractive, +2<i class=ri-morale></i> Callisto
   // ATTRACTIVE_COLS=['lune','europe','titan','encelade','triton']
-  lune:{id:'lune',name:'Lune',emoji:'🌕',color:'#B0BEC5',type:'moon',baseVP:2,maxLv:3,r:15,strategic:'half',res:{energy:1,materials:2},x:420,y:475,conn:['phobos','ceres','deimos','io','vesta'],desc:'Satellite terrestre. Vue sur la Terre — habitat confortable.'},
-  phobos:{id:'phobos',name:'Phobos',emoji:'⚫',color:'#8D6E63',type:'moon',baseVP:2,maxLv:3,r:11,strategic:'half',res:{energy:1,materials:2},x:555,y:260,conn:['lune','deimos','ceres','vesta'],desc:'Lune intérieure de Mars. Proche des routes de propulsion.'},
-  deimos:{id:'deimos',name:'Déimos',emoji:'🟤',color:'#795548',type:'moon',baseVP:1,maxLv:3,r:12,strategic:null,res:{materials:1},x:452,y:322,conn:['phobos','lune'],desc:'Petite lune aride de Mars. Conditions difficiles.'},
-  ceres:{id:'ceres',name:'Cérès',emoji:'⬜',color:'#CFD8DC',type:'dwarf_planet',baseVP:3,maxLv:3,r:21,strategic:'full',res:{energy:1,materials:3},x:625,y:548,conn:['lune','phobos','vesta','io','ganymede'],desc:'Hub de la ceinture d\'astéroïdes. Carrefour stratégique des routes.'},
-  vesta:{id:'vesta',name:'Vesta',emoji:'🪨',color:'#78909C',type:'asteroid',baseVP:2,maxLv:3,r:17,strategic:null,res:{materials:2},x:715,y:212,conn:['ceres','ganymede','phobos','io','europe','lune'],desc:'Grand astéroïde métallique. Éloigné des routes principales.'},
-  io:{id:'io',name:'Io',emoji:'🟡',color:'#FFD54F',type:'moon',baseVP:3,maxLv:3,r:15,strategic:'half',res:{energy:3,materials:1},x:862,y:328,conn:['ceres','europe','ganymede','vesta','lune'],desc:'Lune volcanique. Énergie géothermique intense.'},
-  europe:{id:'europe',name:'Europe',emoji:'🔵',color:'#42a5f5',type:'moon',baseVP:4,maxLv:3,r:15,strategic:null,res:{energy:1,materials:1},x:1072,y:266,conn:['io','callisto','titan','vesta','pluto'],desc:'Océan sous-glaciaire. Paysage saisissant sous Jupiter. Radiation intense.'},
-  ganymede:{id:'ganymede',name:'Ganymède',emoji:'🟤',color:'#A1887F',type:'moon',baseVP:4,maxLv:3,r:18,strategic:'full',res:{energy:1,materials:2},x:922,y:432,conn:['io','vesta','callisto','titan','ceres'],desc:'Plus grande lune du système. Hub jovien majeur, carrefour de routes.'},
-  callisto:{id:'callisto',name:'Callisto',emoji:'🔘',color:'#607D8B',type:'moon',baseVP:3,maxLv:3,r:16,strategic:'half',res:{energy:1,materials:2},x:1052,y:397,conn:['europe','ganymede','titan'],desc:'Hors de la radiation jovienne. Meilleur habitat humain du système jovien.'},
+  lune:{id:'lune',name:'Lune',emoji:'🌕',color:'#B0BEC5',type:'moon',baseVP:2,maxLv:3,r:15,strategic:'half',res:{energy:1,materials:2},x:287,y:1364,conn:['phobos','ceres','deimos','io'],desc:'Satellite terrestre. Vue sur la Terre — habitat confortable.'},
+  phobos:{id:'phobos',name:'Phobos',emoji:'⚫',color:'#8D6E63',type:'moon',baseVP:2,maxLv:3,r:11,strategic:'half',res:{energy:1,materials:2},x:498,y:1560,conn:['lune','deimos','ceres','vesta'],desc:'Lune intérieure de Mars. Proche des routes de propulsion.'},
+  deimos:{id:'deimos',name:'Déimos',emoji:'🟤',color:'#795548',type:'moon',baseVP:1,maxLv:3,r:12,strategic:null,res:{materials:1},x:539,y:1421,conn:['phobos','lune'],desc:'Petite lune aride de Mars. Conditions difficiles.'},
+  ceres:{id:'ceres',name:'Cérès',emoji:'⬜',color:'#CFD8DC',type:'dwarf_planet',baseVP:3,maxLv:3,r:21,strategic:'full',res:{energy:1,materials:3},info:'2,77 UA · 4,6 ans',x:421,y:1109,conn:['lune','phobos','vesta','io','ganymede'],desc:'Hub de la ceinture d\'astéroïdes. Carrefour stratégique des routes.'},
+  vesta:{id:'vesta',name:'Vesta',emoji:'🪨',color:'#78909C',type:'asteroid',baseVP:2,maxLv:3,r:17,strategic:null,res:{materials:2},info:'2,36 UA · 3,6 ans',x:825,y:1705,conn:['ceres','ganymede','phobos','io','encelade'],desc:'Grand astéroïde métallique. Éloigné des routes principales.'},
+  io:{id:'io',name:'Io',emoji:'🟡',color:'#FFD54F',type:'moon',baseVP:3,maxLv:3,r:15,strategic:'half',res:{energy:3,materials:1},x:616,y:1091,conn:['ceres','europe','ganymede','vesta','lune'],desc:'Lune volcanique. Énergie géothermique intense.'},
+  europe:{id:'europe',name:'Europe',emoji:'🔵',color:'#42a5f5',type:'moon',baseVP:4,maxLv:3,r:15,strategic:null,res:{energy:1,materials:1},x:711,y:930,conn:['io','callisto','titan','pluto'],desc:'Océan sous-glaciaire. Paysage saisissant sous Jupiter. Radiation intense.'},
+  ganymede:{id:'ganymede',name:'Ganymède',emoji:'🟤',color:'#A1887F',type:'moon',baseVP:4,maxLv:3,r:18,strategic:'full',res:{energy:1,materials:2},x:880,y:899,conn:['io','vesta','callisto','titan','ceres','triton'],desc:'Plus grande lune du système. Hub jovien majeur, carrefour de routes.'},
+  callisto:{id:'callisto',name:'Callisto',emoji:'🔘',color:'#607D8B',type:'moon',baseVP:3,maxLv:3,r:16,strategic:'half',res:{energy:1,materials:2},x:1031,y:1012,conn:['europe','ganymede','titan','encelade'],desc:'Hors de la radiation jovienne. Meilleur habitat humain du système jovien.'},
   /* ⚠️ « STATION JUPITER » N'EST PLUS QU'UN DESSIN (2026-08-07, décision de Marc).
-     Elle n'est pas SUPPRIMÉE de la table des nœuds, et c'est délibéré : c'est elle qui DESSINE la
-     planète Jupiter sur la carte tactique (`mapImg` la traduit en image `jupiter`, `MAP_RAD` lui
-     donne son rayon de 42). L'effacer ferait disparaître Jupiter de la carte, ce qui n'est pas ce
-     qui était demandé — la base jupitérienne est désormais Io, mais Jupiter doit rester visible.
+     Elle n'est pas SUPPRIMÉE de la table des nœuds, et c'est délibéré (des sauvegardes et des bancs
+     la connaissent). Depuis v10.70 Jupiter est dessinée par `PLANETS_DECO` (vecteur) : cette
+     entrée n'est plus dessinée du tout, ses coordonnées sont celles de Jupiter par cohérence.
+     La base jupitérienne est Io.
      Elle devient donc `decorative` comme les anneaux : aucune ressource, aucun revenu, aucune route
      possible à travers elle, exclue de tous les calculs. Un décor, rien de plus.
      À noter : elle portait déjà `noColonize`, donc personne ne pouvait la posséder — l'exception
      d'entretien jovienne qu'on vient de retirer ne s'appliquait en réalité à RIEN. */
-  jorbital1:{id:'jorbital1',name:'Jupiter',emoji:'🟠',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:16,strategic:null,noColonize:true,decorative:true,res:{},x:960,y:415,conn:[],desc:'Géante gazeuse — non colonisable. La base jupitérienne est Io.'},
-  jorbital2:{id:'jorbital2',name:'Anneau J-2',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:421,y:159,conn:['jorbital1','jorbital3'],desc:'Territoire jovien — non colonisable.'},
-  jorbital3:{id:'jorbital3',name:'Anneau J-3',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:429,y:194,conn:['jorbital2','jorbital4'],desc:'Territoire jovien — non colonisable.'},
-  jorbital4:{id:'jorbital4',name:'Anneau J-4',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:406,y:223,conn:['jorbital3','jorbital5'],desc:'Territoire jovien — non colonisable.'},
-  jorbital5:{id:'jorbital5',name:'Anneau J-5',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:370,y:223,conn:['jorbital4','jorbital6'],desc:'Territoire jovien — non colonisable.'},
-  jorbital6:{id:'jorbital6',name:'Anneau J-6',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:347,y:194,conn:['jorbital5','jorbital7'],desc:'Territoire jovien — non colonisable.'},
-  jorbital7:{id:'jorbital7',name:'Anneau J-7',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:355,y:159,conn:['jorbital6','jorbital1'],desc:'Territoire jovien — non colonisable.'},
-  titan:{id:'titan',name:'Titan',emoji:'🌫️',color:'#FF8F00',type:'moon',baseVP:5,maxLv:3,r:18,strategic:'full',res:{energy:2,materials:1},x:1400,y:485,conn:['ganymede','callisto','encelade','triton','europe','pluto'],desc:'Hydrocarbures atmosphériques. Paysage orange unique. Hub saturnien.'},
-  encelade:{id:'encelade',name:'Encelade',emoji:'❄️',color:'#E0F7FA',type:'moon',baseVP:3,maxLv:3,r:14,strategic:null,res:{energy:1,materials:1},x:1325,y:580,conn:['titan','triton'],desc:'Geysers spectaculaires. Lune éloignée dans l\'ombre de Saturne.'},
-  triton:{id:'triton',name:'Triton',emoji:'💜',color:'#7C4DFF',type:'moon',baseVP:4,maxLv:3,r:16,strategic:'half',res:{energy:1,materials:1},x:1745,y:620,conn:['titan','pluto','eris','encelade'],desc:'Lune rétrograde de Neptune. Paysage unique — carrefour vers Kuiper.'},
-  pluto:{id:'pluto',name:'Pluton',emoji:'🩶',color:'#90A4AE',type:'dwarf_planet',baseVP:4,maxLv:3,r:15,strategic:null,res:{materials:1},x:1590,y:215,conn:['triton','eris','titan','europe'],desc:'Porte de la ceinture de Kuiper. Très éloigné, conditions extrêmes.'},
-  eris:{id:'eris',name:'Éris',emoji:'⬡',color:'#B0BEC5',type:'dwarf_planet',baseVP:5,maxLv:3,r:17,strategic:null,res:{materials:1,energy:1},x:1790,y:190,conn:['pluto','triton'],desc:'Aux confins du système solaire. Avant-poste visible d\'un réseau de colonies dispersées dans la Ceinture — VP élevés.'},
+  jorbital1:{id:'jorbital1',name:'Jupiter',emoji:'🟠',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:16,strategic:null,noColonize:true,decorative:true,res:{},x:800,y:1120,conn:[],desc:'Géante gazeuse — non colonisable. La base jupitérienne est Io.'},
+  jorbital2:{id:'jorbital2',name:'Anneau J-2',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:800,y:1120,conn:['jorbital1','jorbital3'],desc:'Territoire jovien — non colonisable.'},
+  jorbital3:{id:'jorbital3',name:'Anneau J-3',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:800,y:1120,conn:['jorbital2','jorbital4'],desc:'Territoire jovien — non colonisable.'},
+  jorbital4:{id:'jorbital4',name:'Anneau J-4',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:800,y:1120,conn:['jorbital3','jorbital5'],desc:'Territoire jovien — non colonisable.'},
+  jorbital5:{id:'jorbital5',name:'Anneau J-5',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:800,y:1120,conn:['jorbital4','jorbital6'],desc:'Territoire jovien — non colonisable.'},
+  jorbital6:{id:'jorbital6',name:'Anneau J-6',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:800,y:1120,conn:['jorbital5','jorbital7'],desc:'Territoire jovien — non colonisable.'},
+  jorbital7:{id:'jorbital7',name:'Anneau J-7',emoji:'🛸',color:'#FFB74D',type:'orbital_station',baseVP:0,maxLv:1,r:2,strategic:null,res:{},decorative:true,x:800,y:1120,conn:['jorbital6','jorbital1'],desc:'Territoire jovien — non colonisable.'},
+  titan:{id:'titan',name:'Titan',emoji:'🌫️',color:'#FF8F00',type:'moon',baseVP:5,maxLv:3,r:18,strategic:'full',res:{energy:2,materials:1},x:1333,y:1176,conn:['ganymede','callisto','encelade','triton','europe','pluto'],desc:'Hydrocarbures atmosphériques. Paysage orange unique. Hub saturnien.'},
+  encelade:{id:'encelade',name:'Encelade',emoji:'❄️',color:'#E0F7FA',type:'moon',baseVP:3,maxLv:3,r:14,strategic:null,res:{energy:1,materials:1},x:1073,y:1336,conn:['titan','triton','vesta','callisto'],desc:'Geysers spectaculaires. Lune éloignée dans l\'ombre de Saturne.'},
+  triton:{id:'triton',name:'Triton',emoji:'💜',color:'#7C4DFF',type:'moon',baseVP:4,maxLv:3,r:16,strategic:'half',res:{energy:1,materials:1},x:1260,y:675,conn:['titan','pluto','eris','encelade','ganymede'],desc:'Lune rétrograde de Neptune. Paysage unique — carrefour vers Kuiper.'},
+  pluto:{id:'pluto',name:'Pluton',emoji:'🩶',color:'#90A4AE',type:'dwarf_planet',baseVP:4,maxLv:3,r:15,strategic:null,res:{materials:1},info:'39,5 UA · 248 ans',x:503,y:180,conn:['triton','eris','titan','europe'],desc:'Porte de la ceinture de Kuiper. Très éloigné, conditions extrêmes.'},
+  eris:{id:'eris',name:'Éris',emoji:'⬡',color:'#B0BEC5',type:'dwarf_planet',baseVP:5,maxLv:3,r:17,strategic:null,res:{materials:1,energy:1},info:'67,8 UA · 559 ans',x:1417,y:503,conn:['pluto','triton'],desc:'Aux confins du système solaire. Avant-poste visible d\'un réseau de colonies dispersées dans la Ceinture — VP élevés.'},
 };
 /* ⚠️ CETTE TABLE APLATISSAIT LES BRANCHES, et le renommage du 26/08 l'a mise à nu.
    Elle donnait une couleur par `type` : toutes les cartes marquées `technology` — Navigation,
@@ -439,8 +444,22 @@ const CIVIC_MARKET=[
    effect:'+2<i class=ri-morale></i> +1<i class=ri-science></i> immédiat (1× la partie)', desc:'Bien-être et éducation publique.',
    resGain:{morale:2,science:1}, cost:{materials:2}},
   {id:'cm_calm', name:'Calmer la Population', emoji:'🕊️', type:'social', repeatable:true,
-   effect:'+1<i class=ri-morale></i> −3 tension vers une nation', desc:'Festivals de paix — apaisement populaire ciblé.',
+   /* Marc, 17/09 : « on ne sait pas quelle tension elle calme ». Le SENS est écrit sur la carte,
+      et redit dans la fenêtre de choix : c'est TA tension envers la nation choisie. Même garde-fou
+      que la Mission diplomatique — une fois par nation et par tour (`calmerPopulation`). */
+   effect:'+1<i class=ri-morale></i> · −3 à <b>TA tension envers</b> une nation de ton choix (une fois par nation et par tour)', desc:'Festivals de paix — ton peuple se calme vis-à-vis d\'une nation.',
    calmAction:true, cost:{materials:1,energy:1}},
+  /* ═══ LA MISSION DIPLOMATIQUE (Marc, 17/09, après la partie 66C3) ═══
+     « On peut ajouter dans les actions sociales une nouvelle tech : Diplomatie, répétable comme
+     les 3 ressources, −2 matériaux, permet de réduire la tension de 3 avec une nation à choix. »
+     Le SENS est ce qui compte : Calmer la Population baisse MA tension envers l'autre ; celle-ci
+     baisse la SIENNE envers moi — celle qui décide si son peuple me déclare la guerre. Jusqu'ici ce
+     sens n'existait que par la carte Stratégie 🕊️ Diplomatie, qu'il faut avoir la chance de piocher ;
+     Marc l'a jouée cinq fois dans la 66C3 pour survivre. Garde-fou : une fois par nation et par
+     tour (`diplomatieCivique`). Banc : server/test_mission_diplomatique.js */
+  {id:'cm_diplomatie', name:'Mission diplomatique', emoji:'🕊️', type:'social', repeatable:true,
+   effect:'−3 à <b>SA tension envers toi</b>, nation de ton choix (une fois par nation et par tour)', desc:'Ambassade, cadeaux, promesses — on apaise l\'autre.',
+   diploAction:true, cost:{materials:2}},
   /* ⚠️ ELLE ÉTAIT LA SEULE BRIDÉE À 1×/TOUR, ET RIEN NE LE JUSTIFIAIT. Ses trois sœurs du marché
      civique font exactement la même chose — une action et des ressources contre un gain immédiat —
      sans aucune limite : Extraction d'He3 (1🪨 1🔬 → +2⚡), Capture d'astéroïdes (1⚡ 1🔬 → +2🪨),
@@ -2181,7 +2200,7 @@ function costHtml(cost){return Object.entries(cost).map(([r,a])=>rHtml(r,'-'+a))
         de 60 à 150 jours   → 2 actions  (d'un système à l'autre : Jupiter→Saturne 78–82 j ;
                                           Éris–Triton 90 j ; Lune–Io 113 j ; Pluton–Titan 130 j)
         plus de 150 jours   → 3 actions  (la traversée : Europe–Pluton 170 j, et les longs trajets)
-   ⚠️ PLAFOND À 3, VOLONTAIRE. En prolongeant les paliers de 60 jusqu'au bout, Lune↔Triton (346 j)
+   ⚠️ PLAFOND À 3, VOLONTAIRE. En prolongeant les paliers de 60 jusqu'au bout, Lune↔Triton (346 j, 306 depuis v10.70)
    coûterait 6 actions : injouable, le maximum du jeu étant 5. Le plafond garde la règle mordante
    sans créer d'attaque impossible — et au gouvernement de niveau 1 (2 AC) les cibles lointaines
    restent hors de portée, ce qui protège les débuts de partie.
@@ -2203,6 +2222,17 @@ const DUREES_TRAJET={'lune|phobos':55,'ceres|lune':58,'deimos|lune':52,'deimos|p
     'europe|titan':82,'ganymede|titan':80,'callisto|titan':78,
     'encelade|titan':6,'encelade|triton':150,'titan|triton':150,'pluto|titan':130,
     'pluto|triton':60,'eris|triton':90,'eris|pluto':45,'europe|pluto':170,
+    /* v10.70 (Marc, 17/09, plateau en quart de disque — REPRISE §141). Les trois premières
+       n'étaient PAS dans la table : leur durée sortait de la distance à l'écran × 0,26, et le
+       nouveau plateau déplace tous les nœuds — sans les geler, le coût des assauts aurait changé
+       en silence. Les trois suivantes sont les liaisons AJOUTÉES (Vesta–Europe et Lune–Vesta
+       retirées), durées posées par cohérence avec les voisines ET pour que le nouveau raccourci
+       ne batte pas le trajet naturel : Vesta–Encelade (125) > Ganymède–Titan (80) car Saturne est
+       plus loin de la Ceinture que de Jupiter (à 95, Lune→Titan passait par Vesta en 171 j au lieu
+       de 196) ; Ganymède–Triton (190) > Titan–Triton (150) mais < Ganymède–Titan–Triton (230).
+       Banc : test_routes_carte.js */
+    'io|lune':121,'phobos|vesta':43,'io|vesta':49,
+    'encelade|vesta':125,'callisto|encelade':78,'ganymede|triton':190,
     'mars|terre':26,'jupiter|mars':70,'eris|jupiter':220};
 const SEUILS_VOYAGE=[60,150];          // <60 → 1 action · 60–150 → 2 · >150 → 3
 /* Jours entre deux nœuds ADJACENTS. Hors table : la distance à l'écran × 0,26, comme la carte. */
@@ -4531,7 +4561,7 @@ function showCalmPopup(mode,amount,stratCard){
      est l'autre fait partie de la décision — mais c'est celui que la carte modifie qui est coloré
      et annoncé « −N ». Sans cela, la Diplomatie afficherait en gros une tension qu'elle ne touche
      pas, et l'on retomberait dans le reproche de Marc : on ne sait ni qui ni de combien. */
-  const _leur=(mode==='diplomatie');
+  const _leur=(mode==='diplomatie'||mode==='civic_diplo');
   const rows=G.ais.map(ai=>{
     const pt=getTens('player',ai.civ.id);
     const at=getTens(ai.civ.id,'player');
@@ -4547,10 +4577,11 @@ function showCalmPopup(mode,amount,stratCard){
       ((function(){const _t=tensionsCroiseesTexte(ai,G.player);return _t?`<div style="margin-top:3px;font-size:.78em;color:#7880a0">ses autres tensions <span style="opacity:.7">(envers / de)</span> : ${_t}</div>`:'';})())+
       `</button>`;
   }).join('');
-  const label=mode==='strategy'?'🕊️ Calmer les tensions intérieures'
-             :(_leur?'🕊️ Diplomatie — apaiser une nation':'🕊️ Calmer la Population');
+  const label=mode==='strategy'?'🕊️ Calmer les tensions intérieures — TA tension envers une nation'
+             :(mode==='civic_diplo'?'🕊️ Mission diplomatique — SA tension envers toi'
+             :(_leur?'🕊️ Diplomatie — SA tension envers toi':'🕊️ Calmer la Population — TA tension envers une nation'));
   const desc=mode==='strategy'?`Réduit ta tension vers une nation de <strong>${amount_}</strong> points`
-            :(_leur?`Une mission diplomatique apaise la nation de ton choix : <strong>sa</strong> tension envers toi baisse de <strong>${amount_}</strong> points.<br><small style="color:#7880a0">Moins elle t'en veut, moins son peuple peut la pousser à te déclarer la guerre.</small>`
+            :(_leur?`Une mission diplomatique`+(mode==='civic_diplo'?` (1 AC, −2<i class=ri-materials></i>, une fois par nation et par tour)`:``)+` apaise la nation de ton choix : <strong>sa</strong> tension envers toi baisse de <strong>${amount_}</strong> points.<br><small style="color:#7880a0">Moins elle t'en veut, moins son peuple peut la pousser à te déclarer la guerre.</small>`
                    :`+1<i class=ri-morale></i> et réduit ta tension vers une nation de <strong>${amount_}</strong> points<br><small style="color:#7880a0">Coût : −1<i class=ri-materials></i> −1<i class=ri-energy></i></small>`);
   // Réutiliser le modal de détail tech (ou créer un overlay inline)
   document.body.insertAdjacentHTML('beforeend',`<div id="calm-overlay" style="position:fixed;inset:0;background:rgba(4,4,18,.85);z-index:600;display:flex;align-items:center;justify-content:center">
@@ -4590,31 +4621,85 @@ function applyCalmTension(aiId,mode,amount){
      un refus aurait laissé la tension baissée gratuitement). Le montant est celui de la carte,
      pas celui reçu. Les autres modes (Stratégie, Diplomatie) n'ont pas de sens sans écran : en
      ligne ils passent par la question `strategy_calm`. */
+  /* Mission diplomatique (carte civique cm_diplomatie) : la règle est dans `diplomatieCivique`,
+     ici on ne fait que l'appeler et écrire l'action au carnet. Refus dit en clair, rien dépensé. */
+  if(mode==='civic_diplo'){
+    const r=diplomatieCivique(G.player,aiId);
+    if(r!==true){ addLog('⚠️ Mission diplomatique : '+r+'.','red'); return; }
+    const _n=(G.ais||[]).find(a=>a&&a.civ&&a.civ.id===aiId);
+    addAction('🕊️','Mission diplomatique',1,{materials:MISSION_DIPLO_COUT_MAT},(_n?_n.civ.name:aiId)+' : sa tension −'+MISSION_DIPLO_APAISEMENT);
+    render(); return;
+  }
   if(_decisionActive()&&mode!=='civic'){ addLog('⚠️ Apaisement : mode invalide en ligne.','red'); return; }
+  /* Calmer la Population (carte civique cm_calm) : la règle est dans `calmerPopulation`, comme la
+     mission dans `diplomatieCivique`. Refus dit en clair, rien dépensé. */
   if(mode==='civic'){
-    amount=3;
-    const p=G.player;
-    if(G.phase!=='actions'){ addLog('⚠️ Calmer la Population : impossible hors phase d\'actions.','red'); return; }
-    if(!(G.ais||[]).some(a=>a&&a.civ&&a.civ.id===aiId)){ addLog('⚠️ Calmer la Population : nation invalide.','red'); return; }
-    if((p.acLeft||0)<1){ addLog('⚠️ Pas assez d\'AC (besoin 1).','red'); return; }
-    if((p.res.materials||0)<1||(p.res.energy||0)<1){ addLog('⚠️ Pas assez de ressources (besoin 1<i class=ri-materials></i> 1<i class=ri-energy></i>).','red'); return; }
+    saveUndo();
+    const r=calmerPopulation(G.player,aiId);
+    if(r!==true){ addLog('⚠️ Calmer la Population : '+r+'.','red'); return; }
+    const _n=(G.ais||[]).find(a=>a&&a.civ&&a.civ.id===aiId);
+    addAction('🕊️','Calmer la Population',1,{materials:1,energy:1},'+1<i class=ri-morale></i> · ta tension envers '+(_n?_n.civ.name:aiId)+' −'+CALME_POP_APAISEMENT);
+    render(); return;
   }
   const prev=getTens('player',aiId);
   setTens('player',aiId,Math.max(0,prev-amount));
   const _vers=(G.ais||[]).find(a=>a&&a.civ&&a.civ.id===aiId); // le NOM, pas l'identifiant (« jupiteriens » en minuscule dans D538)
   addLog('🕊️ '+G.player.civ.emoji+' '+G.player.civ.name+' calme sa tension vers '+(_vers?_vers.civ.emoji+' '+_vers.civ.name:aiId)+' : −'+amount+' ('+prev+' → '+getTens('player',aiId)+'/10)','gold');
-  if(mode==='civic'){
-    // Action civique : payer le coût, donner +1 moral
-    const p=G.player;
-    saveUndo();
-    p.acLeft-=1;p.res.materials=Math.max(0,(p.res.materials||0)-1);p.res.energy=Math.max(0,(p.res.energy||0)-1);
-    p.res.morale=Math.min(10,(p.res.morale||0)+1);
-    addAction('🕊️','Calmer la Population',1,{materials:1,energy:1},'+1<i class=ri-morale></i> −'+amount+' tension vs '+aiId);
-    render();
-  }else if(mode==='strategy'){
+  if(mode==='strategy'){
     G.player.stratBonus=null;
     _playerStratDone();
   }
+}
+/* ═══ LA MISSION DIPLOMATIQUE — LA RÈGLE, POUR TOUT LE MONDE (Marc, 17/09) ═══
+   `nat` envoie une mission chez `cibleId` : 1 action, 2 matériaux, et la tension de la cible ENVERS
+   `nat` baisse de 3. Une fois par nation et par tour — répétable, mais pas sur la même nation : avec
+   5 actions on effacerait sinon 15 points de tension par tour, et la guerre redeviendrait gratuite
+   à éviter. Rend true si la mission est partie ; sinon une raison (chaîne), sans rien dépenser.
+   Le joueur y arrive par `applyCalmTension(id,'civic_diplo')`, l'ordinateur par `aiBuyCivic`. */
+const MISSION_DIPLO_COUT_MAT = 2, MISSION_DIPLO_APAISEMENT = 3;
+/* ═══ CALMER LA POPULATION — LA RÈGLE, POUR TOUT LE MONDE (Marc, 17/09) ═══
+   Le miroir de la mission : `nat` calme SON peuple vis-à-vis de `cibleId` — 1 action, 1🪨 1⚡, +1 moral,
+   et SA tension envers la cible baisse de 3. Même garde-fou : une fois par nation et par tour.
+   ⚠️ AVANT, L'ORDINATEUR L'ACHETAIT SANS EFFET : `aiBuyCivic` payait, donnait le moral, et ne touchait
+   à aucune tension (le choix de la nation n'existait que dans la fenêtre du joueur). Une seule
+   règle désormais, le joueur y arrive par `applyCalmTension(id,'civic')`, l'ordinateur par `aiBuyCivic`. */
+const CALME_POP_APAISEMENT = 3;
+function calmerPopulation(nat, cibleId){
+  nat=nat||G.player;
+  if(!nat||!nat.civ) return 'nation invalide';
+  if(G.phase!=='actions') return 'impossible hors phase d\'actions';
+  const cible=allPlayers().find(n=>n&&n!==nat&&n.civ&&n.civ.id===cibleId);
+  if(!cible) return 'nation invalide';
+  if((nat.acLeft||0)<1) return 'besoin 1 AC';
+  if((nat.res.materials||0)<1||(nat.res.energy||0)<1) return 'besoin 1 matériau et 1 énergie';
+  if(!nat._calmePop||nat._calmePop.tour!==G.turn) nat._calmePop={tour:G.turn,faites:[]};
+  if(nat._calmePop.faites.indexOf(cibleId)>=0) return 'déjà calmée vis-à-vis de cette nation ce tour — une fois par nation et par tour';
+  nat._calmePop.faites.push(cibleId);
+  nat.acLeft-=1; nat.res.materials-=1; nat.res.energy-=1; nat.spentThisTurn=(nat.spentThisTurn||0)+3;
+  nat.res.morale=Math.min(getResCapFor(nat).morale||10,(nat.res.morale||0)+1);
+  const avant=getTens(nat.civ.id,cible.civ.id);
+  setTens(nat.civ.id,cible.civ.id,Math.max(0,avant-CALME_POP_APAISEMENT));
+  addLog('🕊️ '+_evName(nat)+' calme sa population vis-à-vis de '+cible.civ.emoji+' '+cible.civ.name+' : '
+    +(nat===G.player?'ta':'sa')+' tension envers elle '+avant+' → '+getTens(nat.civ.id,cible.civ.id)+'/10 (−'+CALME_POP_APAISEMENT+'), +1<i class=ri-morale></i>','gold');
+  return true;
+}
+function diplomatieCivique(nat, cibleId){
+  nat=nat||G.player;
+  if(!nat||!nat.civ) return 'nation invalide';
+  if(G.phase!=='actions') return 'impossible hors phase d\'actions';
+  const cible=allPlayers().find(n=>n&&n!==nat&&n.civ&&n.civ.id===cibleId);
+  if(!cible) return 'nation invalide';
+  if((nat.acLeft||0)<1) return 'besoin 1 AC';
+  if((nat.res.materials||0)<MISSION_DIPLO_COUT_MAT) return 'besoin '+MISSION_DIPLO_COUT_MAT+' matériaux';
+  if(!nat._diploCivique||nat._diploCivique.tour!==G.turn) nat._diploCivique={tour:G.turn,faites:[]};
+  if(nat._diploCivique.faites.indexOf(cibleId)>=0) return 'déjà apaisée ce tour — une mission par nation et par tour';
+  nat._diploCivique.faites.push(cibleId);
+  nat.acLeft-=1; nat.res.materials-=MISSION_DIPLO_COUT_MAT; nat.spentThisTurn=(nat.spentThisTurn||0)+1+MISSION_DIPLO_COUT_MAT;
+  const avant=getTens(cible.civ.id,nat.civ.id);
+  setTens(cible.civ.id,nat.civ.id,Math.max(0,avant-MISSION_DIPLO_APAISEMENT));
+  addLog('🕊️ Mission diplomatique de '+_evName(nat)+' chez '+cible.civ.emoji+' '+cible.civ.name+' : sa tension envers '
+    +(nat===G.player?'toi':nat.civ.name)+' '+avant+' → '+getTens(cible.civ.id,nat.civ.id)+'/10 (−'+MISSION_DIPLO_APAISEMENT+', −'+MISSION_DIPLO_COUT_MAT+'<i class=ri-materials></i>)','gold');
+  return true;
 }
 function skipStrategy(){document.getElementById('strategy-modal').classList.add('hidden');G.player.stratBonus=null;G._playerDraftCard=null;_playerStratDone();}
 /* ============================================================ TURN ============================================================ */
@@ -5191,8 +5276,11 @@ function guerresPreparer(apres){
      guerres une fois la perspective changée — et la file se sérialise, ce qui figeait l'erreur
      dans la sauvegarde. Le couple, lui, ne dépend de personne. */
   const cle=w=>({a:w.a,b:w.b});
-  const enCours=G.wars.filter(w=>!w.justDeclared).map(cle);
-  const fraiches=G.wars.filter(w=>w.justDeclared).map(cle);
+  /* Tri par ordre de cause (voir `declarerGuerre`). Une guerre d'une sauvegarde antérieure, sans
+     numéro, garde sa place de déclaration. */
+  const parOrdre=(x,y)=>((x.ordre===undefined?Infinity:x.ordre)-(y.ordre===undefined?Infinity:y.ordre));
+  const enCours=G.wars.filter(w=>!w.justDeclared).slice().sort(parOrdre).map(cle);
+  const fraiches=G.wars.filter(w=>w.justDeclared).slice().sort(parOrdre).map(cle);
   G.wars.forEach(w=>{ if(w.justDeclared) w.justDeclared=false; });
   d.guerres=enCours.map(k=>({a:k.a,b:k.b,fraiche:false})).concat(fraiches.map(k=>({a:k.a,b:k.b,fraiche:true})));
   d.guerreIdx=0;
@@ -5545,6 +5633,19 @@ function guerreCombatClassiqueChoisi(playerCommitted){
 function guerreRaison(){ const w=guerreObjet(); return (w&&w.reason)||G._warDeclareReason||'Tensions trop élevées'; }
 function guerreEtapeFraiche(){
   const war=guerreObjet(), warEnName=guerreEnnemiNom();
+  /* ═══ GUERRE POPULAIRE DU JOUEUR : SON CHOIX SE FAIT ICI, SUR L'ÉTAT DU MOMENT (Marc, 17/09) ═══
+     Voir `_guerrePopDemander`. La fenêtre de guerre forcée (routes, colonies, paix) s'ouvre à la
+     place de cette guerre dans la file ; ses suites (`forcedWarChoiceColony`, `…Route`,
+     `…DemandPeace`, `…NoTarget`) rejoignent toutes `_guerrePopSuiteJouer`, qui enchaîne sur
+     `guerreSuivante`. La guerre n'est donc traitée qu'UNE fois — plus de seconde fenêtre. */
+  if(war&&war.populaireJoueur&&war.agresseurCiv===_moiId()&&G.player&&!G.player._isAI){
+    war.populaireJoueur=false;
+    _guerrePopSuite('guerreSuivante');
+    const ouverte=triggerGuereeForcee('player', guerreEnnemi(), {dejaDeclaree:true});
+    G._forcedWarPending=false;      // la fenêtre est DANS la file : rien à attendre avant elle
+    if(ouverte) return;
+    guerreSuivante(); return;
+  }
   if(war && (war.agresseurCiv ? (war.agresseurCiv===_moiId()) : (war.declaredBy==='player'))){
     showWarModal('⚔️ Guerre déclarée vs '+warEnName+' !','<strong>'+guerreRaison()+'</strong><br><br>Assaille une colonie ennemie, ou tiens ta position.',null);
     // TU es l'agresseur (ex. refus de la Sphère de Dyson) → tu dois pouvoir ATTAQUER TOUT DE SUITE.
@@ -5603,6 +5704,11 @@ function stFinDeTour(){
     if(evMsg)_journalAuto(G.player.civ.name,'Événement : '+G.curEvent.name,evMsg);
     G._pendingEvModal={ev:G.curEvent,msg:evMsg};
   }
+  /* L'avance technologique se juge ICI — après l'événement, aux tours pairs (Marc, 17/09). Comme
+     `updateTension` a déjà jugé le seuil de 10 avant les guerres, une tension qui monte par ce grief
+     ne déclenche la guerre qu'à la fin du tour suivant : décalage voulu, les guerres technologiques
+     ne tombent plus le même soir que les autres. */
+  if(typeof griefTechnologique==='function') griefTechnologique();
   G._lastEOT={maint,revs}; // mémorisé pour ré-affichage sûr en cas de reprise (manquait côté solo)
   // ORDRE (Marc) : l'ÉVÉNEMENT de fin de tour — son RÉSULTAT à valider, ou son ACTION (accords
   // commerciaux / diplomatiques) — est présenté AVANT le bilan de fin de tour. Le plafonnement des
@@ -5644,6 +5750,7 @@ fluxDeclarer('guerreFraicheOuvrirCombat', guerreFraicheOuvrirCombat);
 fluxDeclarer('guerrePaixRepondue', guerrePaixRepondue);
 fluxDeclarer('guerreFraichePaixRepondue', guerreFraichePaixRepondue);
 fluxDeclarer('guerreCombatLiveChoisi', guerreCombatLiveChoisi);
+fluxDeclarer('stAssautForceReponse', stAssautForceReponse);
 fluxDeclarer('guerreDefenseRecue', guerreDefenseRecue);   // le défenseur humain a choisi ses jetons
 fluxDeclarer('guerreCombatClassiqueChoisi', guerreCombatClassiqueChoisi);
 fluxDeclarer('guerreFraicheCombatChoisi', guerreFraicheCombatChoisi);
@@ -5865,8 +5972,11 @@ function endTurn(){
     updateTension();
     // Même suite que le chemin serveur (`runEndOfRound`) : ce sont les MÊMES fonctions nommées,
     // il n'y a plus deux copies de la fin de tour à maintenir en parallèle.
-    if(G._forcedWarPending){G._forcedWarPending=false;_guerrePopSuite('stDysonPuisGuerres');} // guerre populaire résolue AVANT les guerres
-    else stDysonPuisGuerres();
+    /* La guerre populaire du joueur n'est plus jouée AVANT la file mais À SA PLACE dedans (17/09,
+       voir `_guerrePopDemander`). Le drapeau est remis à zéro par prudence : s'il restait posé,
+       la fin de tour attendrait une fenêtre qui n'existe pas. */
+    G._forcedWarPending=false;
+    stDysonPuisGuerres();
   },150);
 }
 // Résout l'événement de FIN DE TOUR (résultat OU action interactive accord commercial/diplomatique) puis done().
@@ -6866,6 +6976,11 @@ function buyMarket(cardId){
     if(!_aUnEcran()){ addLog('⚠️ Calmer la Population : choix de la nation impossible sans écran — rien dépensé.','red'); return; }
     showCalmPopup('civic',3); return;
   }
+  if(card.diploAction){
+    closePopup();
+    if(!_aUnEcran()){ addLog('⚠️ Mission diplomatique : choix de la nation impossible sans écran — rien dépensé.','red'); return; }
+    showCalmPopup('civic_diplo',MISSION_DIPLO_APAISEMENT); return;
+  }
   saveUndo();
   G.player.acLeft-=1;
   G.player.spentThisTurn+=1+Object.values(card.cost).reduce((s,v)=>s+v,0);
@@ -7482,6 +7597,7 @@ function doRaidTarget(aiId,nodeId,pillard){
     addTens(p.civ.id,target.civ.id,1);
     /* On se souvient d'avoir été pillé (§134 étape 4) — la tension redescend, pas la mémoire. */
     if(typeof ajouterRancune==='function') ajouterRancune(target,p);
+    if(typeof _marquerCause==='function') _marquerCause(target,p);
     addLog('⚔️ Raid sur '+target.civ.emoji+' '+target.civ.name+(_nomCol?' — production de '+_nomCol+' pillée':'')
       +' ! '+(stolen.join(' ')||'rien à prendre')+(enCost>0?' (−1<i class=ri-energy></i>)':'')+' ('+tc+' jeton en récupération, tension +3)','green');
     addAction('💰','Raid '+target.civ.emoji,1,{},'Volé : '+(stolen.join('')||'rien'));
@@ -8309,6 +8425,35 @@ function principalBloqueur(x){
   }
   return best;
 }
+/* ═══ L'AVANCE TECHNOLOGIQUE, EN RELATIF, TOUS LES DEUX TOURS (Marc, 17/09, partie 66C3) ═══
+   Avant : `+4` par tour, forfaitaire, de la part de TOUTES les nations à la fois, dès deux rangs 3.
+   Les Terriens en avaient trois ; Marc lisait « Ta tension vs Terriens +4 » à chaque tour, et les
+   trois autres nations recevaient la même chose au même rythme — elles ont atteint 10 ensemble et
+   déclaré la guerre le même soir. Un grief plat, synchronisé, sans plafond.
+   Maintenant : « par tech de niveau 3 en plus qu'une autre nation +2, évalué tous les deux tours
+   après l'évaluation de l'événement ». Une nation qui suit le rythme n'est plus punie ; l'écart seul
+   compte ; et la pression est divisée par deux. Banc : server/test_tension_technologique.js */
+const GRIEF_TECH_PAR_RANG3 = 2;
+function griefTechnologique(){
+  const out=[];
+  if((G.turn%2)!==0) return out;
+  const nations=allPlayers().filter(n=>n&&n.civ);
+  const r3=n=>(n.cards||[]).filter(c=>c&&c.tier===3).length;
+  for(const x of nations) for(const y of nations){
+    if(x===y) continue;
+    if(_warBetween(x.civ.id,y.civ.id)) continue;                 // en guerre : la tension est déjà à 10
+    const ecart=r3(y)-r3(x);
+    if(ecart<=0) continue;
+    const avant=getTens(x.civ.id,y.civ.id);
+    addTens(x.civ.id,y.civ.id,GRIEF_TECH_PAR_RANG3*ecart);
+    const apres=getTens(x.civ.id,y.civ.id);
+    out.push({de:x.civ.id,vers:y.civ.id,ecart,avant,apres});
+    /* Comme les autres griefs : on n'écrit que ce qui concerne le joueur qui lit. */
+    if(x===G.player) addLog('🔬 Avance technologique de '+y.civ.emoji+' '+y.civ.name+' ('+ecart+' rang'+(ecart>1?'s':'')+' 3 de plus que toi) : ta tension +'+(apres-avant)+' → '+apres+'/10','red');
+    else if(y===G.player) addLog('🔬 '+x.civ.emoji+' '+x.civ.name+' jalouse ton avance technologique ('+ecart+' rang'+(ecart>1?'s':'')+' 3 d\'écart) : sa tension envers toi +'+(apres-avant)+' → '+apres+'/10','red');
+  }
+  return out;
+}
 function updateTension(){
   /* ═══════ LA TENSION SE FIGEAIT DÈS QU'UNE GUERRE EXISTAIT QUELQUE PART ═══════
      ⚠️ `if(G.warState) return;` — une seule ligne, et tout le système s'arrêtait. `G.warState` est
@@ -8348,7 +8493,9 @@ function updateTension(){
     }
     const cx=x.colonies.filter(c=>c.connected).length, cy=y.colonies.filter(c=>c.connected).length;
     if(cy-cx>=6)add+=6;else if(cy-cx>=4)add+=3;   // y domine x
-    if(y.cards.filter(c=>c.tier===3).length>=2)add+=4;  // y prend une avance technologique
+    /* L'avance technologique ne se juge plus ici, chaque tour et en forfait (+4 dès deux rangs 3 —
+       c'est ce qui a fait tomber trois guerres sur les Terriens le même soir, 66C3). Elle se juge
+       en RELATIF, tous les deux tours, après l'événement : voir `griefTechnologique` (17/09). */
     /* A — y barre le chemin de x. UNE SEULE FOIS, à l'instant où le blocage s'installe : c'est un
        ACTE (« en colonisant sur le chemin qu'on veut prendre »), pas un état permanent. La charge a
        été décidée avant les boucles, ici on ne fait que la lire. */
@@ -8505,6 +8652,19 @@ function _guerrePopSuiteJouer(){
    test_guerres_populaires_file.js */
 function _guerrePopDemander(side, ai){
   const d=fluxDonnees();
+  /* ═══ LE JOUEUR CHOISIT SA CIBLE À SA PLACE DANS LA FILE, PAS AVANT (Marc, 17/09, 66C3) ═══
+     La fenêtre « ton peuple exige la guerre » s'ouvrait ICI, avant `stDysonPuisGuerres` ; Marc y
+     choisissait Titan, puis la file jouait les guerres des autres — les Ceinturiens prenaient Titan —
+     et sa propre guerre, en file comme « fraîche », rouvrait une fenêtre où Titan n'existait plus.
+     Désormais on ne fait ici que ce qui ne dépend d'aucun écran : déclarer la guerre et la marquer.
+     La fenêtre s'ouvre dans `guerreEtapeFraiche`, quand la file arrive à cette guerre-là, sur
+     l'état du moment. Choix et coup au même instant. Banc : test_ordre_des_guerres.js §3-§4 */
+  if(side==='player'&&G.player&&!G.player._isAI){
+    const w=guerrePopulaireEntre(G.player, ai);
+    if(!w) return false;
+    w.populaireJoueur=true;
+    return true;
+  }
   if(d.guerrePopFenetre){ (d.guerresPopEnAttente=d.guerresPopEnAttente||[]).push(ai.civ.id); return false; }
   const ok=triggerGuereeForcee(side, ai);
   if(ok&&side==='player'&&G.player&&!G.player._isAI) d.guerrePopFenetre=true;   // fenêtre (solo) ou question (en ligne) ouverte
@@ -8557,7 +8717,8 @@ function guerrePopulaireEntre(offense,offenseur){
      et paix conclue le même soir sans un seul combat. « Dans ce cas, les malus ne devraient pas
      s'appliquer puisque la guerre n'a pas eu lieu réellement. » L'usure (−4) et les −2 populaires
      ne sont donc prélevés qu'au premier combat, ou en fin de tour si la guerre tient encore. */
-  const w=declarerGuerre(offense,offenseur,'Guerre Populaire Forcée — le peuple exige vengeance !','other',{penalitesDifferees:true});
+  const w=declarerGuerre(offense,offenseur,'Guerre Populaire Forcée — le peuple exige vengeance !','other',
+    {penalitesDifferees:true, ordre:(typeof _causeDe==='function')?_causeDe(offense,offenseur):null});
   if(!w)return null;
   /* La tension reste à 10 pendant la guerre ; elle ne redescend qu'à la paix. */
   setTens(offense.civ.id,offenseur.civ.id,10); setTens(offenseur.civ.id,offense.civ.id,10);
@@ -8628,12 +8789,16 @@ function guerrePopulaireAuto(offense,offenseur){
 }
 /* Façade historique : « le joueur local, offensé ou offenseur, contre une IA ». Elle ajoute au noyau
    la fenêtre de choix, qui n'a de sens que pour quelqu'un qui regarde un écran. */
-function triggerGuereeForcee(offendedSide,targetAi){
+function triggerGuereeForcee(offendedSide,targetAi,opts){
+  opts=opts||{};
   const fwTargetAi=targetAi||(G.ais[0]);
   if(!fwTargetAi)return false;
   const offense=(offendedSide==='player')?G.player:fwTargetAi;
   const offenseur=(offendedSide==='player')?fwTargetAi:G.player;
-  if(!guerrePopulaireEntre(offense,offenseur))return false;
+  /* `dejaDeclaree` : la guerre a été déclarée au jugement de la tension (voir `_guerrePopDemander`),
+     on ne fait ici que la partie qui a besoin d'un écran. */
+  if(opts.dejaDeclaree){ if(!_warBetween(offense.civ.id,offenseur.civ.id)) return false; }
+  else if(!guerrePopulaireEntre(offense,offenseur))return false;
   const fwAi=fwTargetAi;
   if(offendedSide==='player'){
     // Joueur offensé : montrer choix
@@ -8743,6 +8908,29 @@ function forcedWarChoiceColony(nodeId){
   // Plus de capture instantanée : on lance le VRAI combat (tu choisis tes jetons). La guerre populaire reprend après le combat.
   G._assaultThenSuite='stApresGuerrePopulaire'; // un NOM (la guerre populaire reprend ensuite son cours)
   playerAssaultColony(nodeId,fwcAi2);
+  /* ═══ EN LIGNE, LA QUESTION DES JETONS DOIT PARTIR — ELLE NE PARTAIT JAMAIS (trouvé le 17/09) ═══
+     `playerAssaultColony` finit par `_ouvrirFenetreAssaut`, qui est un DESSIN : sans écran (serveur),
+     elle rend la main sans rien demander. L'assaut restait armé — cible retenue, suite posée — et
+     personne ne le résolvait ; la partie continuait parce que la file des guerres n'attendait pas
+     cette réponse. Depuis que la guerre populaire du joueur est jouée À SA PLACE dans la file
+     (`guerreEtapeFraiche`), la file attend : sans question, la table se figeait (test_actions.js,
+     tour 5). On pose donc la question des jetons par la fenêtre de combat ordinaire, avec la colonie
+     choisie en tête ; « tenir sa position » y reste possible (`stAssautForceReponse`). */
+  if(_decisionActive()&&G.player&&!G.player._isAI&&fwcAi2){
+    try{ const w=_warBetween(_moiId(),fwcAi2.civ.id); if(w) w.focusColony=nodeId; }catch(e){}
+    showWarCombatModal('stAssautForceReponse');
+  }
+}
+/* La réponse du joueur à la fenêtre de combat de sa guerre populaire (en ligne). Un nombre : ses
+   jetons, l'assaut se résout par `stAssautJoueurChoisi`. Autre chose (« tenir ») : pas d'assaut, pas
+   de dépense, la file reprend. Nommée pour survivre à une sauvegarde. */
+function stAssautForceReponse(committed){
+  if(committed===undefined||committed===null||typeof committed==='string'||(committed|0)<=0){
+    addLog('🛡️ Tu tiens ta position — aucun assaut ce tour.','dim');
+    G._assaultThenSuite=null; fluxDonnees().assautCible=null; fluxDonnees().assautEnnemi=null;
+    if(!_guerrePopSuiteJouer())render(); return;
+  }
+  stAssautJoueurChoisi(committed|0);
 }
 function forcedWarDemandPeace(){
   document.getElementById('forced-war-modal').classList.add('hidden');
@@ -8893,6 +9081,19 @@ function revoquerAccordsEntre(agresseur,cible){
      3. rien ne la déclare aux tiers, ne révoque d'accord ni ne rompt de route : même vivante une
         seconde, elle ne laisse pas de trace.
    ═══════════════════════════════════════════════════════════════════════════════ */
+/* Une horloge monotone sur toute la partie : chaque acte d'agression et chaque déclaration prend le
+   tick suivant. C'est ce qui permet de dire « cette cause est arrivée avant celle-là » quand plusieurs
+   guerres populaires tombent le même soir. Un simple entier dans `G` : il se sauvegarde. */
+function _tickSuivant(){ G._tick=(G._tick||0)+1; return G._tick; }
+/* L'acte d'agression le plus récent entre deux nations — celui qui, s'il pousse la tension à 10,
+   fixera la place de la guerre populaire dans la file. */
+function _marquerCause(victime,agresseur){
+  try{ const v=victime.civ.id, a=agresseur.civ.id;
+    G._causeTick=G._causeTick||{}; G._causeTick[v+'|'+a]=_tickSuivant(); }catch(e){}
+}
+function _causeDe(victime,agresseur){
+  try{ return (G._causeTick||{})[victime.civ.id+'|'+agresseur.civ.id]||null; }catch(e){ return null; }
+}
 const TENSION_COLONIE_PRISE   = 8;   // « si tu te fais attaquer une colonie et la prendre : tension à 8 direct »
 const TENSION_ASSAUT_REPOUSSE = 6;   // « si l'attaque est ratée, tension à 6 » — jamais pardonnée non plus
 function finEscarmouche(w){
@@ -8912,6 +9113,7 @@ function tensionApresAssaut(agresseur, victime, coloniePrise){
   /* ⚠️ AVANT LE RETOUR ANTICIPÉ CI-DESSOUS. La tension a un plafond, la mémoire non : une nation
      déjà à 10 de tension doit quand même enregistrer l'agression de plus. */
   if(typeof ajouterRancune==='function') ajouterRancune(victime,agresseur);
+  _marquerCause(victime,agresseur);
   const seuil = coloniePrise ? TENSION_COLONIE_PRISE : TENSION_ASSAUT_REPOUSSE;
   const a=agresseur.civ.id, v=victime.civ.id, avant=getTens(v,a);
   if(avant>=seuil)return;
@@ -8931,6 +9133,15 @@ function declarerGuerre(agresseur, cible, raison, declaredBy, opts){
   if(typeof agressionInterditeEntre==='function'&&agressionInterditeEntre(agresseur,cible,true)) return null;
   const w=_attachWar({a:A,b:B,winsBy:{[A]:0,[B]:0},turnsLeft:99,justDeclared:true,
     reason:raison, declaredBy:declaredBy||'other', agresseurCiv:A, live:true, aiRecaptureTarget:null});
+  /* ═══ L'ORDRE DES GUERRES EST CELUI DE LEUR CAUSE (Marc, 17/09, partie 66C3) ═══
+     « Il faut que chaque guerre se résolve dans l'ordre et en entier. » L'ordre est fixé ICI, une
+     fois pour toutes : le tick de la cause quand on le connaît (`opts.ordre` — l'agression qui a
+     poussé la tension à 10, voir `_marquerCause`), sinon le rang de déclaration. `guerresPreparer`
+     trie la file dessus : les guerres pendantes d'un tour précédent d'abord, puis les nouvelles par
+     ordre de cause. Un refus de Dyson à la première action passe donc avant une conquête faite à la
+     troisième. Banc : server/test_ordre_des_guerres.js */
+  w.ordre=(opts.ordre!==undefined&&opts.ordre!==null)?opts.ordre:_tickSuivant();
+  w.tourDeclaration=G.turn;
   w.focusColony=G._warFocusColony||null; G._warFocusColony=null;
   G.wars.push(w);
   /* ═══ ESCARMOUCHE : ON S'ARRÊTE ICI (voir le bandeau au-dessus de cette fonction) ═══
@@ -9598,6 +9809,28 @@ function chooseInvestmentForAI(ai,level){
 }
 // ── Achat IA d'une carte civique (forme de gouvernement ou sociale) ──
 function aiBuyCivic(ai,card){
+  /* Calmer la Population : SA tension envers une nation — il calme celle qu'il déteste le plus (c'est
+     elle qui le pousserait à une guerre populaire) et qu'il n'a pas encore calmée ce tour. */
+  if(card.calmAction){
+    const faites=(ai._calmePop&&ai._calmePop.tour===G.turn)?ai._calmePop.faites:[];
+    let pire=null,max=0;
+    for(const o of allPlayers()){ if(!o||o===ai||!o.civ||faites.indexOf(o.civ.id)>=0)continue;
+      const tv=getTens(ai.civ.id,o.civ.id); if(tv>max){max=tv;pire=o;} }
+    if(!pire||calmerPopulation(ai,pire.civ.id)!==true) return false;
+    G.aiActions.push({emoji:card.emoji,name:card.name,desc:'+1 moral · sa tension envers '+pire.civ.name+' −'+CALME_POP_APAISEMENT});
+    return true;
+  }
+  /* Mission diplomatique : la règle et le prix sont dans `diplomatieCivique`. L'ordinateur apaise
+     la nation qui lui en veut le plus et qu'il n'a pas encore apaisée ce tour. */
+  if(card.diploAction){
+    const faites=(ai._diploCivique&&ai._diploCivique.tour===G.turn)?ai._diploCivique.faites:[];
+    let pire=null,max=0;
+    for(const o of allPlayers()){ if(!o||o===ai||!o.civ||faites.indexOf(o.civ.id)>=0)continue;
+      const tv=getTens(o.civ.id,ai.civ.id); if(tv>max){max=tv;pire=o;} }
+    if(!pire||diplomatieCivique(ai,pire.civ.id)!==true) return false;
+    G.aiActions.push({emoji:card.emoji,name:card.name,desc:pire.civ.name+' : sa tension −'+MISSION_DIPLO_APAISEMENT});
+    return true;
+  }
   const cost=card.cost||{};
   ai.acLeft-=1;ai.spentThisTurn+=1+Object.values(cost).reduce((s,v)=>s+v,0);
   for(const[r,a]of Object.entries(cost))ai.res[r]=(ai.res[r]||0)-a;
@@ -10353,6 +10586,16 @@ function coupsPossibles(nat){
     if(card.id===nat.govForm)continue;
     if(nat._civicTaken&&nat._civicTaken.has(card.id)&&!card.repeatable)continue;
     if(!abordable(card.cost))continue;
+    /* Mission diplomatique : un coup seulement s'il reste quelqu'un à apaiser (≥ 3 de tension envers
+       moi, pas encore apaisé ce tour) — sinon la simulation dépenserait pour rien. */
+    if(card.diploAction){
+      const faites=(nat._diploCivique&&nat._diploCivique.tour===G.turn)?nat._diploCivique.faites:[];
+      if(!allPlayers().some(o=>o&&o!==nat&&o.civ&&faites.indexOf(o.civ.id)<0&&getTens(o.civ.id,nat.civ.id)>=3))continue;
+    }
+    if(card.calmAction){
+      const faites=(nat._calmePop&&nat._calmePop.tour===G.turn)?nat._calmePop.faites:[];
+      if(!allPlayers().some(o=>o&&o!==nat&&o.civ&&faites.indexOf(o.civ.id)<0&&getTens(nat.civ.id,o.civ.id)>=3))continue;
+    }
     coups.push({type:'civique',card:card.id,libelle:'civique : '+card.name});
   }
   /* RAID, ASSAUT, ACCORD — sur chaque colonie adverse, nommément. */
@@ -12718,18 +12961,16 @@ function renderEvents(){
   document.getElementById('evt-next-box').innerHTML=nxt?`<div class="evt-next">⚠️ <strong>Prochain — fin du tour ${G.turn+1} :</strong> ${nxt.emoji} ${nxt.name}<br><span style="font-size:.88em">${nxt.preview}</span></div>`:'';
 }
 function renderSystemMap(){
-  const panel=MAP_PANELS[G.mapPanel||0];
-  document.getElementById('solar-svg').setAttribute('viewBox','0 175 2020 490');
-  document.getElementById('panel-label').textContent=panel.name;
-  document.getElementById('panel-left').style.opacity=G.mapPanel===0?'.3':'1';
-  document.getElementById('panel-right').style.opacity=G.mapPanel===MAP_PANELS.length-1?'.3':'1';
-  // Contested routes
+  document.getElementById('solar-svg').setAttribute('viewBox',MAP_VIEWBOX);
+  /* v10.70 : les routes construites suivent le MÊME tracé (droit ou courbe) que la route possible
+     dessinée dessous — `routePathD` / `routePoint` — sinon une route achetée se décollerait de son
+     pointillé. Le jeton et le bouton de gestion sont au milieu du parcours (t = 0,5). */
   const rp=document.getElementById('routes-p'),ra=document.getElementById('routes-ai');
   rp.innerHTML='';ra.innerHTML='';
   const contested=getContestedSegments();
-  for(const seg of contested){const f=NODES[seg.from],t=NODES[seg.to];if(!f||!t)continue;const mx=(f.x+t.x)/2,my=(f.y+t.y)/2;ra.innerHTML+=`<line x1="${f.x}" y1="${f.y}" x2="${t.x}" y2="${t.y}" stroke="#ff5500" stroke-width="5" stroke-opacity=".22"/><text x="${mx}" y="${my-4}" text-anchor="middle" font-size="10" fill="#ff7744">⚠</text>`;}
-  for(let ri=0;ri<G.player.routes.length;ri++){const r=G.player.routes[ri];const f=NODES[r.from],t=NODES[r.to];if(!f||!t)continue;const canManage=G.phase==='actions';rp.innerHTML+=`<line x1="${f.x}" y1="${f.y}" x2="${t.x}" y2="${t.y}" stroke="${G.player.civ.color}" stroke-width="2.5" stroke-opacity=".75" stroke-dasharray="5,3"/>`;if((r.tokens||0)>0){const mx=(f.x+t.x)/2,my=(f.y+t.y)/2;rp.innerHTML+=`<rect x="${mx-6}" y="${my-6}" width="12" height="12" fill="${G.player.civ.color}" opacity=".88" rx="2"/><text x="${mx}" y="${my+4}" text-anchor="middle" font-size="8" fill="white">⚔</text>`;}if(canManage){const mx=(f.x+t.x)/2,my=(f.y+t.y)/2;rp.innerHTML+=`<line x1="${f.x}" y1="${f.y}" x2="${t.x}" y2="${t.y}" stroke="transparent" stroke-width="16" onclick="showRouteManageModal(${ri})" style="cursor:pointer"/><circle cx="${mx}" cy="${my}" r="7" fill="${(r.tokens||0)>0?'#ff8844':'#224488'}" fill-opacity=".7" stroke="${(r.tokens||0)>0?'#ffaa66':'#4a9eff'}" stroke-width="1" onclick="showRouteManageModal(${ri})" style="cursor:pointer" title="${(r.tokens||0)>0?'↩️ Rappeler jeton':'⚔️ Déployer jeton'}"/>`;} }
-  for(const aiP of G.ais){for(const r of aiP.routes){const f=NODES[r.from],t=NODES[r.to];if(!f||!t)continue;ra.innerHTML+=`<line x1="${f.x}" y1="${f.y}" x2="${t.x}" y2="${t.y}" stroke="${aiP.civ.color}" stroke-width="2" stroke-opacity=".5" stroke-dasharray="4,4"/>`;if((r.tokens||0)>0){const mx=(f.x+t.x)/2+8,my=(f.y+t.y)/2-8;ra.innerHTML+=`<rect x="${mx-5}" y="${my-5}" width="10" height="10" fill="${aiP.civ.color}" opacity=".7" rx="2"/><text x="${mx}" y="${my+3.5}" text-anchor="middle" font-size="7" fill="white">⚔</text>`;}}
+  for(const seg of contested){const f=NODES[seg.from],t=NODES[seg.to];if(!f||!t)continue;const P=routePoint(seg.from,seg.to,0.5);ra.innerHTML+=`<path d="${routePathD(seg.from,seg.to)}" fill="none" stroke="#ff5500" stroke-width="5" stroke-opacity=".22"/><text x="${P.x.toFixed(1)}" y="${(P.y-4).toFixed(1)}" text-anchor="middle" font-size="10" fill="#ff7744">⚠</text>`;}
+  for(let ri=0;ri<G.player.routes.length;ri++){const r=G.player.routes[ri];const f=NODES[r.from],t=NODES[r.to];if(!f||!t)continue;const canManage=G.phase==='actions';const d=routePathD(r.from,r.to);const P=routePoint(r.from,r.to,0.5);const mx=P.x,my=P.y;rp.innerHTML+=`<path d="${d}" fill="none" stroke="${G.player.civ.color}" stroke-width="2.5" stroke-opacity=".75" stroke-dasharray="5,3"/>`;if((r.tokens||0)>0){rp.innerHTML+=`<rect x="${(mx-6).toFixed(1)}" y="${(my-6).toFixed(1)}" width="12" height="12" fill="${G.player.civ.color}" opacity=".88" rx="2"/><text x="${mx.toFixed(1)}" y="${(my+4).toFixed(1)}" text-anchor="middle" font-size="8" fill="white">⚔</text>`;}if(canManage){rp.innerHTML+=`<path d="${d}" fill="none" stroke="transparent" stroke-width="16" onclick="showRouteManageModal(${ri})" style="cursor:pointer"/><circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="7" fill="${(r.tokens||0)>0?'#ff8844':'#224488'}" fill-opacity=".7" stroke="${(r.tokens||0)>0?'#ffaa66':'#4a9eff'}" stroke-width="1" onclick="showRouteManageModal(${ri})" style="cursor:pointer" title="${(r.tokens||0)>0?'↩️ Rappeler jeton':'⚔️ Déployer jeton'}"/>`;} }
+  for(const aiP of G.ais){for(const r of aiP.routes){const f=NODES[r.from],t=NODES[r.to];if(!f||!t)continue;ra.innerHTML+=`<path d="${routePathD(r.from,r.to)}" fill="none" stroke="${aiP.civ.color}" stroke-width="2" stroke-opacity=".5" stroke-dasharray="4,4"/>`;if((r.tokens||0)>0){const P=routePoint(r.from,r.to,0.5);const mx=P.x+8,my=P.y-8;ra.innerHTML+=`<rect x="${(mx-5).toFixed(1)}" y="${(my-5).toFixed(1)}" width="10" height="10" fill="${aiP.civ.color}" opacity=".7" rx="2"/><text x="${mx.toFixed(1)}" y="${(my+3.5).toFixed(1)}" text-anchor="middle" font-size="7" fill="white">⚔</text>`;}}
   }
   // (Attaque de route par clic sur la carte retirée : peu lisible. On attaque les routes via la fenêtre de combat ou la guerre populaire forcée.)
   // Pirates NPC (masqué si l'une des factions joue Pirates)
@@ -12764,118 +13005,105 @@ function renderSystemMap(){
     let rings='';
     if(pCol)rings+=`<circle cx="${node.x}" cy="${node.y}" r="${br+3+pCol.level*3}" fill="none" stroke="${G.player.civ.color}" stroke-width="${pCol.level+1}" stroke-opacity="${pCol.connected?.85:.3}"/>`;
     _occ.forEach((o,i)=>{ rings+=`<circle cx="${node.x}" cy="${node.y}" r="${br+1+o.col.level*2+i*2}" fill="none" stroke="${o.ai.civ.color}" stroke-width="${o.col.level}" stroke-opacity="${o.col.connected?.65:.2}"${i?' stroke-dasharray="3,3"':''}/>`; });
-    // Image pour lunes/naines ; petite station pour Station Jupiter (la grosse Jupiter est un décor) ; losange pour les anneaux joviens.
-    const body=node.decorative
-      ?`<polygon points="${node.x},${node.y-nr*1.5} ${node.x+nr*1.5},${node.y} ${node.x},${node.y+nr*1.5} ${node.x-nr*1.5},${node.y}" fill="${node.color}" fill-opacity=".25" stroke="${node.color}" stroke-width="1.2" stroke-dasharray="3,2"/>`
-      :isOrbital
-        ?`<circle cx="${node.x}" cy="${node.y}" r="${nr+1}" fill="${node.color}" fill-opacity=".4" stroke="${node.color}" stroke-width="1.4"/><text x="${node.x}" y="${node.y+3}" text-anchor="middle" font-size="9">${node.emoji}</text>`
-        :`<image href="assets/map/${mapImg(id)}.png" xlink:href="assets/map/${mapImg(id)}.png" x="${(node.x-ir).toFixed(1)}" y="${(node.y-ir).toFixed(1)}" width="${2*ir}" height="${2*ir}" preserveAspectRatio="xMidYMid meet"/>`;
-    ng.innerHTML+=`<g style="cursor:pointer" onclick="handleNodeClick('${id}')">${glow}${body}${rings}<circle cx="${node.x}" cy="${node.y}" r="${Math.max(br,12)}" fill="transparent"/><text x="${node.x}" y="${node.y+br+11}" text-anchor="middle" font-size="10" font-weight="600" paint-order="stroke" stroke="#04060f" stroke-width="2.6" fill="${isOrbital?'#FFD08a':'#e6eeff'}">${node.name}</text>${node.baseVP>0?`<text x="${node.x}" y="${node.y+br+19}" text-anchor="middle" font-size="7" fill="#6070a0">${node.baseVP}VP</text>`:''}</g>`;
+    // v10.70 : lunes et naines en VECTEUR (disque dégradé à la couleur du nœud), plus de photo — le
+    // rendu « Système » retenu par Marc sur maquette. Les anneaux joviens décoratifs ne sont pas dessinés.
+    const body=node.decorative?'':_vecLune(id,node,ir);
+    const infoLigne=node.info?`<text x="${node.x}" y="${node.y+br+28}" text-anchor="middle" font-size="7.5" fill="#8fa0c8" paint-order="stroke" stroke="#04060f" stroke-width="2">${node.info}</text>`:'';
+    ng.innerHTML+=`<g style="cursor:pointer" onclick="handleNodeClick('${id}')">${glow}${body}${rings}<circle cx="${node.x}" cy="${node.y}" r="${Math.max(br,12)}" fill="transparent"/><text x="${node.x}" y="${node.y+br+11}" text-anchor="middle" font-size="10" font-weight="600" paint-order="stroke" stroke="#04060f" stroke-width="2.6" fill="#e6eeff">${node.name}</text>${node.baseVP>0?`<text x="${node.x}" y="${node.y+br+19}" text-anchor="middle" font-size="7" fill="#6070a0">${node.baseVP}VP</text>`:''}${infoLigne}</g>`;
   }
   if(typeof uiMapMarkers==='function')uiMapMarkers();
   try{ if(typeof uiMapFit==='function') setTimeout(uiMapFit,0); }catch(e){}
 }
-/* ============ NOUVELLE CARTE : vue globale (image) + vues secteur ============ */
-const MAP_RAD={jorbital1:42,saturne:54,uranus:30,neptune:30,venus:26,terre:26,mars:19,mercure:16,
- ganymede:15,titan:15,callisto:14,io:13,europe:13,lune:9,triton:12,encelade:11,phobos:8,deimos:8,
- ceres:11,vesta:9,pluto:11,eris:11};
-function mrad(id){return MAP_RAD[id]||14;}
-const MAP_HOMECOL={'Terriens':'#4CAF50','Jupitériens':'#FF9800','Ceinturiens':'#AB47BC','Martiens':'#ef5350'};
-const MAP_DECOR={mercure:'Mercure',venus:'Vénus',terre:'Terre',mars:'Mars',saturne:'Saturne',uranus:'Uranus',neptune:'Neptune'};
-const MAP_CAPITAL={terre:'Terriens',mars:'Martiens',io:'Jupitériens',eris:'Ceinturiens'};   // la base jovienne est Io, plus la station
-// planète décor-capitale → nœud jouable (QG) qu'elle représente, pour la rendre cliquable
-const MAP_CAPITAL_NODE={terre:'lune',mars:'phobos'};
-// durées de trajet (par arête, ids triés) — voie commerciale ∝ temps
-const MAP_ROUTE_TIME={'lune|phobos':'~7 mois','ceres|lune':'~1 an','ceres|phobos':'~8 mois',
- 'europe|io':'~5 j','ganymede|io':'~8 j','callisto|europe':'~6 j','callisto|ganymede':'~7 j','ganymede|vesta':'≈ mois',
- 'encelade|titan':'~5 j','pluto|triton':'~ans','eris|pluto':'~ans',
- 'ceres|io':'~1 an','ceres|vesta':'~1 an','ganymede|titan':'~2 ans','callisto|titan':'~2 ans','titan|triton':'~3 ans'};
-function routeTime(a,b){return MAP_ROUTE_TIME[[a,b].sort().join('|')]||'';}
-function ownsNode(id){return G.player.civ.home===id||G.player.colonies.some(c=>c.nodeId===id);}
-function playerRouteIdx(a,b){return G.player.routes.findIndex(r=>(r.from===a&&r.to===b)||(r.from===b&&r.to===a));}
-function mapRouteClick(a,b){const idx=playerRouteIdx(a,b);if(idx>=0){if(typeof showRouteManageModal==='function')showRouteManageModal(idx);return;}
-  let from=null,to=null;if(ownsNode(a)){from=a;to=b;}else if(ownsNode(b)){from=b;to=a;}
-  if(!from){addLog('⚠️ Une route part d\'une de tes colonies — colonise d\'abord une extrémité.','red');render();return;}
-  doEstablishRoute(from,to);render();}
-function mapRouteLabel(x,y,ang,lab){if(ang>90)ang-=180;if(ang<-90)ang+=180;const w=lab.length*5+12;return `<g transform="rotate(${ang.toFixed(1)} ${x.toFixed(0)} ${y.toFixed(0)})"><rect x="${(x-w/2).toFixed(0)}" y="${(y-8).toFixed(0)}" width="${w}" height="14" rx="7" fill="#0a1326ee" stroke="#2a3a6a"/><text x="${x.toFixed(0)}" y="${(y+2.6).toFixed(0)}" text-anchor="middle" font-size="8" fill="#9fc4e8">${lab}</text></g>`;}
-function mapPlus(mx,my,built,own,onclick){const fill=built?'#16401a':(own?'#0e2a4a':'#161b29');const st=built?'#3fbf6a':(own?'#4a9eff':'#3a4566');const col=built?'#9ad89a':(own?'#9cc2ff':'#6a7a9a');return `<g style="cursor:pointer" onclick="${onclick}"><circle cx="${mx.toFixed(0)}" cy="${my.toFixed(0)}" r="10" fill="${fill}" stroke="${st}" stroke-width="1.5"/><text x="${mx.toFixed(0)}" y="${(my+4).toFixed(0)}" text-anchor="middle" font-size="13" fill="${col}" font-weight="700">${built?'✓':'+'}</text></g>`;}
-function mapImg(id){return id==='jorbital1'?'jupiter':id;}
-function bodyName(id){return (NODES[id]&&NODES[id].name)||MAP_DECOR[id]||id;}
-function isNodeBody(id){return !!NODES[id];}
-function playingCivs(){return [G.player,...G.ais].map(p=>p.civ.name);}
-const MAP_SECTORS={
- interne:{title:'Secteur 1 · Interne',color:'#7ed09a',belt:1,
-   place:{mercure:[68,128],venus:[110,232],terre:[180,355],lune:[146,372],mars:[188,488],phobos:[150,452],deimos:[258,392],ceres:[332,250]},
-   /* ⚠️ UNE LIAISON INTER-SECTEURS N'EST PAS DESSINÉE PAR `conn` SEUL. La carte tactique ne trace
-      que les arêtes INTRA-secteur ; tout ce qui sort du cadre passe par un `nexus`, qui porte le
-      point de sortie et le bouton « + » de construction. Les liaisons Lune↔Io, Lune↔Vesta et
-      Phobos↔Vesta (Marc, 2026-08-14 : « ça va désenclaver ») franchissent la frontière Interne ↔
-      Jupiter : il leur faut donc une entrée de CHAQUE côté. */
-   nexus:[{fromNode:'ceres',toNode:'io',to:'jupiter',next:'Io',xy:[372,345]},{fromNode:'ceres',toNode:'vesta',to:'jupiter',next:'Vesta',xy:[392,196]},
-          {fromNode:'lune',toNode:'vesta',to:'jupiter',next:'Vesta',xy:[350,110]},
-          {fromNode:'lune',toNode:'io',to:'jupiter',next:'Io',xy:[372,432]},
-          {fromNode:'phobos',toNode:'vesta',to:'jupiter',next:'Vesta',xy:[380,530]}],
-   band:{a:[300,118],b:[372,366],w:74,n:60,warm:true,name:'Ceinture intérieure',lab:[348,108]}},
- jupiter:{title:'Secteur 2 · Jupiter',color:'#ffb255',belt:1,
-   place:{vesta:[52,158],jorbital1:[105,392],io:[160,350],europe:[240,378],ganymede:[208,238],callisto:[348,300]},
-   nexus:[{fromNode:'io',toNode:'ceres',to:'interne',next:'Cérès',xy:[28,248]},{fromNode:'vesta',toNode:'ceres',to:'interne',next:'Cérès',xy:[24,96]},{fromNode:'callisto',toNode:'titan',to:'saturne',next:'Titan',xy:[372,392]},
-          {fromNode:'vesta',toNode:'phobos',to:'interne',next:'Phobos',xy:[22,36]},
-          {fromNode:'vesta',toNode:'lune',to:'interne',next:'Lune',xy:[18,170]},
-          {fromNode:'io',toNode:'lune',to:'interne',next:'Lune',xy:[26,440]},
-          {fromNode:'europe',toNode:'pluto',to:'externe',next:'Pluton',xy:[368,470]}],
-   band:{a:[18,80],b:[120,248],w:52,n:44,warm:true,name:'Ceinture intérieure',lab:[132,264]}},
- saturne:{title:'Secteur 3 · Saturne',color:'#e9cf86',
-   place:{saturne:[108,425,54],encelade:[210,360],titan:[262,235]},
-   nexus:[{fromNode:'titan',toNode:'callisto',to:'jupiter',next:'Callisto',xy:[36,175]},{fromNode:'titan',toNode:'triton',to:'externe',next:'Triton',xy:[376,330]}]},
- externe:{title:'Secteur 4 · Externe & Kuiper',color:'#9ac8f5',belt:1,
-   place:{uranus:[108,165],neptune:[235,150],triton:[222,196],pluto:[135,430],eris:[305,458]},
-   /* Pluton↔Europe (Marc, 2026-08-14) : la Ceinture externe était la seule à n'avoir gagné aucune
-      liaison au désenclavement du centre — quatre sauts d'Io contre un pour les Terriens. */
-   nexus:[{fromNode:'triton',toNode:'titan',to:'saturne',next:'Titan',xy:[36,300]},
-          {fromNode:'pluto',toNode:'europe',to:'jupiter',next:'Europe',xy:[28,470]}],
-   band:{a:[55,398],b:[362,500],w:64,n:62,warm:false,name:'Ceinture de Kuiper',lab:[210,556]}},
-};
-/* ─── ZONES CLIQUABLES DE LA CARTE GLOBALE ────────────────────────────────────
-   Coordonnées dans l'espace du `viewBox` (400 × 600), pas en pixels : elles ne dépendent donc pas
-   de la taille d'affichage, mais elles dépendent du CADRAGE du dessin.
-   RECALCULÉES le 2026-08-07 pour `global2.webp`, qui montre enfin toute la ceinture de Kuiper.
-   Le nouveau dessin est un dézoom UNIFORME autour du Soleil : une seule transformation a donc suffi
-   pour les dix, au lieu de dix relevés à l'œil —
-        nouveau = Soleil + (ancien − Soleil) × 0,77,  avec Soleil ≈ (200, 245).
-   Vérifié planète par planète sur l'image : Uranus, Jupiter, Neptune, Saturne, Terre, Mars et Vénus
-   tombent tous à moins de 10 px de leur position mesurée. Les rayons sont réduits en proportion,
-   et deux zones ont été replacées à la main car le dézoom les faisait chevaucher une planète :
-   la Ceinture (descendue sur l'arc gauche, dégagé) et Kuiper (remontée sur l'anneau extérieur). */
-const MAP_HOTSPOTS=[
- {x:157,y:203,r:18,label:'Mercure',lp:'below',sector:'interne',node:'lune'},
- {x:134,y:232,r:18,label:'Vénus',lp:'below',sector:'interne',node:'lune'},
- {x:186,y:306,r:20,label:'Terre',lp:'right',sector:'interne',node:'lune'},
- {x:253,y:305,r:19,label:'Mars',lp:'right',sector:'interne',node:'phobos'},
- {x:305,y:231,r:26,label:'Jupiter',lp:'below',sector:'jupiter',node:'io'},   // ouvre la vue jovienne sur Io, la vraie base
- {x:128,y:354,r:26,label:'Saturne',lp:'below',sector:'saturne',node:'titan'},
- {x:138,y:127,r:20,label:'Uranus',lp:'right',sector:'externe',node:'triton'},
- {x:288,y:408,r:20,label:'Neptune',lp:'right',sector:'externe',node:'triton'},
- {x:97,y:275,r:24,label:'Ceinture',lp:'right',sector:'jupiter',node:'ceres'},
- {x:200,y:95,r:26,label:'Kuiper',lp:'below',sector:'externe',node:'pluto'},
-];
-function setSector(k){G.mapView=k;closePopup();render();}
-function backToMap(){
-  /* ⚠️ La vue globale repart à 1×, sinon elle hérite du zoom posé en entrant sur une planète.
-     (Piège rencontré ici : `backToMap` tenait sur UNE ligne ; ajouter un commentaire `//` en fin
-     de ligne a fait disparaître tout ce qui suivait, accolade fermante comprise. `node --check`
-     l'a vu tout de suite — mais seulement parce que je l'ai lancé.) */
-  try{ if(typeof uiMZ!=='undefined'){ uiMZ=1; if(typeof uiApplyMZ==='function')uiApplyMZ(); } }catch(e){}
-  G.mapView='global';closePopup();render();
+/* ============ LA CARTE (v10.70) : UN SEUL PLATEAU, en quart de disque ============
+   Avant : une image peinte (`global2.webp`) avec des zones cliquables, puis une carte dessinée qui
+   défilait. Depuis le plateau carré, une seule carte fait les deux rôles, avec le zoom. Tout ce qui
+   servait la vue peinte et les vues « secteur » (MAP_HOTSPOTS, MAP_SECTORS, mapSectorSVG, setSector,
+   backToMap, cadrerVueGlobale, MAP_RAD, les photos `assets/map/*.png`) a été retiré. */
+const MAP_VIEWBOX='0 0 1920 1920';
+const MAP_SUN={x:50,y:1870};
+const MAP_UA=ua=>500+340*Math.log(ua);   // distance au Soleil, en unités du plateau, pour ua unités astronomiques
+/* ─── GÉOMÉTRIE DES ROUTES : droite si courte, sinon courbe « prograde », et contournement ───
+   Marc, 17/09 : « toutes les routes courbes ? — oui, mais peu et avec une seule règle ». La règle :
+   · moins de 200 unités → droite (les liaisons internes d'un système de lunes) ;
+   · sinon courbe de Bézier quadratique, déviation 12 % de la longueur (60 max), TOUJOURS du côté
+     qui s'éloigne du Soleil — le sens d'un transfert prograde, et une seule convention à lire ;
+   · si le tracé passe à moins de 18 unités d'une planète-décor (anneaux compris pour Saturne) ou de
+     9 d'un autre nœud, la déviation grandit par paliers (40 … 200), côté extérieur d'abord, jusqu'à
+     être dégagée. C'est le contrôle fait à la main le 14/08 pour Mars, rendu automatique : déplacer
+     un nœud ne casse plus rien. Le résultat ne dépend que de la carte : calculé une fois et gardé. */
+let _routeGeomCache=null;
+function _routeObstacles(){ return PLANETS_DECO.map(p=>({x:p.x,y:p.y,r:(p.ring?p.r*1.9:p.r)+18})); }
+function _routeDegagee(pts,a,b,obst){
+  for(const o of obst)for(const p of pts)if(Math.hypot(p.x-o.x,p.y-o.y)<o.r)return false;
+  for(const[id,n]of Object.entries(NODES)){ if(id===a||id===b||n.decorative||n.type==='orbital_station')continue; const rr=(n.r||6)+9; for(const p of pts)if(Math.hypot(p.x-n.x,p.y-n.y)<rr)return false; }
+  return true;
 }
-// Ouvre la 2e carte (système entier scrollable, dessin index.html) centrée sur la planète cliquée.
-/* ⚠️ CLIQUER UNE PLANÈTE DOIT ZOOMER DESSUS.
-   Depuis que la carte TIENT entièrement dans son cadre à 1×, il n'y a plus rien à faire défiler :
-   `scrollToNode` calculait un décalage, le trouvait nul, et la vue restait sur le système entier.
-   On pose donc explicitement un niveau de zoom en arrivant, puis on centre. C'était gratuit avant
-   parce que la carte débordait toujours — ce n'est plus le cas, il faut le demander. */
-const ZOOM_PLANETE=3;   // ~un tiers du système visible : le voisinage de la planète, pas tout
+function routeGeom(a,b){
+  const k=[a,b].sort().join('|');
+  if(!_routeGeomCache)_routeGeomCache={};
+  if(_routeGeomCache[k])return _routeGeomCache[k];
+  const A=NODES[a],B=NODES[b]; if(!A||!B)return null;
+  const len=Math.hypot(B.x-A.x,B.y-A.y)||1, mx=(A.x+B.x)/2, my=(A.y+B.y)/2, nx=-(B.y-A.y)/len, ny=(B.x-A.x)/len;
+  const ext=((mx-MAP_SUN.x)*nx+(my-MAP_SUN.y)*ny)>=0?1:-1;   // la normale qui s'éloigne du Soleil
+  const cands=[]; if(len<200)cands.push(0); cands.push(ext*Math.min(len*0.12,60));
+  for(const d of [40,70,100,130,160,200])cands.push(ext*d,-ext*d);
+  const obst=_routeObstacles();
+  const echant=C=>{const o=[];for(let i=1;i<24;i++){const t=i/24,u=1-t;o.push({x:u*u*A.x+2*u*t*C.x+t*t*B.x,y:u*u*A.y+2*u*t*C.y+t*t*B.y});}return o;};
+  let g=null;
+  for(const off of cands){const C={x:mx+nx*off,y:my+ny*off};if(_routeDegagee(echant(C),a,b,obst)){g={C,off};break;}}
+  if(!g){const off=ext*Math.min(len*0.12,60);g={C:{x:mx+nx*off,y:my+ny*off},off};}
+  _routeGeomCache[k]=g; return g;
+}
+/* Le tracé SVG de a vers b, et un point à la fraction t du parcours (0 = a, 1 = b). La courbe est la
+   même dans les deux sens : le point de contrôle ne dépend que de la paire. */
+function routePathD(a,b){ const g=routeGeom(a,b),A=NODES[a],B=NODES[b]; if(!g||!A||!B)return ''; if(g.off===0)return `M ${A.x} ${A.y} L ${B.x} ${B.y}`; return `M ${A.x} ${A.y} Q ${g.C.x.toFixed(1)} ${g.C.y.toFixed(1)} ${B.x} ${B.y}`; }
+function routePoint(a,b,t){ const g=routeGeom(a,b),A=NODES[a],B=NODES[b]; if(!A||!B)return {x:0,y:0}; if(!g||g.off===0)return {x:A.x+(B.x-A.x)*t,y:A.y+(B.y-A.y)*t}; const u=1-t; return {x:u*u*A.x+2*u*t*g.C.x+t*t*B.x, y:u*u*A.y+2*u*t*g.C.y+t*t*B.y}; }
+/* ─── Corps célestes en vecteur (plus de photos) ─── */
+function _vecLune(id,n,r){
+  const c=n.color||'#9aa';
+  return `<defs><radialGradient id="gm-${id}" cx="35%" cy="35%" r="75%"><stop offset="0%" stop-color="#fff" stop-opacity=".85"/><stop offset="45%" stop-color="${c}"/><stop offset="100%" stop-color="#000" stop-opacity=".6"/></radialGradient></defs><circle cx="${n.x}" cy="${n.y}" r="${r}" fill="${c}"/><circle cx="${n.x}" cy="${n.y}" r="${r}" fill="url(#gm-${id})"/>`;
+}
+function _vecPlanete(d){
+  const id=d.id,x=d.x,y=d.y,r=d.r; const f1=v=>(+v).toFixed(1); let s='';
+  const shade=`<circle cx="${x}" cy="${y}" r="${r}" fill="url(#mapShade)"/>`;
+  const base=(c1,c2)=>`<defs><radialGradient id="gp-${id}" cx="35%" cy="35%" r="75%"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></radialGradient></defs><circle cx="${x}" cy="${y}" r="${r}" fill="url(#gp-${id})"/>`;
+  const clip=`<clipPath id="cp-${id}"><circle cx="${x}" cy="${y}" r="${r}"/></clipPath>`;
+  const band=(yy,h,c,o)=>`<rect x="${x-r}" y="${f1(y+yy*r)}" width="${2*r}" height="${f1(h*r)}" fill="${c}" opacity="${o}"/>`;
+  switch(id){
+    case 'jupiter': s+=base('#f3dcb8','#9a6a3a')+`<defs>${clip}</defs><g clip-path="url(#cp-${id})">`+band(-0.85,0.12,'#c9946a',.7)+band(-0.62,0.1,'#e8cfae',.6)+band(-0.42,0.14,'#b97d55',.75)+band(-0.2,0.1,'#f0dcc0',.5)+band(-0.05,0.16,'#c58c62',.7)+band(0.18,0.09,'#efd6b5',.55)+band(0.32,0.14,'#b8825a',.7)+band(0.55,0.1,'#e3c8a4',.5)+band(0.72,0.13,'#c39068',.6)+`<ellipse cx="${f1(x+r*0.3)}" cy="${f1(y+r*0.36)}" rx="${f1(r*0.2)}" ry="${f1(r*0.11)}" fill="#d4674a" opacity=".85"/></g>`+shade;break;
+    case 'saturne':{const tilt=-14;const rings=(rx,ry,c,w,o)=>`<ellipse cx="${x}" cy="${y}" rx="${f1(rx)}" ry="${f1(ry)}" fill="none" stroke="${c}" stroke-width="${f1(w)}" opacity="${o}"/>`;
+      const back=`<g transform="rotate(${tilt} ${x} ${y})" clip-path="url(#cpSB)">`+rings(r*1.9,r*1.9*0.28,'#d9c69a',r*0.5,.55)+rings(r*2.25,r*2.25*0.28,'#c9b283',r*0.16,.5)+rings(r*1.42,r*1.42*0.28,'#a89570',r*0.28,.45)+`</g>`;
+      const front=`<g transform="rotate(${tilt} ${x} ${y})" clip-path="url(#cpSF)">`+rings(r*1.9,r*1.9*0.28,'#e8d6a8',r*0.5,.8)+rings(r*2.25,r*2.25*0.28,'#d5be8e',r*0.16,.7)+rings(r*1.42,r*1.42*0.28,'#b6a27a',r*0.28,.6)+`</g>`;
+      s+=`<defs><clipPath id="cpSB"><rect x="${x-r*3}" y="${y-r*3}" width="${r*6}" height="${r*3}"/></clipPath><clipPath id="cpSF"><rect x="${x-r*3}" y="${y}" width="${r*6}" height="${r*3}"/></clipPath>${clip}</defs>`;
+      s+=back+base('#f6e7c4','#b48f57')+`<g clip-path="url(#cp-${id})">`+band(-0.5,0.12,'#e2c896',.5)+band(-0.1,0.16,'#d6b57e',.5)+band(0.35,0.12,'#e6cf9e',.45)+`</g>`+shade+front;break;}
+    case 'uranus': s+=base('#c9f3f7','#5fb8c6')+shade+`<ellipse cx="${x}" cy="${y}" rx="${f1(r*0.35)}" ry="${f1(r*1.7)}" fill="none" stroke="#bfe9ef" stroke-width="1.2" opacity=".45"/>`;break;
+    case 'neptune': s+=base('#6f8cf0','#1d2f9a')+`<defs>${clip}</defs><g clip-path="url(#cp-${id})">`+band(-0.3,0.1,'#3c55c8',.6)+band(0.25,0.14,'#2a3fb0',.6)+`<ellipse cx="${f1(x-r*0.25)}" cy="${f1(y-r*0.1)}" rx="${f1(r*0.22)}" ry="${f1(r*0.14)}" fill="#152470" opacity=".8"/></g>`+shade;break;
+    case 'terre': s+=base('#7fc4ff','#0d3f8a')+`<defs>${clip}</defs><g clip-path="url(#cp-${id})"><path d="M ${f1(x-r*0.6)} ${f1(y-r*0.5)} c ${f1(r*0.3)} ${f1(-r*0.3)} ${f1(r*0.7)} ${f1(-r*0.1)} ${f1(r*0.5)} ${f1(r*0.3)} c ${f1(-r*0.2)} ${f1(r*0.3)} ${f1(-r*0.6)} ${f1(r*0.2)} ${f1(-r*0.5)} ${f1(-r*0.2)} z" fill="#4c9e4a"/><path d="M ${f1(x+r*0.1)} ${f1(y+r*0.1)} c ${f1(r*0.4)} ${f1(-r*0.2)} ${f1(r*0.6)} ${f1(r*0.3)} ${f1(r*0.3)} ${f1(r*0.6)} c ${f1(-r*0.3)} ${f1(r*0.2)} ${f1(-r*0.5)} ${f1(-r*0.1)} ${f1(-r*0.3)} ${f1(-r*0.6)} z" fill="#3f8c47"/><ellipse cx="${f1(x-r*0.2)}" cy="${f1(y+r*0.55)}" rx="${f1(r*0.5)}" ry="${f1(r*0.15)}" fill="#fff" opacity=".55"/></g>`+shade;break;
+    case 'mars': s+=base('#f0a07a','#8c3a24')+`<defs>${clip}</defs><g clip-path="url(#cp-${id})"><ellipse cx="${f1(x+r*0.2)}" cy="${f1(y+r*0.15)}" rx="${f1(r*0.5)}" ry="${f1(r*0.25)}" fill="#6d2c1a" opacity=".6"/><ellipse cx="${x}" cy="${f1(y-r*0.92)}" rx="${f1(r*0.35)}" ry="${f1(r*0.14)}" fill="#fff" opacity=".8"/></g>`+shade;break;
+    case 'venus': s+=base('#fff1c9','#c99a3f')+`<defs>${clip}</defs><g clip-path="url(#cp-${id})">`+band(-0.4,0.1,'#e9c979',.5)+band(0.1,0.14,'#d9b25e',.45)+`</g>`+shade;break;
+    default: s+=base('#d9d3c8','#6f6a60')+shade;
+  }
+  return s;
+}
+/* ─── Champ d'astéroïdes : polygones irréguliers dans un anneau centré sur le Soleil, angles a0..a1
+   (radians, 0 = vers la droite, π/2 = vers le haut), jamais sur un corps. Graine fixe : le même
+   champ à chaque rendu. « Les jolies ceintures » gardées par Marc (17/09). ─── */
+function _champAsteroides(r0,r1,a0,a1,n,seed,chaud){
+  let x=seed; const R=()=>{x=(x*9301+49297)%233280;return x/233280;};
+  const corps=[...PLANETS_DECO.map(p=>({x:p.x,y:p.y,r:(p.ring?p.r*2.3:p.r)+12})),...Object.values(NODES).filter(nd=>!nd.decorative&&nd.type!=='orbital_station').map(nd=>({x:nd.x,y:nd.y,r:(nd.r||6)+10}))];
+  const f1=v=>(+v).toFixed(1); let s='',k=0,tries=0;
+  while(k<n&&tries<n*8){tries++;const t=R();const rr=r0+(r1-r0)*(0.5+0.5*Math.sin((R()-0.5)*Math.PI));const ang=a0+(a1-a0)*t;const px=MAP_SUN.x+rr*Math.cos(ang),py=MAP_SUN.y-rr*Math.sin(ang);
+    if(px<8||px>1912||py<8||py>1912)continue; if(corps.some(b=>Math.hypot(px-b.x,py-b.y)<b.r))continue;
+    const sz=R();const rad=1+sz*sz*4.2;const op=0.35+R()*0.5;const jc=(R()*30)|0;const col=chaud?`rgb(${185+jc},${160+jc},${110+jc})`:`rgb(${150+jc},${175+jc},${210+jc})`;
+    const pts=[];const mm=5+((R()*3)|0);for(let i=0;i<mm;i++){const a=i/mm*Math.PI*2;const q=rad*(0.62+R()*0.5);pts.push(f1(px+q*Math.cos(a))+','+f1(py+q*Math.sin(a)));}
+    s+=`<polygon points="${pts.join(' ')}" fill="${col}" opacity="${f1(op)}"/>`;if(rad>3.2)s+=`<polygon points="${pts.slice(0,3).join(' ')}" fill="#fff" opacity="${f1(op*0.25)}"/>`;
+    k++;}
+  return s;
+}
+/* Ouvre la carte centrée et zoomée sur un nœud (fiche d'une planète, tutoriel…). */
+const ZOOM_PLANETE=3;   // ~un tiers du plateau visible : le voisinage de la planète, pas tout
 function openNodeMap(nodeId){
-  G.mapView='zoom'; G._zoomNode=nodeId||null; closePopup(); render();
+  G._zoomNode=nodeId||null; closePopup(); render();
   try{ if(typeof uiMZ!=='undefined'){ uiMZ=ZOOM_PLANETE; if(typeof uiApplyMZ==='function')uiApplyMZ(); } }catch(e){}
   setTimeout(()=>scrollToNode(G._zoomNode),120);
 }
@@ -12883,12 +13111,10 @@ function scrollToNode(nodeId){
   const wrap=document.getElementById('map-wrap'); if(!wrap)return;
   const n=NODES[nodeId]; if(!n)return;
   const svg=document.getElementById('solar-svg'); if(!svg)return;
-  const vb=((svg.getAttribute('viewBox'))||'0 175 2020 490').split(' ').map(Number);
+  const vb=((svg.getAttribute('viewBox'))||MAP_VIEWBOX).split(' ').map(Number);
   /* ⚠️ LE DESSIN N'OCCUPE PAS TOUTE LA BOÎTE. `preserveAspectRatio="xMidYMid meet"` le met à
-     l'échelle pour qu'il tienne, puis le CENTRE : il reste donc des bandes vides sur un axe. Le
-     calcul précédent supposait que le dessin remplissait la boîte, et visait donc à côté dès que
-     les deux proportions différaient — c'est-à-dire presque toujours. On refait le calcul du
-     navigateur : échelle, puis bandes, puis position réelle du nœud en pixels. */
+     l'échelle pour qu'il tienne, puis le CENTRE : il reste des bandes vides sur un axe. On refait le
+     calcul du navigateur : échelle, puis bandes, puis position réelle du nœud en pixels. */
   const bw=svg.clientWidth||wrap.clientWidth, bh=svg.clientHeight||wrap.clientHeight;
   if(!bw||!bh)return;
   const k=Math.min(bw/vb[2], bh/vb[3]);
@@ -12902,138 +13128,16 @@ function renderMap(){
   // La colonne s'élargit sur l'onglet Carte : on le vérifie ici aussi, car la partie démarre sur la
   // carte sans passer par `uiTab` (sinon elle resterait à l'étroit au tout premier affichage).
   try{ document.body.classList.toggle('vue-carte', !!document.querySelector('#mp-map.active')); }catch(e){}
-  const svg=document.getElementById('solar-svg'); const wrap=document.getElementById('map-wrap');
-  const bg=document.getElementById('map-bg-img'); const ng=document.getElementById('nodes-g');
-  const view=G.mapView||'global';
-  if(view!=='zoom'){
-    // Carte de départ : image peinte global.png + zones cliquables invisibles
-    if(wrap)wrap.classList.remove('mapzoom');
-    cadrerVueGlobale();
-    for(const gid of ['stars','connections','routes-ai','routes-p','pirates-g']){const g=document.getElementById(gid);if(g)g.innerHTML='';}
-    if(bg)bg.style.display='';
-    if(ng)ng.innerHTML=mapGlobalSVG();
-    cadrerVueGlobale();   // le bandeau vient d'être (re)dessiné : le placer selon l'orientation
-    try{ if(typeof uiMapFit==='function') setTimeout(uiMapFit,0); }catch(e){}   // vue globale : ajuster aussi
-    // On remesure APRÈS le rendu : la vue vient peut-être de changer de largeur.
-      return;
-  }
-  // 2e carte : système entier scrollable (dessin index.html), centré sur la planète cliquée
+  const wrap=document.getElementById('map-wrap');
   if(wrap)wrap.classList.add('mapzoom');
   try{ if(typeof uiApplyMZ==='function') setTimeout(uiApplyMZ,0); }catch(e){}
-  if(bg)bg.style.display='none';
   drawConnections();
   renderSystemMap();
-}
-/* ═══ LE CADRAGE DE LA VUE GLOBALE SUIT L'ÉCRAN ═══
-   Marc, 04/09 : « tu arrives à rendre l'image du système solaire grande comme l'écran ? » L'image
-   est en PORTRAIT (400×600) ; sur un écran PAYSAGE elle tient en hauteur et laisse du vide sur les
-   côtés — on ne peut pas remplir un écran large avec une image haute sans la couper. Mais les
-   planètes n'occupent que la bande centrale (Kuiper y≈95 … Neptune y≈408) : en paysage on cadre
-   la vue sur cette bande, et tout paraît 1,6× plus grand, sans perdre un nom. En portrait
-   (téléphone), rien ne change. Les zones cliquables vivent dans les mêmes coordonnées : elles
-   suivent d'elles-mêmes. Rappelé au redimensionnement (`uiMapFit`). */
-const CADRAGE_GLOBAL_PORTRAIT='0 0 400 600', CADRAGE_GLOBAL_PAYSAGE='0 65 400 380';
-function cadrerVueGlobale(){
-  const svg=document.getElementById('solar-svg'), wrap=document.getElementById('map-wrap');
-  if(!svg)return;
-  if(G&&G.mapView&&G.mapView!=='global')return;
-  const paysage=!!(wrap&&wrap.clientWidth>wrap.clientHeight*1.05);
-  const vb=paysage?CADRAGE_GLOBAL_PAYSAGE:CADRAGE_GLOBAL_PORTRAIT;
-  if(svg.getAttribute('viewBox')!==vb)svg.setAttribute('viewBox',vb);
-  /* Le bandeau « Touche une planète » reste au bas de ce qui est VISIBLE. */
-  const b=document.getElementById('map-bandeau');
-  if(b){ const y=paysage?405:560; b.setAttribute('transform','translate(0 '+(y-560)+')'); }
-}
-function mapGlobalSVG(){
-  let s='';
-  // Les noms des planètes sont dans l'image ; ici uniquement les zones cliquables invisibles.
-  for(const h of MAP_HOTSPOTS){
-    s+=`<g style="cursor:pointer" onclick="openNodeMap('${h.node}')">`;
-    s+=`<circle cx="${h.x}" cy="${h.y}" r="${h.r}" fill="#000" opacity="0" pointer-events="all"/>`;
-    s+=`</g>`;
-  }
-  s+=`<g id="map-bandeau"><rect x="40" y="560" width="320" height="30" rx="12" fill="#0a1326cc" stroke="#2a3a6a"/><text x="200" y="580" text-anchor="middle" font-size="11" fill="#cfe0ff">Touche une planète → carte détaillée</text></g>`;
-  return s;
-}
-function mapSectorSVG(key){
-  const S=MAP_SECTORS[key]; if(!S)return '';
-  const ids=Object.keys(S.place); const civsIn=playingCivs(); const inSec=id=>!!S.place[id];
-  // Tonalité dorée du Soleil sur le fond noir : forte dans l'Interne, de moins en moins vers Kuiper
-  // Halo doré CONTINU sur tout le système : fort près du Soleil (Interne), s'éteignant presque à Éris (Externe).
-  // Niveaux [bord interne, bord externe] choisis pour se raccorder d'une carte à l'autre.
-  const GOLD={interne:[.54,.384],jupiter:[.448,.308],saturne:[.44,.26],externe:[.26,.05]}[key]||[.5,.3];
-  let s=`<defs>`
-    +`<linearGradient id="msGold" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#7e5d1e" stop-opacity="${GOLD[0]}"/><stop offset="100%" stop-color="#6a4d18" stop-opacity="${GOLD[1]}"/></linearGradient>`
-    +`<radialGradient id="msVig" cx="50%" cy="44%" r="66%"><stop offset="60%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity=".42"/></radialGradient>`
-    +`</defs>`;
-  // fond noir profond, teinté d'or côté Soleil
-  s+=`<rect width="400" height="600" fill="#050509"/>`;
-  s+=`<rect width="400" height="600" fill="url(#msGold)"/>`;
-  // étoiles
-  {let x=key.length*29+5;const rnd=()=>{x=(x*9301+49297)%233280;return x/233280;};
-   for(let i=0;i<72;i++){s+=`<circle cx="${(rnd()*400)|0}" cy="${(rnd()*600)|0}" r="${(rnd()*1.2+.3).toFixed(1)}" fill="#fff" opacity="${(rnd()*.55+.12).toFixed(2)}"/>`;}}
-  s+=`<rect width="400" height="600" fill="url(#msVig)"/>`;
-  // Ceinture d'astéroïdes : BANDEAU délimité (début/fin) rempli de mini-astéroïdes, sans saturer près des planètes
-  if(S.band){const B=S.band;const ax=B.a[0],ay=B.a[1],bx=B.b[0],by=B.b[1];const dx=bx-ax,dy=by-ay;const L=Math.hypot(dx,dy)||1;const ux=dx/L,uy=dy/L;const nx=-uy,ny=ux;const hw=B.w/2;const warm=B.warm!==false;const ec=warm?'#caa86a':'#9fb3da';
-    const EG=(x1,y1,x2,y2,o,w)=>`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${ec}" stroke-opacity="${o}" stroke-width="${w}" stroke-dasharray="3 5"/>`;
-    s+=`<polygon points="${(ax+nx*hw).toFixed(1)},${(ay+ny*hw).toFixed(1)} ${(bx+nx*hw).toFixed(1)},${(by+ny*hw).toFixed(1)} ${(bx-nx*hw).toFixed(1)},${(by-ny*hw).toFixed(1)} ${(ax-nx*hw).toFixed(1)},${(ay-ny*hw).toFixed(1)}" fill="${ec}" opacity=".05"/>`;
-    s+=EG(ax+nx*hw,ay+ny*hw,bx+nx*hw,by+ny*hw,.4,1.2)+EG(ax-nx*hw,ay-ny*hw,bx-nx*hw,by-ny*hw,.4,1.2);
-    s+=EG(ax+nx*hw,ay+ny*hw,ax-nx*hw,ay-ny*hw,.55,1.4)+EG(bx+nx*hw,by+ny*hw,bx-nx*hw,by-ny*hw,.55,1.4);
-    let x=key.length*61+7;const rnd=()=>{x=(x*9301+49297)%233280;return x/233280;};
-    const bodies=ids.map(id=>{const p=S.place[id];return [p[0],p[1],(p[2]||mrad(id))+9];});
-    let placed=0,tries=0;const N=B.n||55;
-    while(placed<N&&tries<N*6){tries++;const t=rnd(),off=(rnd()-0.5)*B.w;const px=ax+ux*L*t+nx*off,py=ay+uy*L*t+ny*off;
-      if(bodies.some(bd=>Math.hypot(px-bd[0],py-bd[1])<bd[2]))continue;
-      const rad=(rnd()*1.4+.4),op=(rnd()*.45+.3),jc=(rnd()*26)|0;const cc=warm?`rgb(${196+jc},${172+jc},${122+jc})`:`rgb(${156+jc},${178+jc},${212+jc})`;
-      s+=`<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${rad.toFixed(1)}" fill="${cc}" opacity="${op.toFixed(2)}"/>`;placed++;}
-  }
-  // arêtes réelles intra-secteur (collecte unique)
-  const edges=[]; const seen=new Set();
-  for(const id of ids){if(!isNodeBody(id))continue;for(const adj of (NODES[id].conn||[])){if(!inSec(adj)||!isNodeBody(adj))continue;const k=[id,adj].sort().join('|');if(seen.has(k))continue;seen.add(k);edges.push([id,adj]);}}
-  // 1) traits de route (faibles si non construites, pleins si construites) — sous les corps
-  for(const [a,b] of edges){const pa=S.place[a],pb=S.place[b];const built=playerRouteIdx(a,b)>=0;
-    s+=`<line x1="${pa[0]}" y1="${pa[1]}" x2="${pb[0]}" y2="${pb[1]}" stroke="${built?'#3fbf6a':'#33509a'}" stroke-width="${built?3:2}" stroke-dasharray="${built?'':'6,4'}" opacity="${built?'.95':'.5'}"/>`;}
-  for(const ai of G.ais)for(const r of ai.routes){if(!inSec(r.from)||!inSec(r.to))continue;const pa=S.place[r.from],pb=S.place[r.to];s+=`<line x1="${pa[0]}" y1="${pa[1]}" x2="${pb[0]}" y2="${pb[1]}" stroke="${ai.civ.color}" stroke-width="2" stroke-opacity=".5" stroke-dasharray="4,4"/>`;}
-  // nexus : trait inter-secteurs (sous les corps)
-  for(const nx of (S.nexus||[])){const pf=S.place[nx.fromNode];if(!pf)continue;const built=playerRouteIdx(nx.fromNode,nx.toNode)>=0;s+=`<line x1="${pf[0]}" y1="${pf[1]}" x2="${nx.xy[0]}" y2="${nx.xy[1]}" stroke="${built?'#3fbf6a':'#3a8a5a'}" stroke-width="${built?3:2}" stroke-dasharray="${built?'':'6,4'}" opacity=".85"/>`;}
-  // 2) corps
-  for(const id of ids){
-    const p=S.place[id]; const bx=p[0],by=p[1]; const r=p[2]||mrad(id); const node=isNodeBody(id);
-    // Pas de halo sur les planètes ni de cercle autour de la planète-décor : seule la colonie est cerclée.
-    if(node){const pCol=G.player.colonies.find(c=>c.nodeId===id);const aRec=G.ais.map(ai=>({col:ai.colonies.find(c=>c.nodeId===id),ai})).find(x=>x.col);
-      if(pCol)s+=`<circle cx="${bx}" cy="${by}" r="${r+5}" fill="none" stroke="${G.player.civ.color}" stroke-width="${pCol.level+1}" stroke-opacity="${pCol.connected?.9:.35}"/>`;
-      else if(aRec)s+=`<circle cx="${bx}" cy="${by}" r="${r+5}" fill="none" stroke="${aRec.ai.civ.color}" stroke-width="${aRec.col.level+1}" stroke-opacity="${aRec.col.connected?.7:.3}"/>`;}
-    const clickId=node?id:(MAP_CAPITAL_NODE[id]||null);
-    s+= clickId?`<g style="cursor:pointer" onclick="handleNodeClick('${clickId}')">`:`<g>`;
-    s+=`<image href="assets/map/${mapImg(id)}.png" xlink:href="assets/map/${mapImg(id)}.png" x="${bx-r}" y="${by-r}" width="${r*2}" height="${r*2}" preserveAspectRatio="xMidYMid meet"/>`;
-    s+=`<text x="${bx}" y="${by+r+12}" text-anchor="middle" font-size="10" fill="${node?'#e3ecff':'#9fb4d6'}" font-weight="${node?'700':'400'}" style="paint-order:stroke;stroke:#05060f;stroke-width:2.5px">${bodyName(id)}</text>`;
-    if(node)s+=`<text x="${bx}" y="${by+r+22}" text-anchor="middle" font-size="8.5" fill="#8fa0c8" style="paint-order:stroke;stroke:#05060f;stroke-width:2px">${NODES[id].baseVP} PV</text>`;
-    s+=`</g>`;
-  }
-  // 3) étiquettes de temps + boutons « + » (par-dessus les corps)
-  for(const [a,b] of edges){const pa=S.place[a],pb=S.place[b];const built=playerRouteIdx(a,b)>=0;const own=ownsNode(a)||ownsNode(b);
-    const lab=routeTime(a,b); if(lab){const lx=pa[0]+0.72*(pb[0]-pa[0]),ly=pa[1]+0.72*(pb[1]-pa[1]),ang=Math.atan2(pb[1]-pa[1],pb[0]-pa[0])*180/Math.PI;s+=mapRouteLabel(lx,ly,ang,lab);}
-    s+=mapPlus((pa[0]+pb[0])/2,(pa[1]+pb[1])/2,built,own,`mapRouteClick('${a}','${b}')`);
-    const idx=playerRouteIdx(a,b); if(idx>=0&&(G.player.routes[idx].tokens||0)>0){const mx=(pa[0]+pb[0])/2,my=(pa[1]+pb[1])/2;s+=`<rect x="${mx+9}" y="${my-7}" width="13" height="13" rx="2" fill="${G.player.civ.color}"/><text x="${(mx+15.5).toFixed(0)}" y="${(my+3).toFixed(0)}" text-anchor="middle" font-size="9" fill="#fff">⚔</text>`;}
-  }
-  // 4) nexus : temps + bouton « + » (construit la vraie route) + pastille étape suivante
-  for(const nx of (S.nexus||[])){const pf=S.place[nx.fromNode];if(!pf)continue;const ex=nx.xy[0],ey=nx.xy[1];
-    const built=playerRouteIdx(nx.fromNode,nx.toNode)>=0; const own=ownsNode(nx.fromNode)||ownsNode(nx.toNode);
-    const lab=routeTime(nx.fromNode,nx.toNode); if(lab){const lx=pf[0]+0.40*(ex-pf[0]),ly=pf[1]+0.40*(ey-pf[1]),ang=Math.atan2(ey-pf[1],ex-pf[0])*180/Math.PI;s+=mapRouteLabel(lx,ly,ang,lab);}
-    s+=mapPlus((pf[0]+ex)/2,(pf[1]+ey)/2,built,own,`mapRouteClick('${nx.fromNode}','${nx.toNode}')`);
-    const elab='→ '+nx.next,w=elab.length*5.6+16,cxp=Math.max(w/2+2,Math.min(398-w/2,ex)),cyp=Math.max(14,Math.min(560,ey));
-    s+=`<g style="cursor:pointer" onclick="setSector('${nx.to}')"><rect x="${(cxp-w/2).toFixed(0)}" y="${(cyp-10).toFixed(0)}" width="${w.toFixed(0)}" height="20" rx="10" fill="#102a1a" stroke="#3a8a5a"/><text x="${cxp.toFixed(0)}" y="${(cyp+4).toFixed(0)}" text-anchor="middle" font-size="9.5" fill="#9ff0c0" font-weight="700">${elab}</text></g>`;
-  }
-  // étiquette du bandeau de ceinture (au-dessus des corps) + origine ceinturienne
-  if(S.band&&S.band.lab)s+=`<text x="${S.band.lab[0]}" y="${S.band.lab[1]}" text-anchor="middle" font-size="10.5" fill="${S.band.warm===false?'#b9ccf0':'#e0cd97'}" font-weight="700" style="paint-order:stroke;stroke:#05060f;stroke-width:2.5px">⌁ ${S.band.name}</text>`;
-  if(key==='externe'&&civsIn.includes('Ceinturiens')&&S.place['eris'])s+=`<text x="${S.place['eris'][0]}" y="${(S.place['eris'][1]-mrad('eris')-9).toFixed(0)}" text-anchor="middle" font-size="9" fill="#e0bdf2" font-weight="700" style="paint-order:stroke;stroke:#05060f;stroke-width:2.5px">⚑ Origine Ceinturiens (ceinture externe)</text>`;
-  s+=`<g style="cursor:pointer" onclick="backToMap()"><rect x="14" y="14" width="112" height="32" rx="16" fill="#13203f" stroke="#33509a"/><text x="70" y="35" text-anchor="middle" font-size="12.5" fill="#bcd0ff" font-weight="700">← Carte</text></g>`;
-  s+=`<text x="386" y="33" text-anchor="end" font-size="14" fill="${S.color}" font-weight="700" style="paint-order:stroke;stroke:#05060f;stroke-width:3px">${S.title}</text>`;
-  return s;
-}
-function changePanel(dir){
-  G.mapPanel=Math.max(0,Math.min(MAP_PANELS.length-1,(G.mapPanel||0)+dir));
-  renderMap();
+  /* Premier affichage sur un écran plus haut que large (téléphone tenu droit) : le carré entier n'y
+     fait que des points. On ouvre à 2× sur la capitale ; sur ordinateur, 1× et tout le plateau
+     (Marc, 17/09). Une seule fois par chargement de page, et seulement si personne n'a déjà zoomé. */
+  if(!renderMap._premierCadrage){ renderMap._premierCadrage=true;
+    setTimeout(()=>{ try{ const w=document.getElementById('map-wrap'); if(w&&w.clientWidth<w.clientHeight*1.1&&typeof uiMZ!=='undefined'&&uiMZ===1){ uiMZ=2; uiApplyMZ(); scrollToNode(G.player.civ.home); } }catch(e){} },200); }
 }
 function getTechAreaMode(){
   const h=document.getElementById('tech-area').offsetHeight;
@@ -14085,11 +14189,14 @@ function showWarCombatModal(cb){
   const _focus=_war&&_war.focusColony;
   const _enemyAI=G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0];
   const _focusOwned=_focus&&_enemyAI&&_enemyAI.colonies.some(c=>c.nodeId===_focus);
+  /* La colonie pour laquelle on fait la guerre n'est plus à l'ennemi : on le dit, en tête de fenêtre. */
+  const _perdue=(!_focusOwned&&_focus)?cibleChangeeDeMains(p,_focus):((_warAttackColonyTarget&&!_enemyAI.colonies.some(c=>c.nodeId===_warAttackColonyTarget))?cibleChangeeDeMains(p,_warAttackColonyTarget):null);
+  const perduBtn=_perdue?'<div style="margin-bottom:10px;padding:9px;background:#2a1a0a;border:1px solid #ffaa44;border-radius:8px;color:#ffcc88;font-size:.85em">⚠️ '+_perdue+'</div>':'';
   const focusBtn=_focusOwned
     ?'<div style="margin-bottom:10px;padding:9px;background:#2a0a0a;border:1px solid #ff5050;border-radius:8px"><strong style="color:#ff9966">🎯 Assaut sur '+(NODES[_focus]?.emoji||'')+' '+(NODES[_focus]?.name||_focus)+'</strong><br><span style="color:#cc8866;font-size:.82em">La colonie pour laquelle tu fais la guerre — gagne le combat et tu la <b>captures</b> !</span><br><button onclick="_warSelectColonyTarget(\''+_focus+'\')" style="margin-top:6px;padding:8px 16px;background:#3a0a0a;border:1px solid #ff5050;color:#ffbbbb;border-radius:6px;cursor:pointer;font-weight:700">🎯 Assaillir '+(NODES[_focus]?.name||_focus)+'</button></div>'
     :'';
   document.getElementById('wcm-info').innerHTML=
-    focusBtn+
+    perduBtn+focusBtn+
     '<div style="margin-bottom:10px"><strong style="color:#ffb347">⚔️ Attaquer une autre colonie</strong><br>'+
     '<span style="color:#9898b8;font-size:.82em">Tes jetons : <strong>'+p.forceTokens+'</strong> | Force ennemie : <strong>'+enemyForceTxt+'</strong></span><br>'+
     '<button onclick="warAttackColony()" style="margin-top:6px;padding:6px 14px;background:#2a0a0a;border:1px solid #ef5350;color:#ff8080;border-radius:6px;cursor:pointer;font-weight:700">⚔️ Choisir une colonie</button></div>'+
@@ -14154,6 +14261,27 @@ function warAttackColony(){
   document.getElementById('war-combat-modal').querySelector('.atk-btns').style.display='none';
 }
 let _warAttackColonyTarget=null;
+/* ═══ UNE CIBLE QUI A CHANGÉ DE MAINS SE DIT, ELLE NE DISPARAÎT PAS EN SILENCE (Marc, 17/09) ═══
+   Même avec la file dans le bon ordre, une colonie peut changer de propriétaire entre le moment où
+   l'on décide et celui où l'on frappe — une IA l'a prise pendant sa phase d'actions, une autre guerre
+   l'a capturée. Les fenêtres reconstruisaient leur liste sans un mot : Marc a vu Titan s'évaporer.
+   Rend la phrase à afficher (et l'écrit au journal) si `nodeId` n'est plus à l'ennemi de guerre
+   courant de `nat` ; sinon null. Règle, pas dessin : le serveur et les bancs peuvent l'appeler. */
+function cibleChangeeDeMains(nat,nodeId){
+  try{
+    nat=nat||G.player; if(!nat||!nodeId)return null;
+    const ennemiId=G.warWith; if(!ennemiId)return null;
+    const ennemi=allPlayers().find(n=>n&&n.civ&&n.civ.id===ennemiId); if(!ennemi)return null;
+    if((ennemi.colonies||[]).some(c=>c.nodeId===nodeId))return null;          // toujours à lui : rien à dire
+    const nouveau=allPlayers().find(n=>n&&n!==ennemi&&(n.colonies||[]).some(c=>c.nodeId===nodeId));
+    const nom=(NODES[nodeId]&&NODES[nodeId].name)||nodeId;
+    const msg=nouveau
+      ?(nom+' a changé de mains entre ton choix et ton assaut : '+nouveau.civ.emoji+' '+nouveau.civ.name+' l\'a prise. Choisis une autre cible.')
+      :(nom+' n\'appartient plus à '+ennemi.civ.emoji+' '+ennemi.civ.name+'. Choisis une autre cible.');
+    if(nat._cibleChangeeDite!==nodeId+'@'+G.turn){ nat._cibleChangeeDite=nodeId+'@'+G.turn; addLog('⚠️ '+msg,'red'); }
+    return msg;
+  }catch(e){ return null; }
+}
 function _warSelectColonyTarget(nodeId){
   _warAttackColonyTarget=nodeId;      // règle : la cible, même sans écran
   if(!_aUnEcran())return;             // le reste est du dessin
@@ -15021,65 +15149,67 @@ function _ackPlayerHits(){
 /* ============================================================ SVG SETUP ============================================================ */
 function drawStars(){const el=document.getElementById('stars');if(el)el.innerHTML='';/* étoiles décoratives retirées : le fond image fournit les étoiles */}
 function drawConnections(){
+  /* v10.70 — LE PLATEAU : fond étoilé, Soleil dans le coin, orbites, ceintures (halo + champ
+     d'astéroïdes), planètes vectorielles, encarts de lunes, puis les ROUTES POSSIBLES (pointillé
+     bleu, courbes prograde, pastille de jours ≥ 50 j aux 3/4) et les distances entre capitales.
+     Le bouton ⤳ masque à la fois les distances (jaune) ET les champs d'astéroïdes (Marc, 15/09) —
+     les halos et les étiquettes de ceinture restent, pour qu'on sache toujours où l'on est. */
+  const f1=v=>(+v).toFixed(1); const off=_mapDistOff();
   let s='';
-  // Lueur du Soleil (venant de la gauche)
-  s+=`<defs><radialGradient id="mapSun" cx="0%" cy="52%" r="80%"><stop offset="0%" stop-color="#fff2c8" stop-opacity=".85"/><stop offset="9%" stop-color="#ffd98a" stop-opacity=".65"/><stop offset="24%" stop-color="#ff9d3c" stop-opacity=".26"/><stop offset="55%" stop-color="#ff6a1e" stop-opacity="0"/></radialGradient></defs>`;
-  s+=`<rect x="0" y="150" width="1100" height="540" fill="url(#mapSun)"/>`;
-  s+=`<circle cx="-10" cy="420" r="70" fill="#fff1c4" opacity=".85"/>`;
-  // Ceinture d'astéroïdes (Mars–Jupiter)
-  s+=`<rect x="600" y="175" width="255" height="420" rx="14" fill="#c2a86e" fill-opacity=".05" stroke="#c2a86e" stroke-opacity=".22" stroke-width="1" stroke-dasharray="3,8"/>`;
-  s+=`<text x="728" y="300" text-anchor="middle" font-size="13" font-weight="700" fill="#c2a86e" fill-opacity=".9">☄️ Ceinture d'astéroïdes</text>`;
-  // Ceinture de Kuiper (externe)
-  s+=`<rect x="1500" y="115" width="390" height="210" rx="14" fill="#8fbcd6" fill-opacity=".05" stroke="#8fbcd6" stroke-opacity=".22" stroke-width="1" stroke-dasharray="3,8"/>`;
-  s+=`<text x="1695" y="300" text-anchor="middle" font-size="13" font-weight="700" fill="#8fbcd6" fill-opacity=".9">❄️ Ceinture de Kuiper</text>`;
-  for(const p of PLANETS_DECO){const pr=p.ir||p.r;
-    if(p.img)s+=`<image href="assets/map/${p.img}.png" x="${p.x-pr}" y="${p.y-pr}" width="${pr*2}" height="${pr*2}" preserveAspectRatio="xMidYMid meet"/>`;
-    else s+=`<circle cx="${p.x}" cy="${p.y}" r="${p.r}" fill="${p.color}" fill-opacity=".15" stroke="${p.color}" stroke-width="1" stroke-opacity=".35"/>`;
-    s+=`<text x="${p.x}" y="${p.y+pr+12}" text-anchor="middle" font-size="11" font-weight="600" paint-order="stroke" stroke="#04060f" stroke-width="2.8" fill="#dce8ff" fill-opacity=".92">${p.name}</text>`;}
-  // (anneaux de Saturne désormais inclus dans saturne.png)
-  // Anneau orbital jovien (style sphère de Dyson) — cercle fin autour de Jupiter
-  // Helpers durée / pastilles / courbe (Soleil à gauche → assistance gravitationnelle)
-  const SUN={x:-40,y:420};
-  const _days=(a,b)=>Math.round(Math.hypot(b.x-a.x,b.y-a.y)*0.26);
-  // Durées de trajet : la table vit désormais au niveau du moteur (DUREES_TRAJET), c'est une RÈGLE.
-  const DUR=DUREES_TRAJET;
+  s+=`<defs>`
+    +`<radialGradient id="mapSun" cx="${MAP_SUN.x}" cy="${MAP_SUN.y}" r="1400" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#fff2c8" stop-opacity=".9"/><stop offset="6%" stop-color="#ffd98a" stop-opacity=".55"/><stop offset="18%" stop-color="#ff9d3c" stop-opacity=".2"/><stop offset="50%" stop-color="#ff6a1e" stop-opacity="0"/></radialGradient>`
+    +`<radialGradient id="mapSunDisk" cx="50%" cy="50%" r="50%"><stop offset="55%" stop-color="#fff6d0"/><stop offset="80%" stop-color="#ffc45a"/><stop offset="100%" stop-color="#ff8a2a" stop-opacity=".2"/></radialGradient>`
+    +`<radialGradient id="mapShade" cx="30%" cy="30%" r="80%"><stop offset="0%" stop-color="#fff" stop-opacity=".22"/><stop offset="45%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity=".78"/></radialGradient>`;
+  const halo=(id,r0,r1,c,op)=>{const R=r1+40;const o=x=>f1(x/R);return `<radialGradient id="${id}" cx="${MAP_SUN.x}" cy="${MAP_SUN.y}" r="${R}" gradientUnits="userSpaceOnUse"><stop offset="${o(r0-40)}" stop-color="${c}" stop-opacity="0"/><stop offset="${o(r0+30)}" stop-color="${c}" stop-opacity="${op}"/><stop offset="${o(r1-30)}" stop-color="${c}" stop-opacity="${op}"/><stop offset="${o(r1+40)}" stop-color="${c}" stop-opacity="0"/></radialGradient>`;};
+  s+=halo('mapBelt1',MAP_UA(2.1),MAP_UA(3.3),'#c2a86e',.2)+halo('mapBelt2',MAP_UA(30),MAP_UA(50),'#8fbcd6',.11);
+  s+=`<clipPath id="mapClip"><rect x="0" y="0" width="1920" height="1920"/></clipPath></defs>`;
+  /* Tout le plateau est DÉCOUPÉ au carré : les halos de ceinture et la lueur du Soleil sont des cercles
+     centrés sur le coin, ils déborderaient sinon dans les bandes vides du cadre (vu à l'écran, 17/09). */
+  s+=`<g clip-path="url(#mapClip)">`;
+  // étoiles (graine fixe)
+  {let x=5;const R=()=>{x=(x*9301+49297)%233280;return x/233280;};for(let i=0;i<420;i++){s+=`<circle cx="${(R()*1920)|0}" cy="${(R()*1920)|0}" r="${f1(R()*1.4+.3)}" fill="#fff" opacity="${f1(R()*.6+.12)}"/>`;}}
+  s+=`<rect x="0" y="0" width="1920" height="1920" fill="url(#mapSun)"/>`;
+  // halos de ceinture, orbites, champs d'astéroïdes
+  s+=`<circle cx="${MAP_SUN.x}" cy="${MAP_SUN.y}" r="${f1(MAP_UA(3.3)+40)}" fill="url(#mapBelt1)"/>`;
+  s+=`<circle cx="${MAP_SUN.x}" cy="${MAP_SUN.y}" r="${f1(MAP_UA(50)+40)}" fill="url(#mapBelt2)"/>`;
+  for(const p of PLANETS_DECO)s+=`<circle cx="${MAP_SUN.x}" cy="${MAP_SUN.y}" r="${f1(MAP_UA(p.ua))}" fill="none" stroke="#fff" stroke-opacity=".10"/>`;
+  if(!off){ s+=`<g id="asteroides">`+_champAsteroides(MAP_UA(2.1),MAP_UA(3.3),0.02,1.55,520,31,true)+_champAsteroides(MAP_UA(30),MAP_UA(50),0.02,1.55,260,37,false)+`</g>`; }
+  s+=`<circle cx="${MAP_SUN.x}" cy="${MAP_SUN.y}" r="105" fill="url(#mapSunDisk)"/>`;
+  // étiquettes des ceintures, le long de l'arc
+  const arcLab=(id,ua,t,c)=>{const r=MAP_UA(ua);const P=deg=>{const q=deg*Math.PI/180;return f1(MAP_SUN.x+r*Math.cos(q))+' '+f1(MAP_SUN.y-r*Math.sin(q));};return `<defs><path id="${id}" d="M ${P(80)} A ${f1(r)} ${f1(r)} 0 0 1 ${P(10)}"/></defs><text font-size="14" fill="${c}" font-family="Michroma,'Exo 2',sans-serif" letter-spacing="3" opacity=".8"><textPath href="#${id}" startOffset="50%" text-anchor="middle">${t}</textPath></text>`;};
+  s+=arcLab('mapLab1',3.45,"CEINTURE D'ASTÉROÏDES PRINCIPALE  ·  2,1 – 3,3 UA",'#d8c08a')+arcLab('mapLab2',44,'CEINTURE DE KUIPER  ·  30 – 50 UA','#a9cbe6');
+  // planètes-décor, encarts de lunes, étiquettes
+  const civsEnJeu=(()=>{ try{ return [G.player,...G.ais].map(p=>p.civ.name); }catch(e){ return []; } })();
+  const couleurNation=nom=>{ try{ return Object.values(CIVS).find(c=>c.name===nom).color; }catch(e){ return '#fff'; } };
+  for(const p of PLANETS_DECO){
+    if(p.lunes&&p.lunes.length){const far=Math.max(...p.lunes.map(id=>NODES[id]?Math.hypot(NODES[id].x-p.x,NODES[id].y-p.y):0))+30;s+=`<circle cx="${p.x}" cy="${p.y}" r="${f1(far)}" fill="none" stroke="#9cc2ff" stroke-opacity=".18" stroke-dasharray="4,8"/>`;}
+    s+=_vecPlanete(p);
+    const ly=p.y+(p.ring?p.r*0.75:p.r)+16;
+    s+=`<text x="${p.x}" y="${f1(ly)}" text-anchor="middle" font-size="13" font-weight="700" font-family="Michroma,'Exo 2',sans-serif" paint-order="stroke" stroke="#04060f" stroke-width="3.5" fill="#e6eeff">${p.name}</text>`;
+    s+=`<text x="${p.x}" y="${f1(ly+13)}" text-anchor="middle" font-size="9" fill="#8fa0c8" paint-order="stroke" stroke="#04060f" stroke-width="2.5">${p.info}</text>`;
+    if(p.nation&&civsEnJeu.includes(p.nation))s+=`<text x="${p.x}" y="${f1(ly+25)}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${couleurNation(p.nation)}" paint-order="stroke" stroke="#04060f" stroke-width="2.5">⚑ ${p.nation}</text>`;
+  }
+  // Fanion des Ceinturiens sur Éris (nœud, pas planète-décor)
+  if(civsEnJeu.includes('Ceinturiens')&&NODES.eris)s+=`<text x="${NODES.eris.x}" y="${NODES.eris.y-(NODES.eris.r||15)-9}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${couleurNation('Ceinturiens')}" paint-order="stroke" stroke="#04060f" stroke-width="2.5">⚑ Ceinturiens</text>`;
+  // Pastilles de durée et distances entre capitales
+  const _pill=(x,y,txt,gold)=>{const w=Math.max(34,txt.length*5.4);return `<g><rect x="${f1(x-w/2)}" y="${f1(y-8)}" width="${f1(w)}" height="16" rx="8" fill="${gold?'#241f0e':'#0b1730'}" fill-opacity=".9" stroke="${gold?'#FFD54F':'#4a9eff'}" stroke-opacity=".65" stroke-width="1"/><text x="${f1(x)}" y="${f1(y+3.5)}" text-anchor="middle" font-size="8.5" font-weight="600" fill="${gold?'#ffe08a':'#a9c8ff'}">${txt}</text></g>`;};
   const _range=d=>{const lo=Math.max(1,Math.round(d*0.85)),hi=Math.round(d*1.2);return lo+'–'+hi+' j';};
-  const _pill=(x,y,txt,gold)=>{const w=Math.max(34,txt.length*5.4);return `<g><rect x="${(x-w/2).toFixed(1)}" y="${y-8}" width="${w.toFixed(1)}" height="16" rx="8" fill="${gold?'#241f0e':'#0b1730'}" fill-opacity=".9" stroke="${gold?'#FFD54F':'#4a9eff'}" stroke-opacity=".65" stroke-width="1"/><text x="${x}" y="${y+3.5}" text-anchor="middle" font-size="8.5" font-weight="600" fill="${gold?'#ffe08a':'#a9c8ff'}">${txt}</text></g>`;};
-  const _curve=(a,b)=>{const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len;const side=((mx-SUN.x)*ny-(my-SUN.y)*nx)>=0?1:-1;const off=Math.min(len*0.18,90)*side;return{cx:mx+nx*off,cy:my+ny*off};};
-  // Routes POSSIBLES (graphe du jeu) : lignes bleues + durée si le trajet est long (≥50 j)
-  /* ROUTES QUI CONTOURNENT UNE PLANÈTE.
-     ⚠️ Deux tracés passaient à travers le disque de Mars — Phobos↔Déimos à 14 px de son centre
-     (rayon 29) et Lune↔Phobos à 13. Marc, 2026-08-14 : « fais des courbes pour […] éviter de
-     passer sous la planète ». La valeur est la déviation perpendiculaire du point de contrôle, en
-     pixels ; le signe choisit le côté. Chaque valeur a été retenue en MESURANT la distance de la
-     courbe échantillonnée au disque, pas à l'œil :
-        Phobos↔Déimos  +70 → Mars à 47 px (au lieu de 14)
-        Lune↔Phobos    +70 → Mars à 35 px (au lieu de 13), et Terre reste à 64
-     Toute autre liaison reste une droite : une carte pleine de courbes se lit moins bien. */
-  const COURBE_ROUTE={'deimos|phobos':70,'lune|phobos':70};
-  const _ctrl=(a,b,k)=>{const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1;return{cx:mx-dy/len*k, cy:my+dx/len*k};};
+  // Routes POSSIBLES (graphe du jeu) : pointillé bleu + durée si le trajet est long (≥ 50 j).
+  // Durées : la table DUREES_TRAJET est une RÈGLE (coût des assauts) ; toute arête y figure (test_routes_carte).
   const drawn=new Set();
-  for(const[id,node]of Object.entries(NODES)){for(const adj of node.conn){const key=[id,adj].sort().join('-');if(drawn.has(key))continue;drawn.add(key);const t=NODES[adj];if(node.type==='orbital_station'||t.type==='orbital_station')continue;
-    const _k=COURBE_ROUTE[[id,adj].sort().join('|')];
-    let _mid;
-    if(_k){const c=_ctrl(node,t,_k);
-      s+=`<path d="M ${node.x} ${node.y} Q ${c.cx.toFixed(1)} ${c.cy.toFixed(1)} ${t.x} ${t.y}" fill="none" stroke="#5a7fc0" stroke-width="1.5" stroke-opacity=".7" stroke-dasharray="6,4"/>`;
-      _mid={x:0.25*node.x+0.5*c.cx+0.25*t.x, y:0.25*node.y+0.5*c.cy+0.25*t.y};   // point réel de la courbe, pour la pastille
-    }else{
-      s+=`<line x1="${node.x}" y1="${node.y}" x2="${t.x}" y2="${t.y}" stroke="#5a7fc0" stroke-width="1.5" stroke-opacity=".7" stroke-dasharray="6,4"/>`;
-      _mid={x:node.x+(t.x-node.x)*0.65, y:node.y+(t.y-node.y)*0.65};
-    }
-    const d=DUR[[id,adj].sort().join('|')]??_days(node,t);
-    if(d>=50){s+=_pill(_mid.x,_mid.y,_range(d),false);}
+  for(const[id,node]of Object.entries(NODES)){for(const adj of node.conn){const key=[id,adj].sort().join('|');if(drawn.has(key))continue;drawn.add(key);const t=NODES[adj];if(!t||node.type==='orbital_station'||t.type==='orbital_station'||node.decorative||t.decorative)continue;
+    s+=`<path d="${routePathD(id,adj)}" fill="none" stroke="#5a7fc0" stroke-width="1.5" stroke-opacity=".7" stroke-dasharray="6,4"/>`;
+    const d=joursEntreVoisins(id,adj);
+    if(d>=50){const P=routePoint(id,adj,0.74);s+=_pill(P.x,P.y,_range(d),false);}
   }}
-  /* ROUTES COMMERCIALES (purement visuelles) reliant les capitales : Terre → Mars → Jupiter → Éris.
-     ⚠️ MASQUABLES depuis le 2026-08-14 (Marc : « crée un bouton sur la carte pour afficher ou
-     cacher les distances […] sinon ça devient moins lisible »). Elles ne portent AUCUNE règle :
-     ni route constructible, ni adjacence — seulement des durées de trajet. Les cacher ne change
-     donc rien au jeu, et l'état est rangé dans `G` pour survivre à une sauvegarde. */
-  const _pos=id=>NODES[id]||PLANETS_DECO.find(p=>p.name==={terre:'Terre',mars:'Mars',jupiter:'Jupiter'}[id]);
+  /* DISTANCES ENTRE CAPITALES (jaune, purement visuelles) : Terre → Mars → Jupiter → Éris. Aucune règle :
+     ni route constructible, ni adjacence — seulement des durées. Masquables (Marc, 14/08) ; le réglage
+     vit sur l'appareil (localStorage), pas dans `G`, sinon la synchro en ligne le perdait (15/09). */
+  const _curve=(a,b)=>{const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len;const side=((mx-MAP_SUN.x)*nx+(my-MAP_SUN.y)*ny)>=0?1:-1;const offc=Math.min(len*0.18,90)*side;return{cx:mx+nx*offc,cy:my+ny*offc};};
+  const _pos=id=>NODES[id]||PLANETS_DECO.find(p=>p.id===id);
   _mapDistBouton();   // le bouton suit toujours l'état réel (bug du « bouton resté bleu », 15/09)
-  if(!_mapDistOff())for(const[a,b] of [['terre','mars'],['mars','jupiter'],['jupiter','eris']]){const A=_pos(a),B=_pos(b);if(!A||!B)continue;const c=_curve(A,B);s+=`<path d="M ${A.x} ${A.y} Q ${c.cx.toFixed(1)} ${c.cy.toFixed(1)} ${B.x} ${B.y}" fill="none" stroke="#FFD54F" stroke-width="2.3" stroke-opacity=".5" stroke-dasharray="2,7" stroke-linecap="round"/>`;const px=0.25*A.x+0.5*c.cx+0.25*B.x,py=0.25*A.y+0.5*c.cy+0.25*B.y;s+=_pill(px,py,_range(DUR[[a,b].sort().join('|')]??_days(A,B)),true);}
+  if(!off)for(const[a,b] of [['terre','mars'],['mars','jupiter'],['jupiter','eris']]){const A=_pos(a),B=_pos(b);if(!A||!B)continue;const c=_curve(A,B);s+=`<path d="M ${A.x} ${A.y} Q ${f1(c.cx)} ${f1(c.cy)} ${B.x} ${B.y}" fill="none" stroke="#FFD54F" stroke-width="2.3" stroke-opacity=".5" stroke-dasharray="2,7" stroke-linecap="round"/>`;const px=0.25*A.x+0.5*c.cx+0.25*B.x,py=0.25*A.y+0.5*c.cy+0.25*B.y;const dj=DUREES_TRAJET[[a,b].sort().join('|')];if(dj)s+=_pill(px,py,_range(dj),true);}
+  s+=`</g><rect x="0.5" y="0.5" width="1919" height="1919" fill="none" stroke="#2a3a6a" stroke-opacity=".7"/>`;
   document.getElementById('connections').innerHTML=s;
 }
 /* Bascule des distances entre capitales (lignes jaunes). Rien de plus qu'un affichage. */
@@ -15089,7 +15219,7 @@ function drawConnections(){
    C'est un choix d'AFFICHAGE, propre à l'appareil : il vit dans localStorage, comme la taille Aa, et
    `renderMap` remet le bouton en accord à chaque dessin. */
 function _mapDistOff(){ try{ return localStorage.getItem('sc_mapdist')==='off'; }catch(e){ return false; } }
-function _mapDistBouton(){ try{ const b=document.getElementById('mz-dist'); if(b){ const off=_mapDistOff(); b.classList.toggle('off',off); b.title=(off?'Afficher':'Masquer')+' les distances entre capitales'; } }catch(e){} }
+function _mapDistBouton(){ try{ const b=document.getElementById('mz-dist'); if(b){ const off=_mapDistOff(); b.classList.toggle('off',off); b.title=(off?'Afficher':'Masquer')+' les distances entre capitales et les astéroïdes'; } }catch(e){} }
 function toggleDistances(){
   try{ localStorage.setItem('sc_mapdist', _mapDistOff()?'on':'off'); }catch(e){}
   _mapDistBouton();

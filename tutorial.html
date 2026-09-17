@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-09-16 · v10.67';</script>
+<script>window.SOLAR_BUILD_HTML='2026-09-17 · v10.70';</script>
 <script>/* Taille du texte mémorisée (menu Journal → Aa) : appliquée avant le premier rendu, sans à-coup. */
 (function(){try{var t=localStorage.getItem('sc_taille');var m={'11':'14','13':'16','15':'18','17':'20'};if(m[t]){t=m[t];localStorage.setItem('sc_taille',t);}if(t&&/^(14|16|18|20)$/.test(t))document.documentElement.style.setProperty('--sc-fs',t+'px');}catch(e){}})();</script><!-- ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE : celle-ci, `SOLAR_BUILD_JS` (online.js) et `SOLAR_BUILD_MOTEUR` (moteur.js). Surveillé par test_versions.js. -->
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
@@ -1422,7 +1422,7 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
   <div class="m-panel active" id="mp-map">
   <div id="center">
     <div id="map-wrap">
-      <svg id="solar-svg" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+      <svg id="solar-svg" viewBox="0 0 1920 1920" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
         <defs>
           <radialGradient id="bg-grad" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stop-color="#0d0d2a"/>
@@ -1431,11 +1431,8 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
           <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
           <filter id="glow2"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         </defs>
-        <rect width="400" height="600" fill="url(#bg-grad)"/>
-        <!-- Carte globale : `global2.webp` (2048 × 3072, rapport 2:3 exact, 677 Ko). Le WebP pèse trois
-           fois moins que le PNG d'origine (7,3 Mo) pour un rendu identique ; `global2.jpg` sert de repli
-           aux très vieux navigateurs. ⚠️ Changer ce dessin oblige à recalculer MAP_HOTSPOTS (moteur.js). -->
-        <image id="map-bg-img" href="assets/map/global2.webp" xlink:href="assets/map/global2.webp" x="0" y="0" width="400" height="600" preserveAspectRatio="xMidYMid slice"/>
+        <!-- v10.70 : un seul plateau dessiné par le moteur (drawConnections) ; plus d'image peinte. -->
+        <rect x="-4000" y="-4000" width="10000" height="10000" fill="#03040a"/>
         <g id="stars"></g>
         <g id="connections"></g>
         <g id="routes-ai"></g>
@@ -1443,10 +1440,6 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
         <g id="pirates-g"></g>
         <g id="nodes-g"></g>
       </svg>
-      <div id="map-back" onclick="backToMap()">← Carte</div>
-      <div class="panel-nav" id="panel-left" onclick="changePanel(-1)">◀</div>
-      <div class="panel-nav" id="panel-right" onclick="changePanel(1)">▶</div>
-      <div id="panel-label">Zone Interne</div>
       <div id="npop">
         <h4><span id="npop-title"></span><span class="npop-close" onclick="closePopup()">✕</span></h4>
         <div class="npop-info" id="npop-info"></div>
@@ -1462,7 +1455,7 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
       Bascule des distances entre capitales (les traits jaunes Terre–Mars–Jupiter–Éris). Elles
       n'portent aucune règle : ni route, ni adjacence, seulement des durées de trajet. Placée près
       du zoom, comme demandé, parce que c'est là qu'on règle la lisibilité de la carte. -->
-      <button id="mz-dist" onclick="toggleDistances()" title="Masquer les distances entre capitales">⤳</button></div>
+      <button id="mz-dist" onclick="toggleDistances()" title="Masquer les distances entre capitales et les astéroïdes">⤳</button></div>
   </div>
   </div>
   <div class="m-panel" id="mp-tech">
@@ -2106,7 +2099,7 @@ try{ window.addEventListener('resize',function(){ try{ uiMapFit(); }catch(e){} }
    puis dessine les "+" de création de route PAR-DESSUS tout (dans nodes-g). */
 function uiMapMarkers(){
   var svg=document.getElementById('solar-svg');
-  if(svg)svg.setAttribute('viewBox','0 175 2020 490');
+  if(svg)svg.setAttribute('viewBox',(typeof MAP_VIEWBOX!=='undefined')?MAP_VIEWBOX:'0 0 1920 1920');
   uiApplyMZ();
   if(!G||!G.player||G.phase!=='actions')return;
   var ng=document.getElementById('nodes-g');
@@ -2122,8 +2115,9 @@ function uiMapMarkers(){
       var key=[id,adj].sort().join('|');if(seen[key])continue;seen[key]=1;
       if(built(id,adj))continue;
       var from=owns(id)?id:(owns(adj)?adj:id), to=(from===id)?adj:id;
-      var A=NODES[from],B=NODES[to];
-      var mx=A.x+(B.x-A.x)*0.42, my=A.y+(B.y-A.y)*0.42;
+      /* v10.70 : le « + » est au MILIEU du tracé réel (courbe ou droite), comme le jeton de route. */
+      var P=(typeof routePoint==='function')?routePoint(from,to,0.5):{x:NODES[from].x+(NODES[to].x-NODES[from].x)*0.5,y:NODES[from].y+(NODES[to].y-NODES[from].y)*0.5};
+      var mx=P.x, my=P.y;
       add+='<g style="cursor:pointer" onclick="uiAddRoute(\''+from+'\',\''+to+'\')">'
         +'<circle cx="'+mx+'" cy="'+my+'" r="18" fill="transparent"/>'
         +'<circle cx="'+mx+'" cy="'+my+'" r="14" fill="#4a9eff" fill-opacity=".2"/>'

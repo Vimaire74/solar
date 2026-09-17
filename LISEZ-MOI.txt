@@ -1,4 +1,4 @@
-LOT 17 — MISE À JOUR LÉGÈRE (v10.67, sw v188) — 16/09/2026 : ⚠️ NOUVEAU — les nations se souviennent des agressions qu'elles ont subies et durcissent leurs réponses tant qu'on n'a pas fait un geste ; ⚠️ RÈGLE MAJEURE — attaquer une colonie NE DÉCLARE PLUS LA GUERRE : ça fait monter la tension, et c'est elle seule qui impose la guerre à 10, en fin de tour ; ⚠️ NOUVELLE RÈGLE — conquérir loin coûte plus d'actions (1, 2 ou 3 selon le temps de voyage) ; ⚠️ RÈGLE DE GUERRE — l'usure de moral attend le tour suivant, la fenêtre de guerre populaire annonce le prix — et tout le v10.63 (raid à 2 jetons, perte de colonie annoncée, largeurs)
+LOT 17 — MISE À JOUR LÉGÈRE (v10.70, sw v191) — 17/09/2026 : 🗺️ NOUVELLE CARTE (plateau carré en quart de disque, Soleil en bas à gauche, échelle logarithmique, planètes en vecteur, ceintures d'astéroïdes visibles, routes courbes, une seule carte zoomable) + RÈGLE des liaisons (− Vesta–Europe, − Lune–Vesta, + Encelade–Vesta 125 j, + Callisto–Encelade 78 j, + Ganymède–Triton 190 j). Précédent : (v10.69) ⚠️ Calmer la Population dit enfin quelle tension elle calme, une fois par nation et par tour, et l'ordinateur qui l'achète calme VRAIMENT sa tension ; ⚠️ les guerres se résolvent dans l'ordre et en entier, le joueur choisit sa cible AU MOMENT de frapper ; ⚠️ RÈGLE — l'avance technologique se juge en relatif, tous les deux tours ; ⚠️ NOUVELLE ACTION SOCIALE — Mission diplomatique ; ⚠️ NOUVEAU (16/09) — les nations se souviennent des agressions qu'elles ont subies et durcissent leurs réponses tant qu'on n'a pas fait un geste ; ⚠️ RÈGLE MAJEURE — attaquer une colonie NE DÉCLARE PLUS LA GUERRE : ça fait monter la tension, et c'est elle seule qui impose la guerre à 10, en fin de tour ; ⚠️ NOUVELLE RÈGLE — conquérir loin coûte plus d'actions (1, 2 ou 3 selon le temps de voyage) ; ⚠️ RÈGLE DE GUERRE — l'usure de moral attend le tour suivant, la fenêtre de guerre populaire annonce le prix — et tout le v10.63 (raid à 2 jetons, perte de colonie annoncée, largeurs)
 
 Ce dossier ne contient QUE ce qui a changé depuis la version en ligne : 7 fichiers à la racine
 (index.html, moteur.js, online.js, sw.js, tutorial.html, tutorial.js, regles.html) + 2 fichiers serveur (server/game-core.js
@@ -10,6 +10,82 @@ Sur GitHub, à la RACINE du dépôt : Add file → Upload files, glisser les 7 f
 dossier server (il fusionne avec celui du dépôt), pas ce LISEZ-MOI, Commit changes. Puis Coolify : vérifier que les DEUX ressources se redéploient (solar-game.com ET
 live.solar-game.com) — moteur.js contient les règles et le serveur le lit aussi. Si l'une ne s'est
 pas redéployée toute seule : Redeploy à la main.
+
+🗺️ NOUVELLE CARTE (17/09, v10.70) — LE PLATEAU EN QUART DE DISQUE
+Marc a validé sur maquettes un plateau carré : le Soleil dans le coin inférieur gauche, chaque corps
+à une distance du Soleil qui suit le logarithme de sa distance réelle. L'ordre et les rapports sont
+vrais (Pluton au-delà de Neptune, Éris — planète naine du disque épars — seule dans le coin, hors de
+la ceinture de Kuiper) ; les lunes sont des encarts autour de leur planète, seul leur ordre compte.
+Planètes dessinées en vecteur (plus de photos rognées ; Jupiter, Saturne avec ses anneaux, Uranus et
+Neptune à l'échelle entre elles), ceintures avec un champ d'astéroïdes qu'on VOIT, étiquettes
+« Ceinture d'astéroïdes principale » et « Ceinture de Kuiper », distance au Soleil et période sous
+chaque planète. Routes : droites si courtes, courbes vers l'extérieur sinon, et elles contournent
+d'elles-mêmes une planète qu'elles frôleraient ; le « + » et le jeton sont au milieu du tracé.
+UNE SEULE carte : l'image peinte et ses zones cliquables ont disparu, tout est dans le plateau
+zoomable (1× à 5× ; au téléphone la carte s'ouvre à 2× sur ta capitale). Le bouton ⤳ masque les
+distances entre capitales ET les astéroïdes.
+⚠️ RÈGLE (décisions de Marc sur la maquette) : Vesta–Europe et Lune–Vesta n'existent plus ;
+Encelade–Vesta (125 j, 2 actions), Callisto–Encelade (78 j, 2 actions) et Ganymède–Triton (190 j,
+3 actions) existent. Toute liaison a désormais sa durée écrite dans DUREES_TRAJET — trois étaient
+calculées sur les pixels de l'écran (Io–Lune 121, Phobos–Vesta 43, Io–Vesta 49) et ont été gelées,
+sinon déplacer les nœuds aurait changé le coût des assauts en silence. Lune→Triton passe de 346 à
+306 jours (toujours 3 actions). Bancs : server/test_routes_carte.js (nouveau), test_cout_distance
+adapté. Règles écrites (§5) à jour ; tutoriel : l'étape « carte » réécrite.
+Ce qui n'est PAS dans ce lot et viendra après : Obéron / Titania, capitale des Ceinturiens sur
+Triton, coût de traversée d'une ceinture.
+
+⚠️ CORRECTION (17/09, v10.69) — CALMER LA POPULATION : ON SAIT QUELLE TENSION, ET L'IA LA CALME VRAIMENT
+Marc : « on ne sait pas quelle tension elle calme ». La carte et la fenêtre de choix disent maintenant
+le SENS : Calmer la Population baisse TA tension envers la nation choisie (+1 moral) ; la Mission
+diplomatique baisse SA tension envers toi. Les deux ont le même garde-fou, une fois par nation et par
+tour, et les deux demandent vis-à-vis de quelle nation.
+Et un défaut réel : quand un ORDINATEUR achetait Calmer la Population, il payait 1🪨 1⚡, gagnait son
+moral, et aucune tension ne bougeait — le choix de la nation n'existait que dans la fenêtre du joueur.
+Une seule règle désormais (`calmerPopulation`), pour le joueur et l'ordinateur ; l'ordinateur calme
+la nation qu'il déteste le plus. Banc : server/test_calmer_population.js (§6-§8 ajoutés).
+
+⚠️ CORRECTION (17/09, v10.68) — LES GUERRES SE RÉSOLVENT DANS L'ORDRE ET EN ENTIER
+Partie 66C3, tour 7 : trois guerres populaires contre les Terriens le même soir. La fenêtre « ton
+peuple exige la guerre, choisis ta cible » s'ouvrait chez Marc AVANT la file des guerres ; il
+choisissait Titan ; puis la file jouait les guerres des autres — les Ceinturiens prenaient Titan —
+et sa propre guerre, arrivant en troisième, rouvrait une fenêtre où Titan n'existait plus. « Y a un
+truc qui s'est intercalé entre les deux choix ? » Oui : deux guerres entières.
+Désormais (règle de Marc) : chaque guerre se résout à sa place, en entier. Les guerres pendantes d'un
+tour précédent passent d'abord, puis les nouvelles dans l'ordre de leur CAUSE dans le tour (un refus
+de Dyson à la première action avant une conquête faite à la troisième). La guerre populaire du joueur
+n'est plus jouée avant la file mais À SA PLACE dedans : le choix de la cible et le coup au même
+instant, sur l'état du moment. Et si une cible choisie a tout de même changé de mains (une IA l'a
+prise pendant ses actions), la fenêtre le DIT — « Titan a changé de mains entre ton choix et ton
+assaut : les Ceinturiens l'ont prise » — au lieu de la faire disparaître en silence.
+⚠️ Trouvé au passage, EN LIGNE : quand un joueur choisissait une colonie dans cette fenêtre, la
+question de ses jetons ne partait jamais — l'assaut restait armé et personne ne le résolvait ; la
+partie continuait comme si de rien n'était. Corrigé : la fenêtre de combat s'ouvre avec la colonie
+choisie en tête. Bancs : server/test_ordre_des_guerres.js (5 sections), test_guerres_populaires_file
+adapté. Le point 3 de Marc (la nation assaillie choisit quel conflit résoudre en premier) est
+reporté à une livraison suivante.
+
+⚠️ CHANGEMENT DE RÈGLE (17/09, v10.68) — L'AVANCE TECHNOLOGIQUE SE JUGE EN RELATIF, TOUS LES DEUX TOURS
+Avant : +4 de tension PAR TOUR, de la part de TOUTES les nations à la fois, dès que l'une possédait
+deux technologies de rang 3. C'est ce qui a ligué trois nations contre les Terriens le même soir
+dans la 66C3 : tout le monde atteignait 10 au même rythme. Maintenant (Marc) : +2 par technologie de
+rang 3 que l'autre possède EN PLUS de toi, évalué tous les deux tours — aux tours d'événement — après
+l'événement. Une nation qui suit le rythme n'est plus punie ; l'écart seul compte ; la pression est
+divisée par deux. Comme ce grief tombe après le jugement du seuil de 10, une guerre qui en résulte
+n'est déclarée qu'à la fin du tour suivant — décalage accepté : les guerres technologiques cessent
+de tomber le même soir que les autres. Sur la 66C3, les Martiens auraient accumulé +6 contre les
+Terriens en quatre tours au lieu de +16. Banc : server/test_tension_technologique.js.
+
+⚠️ NOUVELLE ACTION SOCIALE (17/09, v10.68) — 🕊️ MISSION DIPLOMATIQUE
+Marc : « une nouvelle tech : Diplomatie, répétable comme les 3 ressources, −2 matériaux, réduire la
+tension de 3 avec une nation à choix. » Il existait Calmer la Population (1🪨 1⚡ → +1 moral et −3 à
+TA tension envers une nation). La Mission diplomatique fait l'autre sens : −3 à la tension d'une
+nation ENVERS TOI — celle qui décide si son peuple te déclare la guerre — pour 1 action et 2🪨,
+répétable. Jusqu'ici ce sens n'existait que par la carte Stratégie Diplomatie, qu'il faut avoir la
+chance de piocher (Marc l'a jouée cinq fois dans la 66C3 pour survivre). Garde-fou : une fois par
+nation et par tour — sinon 5 actions effaçaient 15 points de tension. Les ordinateurs peuvent
+l'utiliser aussi (ils apaisent qui leur en veut le plus). Nommée « Mission diplomatique » pour ne pas
+porter le même nom que la carte Stratégie. Règles écrites mises à jour (marché civique et §12.2).
+Banc : server/test_mission_diplomatique.js (6 sections).
 
 ⚠️ NOUVEAU (16/09, v10.67) — LES NATIONS SE SOUVIENNENT DE CE QU'ON LEUR A FAIT
 Marc : « Si tu les as raidées ou attaquées au moins une fois et que tu n'as jamais fait l'action
