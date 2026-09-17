@@ -1,4 +1,4 @@
-LOT 17 — MISE À JOUR LÉGÈRE (v10.63, sw v184) — 16/09/2026 : ⚠️ CHANGEMENT DE RÈGLE (raid à 2 jetons pour tout le monde), le joueur qui perd une colonie est prévenu, bilan qui ne déborde plus, largeur constante sur ordinateur — et tout le v10.62 (barre « console », panneaux Blason, Aa, « Pouvoir »)
+LOT 17 — MISE À JOUR LÉGÈRE (v10.67, sw v188) — 16/09/2026 : ⚠️ NOUVEAU — les nations se souviennent des agressions qu'elles ont subies et durcissent leurs réponses tant qu'on n'a pas fait un geste ; ⚠️ RÈGLE MAJEURE — attaquer une colonie NE DÉCLARE PLUS LA GUERRE : ça fait monter la tension, et c'est elle seule qui impose la guerre à 10, en fin de tour ; ⚠️ NOUVELLE RÈGLE — conquérir loin coûte plus d'actions (1, 2 ou 3 selon le temps de voyage) ; ⚠️ RÈGLE DE GUERRE — l'usure de moral attend le tour suivant, la fenêtre de guerre populaire annonce le prix — et tout le v10.63 (raid à 2 jetons, perte de colonie annoncée, largeurs)
 
 Ce dossier ne contient QUE ce qui a changé depuis la version en ligne : 7 fichiers à la racine
 (index.html, moteur.js, online.js, sw.js, tutorial.html, tutorial.js, regles.html) + 2 fichiers serveur (server/game-core.js
@@ -10,6 +10,107 @@ Sur GitHub, à la RACINE du dépôt : Add file → Upload files, glisser les 7 f
 dossier server (il fusionne avec celui du dépôt), pas ce LISEZ-MOI, Commit changes. Puis Coolify : vérifier que les DEUX ressources se redéploient (solar-game.com ET
 live.solar-game.com) — moteur.js contient les règles et le serveur le lit aussi. Si l'une ne s'est
 pas redéployée toute seule : Redeploy à la main.
+
+⚠️ NOUVEAU (16/09, v10.67) — LES NATIONS SE SOUVIENNENT DE CE QU'ON LEUR A FAIT
+Marc : « Si tu les as raidées ou attaquées au moins une fois et que tu n'as jamais fait l'action
+diplomatie avec eux, ils devraient avoir des réactions plus négatives envers toi quand tu demandes
+quelque chose. Ce serait logique. »
+La tension s'efface — elle redescend d'elle-même, une paix la divise par deux, un sommet la baisse
+partout. Deux tours après avoir pillé une nation, on lui proposait un accord comme si de rien
+n'était. Désormais chaque raid et chaque assaut subi — RÉUSSI OU NON — s'inscrit dans une RANCUNE
+qui, elle, ne s'efface pas avec le temps. Au moment où la nation décide d'accepter ou de refuser
+(accord commercial, pacte de non-agression, offre de paix), elle ressent ta tension +1 dès la
+première agression et +2 à partir de la troisième. Un accord qui serait passé à 6 de tension est
+refusé si tu l'as déjà attaquée — et le refus te dit pourquoi, en toutes lettres.
+À tension basse, une rancune seule ne bloque rien : une nation tranquille reste ouverte.
+ON SE RÉCONCILIE TOUJOURS : une mission 🕊️ Diplomatie dirigée vers cette nation efface son ardoise
+d'un coup, et elle ne dépend pas de son accord — une diplomatie bloquée peut donc toujours se
+débloquer. Un pacte de non-agression signé l'efface aussi, des deux côtés. Et une nation incapable
+de se battre, ou dont le peuple n'en veut plus, accepte la paix quelle que soit sa rancune : aucune
+guerre ne devient éternelle. Règles écrites : nouveau paragraphe 12.4.
+Banc : server/test_memoire_agressions.js (9 sections).
+MESURÉ sur 6 parties tout-ordinateur : effet nul sur la diplomatie entre ordinateurs — ils ne
+signent ni plus ni moins d'accords, et aucun refus n'a été causé par la rancune. La raison est
+simple : après une agression la tension est déjà au-dessus du seuil de refus, la surcharge ne
+change donc rien. C'est pour le JOUEUR que la règle mord — celui qui raide, laisse la tension
+redescendre, puis revient demander quelque chose.
+
+⚠️ RÈGLE MAJEURE (16/09, v10.66) — ATTAQUER UNE COLONIE NE DÉCLARE PLUS LA GUERRE
+Marc : « ma volonté a toujours été celle-ci. Tout passe par la tension. Si elle est à 10, c'est la
+guerre populaire forcée. Donc c'est ça qui déclenche la guerre obligatoire, mais EN FIN DE TOUR,
+donc pas immédiatement à l'attaque d'une colonie. Car on perd déjà du moral en perdant la défense
+d'une colonie, ça fait beaucoup d'un coup sinon. »
+Jusqu'ici, attaquer une colonie ouvrait la guerre sur-le-champ, avec tout son cortège : accords
+révoqués, routes rompues en territoire ennemi, tension à 10 des deux côtés, −4 de moral à chaque
+camp dès le tour suivant. Désormais l'assaut est une ESCARMOUCHE : le combat a lieu exactement
+comme avant — mêmes jetons, mêmes pertes, même capture — mais aucun état de guerre ne s'ouvre.
+Ce que l'agression laisse derrière elle, c'est la TENSION DE L'AGRESSÉ envers l'agresseur :
+    colonie prise → 8/10   ·   assaut repoussé → 6/10   ·   l'agresseur, lui, n'ajoute rien.
+Ce sont des planchers : une tension déjà plus haute ne redescend pas. Une attaque ratée compte
+presque autant qu'une réussie — Marc : « les actes d'agression des nations sur Terre ne sont jamais
+pardonnés ». Et la guerre reste possible, par le seul chemin voulu : la tension à 10 jugée en fin
+de tour, qui impose la guerre populaire — avec sa fenêtre qui en annonce le prix (v10.64).
+Qui veut la guerre à tout prix peut donc toujours l'obtenir : il lui suffit d'attaquer tant qu'il
+lui reste des actions, et la tension fera le reste le soir même.
+Une seule conséquence diplomatique est conservée à l'assaut : l'ACCORD COMMERCIAL entre les deux
+nations est rompu. On ne commerce pas avec qui l'on attaque — et le bouton s'appelle « Rompre
+l'accord et attaquer ». En revanche, les routes et les colonies de cohabitation ne sont plus
+détruites : une escarmouche ne redessine pas la carte.
+Bancs : server/test_assaut_sans_guerre.js (8 sections).
+MESURÉ sur 6 parties tout-ordinateur, mêmes tirages avant et après :
+    guerres déclarées par partie ....... 4,50 → 2,83   (−37 %)
+    prélèvements d'usure par partie .... 12,5 → 8,0
+    captures de colonie par partie ..... 11,5 → 8,3
+C'est l'effet « temporiser » attendu, et il arrive enfin : le report de l'usure seul (v10.64) avait
+fait l'inverse (+21 %). À noter tout de même : les conquêtes baissent aussi de 28 %, donc une part
+de la baisse vient de moins d'agressions en général, pas seulement de moins d'escalade.
+
+⚠️ CORRECTION (16/09, v10.66) — LE BARÈME DE DISTANCE MANQUAIT SUR UN CHEMIN
+L'assaut d'un ordinateur sur un AUTRE ordinateur payait encore 1 action quelle que soit la distance,
+alors que le joueur et l'ordinateur attaquant un humain payaient déjà le barème de la v10.65 :
+conquérir Titan depuis Io (84 jours de voyage) coûtait 1 action à une IA contre 2 à un joueur.
+Corrigé, même barème pour tout le monde.
+
+⚠️ NOUVELLE RÈGLE (16/09, v10.65) — CONQUÉRIR LOIN COÛTE PLUS D'ACTIONS
+Règle proposée par Laurent, calibrée avec Marc. Jusqu'ici un assaut coûtait UNE action, que la cible
+soit la lune d'à côté ou l'autre bout du système. Le coût suit maintenant le TEMPS DE VOYAGE, qui
+était déjà écrit sur la carte mais ne servait qu'à l'affichage :
+    moins de 60 jours → 1 action · de 60 à 150 jours → 2 · plus de 150 jours → 3 (plafond volontaire).
+Le voyage part de ta colonie CONNECTÉE la plus proche — une colonie isolée ne ravitaille rien, et une
+route ne sert pas de point de départ. L'Hyperpropulsion retire 1 action (minimum 1) ; l'IA de
+Navigation ne donne rien ici, elle est « déjà brutale pour la guerre ».
+Pourquoi un plafond à 3 : en prolongeant les paliers de 60, Lune↔Triton (346 j) coûterait 6 actions
+alors que le maximum du jeu est 5 — l'attaque deviendrait impossible au lieu d'être chère. À 3 elle
+reste jouable pour qui a développé son gouvernement, et hors de portée au niveau 1 (2 AC) : les débuts
+de partie sont protégés sans règle supplémentaire.
+Le bouton d'attaque annonce le prix avant qu'on le paie : « 2AC −3⚔ · 113 j de voyage ».
+Banc : server/test_cout_distance.js. Mesuré sur 6 parties tout-IA, avant contre après : guerres
+déclarées 4,83 → 4,50 par partie, prélèvements d'usure 16,7 → 12,5.
+
+⚠️ CHANGEMENT DE RÈGLE (16/09, v10.64) — L'USURE DE GUERRE ATTEND LE TOUR SUIVANT
+Marc : « le malus moral ne s'applique qu'au début du tour suivant et on a le temps de compenser ».
+Avant, déclarer une guerre coûtait −4 de moral aux DEUX camps sur-le-champ, en pleine phase d'actions :
+dans la partie 96F6, Laurent a payé 8 de moral aux tours 7 et 9 pour deux guerres que l'ordinateur a
+ouvertes puis abandonnées dans le même tour. Désormais l'usure est prélevée UNIQUEMENT à l'ouverture
+d'un tour, et seulement pour les guerres encore ouvertes : une guerre réglée avant la nuit ne coûte
+rien à personne. Le journal prévient au moment de la déclaration. Raison de fond, dans les mots de
+Marc : perdre la défense d'une colonie coûte déjà du moral, ajouter −4 dans le même tour « fait
+beaucoup d'un coup » ; en étalant, on temporise, « comme dans la vraie vie ».
+Vérifié au passage et inchangé : perdre un combat ET la colonie coûte 2 de moral au total, jamais 3.
+Banc : server/test_usure_tour_suivant.js.
+Mesuré sur 6 parties tout-IA, avant contre après : guerres déclarées 4,00 → 4,83 par partie,
+prélèvements d'usure 24,2 → 16,7, moral moyen en fin de partie 7,8 → 8,0. La guerre est donc un peu
+moins chère et un peu plus fréquente — l'effet « temporiser » viendra surtout de l'étape suivante.
+
+Moral 0 : les actions sont divisées par deux ARRONDI AU SUPÉRIEUR (Marc, 16/09), au lieu de l'arrondi
+bas d'avant — à 5 actions il en reste 3, à 3 il en reste 2. Une nation à terre garde de quoi se relever.
+
+LA FENÊTRE DE GUERRE POPULAIRE ANNONCE CE QUE ÇA COÛTE (Marc : « les joueurs ne lisent jamais rien »)
+Un encadré rouge, chiffré pour TOI : −4 de moral à chaque camp dès le début du tour prochain et à
+chaque tour tant que la guerre dure, ton moral actuel et ce qu'il deviendra dans deux tours, la règle
+du moral 1 (revenus divisés par deux), celle du moral 0 (aucun revenu, et tes actions tombent de 5 à 3),
+et la porte de sortie (faire la paix avant la fin du tour ne coûte aucun moral). Même texte en solo et
+en ligne : il est calculé par le moteur, le client ne le recalcule pas.
 
 ⚠️ CHANGEMENT DE RÈGLE (16/09, v10.63) — LES CEINTURIENS PERDENT LE RAID À 1 JETON
 Marc, après la partie 96F6 : « c'est peut-être un peu fort, il a déjà plusieurs avantages donc supprime

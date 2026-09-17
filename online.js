@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-16 · v10.63';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-16 · v10.67';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -605,7 +605,8 @@ function showForcedWarReal(pending){
   /* Blason : médaillon + nom de l'ennemi, le titre devient le verbe. */
   try{ const G=scGetG(); const n=[G.player].concat(G.ais||[]).find(x=>x&&x.civ&&x.civ.id===o.enemy); const e=document.getElementById('fw-emoji'), nm=document.getElementById('fw-nation'); if(e)e.textContent=n?n.civ.emoji:'😡'; if(nm)nm.textContent=enemy; }catch(e){}
   if(title)title.textContent='Ton peuple exige la guerre. Choisis ta cible.';
-  if(desc)desc.innerHTML='Tension à 10 : le peuple exige que tu attaques <b>'+enemy+'</b> maintenant.';
+  /* `o.prix` vient du moteur (voir `prixDeLaGuerreHTML`) : même texte qu'en solo, chiffré pour toi. */
+  if(desc)desc.innerHTML='Tension à 10 : le peuple exige que tu attaques <b>'+enemy+'</b> maintenant.'+(o.prix||'');
   const go=(ans)=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide(ans); };
   let html='<div class="fw-choice" id="fw-peace">🕊️ Exiger la paix (tribut si ennemi faible, sinon la guerre continue)</div>';
   (o.routes||[]).forEach(r=>{ const can=(o.myForce||0)>=r.need; html+='<div class="fw-choice" data-rt="'+r.i+'" style="'+(can?'':'opacity:.5')+'">'+(r.prot?'🛡️':'🔓')+' Attaquer route '+r.name+' — '+r.need+' jeton'+(r.need>1?'s':'')+'</div>'; });

@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-16 · v10.63';
+const SOLAR_BUILD_MOTEUR = '2026-09-16 · v10.67';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -949,6 +949,8 @@ function stPacteReponse(ans,civId){
       if(_i>=0){G.wars.splice(_i,1);halveTensions(prop.civ.id,part.civ.id);if(typeof syncWarState==='function')syncWarState();}
       poserPacte(prop,part,4);
       setTens(prop.civ.id,part.civ.id,0);setTens(part.civ.id,prop.civ.id,0);
+      /* Un pacte lie les deux : les deux ardoises sont effacées (§134 étape 4). */
+      if(typeof apaiserRancune==='function') apaiserRancune(prop,part,{mutuel:true});
       const cap=getResCapFor(prop).morale, cap2=getResCapFor(part).morale;
       prop.res.morale=Math.min(cap,(prop.res.morale||0)+1);
       part.res.morale=Math.min(cap2,(part.res.morale||0)+1);
@@ -1155,6 +1157,62 @@ function _tk(x){return x==='player'?((G.player&&G.player.civ&&G.player.civ.id)||
 function getTens(from,to){from=_tk(from);to=_tk(to);return((G.tensions[from]||{})[to])||0;}
 function setTens(from,to,val){from=_tk(from);to=_tk(to);if(!G.tensions[from])G.tensions[from]={};G.tensions[from][to]=Math.max(0,Math.min(10,val));}
 function addTens(from,to,delta){setTens(from,to,getTens(from,to)+delta);}
+/* ═══════════ LA RANCUNE : CE QU'UNE NATION N'OUBLIE PAS (Marc, 16/09, §134 étape 4) ═══════════
+   « Si tu les as raidées ou attaquées au moins une fois et que tu n'as jamais fait l'action
+   diplomatie avec eux, ils devraient avoir des réactions plus négatives envers toi quand tu
+   demandes quelque chose. »
+
+   POURQUOI LA TENSION NE SUFFISAIT PAS. Elle s'efface : le temps la fait redescendre, une paix la
+   divise par deux, un sommet la baisse de 5 partout. Deux tours après avoir pillé une nation, on
+   lui proposait un accord commercial comme si de rien n'était. Rien ne distinguait un voisin qui
+   ne vous a jamais touché d'un voisin qui vous a pris une colonie et n'a rien fait depuis.
+
+   CE QUE C'EST. Un compteur par couple ORIENTÉ — `G.rancunes[victime][agresseur]` — incrémenté à
+   chaque raid et à chaque assaut SUBI, qui ne se dégrade PAS avec le temps. Un objet simple, sans
+   Set ni Map : il traverse la sérialisation du serveur sans traitement particulier.
+
+   COMMENT IL PÈSE. Pas en modifiant la tension affichée — un chiffre qu'on montre doit être celui
+   qui vaut. La rancune est une SURCHARGE ajoutée au moment de décider, et seulement là : +1 dès la
+   première agression, +2 à partir de la troisième, jamais plus. Et le refus la NOMME, sans quoi le
+   joueur verrait une nation refuser sans comprendre pourquoi.
+
+   ⚠️ LA PORTE DE SORTIE EST LA PARTIE LA PLUS IMPORTANTE. La carte 🕊️ Diplomatie, dirigée vers cette
+   nation, remet le compteur à zéro — elle ne demande l'accord de personne, donc une diplomatie
+   bloquée peut TOUJOURS se débloquer. Un pacte de non-agression signé l'efface des deux côtés.
+   Sans cette issue, une nation agressée une fois refuserait tout jusqu'à la fin de la partie : ce
+   serait une punition, pas une règle. Banc : server/test_memoire_agressions.js */
+const RANCUNE_MAX = 5;                 // au-delà, compter plus n'ajoute rien
+const RANCUNE_SEUIL_FORT = 3;          // à partir de trois agressions, la surcharge passe de +1 à +2
+function _rancunes(){ if(!G.rancunes)G.rancunes={}; return G.rancunes; }
+function rancuneDe(victime,agresseur){
+  const v=_tk(victime&&victime.civ?victime.civ.id:victime), a=_tk(agresseur&&agresseur.civ?agresseur.civ.id:agresseur);
+  return ((_rancunes()[v]||{})[a])||0;
+}
+function ajouterRancune(victime,agresseur){
+  if(!victime||!agresseur||victime===agresseur)return 0;
+  const v=_tk(victime.civ?victime.civ.id:victime), a=_tk(agresseur.civ?agresseur.civ.id:agresseur);
+  if(v===a)return 0;
+  const R=_rancunes(); if(!R[v])R[v]={};
+  R[v][a]=Math.min(RANCUNE_MAX,(R[v][a]||0)+1);
+  return R[v][a];
+}
+/* `mutuel` : un pacte lie deux nations, il efface donc les deux ardoises. Une mission diplomatique,
+   elle, ne va que dans un sens — c'est celui qui la reçoit qui pardonne. */
+function apaiserRancune(a,b,opts){
+  opts=opts||{};
+  if(!a||!b)return;
+  const ia=_tk(a.civ?a.civ.id:a), ib=_tk(b.civ?b.civ.id:b);
+  const R=_rancunes();
+  const effacer=(v,ag)=>{ if(R[v]&&R[v][ag]){ delete R[v][ag]; return true; } return false; };
+  /* `apaiserRancune(moi, lui)` : c'est LUI qui oublie ce que MOI je lui ai fait. */
+  let fait=effacer(ib,ia);
+  if(opts.mutuel) fait=effacer(ia,ib)||fait;
+  return fait;
+}
+function surchargeRancune(victime,agresseur){
+  const n=rancuneDe(victime,agresseur);
+  return n>=RANCUNE_SEUIL_FORT?2:(n>=1?1:0);
+}
 /* Le compte de l'agenda ⚔️ Armada Solaire — voir le commentaire de la carte `ag4`.
    Une seule fonction, lue par l'agenda, par l'écran et par les bancs : si demain le compte change,
    il change PARTOUT en même temps. */
@@ -1935,7 +1993,15 @@ function accordAcceptable(nat, proposant){
   if(typeof accordEntre==='function'&&accordEntre(nat,proposant))
     return {ok:false, raison:'un accord vous lie déjà — il n\'en existe qu\'un par couple de nations'};
   const tension=tensEff(nat.civ.id, proposant.civ.id);
+  /* ═══ LA MÉMOIRE DES AGRESSIONS S'AJOUTE À LA TENSION, AU MOMENT DE DÉCIDER ═══
+     Pas dans la jauge affichée : un chiffre montré doit être celui qui vaut. La surcharge n'existe
+     qu'ici, et le refus la NOMME — sans quoi le joueur verrait une nation refuser sans comprendre.
+     À tension basse, une rancune seule ne bloque rien : on reste ouvert à qui n'a pas envenimé. */
+  const _ranc=(typeof rancuneDe==='function')?rancuneDe(nat,proposant):0;
+  const _surch=(typeof surchargeRancune==='function')?surchargeRancune(nat,proposant):0;
   if(tension>=7) return {ok:false, raison:'tensions trop élevées ('+tension+'/10)'};
+  if(tension+_surch>=7) return {ok:false, raison:'ils n\'ont pas oublié '+(_ranc>1?('tes '+_ranc+' agressions'):'ton agression')
+    +' — tension '+tension+'/10, et rien n\'a été fait pour l\'apaiser (une mission 🕊️ Diplomatie efface l\'ardoise)'};
   try{
     const mien=calcVP(nat).total, sien=calcVP(proposant).total;
     const enForme=(nat.res.morale||0)>=4 && nat.colonies.length>=3;
@@ -2104,6 +2170,98 @@ function rEmoji(r){return{energy:'<i class=ri-energy></i>',materials:'<i class=r
 function rLabel(r){return{energy:'Énergie',materials:'Matériaux',science:'Savoir',morale:'Moral'}[r]||r;}
 function rHtml(r,amt){const cls={energy:'energy',materials:'materials',science:'science',morale:'morale',force:'force'}[r]||'';const e=rEmoji(r);return `<span class="res-tag ${cls}">${amt!=null?amt+' ':''}${e}</span>`;}
 function costHtml(cost){return Object.entries(cost).map(([r,a])=>rHtml(r,'-'+a)).join(' ');}
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   DISTANCES DE VOYAGE — UNE RÈGLE, PLUS SEULEMENT UN DESSIN (Marc et Laurent, 16/09)
+   -------------------------------------------------------------------------------------------
+   Laurent : conquérir coûtait UNE action, que la cible soit la lune d'à côté ou l'autre bout du
+   système. Désormais le coût dépend du TEMPS DE VOYAGE, qui était déjà sur la carte mais ne servait
+   qu'à l'affichage. Barème retenu par Marc après relevé des 29 liaisons (18 sont sous 60 jours) :
+        moins de  60 jours  → 1 action   (même voisinage : les lunes de Jupiter entre elles, 3–4 j ;
+                                          Phobos–Déimos 2 j ; Cérès–Vesta 12 j ; Lune–Phobos 55 j)
+        de 60 à 150 jours   → 2 actions  (d'un système à l'autre : Jupiter→Saturne 78–82 j ;
+                                          Éris–Triton 90 j ; Lune–Io 113 j ; Pluton–Titan 130 j)
+        plus de 150 jours   → 3 actions  (la traversée : Europe–Pluton 170 j, et les longs trajets)
+   ⚠️ PLAFOND À 3, VOLONTAIRE. En prolongeant les paliers de 60 jusqu'au bout, Lune↔Triton (346 j)
+   coûterait 6 actions : injouable, le maximum du jeu étant 5. Le plafond garde la règle mordante
+   sans créer d'attaque impossible — et au gouvernement de niveau 1 (2 AC) les cibles lointaines
+   restent hors de portée, ce qui protège les débuts de partie.
+
+   D'OÙ PART-ON ? De la colonie CONNECTÉE la plus proche (Marc, 16/09 : « il faut compter depuis la
+   colonie connectée la plus proche, mais pas une colonie déconnectée »). Une colonie isolée ne
+   ravitaille rien. Les ROUTES ne servent pas de point de départ — « une route vers une colonie
+   d'une autre nation ne compte pas, c'est la colonie la plus proche qui compte ». Avancer une
+   colonie vers l'ennemi rend donc l'attaque moins chère : c'est la logistique, et cela donne enfin
+   une raison militaire de s'étendre tôt.
+
+   RABAIS : l'Hyperpropulsion retire 1 action (minimum 1) — choix de Marc (« l'IA de Navigation est
+   déjà brutale pour la guerre, le rabais est plus logique avec Hyperpropulsion »).
+   Banc : server/test_cout_distance.js
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+const DUREES_TRAJET={'lune|phobos':55,'ceres|lune':58,'deimos|lune':52,'deimos|phobos':2,'ceres|phobos':24,
+    'ceres|vesta':12,'ceres|io':55,'ceres|ganymede':58,'ganymede|vesta':52,
+    'europe|io':3,'ganymede|io':4,'callisto|europe':4,'callisto|ganymede':4,
+    'europe|titan':82,'ganymede|titan':80,'callisto|titan':78,
+    'encelade|titan':6,'encelade|triton':150,'titan|triton':150,'pluto|titan':130,
+    'pluto|triton':60,'eris|triton':90,'eris|pluto':45,'europe|pluto':170,
+    'mars|terre':26,'jupiter|mars':70,'eris|jupiter':220};
+const SEUILS_VOYAGE=[60,150];          // <60 → 1 action · 60–150 → 2 · >150 → 3
+/* Jours entre deux nœuds ADJACENTS. Hors table : la distance à l'écran × 0,26, comme la carte. */
+function joursEntreVoisins(a,b){
+  const k=[a,b].sort().join('|');
+  if(DUREES_TRAJET[k]!==undefined)return DUREES_TRAJET[k];
+  const A=NODES[a],B=NODES[b];
+  if(!A||!B)return 999;
+  return Math.round(Math.hypot(B.x-A.x,B.y-A.y)*0.26);
+}
+/* Trajet le plus court en JOURS (Dijkstra sur le graphe du jeu). Le résultat ne dépend que de la
+   carte, jamais de l'état de la partie : on le calcule une fois et on le garde. */
+let _joursCache=null;
+function joursTrajet(depuis,vers){
+  if(depuis===vers)return 0;
+  if(!_joursCache){
+    _joursCache={};
+    const ids=Object.keys(NODES).filter(k=>!NODES[k].decorative);
+    for(const a of ids){ _joursCache[a]={}; for(const b of ids) _joursCache[a][b]=(a===b?0:Infinity);
+      for(const adj of (NODES[a].conn||[])) if(!NODES[adj]||!NODES[adj].decorative) _joursCache[a][adj]=joursEntreVoisins(a,adj); }
+    for(const k of ids)for(const i of ids)for(const j of ids)
+      if(_joursCache[i][k]+_joursCache[k][j]<_joursCache[i][j]) _joursCache[i][j]=_joursCache[i][k]+_joursCache[k][j];
+  }
+  const d=_joursCache[depuis]&&_joursCache[depuis][vers];
+  return (d===undefined||!isFinite(d))?999:d;
+}
+/* Le point de départ d'une expédition : ses colonies CONNECTÉES (la capitale en fait partie tant
+   qu'elle lui appartient). Aucune connectée — nation étranglée — on retombe sur ce qu'elle a, sinon
+   elle ne pourrait plus rien attaquer du tout. */
+function _basesDeDepart(nat){
+  const cols=(nat&&nat.colonies)||[];
+  const reliees=cols.filter(c=>c.connected).map(c=>c.nodeId);
+  if(reliees.length)return reliees;
+  const toutes=cols.map(c=>c.nodeId);
+  return toutes.length?toutes:[(nat&&nat.civ&&nat.civ.home)].filter(Boolean);
+}
+/* Durée du voyage vers `nodeId` depuis la base la plus proche, en jours. */
+function joursVersCible(nat,nodeId){
+  const bases=_basesDeDepart(nat);
+  if(!bases.length)return 0;
+  return bases.reduce((m,b)=>Math.min(m,joursTrajet(b,nodeId)),Infinity);
+}
+/* `hasCard` n'existe pas dans ce moteur : la possession d'une carte se lit sur `p.cards` par id. */
+function _aHyperpropulsion(nat){ try{ return !!(nat&&nat.cards&&nat.cards.some(c=>c&&c.id==='hyper3')); }catch(e){ return false; } }
+/* Ce que coûte un assaut sur `nodeId`, en actions. Sert au prélèvement ET à l'affichage : un seul
+   calcul, donc le bouton ne peut pas annoncer autre chose que ce qui sera débité. */
+function coutAssautAC(nat,nodeId){
+  if(!nat||!nodeId)return 1;
+  const j=joursVersCible(nat,nodeId);
+  let ac=(j<SEUILS_VOYAGE[0])?1:((j<=SEUILS_VOYAGE[1])?2:3);
+  if(_aHyperpropulsion(nat))ac=Math.max(1,ac-1);
+  return ac;
+}
+/* Le détail, pour l'écrire à l'écran : « 82 j · 2 actions » (et le rabais s'il joue). */
+function detailCoutAssaut(nat,nodeId){
+  const j=joursVersCible(nat,nodeId), ac=coutAssautAC(nat,nodeId);
+  const rabais=_aHyperpropulsion(nat);
+  return {jours:(isFinite(j)?j:null), ac:ac, rabais:rabais};
+}
 function getNodeDistance(fromId,toId){
   if(fromId===toId)return 0;
   const visited=new Set([fromId]);const queue=[[fromId,0]];
@@ -2777,7 +2935,7 @@ function initGame(civId,aiCivIds){
     log:[],turnActions:[],aiActions:[],_raidsThisTurn:[],_journal:[],
     _chainesTech:_chainesTech,   // l'arbre technologique lu au démarrage (voir lireArbreTechnologique)
     wars:[],warRisk:0,warState:null,warTurnsLeft:0,warWins:{player:0,ai:0},_warDeclaredBy:'other',_aiWarTarget:null,_aiWarStance:'hold',
-    warWith:null,tensions:{},
+    warWith:null,tensions:{},rancunes:{},
     commercialAccords:[],accordsParties:{},mapPanel:0,wormholeUsed:false,_pendingEvModal:null,
     playerInvest:null,aiInvest:null,investApplied:false,
     playerInvest2:null,aiInvest2:null,invest2Applied:false,
@@ -4211,6 +4369,13 @@ function _resolveStratChoice(nat, cardId){
           const prev=getTens(de,vers); setTens(de,vers,Math.max(0,prev-_amt));
           addLog('🕊️ '+nat.civ.emoji+' '+nat.civ.name+(_leur?' apaise '+tid+' — sa tension envers elle : ':' calme sa tension vs '+tid+' : ')
             +prev+' → '+getTens(de,vers)+'/10 (−'+_amt+')','dim');
+          /* Même geste, même effet qu'en solo : la Diplomatie efface la rancune de celui qu'on
+             apaise. Sans cette ligne, la carte aurait deux effets différents selon le mode de jeu. */
+          if(_leur&&typeof apaiserRancune==='function'){
+            const _c=allPlayers().find(p=>p.civ.id===tid), _r=(typeof rancuneDe==='function')?rancuneDe(tid,nat.civ.id):0;
+            if(_c&&_r>0){ apaiserRancune(nat,_c);
+              addLog('🤝 '+_c.civ.emoji+' '+_c.civ.name+' oublie '+(_r>1?('les '+_r+' agressions'):'l\'agression')
+                +' de '+nat.civ.emoji+' '+nat.civ.name+'.','dim'); } }
         }
         nat.stratBonus=null; _afterStratFor(nat); });
     return;
@@ -4408,6 +4573,11 @@ function applyCalmTension(aiId,mode,amount){
     const _n=(G.ais.find(a=>a.civ.id===aiId)||{civ:{name:aiId,emoji:''}});
     addLog('🕊️ Mission diplomatique chez '+_n.civ.emoji+' '+_n.civ.name+' : sa tension envers toi '
       +prevD+' → '+getTens(aiId,'player')+'/10 (−'+amount+')','gold');
+    /* Le geste que Marc réclamait : il efface la mémoire des agressions, pas seulement la jauge. */
+    { const _r=(typeof rancuneDe==='function')?rancuneDe(aiId,'player'):0;
+      if(_r>0&&typeof apaiserRancune==='function'){ apaiserRancune(G.player,_n);
+        addLog('🤝 '+_n.civ.emoji+' '+_n.civ.name+' oublie '+(_r>1?('tes '+_r+' agressions'):'ton agression')
+          +' — la rancune est effacée, tes demandes seront de nouveau écoutées.','gold'); } }
     addAction('🕊️','Diplomatie',0,{},_n.civ.name+' : sa tension −'+amount);
     G.player.stratBonus=null;
     _playerStratDone();
@@ -4494,8 +4664,10 @@ function _usureDeGuerre(w){
     if(reel>0)addLog('⚔️ '+nat.civ.emoji+' '+nat.civ.name+' — usure de guerre : −'+reel+'<i class=ri-morale></i> (guerre en cours).','red');
   }
 }
-/* Toutes les guerres en cours, une fois chacune. Appelée à l'ouverture du tour ET à la déclaration,
-   pour que la guerre déclenchée au tour 1 se paie dès le tour 1. */
+/* Toutes les guerres en cours, une fois chacune (garde `w._usureTour`). ⚠️ SEUL POINT DE PRÉLÈVEMENT
+   DE L'USURE depuis le 16/09 : uniquement à l'ouverture d'un tour, et uniquement pour les guerres
+   encore ouvertes à ce moment-là. Une guerre déclarée puis réglée dans le même tour ne coûte donc
+   rien — c'est la règle voulue par Marc (§134). Ne PAS rappeler cette fonction ailleurs. */
 function usureDesGuerres(){ for(const w of (G.wars||[])) _usureDeGuerre(w); }
 /* ═══ ROUTES ORPHELINES — RÈGLE (Marc, 15/09, partie FE37) ═══
    « Les routes tombent si l'une d'elles n'est pas au moins connectée à une colonie à toi. » Jusqu'ici la
@@ -4523,6 +4695,8 @@ function tomberRoutesOrphelines(){
 function _startTurnPrep(){
   if(G._prepDoneTurn===G.turn)return; // une seule préparation par tour
   G._prepDoneTurn=G.turn;
+  /* Une escarmouche ne passe pas la nuit — et surtout pas devant `usureDesGuerres` (§134 étape 3). */
+  purgerEscarmouches();
   usureDesGuerres();   // AVANT tout le reste : le moral du tour part déjà entamé
   tomberRoutesOrphelines();   // routes sans extrémité à soi (Marc, 15/09)
   if(typeof enforceCaps==='function')enforceCaps(); // écrêtage : correction des excès du tour précédent (après entretien)
@@ -4561,10 +4735,12 @@ function _startTurnPrep(){
   if(G.player.govRpt>0)addGovPts(G.player,G.player.govRpt);
   for(const ai of G.ais){if(ai.govRpt>0)addGovPts(ai,ai.govRpt);}
   G.player.acMax=Math.min(5,calcAC(G.player));G.player.acLeft=G.player.acMax;
-  // Moral v6 : Moral=0 → AC max divisé par 2 (arrondi bas)
-  if((G.player._moraleRev!==undefined?G.player._moraleRev:(G.player.res.morale||0))===0){const half=Math.floor(G.player.acMax/2);G.player.acLeft=half;addLog('😞 Moral nul — AC réduit à '+half+'/'+G.player.acMax,'red');}
+  /* Moral 0 → AC divisé par 2, ARRONDI AU SUPÉRIEUR (Marc, 16/09 : « garde action /2 […] arrondi au
+     sup »). Avant : arrondi bas, donc 5 AC → 2 et 3 AC → 1. Maintenant 5 → 3 et 3 → 2 : une nation
+     à terre garde de quoi se relever, ce qui est le but de la règle, pas de l'achever. */
+  if((G.player._moraleRev!==undefined?G.player._moraleRev:(G.player.res.morale||0))===0){const half=Math.ceil(G.player.acMax/2);G.player.acLeft=half;addLog('😞 Moral nul — AC réduit à '+half+'/'+G.player.acMax,'red');}
   // (Filet IA « se relève » supprimé — parité : tout le monde subit la pénalité basée sur le moral FIGÉ en fin de phase d'actions, et remonte par ses propres actions.)
-  G.ais.forEach(ai=>{ai.acMax=Math.min(5,calcAC(ai));ai.acLeft=ai.acMax;if((ai._moraleRev!==undefined?ai._moraleRev:(ai.res.morale||0))===0){ai.acLeft=Math.floor(ai.acMax/2);}});
+  G.ais.forEach(ai=>{ai.acMax=Math.min(5,calcAC(ai));ai.acLeft=ai.acMax;if((ai._moraleRev!==undefined?ai._moraleRev:(ai.res.morale||0))===0){ai.acLeft=Math.ceil(ai.acMax/2);}});   // arrondi au SUPÉRIEUR (16/09), même règle que le joueur
   if(typeof render==='function')render(); // affiche AC + revenus à jour AVANT le draft Stratégie
 }
 // DÉBUT EFFECTIF DU TOUR (après le choix des cartes Stratégie) : investissements, événement, jeu.
@@ -5171,7 +5347,8 @@ function _assautsDuTour(war,civId){
 function encaisserPenalitesPopulaires(w){
   if(!w||!w.penalitesDifferees||w.ended)return;
   w.penalitesDifferees=false;
-  _usureDeGuerre(w);
+  /* 16/09 : l'usure n'est plus encaissée ici — elle est prélevée à l'ouverture du tour suivant comme
+     pour toute autre guerre (règle §134). Ce qui reste propre à la guerre POPULAIRE est son −2. */
   for(const id of [w.a,w.b]){
     const n=allPlayers().find(function(x){return x&&x.civ&&x.civ.id===id;});
     if(n) n.res.morale=Math.max(0,(n.res.morale||0)-2);
@@ -7303,6 +7480,8 @@ function doRaidTarget(aiId,nodeId,pillard){
        raids dans le tour font +6, sous le seuil de la guerre populaire. */
     addTens(target.civ.id,p.civ.id,3);
     addTens(p.civ.id,target.civ.id,1);
+    /* On se souvient d'avoir été pillé (§134 étape 4) — la tension redescend, pas la mémoire. */
+    if(typeof ajouterRancune==='function') ajouterRancune(target,p);
     addLog('⚔️ Raid sur '+target.civ.emoji+' '+target.civ.name+(_nomCol?' — production de '+_nomCol+' pillée':'')
       +' ! '+(stolen.join(' ')||'rien à prendre')+(enCost>0?' (−1<i class=ri-energy></i>)':'')+' ('+tc+' jeton en récupération, tension +3)','green');
     addAction('💰','Raid '+target.civ.emoji,1,{},'Volé : '+(stolen.join('')||'rien'));
@@ -7475,7 +7654,7 @@ function breakAccordAndAttack(nodeId){
   const _avant=G.player.acLeft;
   attackColony(nodeId,G.player);
   if(G.player.acLeft<_avant)
-    addLog('📜 Attaque surprise sur '+((node&&node.name)||nodeId)+' — l\'accord est rompu par la guerre qui suit.','red');
+    addLog('📜 Attaque surprise sur '+((node&&node.name)||nodeId)+' — l\'accord est rompu par l\'agression.','red');
 }
 /* `attaquant` : la nation qui assaille. Sans lui, la nation active. */
 function attackColony(nodeId,attaquant){
@@ -7493,7 +7672,12 @@ function attackColony(nodeId,attaquant){
   /* Capitale assaillable : voir la note dans breakAccordAndAttack(). Sa défense de 10 jetons
      (garrisonOf) suffit à la rendre difficile ; l'interdire n'a plus lieu d'être. */
   const tc=2;                       // 16/09 : seuil identique pour toutes les nations
-  if(p.acLeft<1){addLog('⚠️ Assaut : besoin 1 AC.','red');return;}
+  /* Le coût en ACTIONS dépend du temps de voyage depuis sa colonie connectée la plus proche
+     (règle Laurent/Marc du 16/09, voir `coutAssautAC`). Calculé AVANT toute dépense. */
+  const _coutAC=(typeof coutAssautAC==='function')?coutAssautAC(p,nodeId):1;
+  if(p.acLeft<_coutAC){
+    const _d=(typeof detailCoutAssaut==='function')?detailCoutAssaut(p,nodeId):null;
+    addLog('⚠️ Assaut : besoin de '+_coutAC+' AC'+(_d&&_d.jours!==null?(' — '+_d.jours+' jours de voyage depuis ta colonie connectée la plus proche'):'')+'.','red');return;}
   if(engageableTokens(p)<tc){addLog('⚠️ Assaut : besoin d’au moins '+tc+' jeton(s) Force engageable(s) (la garnison ne compte pas).','red');return;}
   if(Math.min(p.res.materials||0,p.res.energy||0)<1){addLog('⚠️ Assaut : il faut du <i class=ri-materials></i> et de l’<i class=ri-energy></i> pour engager des jetons.','red');return;}
   // LIMITE DE 2 ATTAQUES/TOUR SUPPRIMÉE (demande de Marc) : le nombre d'assauts n'est plus plafonné —
@@ -7504,7 +7688,9 @@ function attackColony(nodeId,attaquant){
      guerre et n'affrontait jamais personne (mesuré, §91). `resoudreAssautIA` débite elle-même l'AC
      et les jetons — et si elle RENONCE (défense trop forte), rien n'est dépensé. */
   if(p._isAI){ resoudreAssautIA(p,nodeId,{ouvrirGuerre:true}); return; }
-  p.acLeft-=1;p.spentThisTurn+=1;closePopup();
+  p.acLeft-=_coutAC;p.spentThisTurn+=_coutAC;closePopup();
+  if(_coutAC>1){ const _d=detailCoutAssaut(p,nodeId);
+    addLog('🚀 Expédition longue : '+_d.jours+' jours de voyage → '+_coutAC+' actions'+(_d.rabais?' (🌀 Hyperpropulsion : −1)':'')+'.','dim'); }
   /* ⚠️ TROISIÈME ARGUMENT : QUI ASSAILLE. Il manquait, et son absence a coûté cher.
      `playerAssaultColony(nodeId, ennemi, attaquant)` retombe sur `G.player` quand on ne le lui dit
      pas. Or `attackColony` SAIT qui attaque — il vient de lui débiter son AC et ses jetons deux
@@ -7572,7 +7758,13 @@ function playerAssaultColony(nodeId,enemyAI,attaquant){
   if(!war){
     G._warFocusColony=nodeId;
     const raison='Assaut sur '+(NODES[nodeId]?.name||nodeId)+' !';
-    declarerGuerre(_atk,enemyAI,raison,'player');
+    /* ⚠️ `{escarmouche:true}` — UN SEUL MOT CHANGE, ET C'EST TOUTE LA RÈGLE DE MARC (§134 étape 3).
+       Avant, ce même appel déclarait une vraie guerre : accords révoqués, routes rompues, tension à
+       10 des deux côtés, usure de −4 au tour suivant, et cela DANS LE TOUR où l'on venait déjà de
+       perdre du moral en perdant la défense d'une colonie. « Ça fait beaucoup d'un coup sinon. »
+       Désormais l'enregistrement ne porte que le combat et disparaît avec lui ; ce qui reste, c'est
+       la tension (`tensionApresAssaut`, en fin de `resolveWarCombat`). */
+    declarerGuerre(_atk,enemyAI,raison,'player',{escarmouche:true});
     G._warDeclareReason=raison;G._warDeclaredBy='player';
     war=_warBetween(_atk.civ.id,enemyAI.civ.id);
   }
@@ -7993,6 +8185,10 @@ function _resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,p){
     addLog('💥 '+lost+' ('+pDef+'🛡️ vs '+aPow+'⚔️)','red');
   }
   if(war)war._aiAssaultedThisTurn=true;
+  /* Une ROUTE n'est pas une colonie : la règle de Marc parle de l'attaque d'une COLONIE, et les
+     attaques de route n'ont lieu que pendant une vraie guerre, où la tension est déjà à 10. */
+  if(target&&target.type==='colony') tensionApresAssaut(ai,p,aPow>pDef);
+  if(war&&war.escarmouche) finEscarmouche(war);
   const _act={emoji:'⚔️',name:'Assaut sur '+target.name,desc:aPow+'⚔️ vs '+pDef+'🛡️'};
   if(ai._turnActions)ai._turnActions.push(_act);else ai._turnActions=[_act];
   render();
@@ -8382,6 +8578,39 @@ function guerrePopulaireEntre(offense,offenseur){
 /* Guerre populaire entre deux nations qu'AUCUN écran ne pilote : on déclare, et l'offensé frappe
    tout de suite une route de l'offenseur qui touche ses colonies. Même geste que la branche « IA
    offensée » ci-dessous, écrit sans supposer que la victime est le joueur local. */
+/* ═══ CE QUE COÛTE UNE GUERRE, ÉCRIT EN TOUTES LETTRES (Marc, 16/09, règle §134) ═══
+   « Le jeu doit te dire que si tu es en guerre tu vas perdre 4 de moral dès le début du tour
+   suivant, puis le tour suivant encore une fois, et qu'à 0 de moral à la fin d'un tour ça veut
+   dire plus de revenus et une seule action. Ou 1, ça veut dire revenus ÷2. Il faut que ce soit
+   explicite dans cette fenêtre là. C'est déjà dans Empire je crois mais les joueurs ne lisent
+   jamais rien, je l'ai vu avec mes amis. »
+   On ne se contente donc pas de rappeler la règle : on la CHIFFRE pour la nation qui décide, avec
+   son moral réel et ses AC réels. Une même fonction sert la fenêtre solo et la fenêtre en ligne
+   (le texte part dans le payload) : une seule vérité, pas deux textes à maintenir.
+   ⚠️ « une seule action » n'est PAS la règle codée : le moral à 0 divise les AC par deux
+   (`_startTurnPrep`, arrondi bas) — à 5 AC il en reste 2. On affiche donc le chiffre exact plutôt
+   qu'une formule fausse ; l'écart est signalé à Marc (§134). */
+function prixDeLaGuerreHTML(nat){
+  try{
+    const m=(nat&&nat.res&&nat.res.morale)||0;
+    const u=(typeof USURE_GUERRE_MORAL==='number')?USURE_GUERRE_MORAL:4;
+    const acMax=(nat&&nat.acMax)||5, acRed=Math.ceil(acMax/2);   // arrondi au supérieur (16/09)
+    const ap1=Math.max(0,m-u), ap2=Math.max(0,m-2*u);
+    let etat='';
+    if(ap1<=0) etat='<b style="color:#ff8a7a">ton moral tomberait à 0 dès demain</b>';
+    else if(ap1===1) etat='<b style="color:#ffcc66">ton moral serait à 1 demain</b>';
+    else etat='ton moral passerait à <b>'+ap1+'</b> demain, <b>'+ap2+'</b> le tour d\'après';
+    return '<div style="margin-top:10px;padding:9px 11px;border:1px solid #8a2626;background:#2a0f0f;'
+      +'border-radius:10px;text-align:left;line-height:1.5">'
+      +'<b style="color:#ff9a8a">⚠️ Ce que coûte la guerre</b><br>'
+      +'<b>−'+u+'<i class=ri-morale></i> à chaque camp dès le DÉBUT du tour prochain</b>, et encore −'+u
+      +' à chaque tour tant qu\'elle dure. Tu as '+m+'<i class=ri-morale></i> : '+etat+'.<br>'
+      +'<span style="color:#ffcc66">Moral 1</span> en fin de tour → <b>revenus divisés par deux</b>. '
+      +'<span style="color:#ff8a7a">Moral 0</span> → <b>aucun revenu</b> et tes actions tombent de '
+      +acMax+' à <b>'+acRed+'</b>.<br>'
+      +'<span style="opacity:.8">Faire la paix avant la fin du tour ne coûte aucun moral.</span></div>';
+  }catch(e){ return ''; }
+}
 function guerrePopulaireAuto(offense,offenseur){
   const w=guerrePopulaireEntre(offense,offenseur);
   if(!w)return null;
@@ -8460,7 +8689,10 @@ function triggerGuereeForcee(offendedSide,targetAi){
             pilote, au bot et aux bancs — un client ancien continue donc de fonctionner. */
          cols:_fwCibles.map(function(t){const _n=NODES[t.col.nodeId]||{};return {node:t.col.nodeId, name:(_n.name||t.col.nodeId), level:(t.col.level||1), dist:t.dist, isHome:(t.col.nodeId===fwAi.civ.home)};}),
          colTarget:(nearestAiCol?nearestAiCol.col.nodeId:null), colName:(nearestAiCol?(NODES[nearestAiCol.col.nodeId]?.name||nearestAiCol.col.nodeId):null),
-         myForce:(G.player.forceTokens||0)},
+         myForce:(G.player.forceTokens||0),
+         /* Le prix de la guerre est calculé ICI, côté moteur, pour la nation qui décide : le client
+            n'a pas à le recalculer et ne peut pas en donner une version différente. */
+         prix:prixDeLaGuerreHTML(G.player)},
         function(ans){
           try{
             if(ans&&ans.peace)forcedWarDemandPeace();
@@ -8473,7 +8705,8 @@ function triggerGuereeForcee(offendedSide,targetAi){
     }
     if(typeof fenAdversaire==='function')fenAdversaire('fw',fwAi);
     document.getElementById('fw-title').textContent='Ton peuple exige la guerre. Choisis ta cible.';
-    document.getElementById('fw-desc').innerHTML='Tension à 10 envers '+fwAi.civ.emoji+' '+fwAi.civ.name+' : attaque une de ses routes ou colonies maintenant.';
+    document.getElementById('fw-desc').innerHTML='Tension à 10 envers '+fwAi.civ.emoji+' '+fwAi.civ.name+' : attaque une de ses routes ou colonies maintenant.'
+      +prixDeLaGuerreHTML(G.player);
     document.getElementById('fw-choices').innerHTML=choicesHtml;
     document.getElementById('forced-war-modal').classList.remove('hidden');
   }else{
@@ -8614,6 +8847,79 @@ function updateWarRisk(){
    conséquences, mais SYMÉTRIQUEMENT et aux deux nations réellement concernées. `declareWar` reste
    comme façade pour tous ses appelants existants : elle traduit « moi contre X » en un appel
    nommé. */
+/* Accords commerciaux ENTRE CES DEUX NATIONS — et seulement eux. L'ancienne version révoquait tout
+   accord posé sur une colonie de la cible, quel qu'en soit l'autre signataire.
+   ⚠️ EXTRAITE DE `declarerGuerre` LE 16/09. Depuis que l'assaut n'ouvre plus de guerre (§134 étape 3),
+   un accord commercial survivait à l'attaque de son cosignataire — y compris par le bouton qui
+   s'appelle littéralement « Rompre l'accord et attaquer ». Rompre un accord n'est pas une
+   conséquence de la GUERRE, c'est une conséquence de l'AGRESSION : les deux chemins l'appellent.
+   Ce qui reste propre à la guerre, en revanche : les routes rompues en territoire ennemi et les
+   colonies de cohabitation défaites — une escarmouche ne redessine pas la carte.
+   Bancs : test_accords_rupture.js §2, test_pacte_et_accords.js §3bis. */
+function revoquerAccordsEntre(agresseur,cible){
+  if(!agresseur||!cible)return 0;
+  const A=agresseur.civ.id, B=cible.civ.id;
+  const _rev=(G.commercialAccords||[]).filter(nid=>{
+    const sg=(typeof _accordSignataires==='function')?_accordSignataires(nid):null;
+    if(sg) return sg.includes(A)&&sg.includes(B);
+    const o=(typeof ownerNation==='function')?ownerNation(nid):null;   // partie d'avant le registre
+    return !!(o&&(o.civ.id===A||o.civ.id===B));
+  });
+  if(!_rev.length)return 0;
+  G.commercialAccords=G.commercialAccords.filter(nid=>!_rev.includes(nid));
+  if(G.accordsParties)for(const n of _rev)delete G.accordsParties[n];
+  addLog('📜 Accords commerciaux entre '+agresseur.civ.emoji+' '+agresseur.civ.name+' et '
+    +cible.civ.emoji+' '+cible.civ.name+' révoqués ('+_rev.length+') !','red');
+  return _rev.length;
+}
+/* ═══════════════ L'ESCARMOUCHE : UN COMBAT QUI N'EST PAS UNE GUERRE ═══════════════
+   RÈGLE (Marc, 16/09, §134 étape 3) : « Tout passe par la tension. Si elle est à 10, c'est la
+   guerre populaire forcée. Donc c'est ça qui déclenche la guerre obligatoire, mais EN FIN DE TOUR,
+   donc pas immédiatement à l'attaque d'une colonie. »
+   Attaquer une colonie ouvrait la guerre sur-le-champ (`playerAssaultColony` → `declarerGuerre`),
+   avec tout son cortège : accords révoqués, routes rompues, tension à 10 des deux côtés, usure au
+   tour suivant. Ce n'est plus le cas. L'assaut reste un COMBAT — mêmes jetons, mêmes pertes, même
+   capture — mais l'état de guerre, lui, ne s'ouvre plus.
+
+   ⚠️ POURQUOI UN ENREGISTREMENT DE GUERRE MALGRÉ TOUT, ET POURQUOI IL MEURT AUSSITÔT.
+   Toute la machinerie de combat (`resolveWarCombat`, `maybeAiAssaultPlayer`, les compteurs de
+   victoires, la fenêtre de défense) retrouve son adversaire par `_warBetween`. La réécrire pour
+   s'en passer, c'est toucher à dix fonctions accordées entre elles pour un gain nul. On pose donc
+   un enregistrement MARQUÉ `escarmouche`, qui saute tout le cortège de la déclaration, et qui est
+   RETIRÉ dès le combat résolu. Trois filets, dans cet ordre :
+     1. chaque chemin de combat appelle `finEscarmouche` en sortant ;
+     2. `purgerEscarmouches()` balaie à l'ouverture du tour, AVANT `usureDesGuerres()` — donc une
+        escarmouche oubliée (assaut annulé, partie rechargée) ne coûte jamais d'usure ;
+     3. rien ne la déclare aux tiers, ne révoque d'accord ni ne rompt de route : même vivante une
+        seconde, elle ne laisse pas de trace.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+const TENSION_COLONIE_PRISE   = 8;   // « si tu te fais attaquer une colonie et la prendre : tension à 8 direct »
+const TENSION_ASSAUT_REPOUSSE = 6;   // « si l'attaque est ratée, tension à 6 » — jamais pardonnée non plus
+function finEscarmouche(w){
+  if(!w||!w.escarmouche)return;
+  G.wars=(G.wars||[]).filter(x=>x!==w);
+  if(G.warWith===w.a||G.warWith===w.b){ G.warWith=null; G.warTurnsLeft=0; }
+  if(typeof syncWarState==='function')syncWarState();
+}
+function purgerEscarmouches(){
+  for(const w of (G.wars||[]).filter(x=>x&&x.escarmouche)) finEscarmouche(w);
+}
+/* La seule conséquence durable d'une agression : la rancune de l'agressé. L'agresseur, lui,
+   n'ajoute rien — Marc : « celui qui attaque n'ajoute pas de tension ». 8 et 6 sont des PLANCHERS :
+   une tension déjà plus haute ne redescend pas, sans quoi une attaque ratée ADOUCIRAIT la victime. */
+function tensionApresAssaut(agresseur, victime, coloniePrise){
+  if(!agresseur||!victime||agresseur===victime||!agresseur.civ||!victime.civ)return;
+  /* ⚠️ AVANT LE RETOUR ANTICIPÉ CI-DESSOUS. La tension a un plafond, la mémoire non : une nation
+     déjà à 10 de tension doit quand même enregistrer l'agression de plus. */
+  if(typeof ajouterRancune==='function') ajouterRancune(victime,agresseur);
+  const seuil = coloniePrise ? TENSION_COLONIE_PRISE : TENSION_ASSAUT_REPOUSSE;
+  const a=agresseur.civ.id, v=victime.civ.id, avant=getTens(v,a);
+  if(avant>=seuil)return;
+  setTens(v,a,seuil);
+  addLog('🔥 Tension '+victime.civ.emoji+' '+victime.civ.name+' → '+agresseur.civ.emoji+' '+agresseur.civ.name
+    +' : '+avant+' → '+seuil+'/10 ('+(coloniePrise?'colonie prise':'assaut repoussé')+'). '
+    +'À 10, le peuple exige la guerre en fin de tour.','red');
+}
 function declarerGuerre(agresseur, cible, raison, declaredBy, opts){
   opts=opts||{};
   if(!agresseur||!cible||agresseur===cible) return null;
@@ -8627,6 +8933,17 @@ function declarerGuerre(agresseur, cible, raison, declaredBy, opts){
     reason:raison, declaredBy:declaredBy||'other', agresseurCiv:A, live:true, aiRecaptureTarget:null});
   w.focusColony=G._warFocusColony||null; G._warFocusColony=null;
   G.wars.push(w);
+  /* ═══ ESCARMOUCHE : ON S'ARRÊTE ICI (voir le bandeau au-dessus de cette fonction) ═══
+     Pas de tension à 10, pas d'accord révoqué, pas de route rompue, pas de cohabitation défaite,
+     aucune annonce aux tiers, aucun avertissement d'usure : rien de tout cela n'a lieu, puisqu'il
+     n'y a pas de guerre. L'enregistrement ne sert qu'à porter le combat, et il est retiré après. */
+  if(opts.escarmouche){
+    w.escarmouche=true; w.live=true; w.justDeclared=false; w.turnsLeft=99; w.tourEscarmouche=G.turn;
+    /* La seule conséquence diplomatique retenue : on n'attaque pas quelqu'un avec qui l'on commerce. */
+    revoquerAccordsEntre(agresseur,cible);
+    if(typeof syncWarState==='function')syncWarState();
+    return w;
+  }
   /* Une nation à qui l'on déclare la guerre change de tempérament : elle riposte et s'arme avant
      tout, quel que soit son profil de temps de paix (voir `PROFILS_IA.assiegee`). */
   if(typeof marquerAgressee==='function'){ marquerAgressee(cible); marquerAgressee(agresseur); }
@@ -8634,20 +8951,7 @@ function declarerGuerre(agresseur, cible, raison, declaredBy, opts){
   // La tension reste au MAXIMUM des deux côtés pendant toute la guerre (endWar la halve à la fin).
   setTens(A,B,10); setTens(B,A,10);
 
-  /* Accords commerciaux ENTRE CES DEUX NATIONS — et seulement eux. L'ancienne version révoquait
-     tout accord posé sur une colonie de la cible, quel qu'en soit l'autre signataire. */
-  const _rev=(G.commercialAccords||[]).filter(nid=>{
-    const sg=(typeof _accordSignataires==='function')?_accordSignataires(nid):null;
-    if(sg) return sg.includes(A)&&sg.includes(B);
-    const o=(typeof ownerNation==='function')?ownerNation(nid):null;   // partie d'avant le registre
-    return !!(o&&(o.civ.id===A||o.civ.id===B));
-  });
-  if(_rev.length){
-    G.commercialAccords=G.commercialAccords.filter(nid=>!_rev.includes(nid));
-    if(G.accordsParties)for(const n of _rev)delete G.accordsParties[n];
-    addLog('📜 Accords commerciaux entre '+agresseur.civ.emoji+' '+agresseur.civ.name+' et '
-      +cible.civ.emoji+' '+cible.civ.name+' révoqués ('+_rev.length+') !','red');
-  }
+  revoquerAccordsEntre(agresseur,cible);
 
   /* Cohabitation extra-solaire : chacun perd la colonie posée sur un nœud de l'autre. Symétrique —
      l'ancienne version ne faisait tomber que celles de la nation active.
@@ -8696,8 +9000,20 @@ function declarerGuerre(agresseur, cible, raison, declaredBy, opts){
      `encaisserPenalitesPopulaires`. */
   addLog('🚨 GUERRE DÉCLARÉE : '+agresseur.civ.emoji+' '+agresseur.civ.name+' contre '
     +cible.civ.emoji+' '+cible.civ.name+' — '+raison,'red');
-  /* v10.62 : l'appel était AVANT l'addLog malgré le commentaire (Marc l'a relevé deux fois, §113 et §120.13). */
-  if(opts.penalitesDifferees) w.penalitesDifferees=true; else _usureDeGuerre(w);
+  /* ═══ L'USURE NE SE PAIE PLUS AU TOUR DE LA DÉCLARATION (Marc, 16/09, règle §134) ═══
+     « Le malus moral ne s'applique qu'au début du tour suivant et on a le temps de compenser. »
+     Raison de fond, dans ses mots : perdre la défense d'une colonie coûte déjà du moral ; ajouter −4
+     dans le même tour « fait beaucoup d'un coup ». En étalant, joueurs et ordinateurs TEMPORISENT —
+     « ça fait réfléchir sur l'éventualité d'une guerre, comme dans la vraie vie ».
+     Ce que ça corrige concrètement (partie 96F6) : Laurent a payé 8 de moral aux tours 7 et 9 pour
+     deux guerres que l'ordinateur a ouvertes puis abandonnées dans le même tour.
+     ⚠️ IL N'Y A PLUS QU'UN SEUL POINT DE PRÉLÈVEMENT : `usureDesGuerres()`, à l'ouverture du tour,
+     pour les guerres ENCORE ouvertes. Une guerre réglée avant la nuit ne coûte rien à personne.
+     Le garde-fou `moralSuffisantPourAssaillir` reste valable tel quel : il ANTICIPE déjà l'usure.
+     Banc : server/test_usure_tour_suivant.js */
+  if(opts.penalitesDifferees) w.penalitesDifferees=true;
+  addLog('⏳ Usure de guerre : −'+USURE_GUERRE_MORAL+'<i class=ri-morale></i> à CHAQUE camp dès le début du tour prochain, '
+    +'et à chaque tour tant que la guerre dure. Faire la paix avant la fin du tour n\'en coûte aucun.','dim');
   annoncerGuerreAuxTiers(agresseur,cible,raison);
   return w;
 }
@@ -9051,6 +9367,9 @@ function resolveWarCombat(playerCommitted, attaquant){
   }catch(e){}
   _decompterTourDeGuerre();let txt,cls;
   const targetId=_warAttackColonyTarget;_warAttackColonyTarget=null;
+  /* Qui subit l'agression, et la place est-elle tombée : les deux seules choses dont la tension a
+     besoin. La victime n'est pas toujours `warEnemy` — sur un nœud partagé, c'est l'occupant réel. */
+  let _victimeAssaut=warEnemy, _coloniePrise=false;
   if(pPow>aPow){
     G.warWins.player++;gagnerVP(_atk,2,'Combat gagné contre '+warEnemy.civ.name);warEnemy.res.morale=Math.max(0,(warEnemy.res.morale||0)-1);
     if(_aiCru)croiseurEnReparation(warEnemy); // croiseur adverse en réparation suite à la défaite en défense
@@ -9079,6 +9398,7 @@ function resolveWarCombat(playerCommitted, attaquant){
         /* La capture est écrite UNE SEULE FOIS (`capturerNoeud`) : elle expulse tous les occupants,
            lève le bridage d'une colonie partagée et fait tomber l'accord forcé. */
         const newLvl=capturerNoeud(_atk,targetId);
+        _victimeAssaut=_proprio; _coloniePrise=true;
         txt='🏴 Victoire ! Tu CAPTURES '+NODES[targetId].name+' (Nv.'+newLvl+') — elle est à toi ! (+2 VP, population hostile −2<i class=ri-morale></i>)';
         addLog('🏴 '+NODES[targetId].name+' capturée sur '+_proprio.civ.emoji+' '+_proprio.civ.name+' ! (Nv.'+newLvl+', −2<i class=ri-morale></i> ennemi)','gold');
         /* ═══ ET ON PRÉVIENT CELUI QUI LA PERD (Marc, 16/09, partie 96F6) ═══
@@ -9126,6 +9446,15 @@ function resolveWarCombat(playerCommitted, attaquant){
         /* Pas d'emoji ici : `_riToText` en écrase une partie et le rapport affichait « 3� ». */
         'puissance '+pPow+' contre '+aPow+' — '+(pWin?'victoire':(aWin?'défaite':'égalité')), true);
     }
+  }catch(e){}
+  /* ═══ CE QUE LAISSE UNE AGRESSION : DE LA TENSION, PAS UNE GUERRE (Marc, §134 étape 3) ═══
+     On ne compte que les assauts sur une COLONIE — un combat de guerre sans cible nommée ne vise
+     personne en particulier. En pleine guerre la tension est déjà à 10 : les planchers 8 et 6 n'y
+     changent donc rien, et il n'y a pas deux règles à tenir. */
+  try{
+    if(targetAvantNettoyage) tensionApresAssaut(_atk,_victimeAssaut,_coloniePrise);
+    const _w=warEnemy&&(typeof _warBetween==='function')&&_warBetween(_atk.civ.id,warEnemy.civ.id);
+    if(_w&&_w.escarmouche) finEscarmouche(_w);
   }catch(e){}
   return{pPow,aPow,txt,cls};
 }
@@ -10052,8 +10381,13 @@ function coupsPossibles(nat){
         if(engageableTokens(nat)>=jetons&&!_protege&&!_raidInterdit&&!coloniePilleeCeTour(col)&&!_butinVide)
           coups.push({type:'raid',cible:o.civ.id,node:col.nodeId,libelle:'raid sur '+nom+' ('+o.civ.name+')'});
         if(engageableTokens(nat)>=jetons&&(nat.res.materials||0)>=1&&(nat.res.energy||0)>=1
-           &&(typeof moralSuffisantPourAssaillir!=='function'||moralSuffisantPourAssaillir(nat,o)))   // test_assaut_sans_moyens.js
-          coups.push({type:'assaut',node:col.nodeId,libelle:'assaillir '+nom+' ('+o.civ.name+')'});
+           &&(typeof moralSuffisantPourAssaillir!=='function'||moralSuffisantPourAssaillir(nat,o))){   // test_assaut_sans_moyens.js
+          /* Une expédition lointaine peut coûter 2 ou 3 actions : ne pas proposer ce qu'on ne peut
+             pas payer, sinon le tacticien évalue un coup qui sera refusé (16/09). */
+          const _cAC=(typeof coutAssautAC==='function')?coutAssautAC(nat,col.nodeId):1;
+          if((nat.acLeft||0)>=_cAC)
+            coups.push({type:'assaut',node:col.nodeId,coutAC:_cAC,libelle:'assaillir '+nom+' ('+o.civ.name+')'+(_cAC>1?(' — '+_cAC+' actions'):'')});
+        }
         if((nat.res.materials||0)>=2&&!mien(col.nodeId))
           coups.push({type:'accord',node:col.nodeId,libelle:'accord sur '+nom+' ('+o.civ.name+')'});
       }
@@ -10421,7 +10755,10 @@ enregistrerCerveau('tacticien', function(ctx){
    `maybeAiAssaultPlayer` refusait (moral < 1). Marc : « sinon c'est aberrant ».
    Une seule question, posée AVANT tout paiement : après l'usure que coûtera la déclaration (rien si
    la guerre existe déjà), reste-t-il au moins 1 de moral ? Sert à l'énumération (`coupsPossibles`)
-   et à la règle (`resoudreAssautIA`). Banc : test_assaut_sans_moyens.js. */
+   et à la règle (`resoudreAssautIA`). Banc : test_assaut_sans_moyens.js.
+   ⚠️ 16/09 : l'usure est désormais prélevée au TOUR SUIVANT (§134) — la formule ne change pas pour
+   autant, elle devient simplement une anticipation : « si j'ouvre cette guerre, serai-je encore
+   debout demain matin ? ». C'est exactement la temporisation que Marc veut voir chez les IA. */
 function moralSuffisantPourAssaillir(ai,cible){
   if(!ai||!cible)return false;
   const enGuerre=(typeof _warBetween==='function')&&!!_warBetween(ai.civ.id,cible.civ.id);
@@ -10481,7 +10818,8 @@ function resoudreAssautIA(ai,nodeId,opts){
     let _w=_warBetween(ai.civ.id,best.civ.id);
     if(!_w){
       /* Voie GÉNÉRALE : deux nations nommées, quelle que soit celle qui est active. */
-      if(!declarerGuerre(ai,best,'Assaut surprise sur '+_nom+' !','ai'))return false;
+      /* Escarmouche, comme du côté humain (§134 étape 3) : le combat a lieu, la guerre non. */
+      if(!declarerGuerre(ai,best,'Assaut surprise sur '+_nom+' !','ai',{escarmouche:true}))return false;
       _w=_warBetween(ai.civ.id,best.civ.id);
     }
     if(!_w)return false;
@@ -10490,12 +10828,15 @@ function resoudreAssautIA(ai,nodeId,opts){
     _w.live=true; _w.justDeclared=false; _w.turnsLeft=99;
     _w.aiAggressor=true;            // elle a pris l'initiative : elle s'engage vraiment
     _w._aiAssaultedThisTurn=false;  // …et c'est CET assaut-ci qu'on autorise
-    ai.acLeft=Math.max(0,ai.acLeft-1); ai._attacksThisTurn=(ai._attacksThisTurn||0)+1;
+    /* Même barème pour l'ordinateur que pour un joueur : le coût dépend du voyage (16/09). */
+    { const _c=(typeof coutAssautAC==='function')?coutAssautAC(ai,nodeId):1;
+      ai.acLeft=Math.max(0,ai.acLeft-_c); }
+    ai._attacksThisTurn=(ai._attacksThisTurn||0)+1;
     /* La rétrocession vaut pour TOUT LE MONDE : une IA qui frappe pendant sa phase d'actions cède
        elle aussi l'initiative du soir. Sans cette ligne, la règle n'aurait puni que le joueur —
        ce qui n'est pas une règle, c'est un handicap. */
     if(typeof noterAssautDuTour==='function') noterAssautDuTour(_w,ai.civ.id);
-    addLog('⚔️ '+ai.civ.emoji+' '+ai.civ.name+' frappe '+_nom+' par surprise !','red');
+    addLog('⚔️ '+ai.civ.emoji+' '+ai.civ.name+' frappe '+_nom+' par surprise — acte d\'agression, sans déclaration de guerre.','red');
     G.aiActions.push({emoji:'⚔️',name:'Assaut sur '+_nom,desc:'frappe surprise'});
     /* Nœud partagé : le cohabitant humain n'est ni le défenseur ni un payeur, mais il tombera avec
        le principal si la place est prise (`capturerNoeud`). Il doit le savoir AVANT, pas le
@@ -10524,7 +10865,7 @@ function resoudreAssautIA(ai,nodeId,opts){
     const _nomG=(NODES[nodeId]&&NODES[nodeId].name)||nodeId;
     let _wg=_warBetween(ai.civ.id,best.civ.id);
     if(!_wg){
-      if(!declarerGuerre(ai,best,'Assaut surprise sur '+_nomG+' !','ai'))return false;
+      if(!declarerGuerre(ai,best,'Assaut surprise sur '+_nomG+' !','ai',{escarmouche:true}))return false;
       _wg=_warBetween(ai.civ.id,best.civ.id);
     }
     if(_wg){ _wg.live=true; _wg.justDeclared=false; _wg.turnsLeft=99; _wg.aiAggressor=true;
@@ -10586,12 +10927,20 @@ function resoudreAssautIA(ai,nodeId,opts){
     addLog('🎯 '+ai.civ.emoji+' '+ai.civ.name+' frappe '+((NODES[bestCol.nodeId]&&NODES[bestCol.nodeId].name)||bestCol.nodeId)
       +' — '+best.civ.name+' est à court de ressources et ne peut pas défendre ('+_engage+' jeton(s) suffisent).','gold');
   const aPow=_engage+aEmpath,dPow=dCommit+dEmpath+_garnison+_renfortIA;
-  ai.acLeft=Math.max(0,ai.acLeft-1);ai.spentThisTurn+=1+_engage;ai._attacksThisTurn=(ai._attacksThisTurn||0)+1;
+  /* ⚠️ CE CHEMIN PAYAIT ENCORE 1 ACTION QUELLE QUE SOIT LA DISTANCE. Le barème de voyage (§136) a
+     été posé dans `attackColony` (joueur) et dans la branche « cible humaine » ci-dessus, mais pas
+     ici : un ordinateur conquérait Titan depuis Io (84 jours) pour une seule action, là où un joueur
+     en payait deux. Vu par `test_assaut_sans_guerre.js` §5. Même barème pour tout le monde. */
+  { const _cAC=(typeof coutAssautAC==='function')?coutAssautAC(ai,nodeId):1;
+    ai.acLeft=Math.max(0,ai.acLeft-_cAC); ai.spentThisTurn+=_cAC+_engage; }
+  ai._attacksThisTurn=(ai._attacksThisTurn||0)+1;
   const win=aPow>dPow;
   applyCombatEngage(ai,_engage,win);if(dCommit>0)applyCombatEngage(best,dCommit,!win);
   /* +2 VP au vainqueur, comme dans `resolveWarCombat` (1C29, 14/09) — test_combat_vp_equitable.js. */
   if(typeof gagnerVP==='function')gagnerVP(win?ai:best,2,'Combat gagné contre '+(win?best:ai).civ.name);
-  addTens(ai.civ.id,best.civ.id,1);addTens(best.civ.id,ai.civ.id,3);
+  /* Avant : +1 pour l'agresseur, +3 pour l'agressé. La règle de Marc remplace les deux — l'agresseur
+     n'ajoute rien, l'agressé monte à 8 si la place tombe, à 6 si elle tient (§134 étape 3). */
+  tensionApresAssaut(ai,best,win);
   const node=NODES[bestCol.nodeId];
   if(win){
     /* ⚠️ CE CHEMIN N'AVAIT AUCUN GARDE-FOU. `ai.colonies.push(...)` était inconditionnel : une IA
@@ -10606,6 +10955,8 @@ function resoudreAssautIA(ai,nodeId,opts){
     addLog('🛡️ '+best.civ.emoji+' '+best.civ.name+' repousse l\'assaut de '+ai.civ.emoji+' '+ai.civ.name+' ('+aPow+'⚔️ vs '+dPow+'🛡️)','gold');
     G.aiActions.push({emoji:'🛡️',name:'Assaut repoussé par '+best.civ.name,desc:aPow+'⚔️ vs '+dPow+'🛡️'});
   }
+  { const _w=(typeof _warBetween==='function')?_warBetween(ai.civ.id,best.civ.id):null;
+    if(_w&&_w.escarmouche) finEscarmouche(_w); }
   return true;
 }
 function doAITurn(aiPlayer,oneShot){
@@ -11116,6 +11467,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
         setTens(pire.civ.id,ai.civ.id,Math.max(0,cur-card.calmTheirs));
         addLog('🕊️ '+ai.civ.emoji+' '+ai.civ.name+' envoie une mission diplomatique chez '+pire.civ.emoji+' '
           +pire.civ.name+' : sa tension '+cur+' → '+getTens(pire.civ.id,ai.civ.id)+'/10','dim');
+        if(typeof apaiserRancune==='function') apaiserRancune(ai,pire);   // même geste, même effet que pour le joueur
       }
     }
     ai.stratBonus={acBonus:card.acBonus||0,spec:card.spec||null,combatBonus:card.combatBonus||0,upkeepDiscount:card.upkeepDiscount||0};
@@ -13120,16 +13472,18 @@ function showNodePopup(nodeId){
       const accordOk=!_accBlocked&&G.player.acLeft>=1&&(G.player.res.materials||0)>=2;
       const _accTitle=_accBlocked?(_atWar?'Impossible — en guerre':'Tensions trop élevées ('+_tens+'/10)'):'1AC · 2<i class=ri-materials></i> donnés';
       acts.innerHTML+=`<button class="npop-btn" ${accordOk?'':'disabled'} onclick="showAccordInfo('${nodeId}')">🤝 Accord Commercial<br><small>${_accTitle}</small></button>`;
-      const tc=2;const atkOk=G.player.acLeft>=1&&G.player.forceTokens>=tc;
-      acts.innerHTML+=`<button class="npop-btn" style="border-color:#9a1a1a;color:#ff8888" ${atkOk?'':'disabled'} onclick="attackColony('${nodeId}')">💥 Attaquer<br><small>1AC -${tc}⚔ — DÉCLENCHE GUERRE</small></button>`;
+      const tc=2;const _cA=coutAssautAC(G.player,nodeId);const _dA=detailCoutAssaut(G.player,nodeId);
+      const atkOk=G.player.acLeft>=_cA&&G.player.forceTokens>=tc;
+      acts.innerHTML+=`<button class="npop-btn" style="border-color:#9a1a1a;color:#ff8888" ${atkOk?'':'disabled'} onclick="attackColony('${nodeId}')">💥 Attaquer<br><small>${_cA}AC -${tc}⚔${_dA.jours!==null?(' · '+_dA.jours+' j de voyage'):''}${_dA.rabais?' 🌀':''} — DÉCLENCHE GUERRE</small></button>`;
     }else{
       // Accord actif : commerce & transit autorisés, PAS de colonisation partagée. On peut rompre l'accord pour attaquer.
-      const tc=2;const atkOk=G.player.acLeft>=1&&G.player.forceTokens>=tc;
+      const tc=2;const _cA=coutAssautAC(G.player,nodeId);const _dA=detailCoutAssaut(G.player,nodeId);
+      const atkOk=G.player.acLeft>=_cA&&G.player.forceTokens>=tc;
       acts.innerHTML+=`<div style="font-size:.82em;color:#9ad89a;margin:4px 0">🤝 Accord actif — commerce & transit autorisés.</div>`;
       /* ⚠️ CE BOUTON ÉTAIT ÉCRIT DEUX FOIS. Le second, sous un `if(!G.warState)`, appelait exactement
          la même fonction avec un libellé différent : hors guerre, la fenêtre affichait donc DEUX
          boutons « Rompre l'accord & Attaquer » l'un sous l'autre. Un seul suffit, et il dit tout. */
-      acts.innerHTML+=`<button class="npop-btn" style="border-color:#9a1a1a;color:#ff8888" ${atkOk?'':'disabled'} onclick="breakAccordAndAttack('${nodeId}')">💥 Rompre l'accord & Attaquer<br><small>1AC -${tc}⚔ — révoque l'accord, DÉCLENCHE LA GUERRE</small></button>`;
+      acts.innerHTML+=`<button class="npop-btn" style="border-color:#9a1a1a;color:#ff8888" ${atkOk?'':'disabled'} onclick="breakAccordAndAttack('${nodeId}')">💥 Rompre l'accord & Attaquer<br><small>${_cA}AC -${tc}⚔${_dA.jours!==null?(' · '+_dA.jours+' j'):''} — révoque l'accord, DÉCLENCHE LA GUERRE</small></button>`;
     }
   }
   if(pCol&&pCol.level<node.maxLv&&!pCol.noUpgrade){
@@ -13330,7 +13684,16 @@ function iaVeutLaPaix(nat,ennemi){
   const payable=Math.min(nat.res.materials||0,nat.res.energy||0);
   if(force<2||payable<1)return true;                 // incapable de se battre : la paix est la seule issue
   if((nat.res.morale||0)<=1)return true;             // le peuple n'en veut plus
-  if(ennemi&&calcVP(ennemi).total>calcVP(nat).total+8)return true;  // trop loin derrière pour espérer
+  /* ⚠️ LES DEUX SORTIES CI-DESSUS SONT ABSOLUES, ET DOIVENT LE RESTER. Une nation à sec, ou dont le
+     peuple n'en veut plus, accepte la paix quelle que soit sa rancune : c'est ce qui garantit
+     qu'aucune guerre ne devient éternelle (banc `test_memoire_agressions` §8).
+     Ce qui suit, en revanche, est un calcul d'intérêt — « je suis trop loin derrière pour espérer
+     gagner » — et une nation qu'on a agressée trois fois sans jamais rien tenter pour l'apaiser ne
+     raisonne plus en comptable. Elle a encore les moyens de se battre : elle continue. */
+  if(ennemi&&calcVP(ennemi).total>calcVP(nat).total+8){
+    const _s=(typeof surchargeRancune==='function')?surchargeRancune(nat,ennemi):0;
+    if(_s<2) return true;
+  }
   return false;
 }
 function showPeaceOfferModal(isJustDeclared,cb){
@@ -14678,14 +15041,8 @@ function drawConnections(){
   // Helpers durée / pastilles / courbe (Soleil à gauche → assistance gravitationnelle)
   const SUN={x:-40,y:420};
   const _days=(a,b)=>Math.round(Math.hypot(b.x-a.x,b.y-a.y)*0.26);
-  // Durées de trajet FIXES réalistes (jours, échelle ×10). Clé = paire de nœuds triée.
-  const DUR={'lune|phobos':55,'ceres|lune':58,'deimos|lune':52,'deimos|phobos':2,'ceres|phobos':24,
-    'ceres|vesta':12,'ceres|io':55,'ceres|ganymede':58,'ganymede|vesta':52,
-    'europe|io':3,'ganymede|io':4,'callisto|europe':4,'callisto|ganymede':4,
-    'europe|titan':82,'ganymede|titan':80,'callisto|titan':78,
-    'encelade|titan':6,'encelade|triton':150,'titan|triton':150,'pluto|titan':130,
-    'pluto|triton':60,'eris|triton':90,'eris|pluto':45,'europe|pluto':170,
-    'mars|terre':26,'jupiter|mars':70,'eris|jupiter':220};
+  // Durées de trajet : la table vit désormais au niveau du moteur (DUREES_TRAJET), c'est une RÈGLE.
+  const DUR=DUREES_TRAJET;
   const _range=d=>{const lo=Math.max(1,Math.round(d*0.85)),hi=Math.round(d*1.2);return lo+'–'+hi+' j';};
   const _pill=(x,y,txt,gold)=>{const w=Math.max(34,txt.length*5.4);return `<g><rect x="${(x-w/2).toFixed(1)}" y="${y-8}" width="${w.toFixed(1)}" height="16" rx="8" fill="${gold?'#241f0e':'#0b1730'}" fill-opacity=".9" stroke="${gold?'#FFD54F':'#4a9eff'}" stroke-opacity=".65" stroke-width="1"/><text x="${x}" y="${y+3.5}" text-anchor="middle" font-size="8.5" font-weight="600" fill="${gold?'#ffe08a':'#a9c8ff'}">${txt}</text></g>`;};
   const _curve=(a,b)=>{const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len;const side=((mx-SUN.x)*ny-(my-SUN.y)*nx)>=0?1:-1;const off=Math.min(len*0.18,90)*side;return{cx:mx+nx*off,cy:my+ny*off};};

@@ -143,7 +143,7 @@
 <tr><td>Établir une route</td><td>1</td><td>1🪨 (+1 jeton Force pour la protéger)</td></tr>
 <tr><td>Raid</td><td>1</td><td>2 jetons Force (1 pour les Ceinturiens)</td></tr>
 <tr><td>Accord commercial</td><td>1</td><td>2🪨 <strong>donnés</strong> à l'autre nation</td></tr>
-<tr><td>Assaut</td><td>1</td><td>jetons engagés — déclenche la guerre</td></tr>
+<tr><td>Assaut</td><td>1 à 3 selon le voyage</td><td>jetons engagés — fait monter la tension de l'assailli, ne déclare pas la guerre</td></tr>
 <tr><td>Acheter une carte</td><td>1 (2 au niveau 3)</td><td>coût de la carte</td></tr>
 <tr><td>Pouvoir de nation</td><td>0</td><td>voir §2</td></tr>
 </table>
@@ -167,7 +167,7 @@
 <li>Tension −3 des deux côtés. Tant qu'il tient : <strong>+1🪨 +1❤️/tour pour chacun</strong> — par accord, pas par colonie.</li>
 <li>Tes routes sur ses colonies ne créent plus de tension, et tu peux <strong>traverser son territoire</strong> pour aller connecter des colonies à toi plus lointaines sans risquer la guerre. Coloniser ses nœuds reste interdit.</li>
 <li><strong>Un seul accord par couple.</strong> Si les deux se le proposent au même sommet, un seul est signé — et les deux en sont avertis.</li>
-<li>Rompu par une déclaration de guerre ou un assaut, pas par un raid. (Le sort des routes en guerre est décrit en 14.4.)</li>
+<li>Rompu par une déclaration de guerre ou un assaut, pas par un raid. (Le sort des routes en guerre est décrit en 14.4 ; un assaut seul ne rompt aucune route.)</li>
 </ul>
 
 <h3>6.5 Cohabitation</h3>
@@ -316,7 +316,7 @@
 <tr><td>Raid subi</td><td>+3 victime, +1 pillard</td><td>à chaque raid</td></tr>
 <tr><td>Raid bloqué par 🔍 IA Défensive</td><td>+1 victime</td><td>à chaque tentative</td></tr>
 <tr><td>Espionnage détecté</td><td>+6, +8 ou +10 chez la victime</td><td>à la détection</td></tr>
-<tr><td>Assaut d'une colonie</td><td>+3 assailli, +1 assaillant</td><td>à chaque assaut</td></tr>
+<tr><td>Assaut d'une colonie</td><td>assailli porté à <strong>8</strong> si la colonie tombe, à <strong>6</strong> si elle tient — l'assaillant n'ajoute rien</td><td>à chaque assaut (plancher : une tension plus haute ne redescend pas)</td></tr>
 <tr><td>Attaque de pirates sur tes routes</td><td>+1 envers les Ceinturiens</td><td>à chaque attaque</td></tr>
 <tr><td>Déclaration de guerre</td><td>les deux jauges à 10</td><td>immédiatement</td></tr>
 </table>
@@ -331,7 +331,7 @@
 <tr><td>Pacte de non-agression</td><td>les deux jauges à 0</td></tr>
 <tr><td>Événement Sommet commercial</td><td>−2 avec chaque nation</td></tr>
 <tr><td>Événement Sommet diplomatique</td><td>−5 partout</td></tr>
-<tr><td>Carte Diplomatie</td><td>−3 à la tension d'une nation choisie ENVERS TOI</td></tr>
+<tr><td>Carte Diplomatie</td><td>−3 à la tension d'une nation choisie ENVERS TOI, <strong>et sa rancune est effacée</strong> (voir 12.4)</td></tr>
 <tr><td>Accepter le monopole de la Sphère de Dyson</td><td>les deux jauges à 2, la guerre à peine déclarée s'arrête</td></tr>
 <tr><td>Fin de guerre</td><td>vainqueur 0, perdant 5 · paix blanche : 4 partout</td></tr>
 </table>
@@ -344,6 +344,11 @@
 </table>
 <p>Un accord commercial ou un pacte est refusé au-dessus de <strong>7</strong> de tension, ou en cas de guerre.</p>
 
+<h3>12.4 La rancune — ce qu'une nation n'oublie pas</h3>
+<p>La tension s'efface : elle redescend d'elle-même, une paix la divise par deux, un sommet la baisse partout. La <strong>rancune</strong>, elle, ne s'efface pas avec le temps. Chaque raid et chaque assaut que tu fais subir à une nation — <strong>réussi ou non</strong> — s'ajoute à son compteur, et ce compteur <strong>durcit toutes ses réponses à tes demandes</strong> : accord commercial, pacte de non-agression, offre de paix.</p>
+<p>Concrètement, au moment où elle décide, elle ressent ta tension <strong>+1</strong> dès la première agression et <strong>+2</strong> à partir de la troisième. Un accord qui serait passé à 6 de tension est refusé si tu l'as déjà attaquée, et le refus te dit pourquoi. À tension basse, en revanche, une rancune seule ne bloque rien : une nation tranquille reste ouverte.</p>
+<p><strong>Et on se réconcilie toujours.</strong> Une mission 🕊️ <strong>Diplomatie</strong> dirigée vers cette nation efface son ardoise d'un coup — elle ne dépend pas de son accord, donc une diplomatie bloquée peut toujours se débloquer. Un pacte de non-agression signé l'efface aussi, des deux côtés.</p>
+
 <h2 id="s13">13. Pirates</h2>
 <p>Ils occupent Triton et épargnent les Ceinturiens, qui font de la contrebande avec eux. Chaque route <strong>non protégée</strong> risque d'être détruite : <strong>20 % au tour 1, +10 points par tour</strong>, certain dès le tour 9. Reconstruction : 1 AC + 1🪨. Les colonies ne sont jamais touchées, et la tension envers les Ceinturiens monte de 1 à chaque attaque.</p>
 <p>🔍 Réseau Orbital, 🔍 IA Défensive et 🔮 Liens Empathes rendent immunisé — à l'achat, les jetons posés sur tes routes reviennent gratuitement.</p>
@@ -351,8 +356,10 @@
 <h2 id="s14">14. Guerre</h2>
 
 <h3>14.1 Déclenchement</h3>
-<p class="cle"><strong>On ne déclare pas la guerre : on attaque.</strong> Un assaut est une <strong>frappe surprise</strong> — l'assaillant ne prévient pas. L'assailli l'apprend au moment de s'y opposer : il choisit ses jetons (et son Supercroiseur), le combat se résout aussitôt, et <strong>la guerre s'ouvre en conséquence</strong>. C'est une réponse obligatoire, pas une décision. Aucune paix avant qu'un premier coup ait été porté.</p>
-<p>Même déroulé, que l'assaut vienne d'un joueur ou de l'ordinateur. La guerre éclate aussi à 10 de tension, ou quand un accord commercial est rompu par un assaut.</p>
+<p class="cle"><strong>Un assaut n'est pas une déclaration de guerre.</strong> C'est une <strong>frappe surprise</strong> — l'assaillant ne prévient pas. L'assailli l'apprend au moment de s'y opposer : il choisit ses jetons (et son Supercroiseur) et le combat se résout aussitôt. Mais <strong>aucune guerre ne s'ouvre</strong> : ce que l'agression laisse derrière elle, c'est la <strong>tension</strong> de l'agressé.</p>
+<p><strong>La tension est le seul chemin vers la guerre.</strong> Une colonie prise porte la tension de l'agressé à <strong>8/10</strong>, un assaut repoussé à <strong>6/10</strong> — une attaque ratée n'est pas pardonnée. L'agresseur, lui, n'ajoute rien à la sienne. Ce sont des planchers : une tension plus haute ne redescend pas. <strong>À 10, en fin de tour, le peuple exige la guerre</strong> : c'est la guerre populaire forcée, et c'est la seule porte — avec le refus d'une Sphère de Dyson et l'espionnage démasqué. À cet instant tu peux encore acheter ou proposer la paix ; la fenêtre te dit ce que la guerre va te coûter.</p>
+<p>Qui veut la guerre à tout prix l'obtient donc quand même : il lui suffit d'attaquer tant qu'il lui reste des actions. Simplement, elle n'arrive pas au milieu du tour où l'on vient déjà de perdre du moral en perdant une colonie.</p>
+<p>Même déroulé, que l'assaut vienne d'un joueur ou de l'ordinateur. Un assaut <strong>rompt l'accord commercial</strong> qui liait les deux nations — on ne commerce pas avec qui l'on attaque — mais il ne rompt ni les routes ni les colonies de cohabitation : cela n'arrive qu'à la déclaration d'une vraie guerre.</p>
 
 <h3>14.2 Le combat</h3>
 <p>Tout se joue en <strong>jetons Force</strong>. Chaque jeton engagé coûte <strong>1🪨 + 1⚡</strong> : tu ne peux engager que ce que tu peux payer (l'IA de Navigation divise ce coût par deux). S'ajoutent gratuitement le bonus Empathes (+2 ou +4) et le Supercroiseur (+5) si tu le déploies.</p>
@@ -363,7 +370,7 @@
 </ul>
 
 <h3>14.3 L'ordre des combats en fin de tour</h3>
-<p>Le <strong>premier tour</strong> appartient à celui qui a ouvert la guerre : lui seul frappe. Dès le <strong>tour suivant</strong>, chaque camp mène un assaut et subit celui de l'autre — <strong>deux combats</strong> par soirée. Chaque jeton se payant, il faut répartir jetons et ressources entre attaque et défense : c'est là que se joue la guerre.</p>
+<p>Une fois la guerre ouverte, le <strong>premier tour</strong> appartient à celui qui l'a ouverte : lui seul frappe. Dès le <strong>tour suivant</strong>, chaque camp mène un assaut et subit celui de l'autre — <strong>deux combats</strong> par soirée. Chaque jeton se payant, il faut répartir jetons et ressources entre attaque et défense : c'est là que se joue la guerre.</p>
 <p>L'<strong>initiative</strong> ne dit pas qui frappe en premier, mais <em>qui choisit</em> lequel des deux frappe en premier. Elle se détermine par la première règle qui départage :</p>
 <table>
 <tr><th>#</th><th>Critère</th><th>Qui l'emporte</th></tr>
