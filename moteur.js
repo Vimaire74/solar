@@ -130,9 +130,9 @@ const NODES={
   ceres:{id:'ceres',name:'Cérès',emoji:'⬜',color:'#CFD8DC',type:'dwarf_planet',baseVP:3,maxLv:3,r:21,strategic:'full',res:{energy:1,materials:3},info:'2,77 UA · 4,6 ans',x:421,y:1109,conn:['lune','phobos','vesta','io','europe'],desc:'Hub de la ceinture d\'astéroïdes. Carrefour stratégique des routes.'},
   vesta:{id:'vesta',name:'Vesta',emoji:'🪨',color:'#78909C',type:'asteroid',baseVP:2,maxLv:3,r:17,strategic:null,res:{materials:2},info:'2,36 UA · 3,6 ans',x:825,y:1705,conn:['ceres','ganymede','phobos','io','encelade'],desc:'Grand astéroïde métallique. Éloigné des routes principales.'},
   io:{id:'io',name:'Io',emoji:'🟡',color:'#FFD54F',type:'moon',baseVP:3,maxLv:3,r:15,strategic:'half',res:{energy:3,materials:1},x:616,y:1091,conn:['ceres','europe','ganymede','vesta','lune'],desc:'Lune volcanique. Énergie géothermique intense.'},
-  europe:{id:'europe',name:'Europe',emoji:'🔵',color:'#42a5f5',type:'moon',baseVP:4,maxLv:3,r:15,strategic:null,res:{energy:1,materials:1},x:711,y:930,conn:['io','callisto','titan','pluto','ceres'],desc:'Océan sous-glaciaire. Paysage saisissant sous Jupiter. Radiation intense.'},
-  ganymede:{id:'ganymede',name:'Ganymède',emoji:'🟤',color:'#A1887F',type:'moon',baseVP:4,maxLv:3,r:18,strategic:'full',res:{energy:1,materials:2},x:880,y:899,conn:['io','vesta','callisto','titan','triton'],desc:'Plus grande lune du système. Hub jovien majeur, carrefour de routes.'},
-  callisto:{id:'callisto',name:'Callisto',emoji:'🔘',color:'#607D8B',type:'moon',baseVP:3,maxLv:3,r:16,strategic:'half',res:{energy:1,materials:2},x:1031,y:1012,conn:['europe','ganymede','titan','encelade'],desc:'Hors de la radiation jovienne. Meilleur habitat humain du système jovien.'},
+  europe:{id:'europe',name:'Europe',emoji:'🔵',color:'#42a5f5',type:'moon',baseVP:4,maxLv:3,r:15,strategic:null,res:{energy:1,materials:1},x:711,y:930,conn:['io','ganymede','titan','pluto','ceres'],desc:'Océan sous-glaciaire. Paysage saisissant sous Jupiter. Radiation intense.'},
+  ganymede:{id:'ganymede',name:'Ganymède',emoji:'🟤',color:'#A1887F',type:'moon',baseVP:4,maxLv:3,r:18,strategic:'full',res:{energy:1,materials:2},x:880,y:899,conn:['io','vesta','callisto','titan','triton','europe'],desc:'Plus grande lune du système. Hub jovien majeur, carrefour de routes.'},
+  callisto:{id:'callisto',name:'Callisto',emoji:'🔘',color:'#607D8B',type:'moon',baseVP:3,maxLv:3,r:16,strategic:'half',res:{energy:1,materials:2},x:1031,y:1012,conn:['ganymede','titan','encelade'],desc:'Hors de la radiation jovienne. Meilleur habitat humain du système jovien.'},
   /* ⚠️ « STATION JUPITER » N'EST PLUS QU'UN DESSIN (2026-08-07, décision de Marc).
      Elle n'est pas SUPPRIMÉE de la table des nœuds, et c'est délibéré (des sauvegardes et des bancs
      la connaissent). Depuis v10.70 Jupiter est dessinée par `PLANETS_DECO` (vecteur) : cette
@@ -2218,7 +2218,7 @@ function costHtml(cost){return Object.entries(cost).map(([r,a])=>rHtml(r,'-'+a))
    ═══════════════════════════════════════════════════════════════════════════════════════════ */
 const DUREES_TRAJET={'lune|phobos':55,'ceres|lune':58,'deimos|lune':52,'deimos|phobos':2,'ceres|phobos':24,
     'ceres|vesta':12,'ceres|io':55,'ceres|europe':58,'ganymede|vesta':52,
-    'europe|io':3,'ganymede|io':4,'callisto|europe':4,'callisto|ganymede':4,
+    'europe|io':3,'ganymede|io':4,'europe|ganymede':4,'callisto|ganymede':4,
     'europe|titan':82,'ganymede|titan':80,'callisto|titan':78,
     'encelade|titan':6,'encelade|triton':150,'titan|triton':150,'pluto|titan':130,
     'pluto|triton':60,'eris|triton':90,'eris|pluto':45,'europe|pluto':170,
@@ -2234,7 +2234,10 @@ const DUREES_TRAJET={'lune|phobos':55,'ceres|lune':58,'deimos|lune':52,'deimos|p
     /* v10.70 (suite) : depuis Cérès, la liaison jovienne va à EUROPE et non plus à Ganymède
        (Marc, 17/09 : « visuellement depuis Cérès la route devrait aller à Europe, les routes se
        croisent » — sur le plateau, le tracé vers Ganymède passait entre Io et Europe). Même durée
-       que l'ancienne, 58 j : le coût des voyages ne bouge pas de ce fait. */
+       que l'ancienne, 58 j : le coût des voyages ne bouge pas de ce fait.
+       Même raison pour Europe–Callisto, remplacée par Europe–GANYMÈDE (Marc, 17/09) : sur l'arc des
+       lunes joviennes, Europe et Callisto sont aux deux bouts et le tracé sautait par-dessus
+       Ganymède. 4 j, comme les autres sauts entre lunes voisines de Jupiter. */
     'io|lune':121,'phobos|vesta':43,'io|vesta':49,
     'encelade|vesta':125,'callisto|encelade':78,'ganymede|triton':190,
     'mars|terre':26,'jupiter|mars':70,'eris|jupiter':220};
@@ -12972,9 +12975,9 @@ function renderSystemMap(){
   const rp=document.getElementById('routes-p'),ra=document.getElementById('routes-ai');
   rp.innerHTML='';ra.innerHTML='';
   const contested=getContestedSegments();
-  for(const seg of contested){const f=NODES[seg.from],t=NODES[seg.to];if(!f||!t)continue;const P=routePoint(seg.from,seg.to,0.5);ra.innerHTML+=`<path d="${routePathD(seg.from,seg.to)}" fill="none" stroke="#ff5500" stroke-width="5" stroke-opacity=".22"/><text x="${P.x.toFixed(1)}" y="${(P.y-4).toFixed(1)}" text-anchor="middle" font-size="10" fill="#ff7744">⚠</text>`;}
-  for(let ri=0;ri<G.player.routes.length;ri++){const r=G.player.routes[ri];const f=NODES[r.from],t=NODES[r.to];if(!f||!t)continue;const canManage=G.phase==='actions';const d=routePathD(r.from,r.to);const P=routePoint(r.from,r.to,0.5);const mx=P.x,my=P.y;rp.innerHTML+=`<path d="${d}" fill="none" stroke="${G.player.civ.color}" stroke-width="2.5" stroke-opacity=".75" stroke-dasharray="5,3"/>`;if((r.tokens||0)>0){rp.innerHTML+=`<rect x="${(mx-6).toFixed(1)}" y="${(my-6).toFixed(1)}" width="12" height="12" fill="${G.player.civ.color}" opacity=".88" rx="2"/><text x="${mx.toFixed(1)}" y="${(my+4).toFixed(1)}" text-anchor="middle" font-size="8" fill="white">⚔</text>`;}if(canManage){rp.innerHTML+=`<path d="${d}" fill="none" stroke="transparent" stroke-width="16" onclick="showRouteManageModal(${ri})" style="cursor:pointer"/><circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="7" fill="${(r.tokens||0)>0?'#ff8844':'#224488'}" fill-opacity=".7" stroke="${(r.tokens||0)>0?'#ffaa66':'#4a9eff'}" stroke-width="1" onclick="showRouteManageModal(${ri})" style="cursor:pointer" title="${(r.tokens||0)>0?'↩️ Rappeler jeton':'⚔️ Déployer jeton'}"/>`;} }
-  for(const aiP of G.ais){for(const r of aiP.routes){const f=NODES[r.from],t=NODES[r.to];if(!f||!t)continue;ra.innerHTML+=`<path d="${routePathD(r.from,r.to)}" fill="none" stroke="${aiP.civ.color}" stroke-width="2" stroke-opacity=".5" stroke-dasharray="4,4"/>`;if((r.tokens||0)>0){const P=routePoint(r.from,r.to,0.5);const mx=P.x+8,my=P.y-8;ra.innerHTML+=`<rect x="${(mx-5).toFixed(1)}" y="${(my-5).toFixed(1)}" width="10" height="10" fill="${aiP.civ.color}" opacity=".7" rx="2"/><text x="${mx.toFixed(1)}" y="${(my+3.5).toFixed(1)}" text-anchor="middle" font-size="7" fill="white">⚔</text>`;}}
+  for(const seg of contested){const f=NODES[seg.from],t=NODES[seg.to];if(!f||!t)continue;const P=routePoint(seg.from,seg.to,0.5);ra.innerHTML+=`<path d="${routePathD(seg.from,seg.to)}" fill="none" stroke="#ff5500" stroke-width="5" stroke-opacity=".22"/><text x="${P.x.toFixed(1)}" y="${(P.y-MT(4)).toFixed(1)}" text-anchor="middle" font-size="${MT(10)}" fill="#ff7744">⚠</text>`;}
+  for(let ri=0;ri<G.player.routes.length;ri++){const r=G.player.routes[ri];const f=NODES[r.from],t=NODES[r.to];if(!f||!t)continue;const canManage=G.phase==='actions';const d=routePathD(r.from,r.to);const P=routePoint(r.from,r.to,0.5);const mx=P.x,my=P.y;rp.innerHTML+=`<path d="${d}" fill="none" stroke="${G.player.civ.color}" stroke-width="2.5" stroke-opacity=".75" stroke-dasharray="5,3"/>`;if((r.tokens||0)>0){rp.innerHTML+=`<rect x="${(mx-MT(6)).toFixed(1)}" y="${(my-MT(6)).toFixed(1)}" width="${MT(12)}" height="${MT(12)}" fill="${G.player.civ.color}" opacity=".88" rx="4"/><text x="${mx.toFixed(1)}" y="${(my+MT(4)).toFixed(1)}" text-anchor="middle" font-size="${MT(8)}" fill="white">⚔</text>`;}if(canManage){rp.innerHTML+=`<path d="${d}" fill="none" stroke="transparent" stroke-width="16" onclick="showRouteManageModal(${ri})" style="cursor:pointer"/><circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="${MT(7)}" fill="${(r.tokens||0)>0?'#ff8844':'#224488'}" fill-opacity=".7" stroke="${(r.tokens||0)>0?'#ffaa66':'#4a9eff'}" stroke-width="1" onclick="showRouteManageModal(${ri})" style="cursor:pointer" title="${(r.tokens||0)>0?'↩️ Rappeler jeton':'⚔️ Déployer jeton'}"/>`;} }
+  for(const aiP of G.ais){for(const r of aiP.routes){const f=NODES[r.from],t=NODES[r.to];if(!f||!t)continue;ra.innerHTML+=`<path d="${routePathD(r.from,r.to)}" fill="none" stroke="${aiP.civ.color}" stroke-width="2" stroke-opacity=".5" stroke-dasharray="4,4"/>`;if((r.tokens||0)>0){const P=routePoint(r.from,r.to,0.5);const mx=P.x+MT(8),my=P.y-MT(8);ra.innerHTML+=`<rect x="${(mx-MT(5)).toFixed(1)}" y="${(my-MT(5)).toFixed(1)}" width="${MT(10)}" height="${MT(10)}" fill="${aiP.civ.color}" opacity=".7" rx="3"/><text x="${mx.toFixed(1)}" y="${(my+MT(3.5)).toFixed(1)}" text-anchor="middle" font-size="${MT(7)}" fill="white">⚔</text>`;}}
   }
   // (Attaque de route par clic sur la carte retirée : peu lisible. On attaque les routes via la fenêtre de combat ou la guerre populaire forcée.)
   // Pirates NPC (masqué si l'une des factions joue Pirates)
@@ -13012,8 +13015,13 @@ function renderSystemMap(){
     // v10.70 : lunes et naines en VECTEUR (disque dégradé à la couleur du nœud), plus de photo — le
     // rendu « Système » retenu par Marc sur maquette. Les anneaux joviens décoratifs ne sont pas dessinés.
     const body=node.decorative?'':_vecLune(id,node,ir);
-    const infoLigne=node.info?`<text x="${node.x}" y="${node.y+br+28}" text-anchor="middle" font-size="7.5" fill="#8fa0c8" paint-order="stroke" stroke="#04060f" stroke-width="2">${node.info}</text>`:'';
-    ng.innerHTML+=`<g style="cursor:pointer" onclick="handleNodeClick('${id}')">${glow}${body}${rings}<circle cx="${node.x}" cy="${node.y}" r="${Math.max(br,12)}" fill="transparent"/><text x="${node.x}" y="${node.y+br+11}" text-anchor="middle" font-size="10" font-weight="600" paint-order="stroke" stroke="#04060f" stroke-width="2.6" fill="#e6eeff">${node.name}</text>${node.baseVP>0?`<text x="${node.x}" y="${node.y+br+19}" text-anchor="middle" font-size="7" fill="#6070a0">${node.baseVP}VP</text>`:''}${infoLigne}</g>`;
+    /* ⚠️ TAILLE DES ÉTIQUETTES — voir la note `MAP_TXT` : le plateau tient dans 1920 unités là où
+       l'ancienne bande n'en montrait que 490 en hauteur ; à l'écran, le MÊME `font-size` y est donc
+       2,4 fois plus petit. « Les noms des lunes et astéroïdes sont illisibles sur mobile »
+       (Marc, 17/09). Les textes et les cibles tactiles sont écrits en unités de plateau × MAP_TXT ;
+       la géométrie des corps, elle, ne bouge pas — elle porte l'échelle du système. */
+    const infoLigne=node.info?`<text x="${node.x}" y="${node.y+br+MT(30)}" text-anchor="middle" font-size="${MT(7.5)}" fill="#8fa0c8" paint-order="stroke" stroke="#04060f" stroke-width="${MT(2)}">${node.info}</text>`:'';
+    ng.innerHTML+=`<g style="cursor:pointer" onclick="handleNodeClick('${id}')">${glow}${body}${rings}<circle cx="${node.x}" cy="${node.y}" r="${Math.max(br,MT(12))}" fill="transparent"/><text x="${node.x}" y="${node.y+br+MT(12)}" text-anchor="middle" font-size="${MT(10)}" font-weight="600" paint-order="stroke" stroke="#04060f" stroke-width="${MT(2.6)}" fill="#e6eeff">${node.name}</text>${node.baseVP>0?`<text x="${node.x}" y="${node.y+br+MT(21)}" text-anchor="middle" font-size="${MT(7)}" fill="#6070a0" paint-order="stroke" stroke="#04060f" stroke-width="${MT(1.8)}">${node.baseVP}VP</text>`:''}${infoLigne}</g>`;
   }
   if(typeof uiMapMarkers==='function')uiMapMarkers();
   try{ if(typeof uiMapFit==='function') setTimeout(uiMapFit,0); }catch(e){}
@@ -13024,6 +13032,20 @@ function renderSystemMap(){
    servait la vue peinte et les vues « secteur » (MAP_HOTSPOTS, MAP_SECTORS, mapSectorSVG, setSector,
    backToMap, cadrerVueGlobale, MAP_RAD, les photos `assets/map/*.png`) a été retiré. */
 const MAP_VIEWBOX='0 0 1920 1920';
+/* ═══ MAP_TXT — POURQUOI LES ÉTIQUETTES SONT ÉCRITES « ×2,4 » ═══
+   Un `font-size` SVG est en unités de dessin, pas en pixels. L'ancienne carte montrait 490 unités
+   de haut : un texte de 10 y faisait ~13 px sur un téléphone. Le plateau en montre 1920 : le même
+   texte tomberait à 5 px à 2,5× — c'est ce que Marc a vu (« illisibles sur mobile »). On rétablit
+   donc la taille APPARENTE de l'ancienne carte en multipliant toutes les annotations — noms, PV,
+   pastilles de durée, boutons « + », jetons — par ce facteur. Les corps, les rayons et les routes
+   n'y touchent pas : eux portent l'échelle du système, pas la lisibilité.
+   ⚠️ 1,8 est un COMPROMIS MESURÉ, pas un chiffre rond : à 2,5× un nom de lune fait 9,6 px sur un
+   téléphone (412 px de large) et 13,5 px sur un ordinateur (cadre de 578 px de haut) — de part et
+   d'autre de ce que donnait l'ancienne carte au zoom où Marc la lisait. À 2,4 c'était juste sur le
+   téléphone mais énorme sur l'écran d'ordinateur. Un facteur qui suivrait le zoom obligerait à
+   redessiner la carte à chaque ± : pas la peine pour 3 px. */
+const MAP_TXT=1.8;
+function MT(v){ return Math.round(v*MAP_TXT*10)/10; }
 const MAP_SUN={x:50,y:1870};
 const MAP_UA=ua=>500+340*Math.log(ua);   // distance au Soleil, en unités du plateau, pour ua unités astronomiques
 /* ─── GÉOMÉTRIE DES ROUTES : droite si courte, sinon courbe « prograde », et contournement ───
@@ -13185,7 +13207,6 @@ function renderMap(){
   try{ document.body.classList.toggle('vue-carte', !!document.querySelector('#mp-map.active')); }catch(e){}
   const wrap=document.getElementById('map-wrap'); const bg=document.getElementById('map-bg-img');
   const ng=document.getElementById('nodes-g'); const back=document.getElementById('map-back');
-  const leg=document.getElementById('map-legend');
   if((G.mapView||'global')!=='zoom'){
     // 1re vue : l'image peinte + les zones cliquables invisibles (aucun dessin de plateau)
     if(wrap)wrap.classList.remove('mapzoom');
@@ -13194,7 +13215,6 @@ function renderMap(){
     if(bg)bg.style.display='';
     if(ng)ng.innerHTML=mapGlobalSVG();
     if(back)back.style.display='none';
-    if(leg)leg.style.display='none';
     cadrerVueGlobale();   // le bandeau vient d'être redessiné : le placer selon l'orientation
     try{ if(typeof uiMapFit==='function') setTimeout(uiMapFit,0); }catch(e){}
     return;
@@ -13203,11 +13223,6 @@ function renderMap(){
   if(wrap)wrap.classList.add('mapzoom');
   if(bg)bg.style.display='none';
   if(back)back.style.display='block';
-  /* Les noms des ceintures sont une ÉTIQUETTE DU CADRE, en haut à gauche, pas un texte posé en
-     travers du dessin (Marc, 17/09 : « inutile de surcharger le centre, c'est pas lisible »). Ils
-     partent avec le ⤳, comme les distances et les astéroïdes. */
-  if(leg){ const off=_mapDistOff(); leg.style.display=off?'none':'block';
-    if(!off)leg.innerHTML='<span><i style="background:#d8c08a"></i>Ceinture d\'astéroïdes principale <b>2,1 – 3,3 UA</b></span><span><i style="background:#8fbcd6"></i>Ceinture de Kuiper <b>30 – 50 UA</b></span>'; }
   /* Le plateau s'ouvre à 2,5× : à 1× le carré entier tient dans le cadre mais les noms des lunes
      font 6 px (Marc, 17/09). Une seule fois par chargement, et seulement si personne n'a zoomé. */
   if(!renderMap._premierCadrage&&typeof uiMZ!=='undefined'&&uiMZ===1){ renderMap._premierCadrage=true; uiMZ=ZOOM_PLANETE;
@@ -15252,23 +15267,30 @@ function drawConnections(){
   for(const p of PLANETS_DECO)s+=`<circle cx="${MAP_SUN.x}" cy="${MAP_SUN.y}" r="${f1(MAP_UA(p.ua))}" fill="none" stroke="#fff" stroke-opacity=".10"/>`;
   if(!off){ s+=`<g id="asteroides">`+_champAsteroides(MAP_UA(2.1),MAP_UA(3.3),-0.16,1.73,620,31,true)+_champAsteroides(MAP_UA(30),MAP_UA(50),-0.16,1.73,330,37,false)+`</g>`; }
   s+=`<circle cx="${MAP_SUN.x}" cy="${MAP_SUN.y}" r="105" fill="url(#mapSunDisk)"/>`;
-  // (Les noms des ceintures ne sont plus écrits en travers du dessin : ils sont dans l'étiquette
-  //  du cadre, en haut à gauche — voir `#map-legend`, posé par `renderMap`.)
+  /* NOMS DES CEINTURES — écrits DANS la carte, sur la ceinture, mais poussés vers le HAUT À GAUCHE
+     de leur arc (Marc, 17/09 : « j'aimais bien la police et le placement, mais décentré tout en
+     haut à gauche, pas au milieu »). Le texte suit l'arc depuis 88° (presque la verticale, donc le
+     coin haut-gauche du quart de disque) et court vers la droite : `startOffset` au début du
+     chemin, ancre à gauche. Ils partent avec le ⤳, comme les distances et les astéroïdes. */
+  if(!off){
+    const arcLab=(id,ua,t,c)=>{const r=MAP_UA(ua);const P=deg=>{const q=deg*Math.PI/180;return f1(MAP_SUN.x+r*Math.cos(q))+' '+f1(MAP_SUN.y-r*Math.sin(q));};return `<defs><path id="${id}" d="M ${P(88)} A ${f1(r)} ${f1(r)} 0 0 1 ${P(8)}"/></defs><text font-size="${MT(14)}" fill="${c}" font-family="Michroma,'Exo 2',sans-serif" letter-spacing="${MT(3)}" opacity=".8"><textPath href="#${id}" startOffset="2%" text-anchor="start">${t}</textPath></text>`;};
+    s+=arcLab('mapLab1',3.45,"CEINTURE D'ASTÉROÏDES PRINCIPALE",'#d8c08a')+arcLab('mapLab2',44,'CEINTURE DE KUIPER','#a9cbe6');
+  }
   // planètes-décor, encarts de lunes, étiquettes
   const civsEnJeu=(()=>{ try{ return [G.player,...G.ais].map(p=>p.civ.name); }catch(e){ return []; } })();
   const couleurNation=nom=>{ try{ return Object.values(CIVS).find(c=>c.name===nom).color; }catch(e){ return '#fff'; } };
   for(const p of PLANETS_DECO){
     if(p.lunes&&p.lunes.length){const far=Math.max(...p.lunes.map(id=>NODES[id]?Math.hypot(NODES[id].x-p.x,NODES[id].y-p.y):0))+30;s+=`<circle cx="${p.x}" cy="${p.y}" r="${f1(far)}" fill="none" stroke="#9cc2ff" stroke-opacity=".18" stroke-dasharray="4,8"/>`;}
     s+=_vecPlanete(p);
-    const ly=p.y+(p.ring?p.r*0.75:p.r)+16;
-    s+=`<text x="${p.x}" y="${f1(ly)}" text-anchor="middle" font-size="13" font-weight="700" font-family="Michroma,'Exo 2',sans-serif" paint-order="stroke" stroke="#04060f" stroke-width="3.5" fill="#e6eeff">${p.name}</text>`;
-    s+=`<text x="${p.x}" y="${f1(ly+13)}" text-anchor="middle" font-size="9" fill="#8fa0c8" paint-order="stroke" stroke="#04060f" stroke-width="2.5">${p.info}</text>`;
-    if(p.nation&&civsEnJeu.includes(p.nation))s+=`<text x="${p.x}" y="${f1(ly+25)}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${couleurNation(p.nation)}" paint-order="stroke" stroke="#04060f" stroke-width="2.5">⚑ ${p.nation}</text>`;
+    const ly=p.y+(p.ring?p.r*0.75:p.r)+MT(16);
+    s+=`<text x="${p.x}" y="${f1(ly)}" text-anchor="middle" font-size="${MT(13)}" font-weight="700" font-family="Michroma,'Exo 2',sans-serif" paint-order="stroke" stroke="#04060f" stroke-width="${MT(3.5)}" fill="#e6eeff">${p.name}</text>`;
+    s+=`<text x="${p.x}" y="${f1(ly+MT(15))}" text-anchor="middle" font-size="${MT(9)}" fill="#8fa0c8" paint-order="stroke" stroke="#04060f" stroke-width="${MT(2.5)}">${p.info}</text>`;
+    if(p.nation&&civsEnJeu.includes(p.nation))s+=`<text x="${p.x}" y="${f1(ly+MT(28))}" text-anchor="middle" font-size="${MT(9.5)}" font-weight="700" fill="${couleurNation(p.nation)}" paint-order="stroke" stroke="#04060f" stroke-width="${MT(2.5)}">⚑ ${p.nation}</text>`;
   }
   // Fanion des Ceinturiens sur Éris (nœud, pas planète-décor)
-  if(civsEnJeu.includes('Ceinturiens')&&NODES.eris)s+=`<text x="${NODES.eris.x}" y="${NODES.eris.y-(NODES.eris.r||15)-9}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${couleurNation('Ceinturiens')}" paint-order="stroke" stroke="#04060f" stroke-width="2.5">⚑ Ceinturiens</text>`;
+  if(civsEnJeu.includes('Ceinturiens')&&NODES.eris)s+=`<text x="${NODES.eris.x}" y="${NODES.eris.y-(NODES.eris.r||15)-MT(9)}" text-anchor="middle" font-size="${MT(9.5)}" font-weight="700" fill="${couleurNation('Ceinturiens')}" paint-order="stroke" stroke="#04060f" stroke-width="${MT(2.5)}">⚑ Ceinturiens</text>`;
   // Pastilles de durée et distances entre capitales
-  const _pill=(x,y,txt,gold)=>{const w=Math.max(34,txt.length*5.4);return `<g><rect x="${f1(x-w/2)}" y="${f1(y-8)}" width="${f1(w)}" height="16" rx="8" fill="${gold?'#241f0e':'#0b1730'}" fill-opacity=".9" stroke="${gold?'#FFD54F':'#4a9eff'}" stroke-opacity=".65" stroke-width="1"/><text x="${f1(x)}" y="${f1(y+3.5)}" text-anchor="middle" font-size="8.5" font-weight="600" fill="${gold?'#ffe08a':'#a9c8ff'}">${txt}</text></g>`;};
+  const _pill=(x,y,txt,gold)=>{const w=MT(Math.max(34,txt.length*5.4));return `<g><rect x="${f1(x-w/2)}" y="${f1(y-MT(8))}" width="${f1(w)}" height="${MT(16)}" rx="${MT(8)}" fill="${gold?'#241f0e':'#0b1730'}" fill-opacity=".9" stroke="${gold?'#FFD54F':'#4a9eff'}" stroke-opacity=".65" stroke-width="${MT(1)}"/><text x="${f1(x)}" y="${f1(y+MT(3.5))}" text-anchor="middle" font-size="${MT(8.5)}" font-weight="600" fill="${gold?'#ffe08a':'#a9c8ff'}">${txt}</text></g>`;};
   const _range=d=>{const lo=Math.max(1,Math.round(d*0.85)),hi=Math.round(d*1.2);return lo+'–'+hi+' j';};
   // Routes POSSIBLES (graphe du jeu) : pointillé bleu + durée si le trajet est long (≥ 50 j).
   // Durées : la table DUREES_TRAJET est une RÈGLE (coût des assauts) ; toute arête y figure (test_routes_carte).

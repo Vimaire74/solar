@@ -753,11 +753,7 @@ body.vue-carte #bottom-bar{border-radius:0;}
 /* 2e carte (système entier index, scrollable) : SVG large 980x320 */
 /* (plus de règle spéciale `.mapzoom` : les deux vues suivent la même, ci-dessus.) */
 #map-back{display:none;position:absolute;top:10px;left:10px;z-index:20;padding:6px 13px;border-radius:10px;background:rgba(19,32,63,.9);border:1px solid #33509a;color:#bcd0ff;font-weight:700;font-size:.82em;cursor:pointer;backdrop-filter:blur(4px);}
-/* Noms des ceintures : étiquette du cadre, en haut à gauche, sous le bouton de retour (Marc, 17/09). */
-#map-legend{display:none;position:absolute;top:48px;left:10px;z-index:19;padding:5px 9px;border-radius:10px;background:rgba(8,10,28,.82);border:1px solid #2a3a6a;backdrop-filter:blur(4px);pointer-events:none;font-size:.62em;line-height:1.7;color:#9fb0d0;}
-#map-legend span{display:block;white-space:nowrap;}
-#map-legend i{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:6px;opacity:.85;}
-#map-legend b{color:#cfe0ff;font-weight:600;}
+
 #map-wrap.mapzoom .panel-nav{display:none!important;}
 .panel-nav{display:none!important;}
 #panel-label{display:none!important;}
@@ -1455,7 +1451,6 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
     <!-- Retour à la carte peinte et noms des ceintures : ancrés au PANNEAU comme le zoom (s'ils
          étaient dans `#map-wrap`, qui défile, ils partiraient hors de vue dès qu'on fait glisser). -->
     <div id="map-back" onclick="backToMap()">← Carte</div>
-    <div id="map-legend"></div>
     <!-- ⚠️ LES BOUTONS DE ZOOM NE DOIVENT PAS ÊTRE DANS `#map-wrap`.
          Je les y avais mis pour les poser « sur la carte ». Mais `#map-wrap` est le cadre qui
          DÉFILE : un élément en `position:absolute` à l'intérieur défile avec le contenu, donc les
@@ -2150,11 +2145,14 @@ function uiMapMarkers(){
       /* v10.70 : le « + » est au MILIEU du tracé réel (courbe ou droite), comme le jeton de route. */
       var P=(typeof routePoint==='function')?routePoint(from,to,0.5):{x:NODES[from].x+(NODES[to].x-NODES[from].x)*0.5,y:NODES[from].y+(NODES[to].y-NODES[from].y)*0.5};
       var mx=P.x, my=P.y;
+      /* Taille × MAP_TXT (voir moteur.js) : dans 1920 unités de plateau, un « + » de 10 unités fait
+         5 px sur un téléphone — impossible à viser. */
+      var K=(typeof MT==='function')?MT:function(v){return v;};
       add+='<g style="cursor:pointer" onclick="uiAddRoute(\''+from+'\',\''+to+'\')">'
-        +'<circle cx="'+mx+'" cy="'+my+'" r="18" fill="transparent"/>'
-        +'<circle cx="'+mx+'" cy="'+my+'" r="14" fill="#4a9eff" fill-opacity=".2"/>'
-        +'<circle cx="'+mx+'" cy="'+my+'" r="10.5" fill="#0a1830" fill-opacity=".96" stroke="#4a9eff" stroke-width="2.2"/>'
-        +'<text x="'+mx+'" y="'+(my+5.5)+'" text-anchor="middle" font-size="16" font-weight="800" fill="#7fbcff">+</text>'
+        +'<circle cx="'+mx+'" cy="'+my+'" r="'+K(18)+'" fill="transparent"/>'
+        +'<circle cx="'+mx+'" cy="'+my+'" r="'+K(14)+'" fill="#4a9eff" fill-opacity=".2"/>'
+        +'<circle cx="'+mx+'" cy="'+my+'" r="'+K(10.5)+'" fill="#0a1830" fill-opacity=".96" stroke="#4a9eff" stroke-width="'+K(2.2)+'"/>'
+        +'<text x="'+mx+'" y="'+(my+K(5.5))+'" text-anchor="middle" font-size="'+K(16)+'" font-weight="800" fill="#7fbcff">+</text>'
         +'</g>';
     }
   }

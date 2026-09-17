@@ -25,11 +25,15 @@ DEUX cartes, comme avant : la carte peinte du système reste l'accueil, on touch
 ouvrir le PLATEAU sur sa région, « ← Carte » revient. Le plateau s'ouvre à 2,5× (lisible sur un
 écran d'ordinateur), le zoom (1× à 5×) garde le point regardé au centre, et le dessin remplit le
 cadre au lieu de laisser des bandes noires. Les noms des ceintures sont en haut à gauche, hors du
-dessin. Le bouton ⤳ masque les distances entre capitales, les astéroïdes ET ces noms.
-⚠️ RÈGLE (décisions de Marc sur la maquette) : Vesta–Europe, Lune–Vesta et Cérès–Ganymède
-n'existent plus ; Cérès–Europe (58 j, la même durée que l'ancienne liaison vers Ganymède, donc
-aucun coût ne change de ce fait), Encelade–Vesta (125 j, 2 actions), Callisto–Encelade (78 j,
-2 actions) et Ganymède–Triton (190 j, 3 actions) existent. Toute liaison a désormais sa durée écrite dans DUREES_TRAJET — trois étaient
+dessin, écrits sur la ceinture elle-même. Le bouton ⤳ masque les distances entre capitales, les
+astéroïdes ET ces noms. Les étiquettes (noms, PV, durées, boutons « + ») retrouvent la taille
+apparente de l'ancienne carte : sur le plateau, qui montre quatre fois plus d'espace, le même
+`font-size` était devenu illisible sur téléphone.
+⚠️ RÈGLE (décisions de Marc sur la maquette et sur la carte) : Vesta–Europe, Lune–Vesta,
+Cérès–Ganymède et Europe–Callisto n'existent plus ; Cérès–Europe (58 j, la même durée que
+l'ancienne liaison vers Ganymède, donc aucun coût ne change de ce fait), Europe–Ganymède (4 j),
+Encelade–Vesta (125 j, 2 actions), Callisto–Encelade (78 j, 2 actions) et Ganymède–Triton (190 j,
+3 actions) existent. Les deux remplacements sont VISUELS : les tracés se croisaient. Toute liaison a désormais sa durée écrite dans DUREES_TRAJET — trois étaient
 calculées sur les pixels de l'écran (Io–Lune 121, Phobos–Vesta 43, Io–Vesta 49) et ont été gelées,
 sinon déplacer les nœuds aurait changé le coût des assauts en silence. Lune→Triton passe de 346 à
 306 jours (toujours 3 actions). Bancs : server/test_routes_carte.js (nouveau), test_cout_distance
