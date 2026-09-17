@@ -378,7 +378,7 @@ const STEPS=[
   tx:"En haut : ⚡ énergie, 🪨 matériaux, 🔬 savoir, ❤️ moral, tes <b>AC</b> (actions du tour) et tes <b>🏆 VP</b>. Chaque action coûte des AC et des ressources.<br><i>Pour t'entraîner, je te donne <b>5 AC</b> et des ressources en abondance.</i>"},
 
  {lab:'La carte du système solaire', glow:'game-wrap',
-  tx:"Voici le système solaire : le Soleil en bas à gauche, les planètes à leur distance (échelle logarithmique), les lunes autour. <b>Pince ou touche ＋</b> pour zoomer, glisse pour te déplacer : c'est là que tu poses colonies et routes.",
+  tx:"Voici le système solaire. <b>Touche une planète</b> pour ouvrir le plateau détaillé sur sa région : le Soleil en bas à gauche, chaque corps à sa distance, les lunes autour de leur planète. C'est là que tu poses colonies et routes ; <b>← Carte</b> revient ici.",
   hint:"Regarde, puis Suivant"},
 
  {lab:'Coloniser', glow:'btn-col', pos:'top', trig:'🏗️',

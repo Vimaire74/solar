@@ -127,11 +127,11 @@ const NODES={
   lune:{id:'lune',name:'Lune',emoji:'🌕',color:'#B0BEC5',type:'moon',baseVP:2,maxLv:3,r:15,strategic:'half',res:{energy:1,materials:2},x:287,y:1364,conn:['phobos','ceres','deimos','io'],desc:'Satellite terrestre. Vue sur la Terre — habitat confortable.'},
   phobos:{id:'phobos',name:'Phobos',emoji:'⚫',color:'#8D6E63',type:'moon',baseVP:2,maxLv:3,r:11,strategic:'half',res:{energy:1,materials:2},x:498,y:1560,conn:['lune','deimos','ceres','vesta'],desc:'Lune intérieure de Mars. Proche des routes de propulsion.'},
   deimos:{id:'deimos',name:'Déimos',emoji:'🟤',color:'#795548',type:'moon',baseVP:1,maxLv:3,r:12,strategic:null,res:{materials:1},x:539,y:1421,conn:['phobos','lune'],desc:'Petite lune aride de Mars. Conditions difficiles.'},
-  ceres:{id:'ceres',name:'Cérès',emoji:'⬜',color:'#CFD8DC',type:'dwarf_planet',baseVP:3,maxLv:3,r:21,strategic:'full',res:{energy:1,materials:3},info:'2,77 UA · 4,6 ans',x:421,y:1109,conn:['lune','phobos','vesta','io','ganymede'],desc:'Hub de la ceinture d\'astéroïdes. Carrefour stratégique des routes.'},
+  ceres:{id:'ceres',name:'Cérès',emoji:'⬜',color:'#CFD8DC',type:'dwarf_planet',baseVP:3,maxLv:3,r:21,strategic:'full',res:{energy:1,materials:3},info:'2,77 UA · 4,6 ans',x:421,y:1109,conn:['lune','phobos','vesta','io','europe'],desc:'Hub de la ceinture d\'astéroïdes. Carrefour stratégique des routes.'},
   vesta:{id:'vesta',name:'Vesta',emoji:'🪨',color:'#78909C',type:'asteroid',baseVP:2,maxLv:3,r:17,strategic:null,res:{materials:2},info:'2,36 UA · 3,6 ans',x:825,y:1705,conn:['ceres','ganymede','phobos','io','encelade'],desc:'Grand astéroïde métallique. Éloigné des routes principales.'},
   io:{id:'io',name:'Io',emoji:'🟡',color:'#FFD54F',type:'moon',baseVP:3,maxLv:3,r:15,strategic:'half',res:{energy:3,materials:1},x:616,y:1091,conn:['ceres','europe','ganymede','vesta','lune'],desc:'Lune volcanique. Énergie géothermique intense.'},
-  europe:{id:'europe',name:'Europe',emoji:'🔵',color:'#42a5f5',type:'moon',baseVP:4,maxLv:3,r:15,strategic:null,res:{energy:1,materials:1},x:711,y:930,conn:['io','callisto','titan','pluto'],desc:'Océan sous-glaciaire. Paysage saisissant sous Jupiter. Radiation intense.'},
-  ganymede:{id:'ganymede',name:'Ganymède',emoji:'🟤',color:'#A1887F',type:'moon',baseVP:4,maxLv:3,r:18,strategic:'full',res:{energy:1,materials:2},x:880,y:899,conn:['io','vesta','callisto','titan','ceres','triton'],desc:'Plus grande lune du système. Hub jovien majeur, carrefour de routes.'},
+  europe:{id:'europe',name:'Europe',emoji:'🔵',color:'#42a5f5',type:'moon',baseVP:4,maxLv:3,r:15,strategic:null,res:{energy:1,materials:1},x:711,y:930,conn:['io','callisto','titan','pluto','ceres'],desc:'Océan sous-glaciaire. Paysage saisissant sous Jupiter. Radiation intense.'},
+  ganymede:{id:'ganymede',name:'Ganymède',emoji:'🟤',color:'#A1887F',type:'moon',baseVP:4,maxLv:3,r:18,strategic:'full',res:{energy:1,materials:2},x:880,y:899,conn:['io','vesta','callisto','titan','triton'],desc:'Plus grande lune du système. Hub jovien majeur, carrefour de routes.'},
   callisto:{id:'callisto',name:'Callisto',emoji:'🔘',color:'#607D8B',type:'moon',baseVP:3,maxLv:3,r:16,strategic:'half',res:{energy:1,materials:2},x:1031,y:1012,conn:['europe','ganymede','titan','encelade'],desc:'Hors de la radiation jovienne. Meilleur habitat humain du système jovien.'},
   /* ⚠️ « STATION JUPITER » N'EST PLUS QU'UN DESSIN (2026-08-07, décision de Marc).
      Elle n'est pas SUPPRIMÉE de la table des nœuds, et c'est délibéré (des sauvegardes et des bancs
@@ -2217,7 +2217,7 @@ function costHtml(cost){return Object.entries(cost).map(([r,a])=>rHtml(r,'-'+a))
    Banc : server/test_cout_distance.js
    ═══════════════════════════════════════════════════════════════════════════════════════════ */
 const DUREES_TRAJET={'lune|phobos':55,'ceres|lune':58,'deimos|lune':52,'deimos|phobos':2,'ceres|phobos':24,
-    'ceres|vesta':12,'ceres|io':55,'ceres|ganymede':58,'ganymede|vesta':52,
+    'ceres|vesta':12,'ceres|io':55,'ceres|europe':58,'ganymede|vesta':52,
     'europe|io':3,'ganymede|io':4,'callisto|europe':4,'callisto|ganymede':4,
     'europe|titan':82,'ganymede|titan':80,'callisto|titan':78,
     'encelade|titan':6,'encelade|triton':150,'titan|triton':150,'pluto|titan':130,
@@ -2231,6 +2231,10 @@ const DUREES_TRAJET={'lune|phobos':55,'ceres|lune':58,'deimos|lune':52,'deimos|p
        plus loin de la Ceinture que de Jupiter (à 95, Lune→Titan passait par Vesta en 171 j au lieu
        de 196) ; Ganymède–Triton (190) > Titan–Triton (150) mais < Ganymède–Titan–Triton (230).
        Banc : test_routes_carte.js */
+    /* v10.70 (suite) : depuis Cérès, la liaison jovienne va à EUROPE et non plus à Ganymède
+       (Marc, 17/09 : « visuellement depuis Cérès la route devrait aller à Europe, les routes se
+       croisent » — sur le plateau, le tracé vers Ganymède passait entre Io et Europe). Même durée
+       que l'ancienne, 58 j : le coût des voyages ne bouge pas de ce fait. */
     'io|lune':121,'phobos|vesta':43,'io|vesta':49,
     'encelade|vesta':125,'callisto|encelade':78,'ganymede|triton':190,
     'mars|terre':26,'jupiter|mars':70,'eris|jupiter':220};
@@ -13092,18 +13096,69 @@ function _champAsteroides(r0,r1,a0,a1,n,seed,chaud){
   let x=seed; const R=()=>{x=(x*9301+49297)%233280;return x/233280;};
   const corps=[...PLANETS_DECO.map(p=>({x:p.x,y:p.y,r:(p.ring?p.r*2.3:p.r)+12})),...Object.values(NODES).filter(nd=>!nd.decorative&&nd.type!=='orbital_station').map(nd=>({x:nd.x,y:nd.y,r:(nd.r||6)+10}))];
   const f1=v=>(+v).toFixed(1); let s='',k=0,tries=0;
+  /* ⚠️ LE CHAMP DOIT MOURIR SUR LE BORD DU CADRE, PAS AVANT. Le Soleil n'est pas exactement dans le
+     coin : un quart de cercle exact (0 … π/2) s'arrêtait à ~50 unités des bords et on voyait le
+     champ « se terminer » en pleine page (Marc, 17/09). On déborde donc l'angle des deux côtés et
+     c'est le découpage au carré (`mapClip`) qui coupe net, au ras du bord. */
   while(k<n&&tries<n*8){tries++;const t=R();const rr=r0+(r1-r0)*(0.5+0.5*Math.sin((R()-0.5)*Math.PI));const ang=a0+(a1-a0)*t;const px=MAP_SUN.x+rr*Math.cos(ang),py=MAP_SUN.y-rr*Math.sin(ang);
-    if(px<8||px>1912||py<8||py>1912)continue; if(corps.some(b=>Math.hypot(px-b.x,py-b.y)<b.r))continue;
+    if(px<-60||px>1980||py<-60||py>1980)continue; if(corps.some(b=>Math.hypot(px-b.x,py-b.y)<b.r))continue;
     const sz=R();const rad=1+sz*sz*4.2;const op=0.35+R()*0.5;const jc=(R()*30)|0;const col=chaud?`rgb(${185+jc},${160+jc},${110+jc})`:`rgb(${150+jc},${175+jc},${210+jc})`;
     const pts=[];const mm=5+((R()*3)|0);for(let i=0;i<mm;i++){const a=i/mm*Math.PI*2;const q=rad*(0.62+R()*0.5);pts.push(f1(px+q*Math.cos(a))+','+f1(py+q*Math.sin(a)));}
     s+=`<polygon points="${pts.join(' ')}" fill="${col}" opacity="${f1(op)}"/>`;if(rad>3.2)s+=`<polygon points="${pts.slice(0,3).join(' ')}" fill="#fff" opacity="${f1(op*0.25)}"/>`;
     k++;}
   return s;
 }
-/* Ouvre la carte centrée et zoomée sur un nœud (fiche d'une planète, tutoriel…). */
-const ZOOM_PLANETE=3;   // ~un tiers du plateau visible : le voisinage de la planète, pas tout
+/* ═══ DEUX VUES, COMME AVANT : LA CARTE PEINTE, PUIS LE PLATEAU ═══
+   v10.70 avait supprimé la vue peinte ; Marc la voulait gardée (17/09) — elle sert d'accueil et de
+   choix de région. `G.mapView` vaut 'global' (image `global2.webp` + zones cliquables invisibles)
+   ou 'zoom' (le plateau dessiné). Les coordonnées des zones vivent dans le viewBox 400 × 600 de
+   l'image ; celles du plateau dans 1920 × 1920 : `cadrerVueGlobale` pose le bon viewBox. */
+const CADRAGE_GLOBAL_PORTRAIT='0 0 400 600', CADRAGE_GLOBAL_PAYSAGE='0 65 400 380';
+function cadrerVueGlobale(){
+  const svg=document.getElementById('solar-svg'), wrap=document.getElementById('map-wrap');
+  if(!svg)return;
+  if(G&&G.mapView&&G.mapView!=='global')return;
+  /* L'image est en PORTRAIT : sur un écran large elle tient en hauteur et laisse du vide sur les
+     côtés. Les planètes n'occupent que la bande centrale — en paysage on cadre sur cette bande et
+     tout paraît 1,6× plus grand sans perdre un nom. Rappelé au redimensionnement (`uiMapFit`). */
+  const paysage=!!(wrap&&wrap.clientWidth>wrap.clientHeight*1.05);
+  const vb=paysage?CADRAGE_GLOBAL_PAYSAGE:CADRAGE_GLOBAL_PORTRAIT;
+  if(svg.getAttribute('viewBox')!==vb)svg.setAttribute('viewBox',vb);
+  const b=document.getElementById('map-bandeau');
+  if(b){ const y=paysage?405:560; b.setAttribute('transform','translate(0 '+(y-560)+')'); }
+}
+/* ZONES CLIQUABLES DE LA CARTE PEINTE — coordonnées du viewBox 400 × 600, relevées sur `global2.webp`
+   le 2026-08-07 (dézoom uniforme autour du Soleil : nouveau = Soleil + (ancien − Soleil) × 0,77). */
+const MAP_HOTSPOTS=[
+ {x:157,y:203,r:18,label:'Mercure',sector:'interne',node:'lune'},
+ {x:134,y:232,r:18,label:'Vénus',sector:'interne',node:'lune'},
+ {x:186,y:306,r:20,label:'Terre',sector:'interne',node:'lune'},
+ {x:253,y:305,r:19,label:'Mars',sector:'interne',node:'phobos'},
+ {x:305,y:231,r:26,label:'Jupiter',sector:'jupiter',node:'io'},   // la base jovienne est Io
+ {x:128,y:354,r:26,label:'Saturne',sector:'saturne',node:'titan'},
+ {x:138,y:127,r:20,label:'Uranus',sector:'externe',node:'triton'},
+ {x:288,y:408,r:20,label:'Neptune',sector:'externe',node:'triton'},
+ {x:97,y:275,r:24,label:'Ceinture',sector:'jupiter',node:'ceres'},
+ {x:200,y:95,r:26,label:'Kuiper',sector:'externe',node:'pluto'},
+];
+function mapGlobalSVG(){
+  let s='';
+  // Les noms des planètes sont dans l'image ; ici uniquement les zones cliquables invisibles.
+  for(const h of MAP_HOTSPOTS)s+=`<g style="cursor:pointer" onclick="openNodeMap('${h.node}')"><circle cx="${h.x}" cy="${h.y}" r="${h.r}" fill="#000" opacity="0" pointer-events="all"/></g>`;
+  s+=`<g id="map-bandeau"><rect x="40" y="560" width="320" height="30" rx="12" fill="#0a1326cc" stroke="#2a3a6a"/><text x="200" y="580" text-anchor="middle" font-size="11" fill="#cfe0ff">Touche une planète → carte détaillée</text></g>`;
+  return s;
+}
+function backToMap(){
+  /* La vue peinte repart à 1×, sinon elle hérite du zoom posé sur le plateau.
+     (Piège connu : cette fonction tenait sur UNE ligne ; un commentaire `//` en fin de ligne y
+     faisait disparaître l'accolade fermante. `node --check` le voit — encore faut-il le lancer.) */
+  try{ if(typeof uiMZ!=='undefined'){ uiMZ=1; if(typeof uiApplyMZ==='function')uiApplyMZ(); } }catch(e){}
+  G.mapView='global';closePopup();render();
+}
+/* Ouvre le PLATEAU, zoomé et centré sur un nœud (clic sur une région, fiche de planète, tutoriel…). */
+const ZOOM_PLANETE=2.5;   // Marc, 17/09 : « pour être lisible sur mon ordinateur, d'emblée 2,5 »
 function openNodeMap(nodeId){
-  G._zoomNode=nodeId||null; closePopup(); render();
+  G.mapView='zoom'; G._zoomNode=nodeId||null; closePopup(); render();
   try{ if(typeof uiMZ!=='undefined'){ uiMZ=ZOOM_PLANETE; if(typeof uiApplyMZ==='function')uiApplyMZ(); } }catch(e){}
   setTimeout(()=>scrollToNode(G._zoomNode),120);
 }
@@ -13128,16 +13183,38 @@ function renderMap(){
   // La colonne s'élargit sur l'onglet Carte : on le vérifie ici aussi, car la partie démarre sur la
   // carte sans passer par `uiTab` (sinon elle resterait à l'étroit au tout premier affichage).
   try{ document.body.classList.toggle('vue-carte', !!document.querySelector('#mp-map.active')); }catch(e){}
-  const wrap=document.getElementById('map-wrap');
+  const wrap=document.getElementById('map-wrap'); const bg=document.getElementById('map-bg-img');
+  const ng=document.getElementById('nodes-g'); const back=document.getElementById('map-back');
+  const leg=document.getElementById('map-legend');
+  if((G.mapView||'global')!=='zoom'){
+    // 1re vue : l'image peinte + les zones cliquables invisibles (aucun dessin de plateau)
+    if(wrap)wrap.classList.remove('mapzoom');
+    cadrerVueGlobale();
+    for(const gid of ['stars','connections','routes-ai','routes-p','pirates-g']){const g=document.getElementById(gid);if(g)g.innerHTML='';}
+    if(bg)bg.style.display='';
+    if(ng)ng.innerHTML=mapGlobalSVG();
+    if(back)back.style.display='none';
+    if(leg)leg.style.display='none';
+    cadrerVueGlobale();   // le bandeau vient d'être redessiné : le placer selon l'orientation
+    try{ if(typeof uiMapFit==='function') setTimeout(uiMapFit,0); }catch(e){}
+    return;
+  }
+  // 2e vue : le plateau
   if(wrap)wrap.classList.add('mapzoom');
-  try{ if(typeof uiApplyMZ==='function') setTimeout(uiApplyMZ,0); }catch(e){}
+  if(bg)bg.style.display='none';
+  if(back)back.style.display='block';
+  /* Les noms des ceintures sont une ÉTIQUETTE DU CADRE, en haut à gauche, pas un texte posé en
+     travers du dessin (Marc, 17/09 : « inutile de surcharger le centre, c'est pas lisible »). Ils
+     partent avec le ⤳, comme les distances et les astéroïdes. */
+  if(leg){ const off=_mapDistOff(); leg.style.display=off?'none':'block';
+    if(!off)leg.innerHTML='<span><i style="background:#d8c08a"></i>Ceinture d\'astéroïdes principale <b>2,1 – 3,3 UA</b></span><span><i style="background:#8fbcd6"></i>Ceinture de Kuiper <b>30 – 50 UA</b></span>'; }
+  /* Le plateau s'ouvre à 2,5× : à 1× le carré entier tient dans le cadre mais les noms des lunes
+     font 6 px (Marc, 17/09). Une seule fois par chargement, et seulement si personne n'a zoomé. */
+  if(!renderMap._premierCadrage&&typeof uiMZ!=='undefined'&&uiMZ===1){ renderMap._premierCadrage=true; uiMZ=ZOOM_PLANETE;
+    setTimeout(()=>{ try{ uiApplyMZ(); scrollToNode(G._zoomNode||G.player.civ.home); }catch(e){} },60); }
+  else { try{ if(typeof uiApplyMZ==='function') setTimeout(uiApplyMZ,0); }catch(e){} }
   drawConnections();
   renderSystemMap();
-  /* Premier affichage sur un écran plus haut que large (téléphone tenu droit) : le carré entier n'y
-     fait que des points. On ouvre à 2× sur la capitale ; sur ordinateur, 1× et tout le plateau
-     (Marc, 17/09). Une seule fois par chargement de page, et seulement si personne n'a déjà zoomé. */
-  if(!renderMap._premierCadrage){ renderMap._premierCadrage=true;
-    setTimeout(()=>{ try{ const w=document.getElementById('map-wrap'); if(w&&w.clientWidth<w.clientHeight*1.1&&typeof uiMZ!=='undefined'&&uiMZ===1){ uiMZ=2; uiApplyMZ(); scrollToNode(G.player.civ.home); } }catch(e){} },200); }
 }
 function getTechAreaMode(){
   const h=document.getElementById('tech-area').offsetHeight;
@@ -15173,11 +15250,10 @@ function drawConnections(){
   s+=`<circle cx="${MAP_SUN.x}" cy="${MAP_SUN.y}" r="${f1(MAP_UA(3.3)+40)}" fill="url(#mapBelt1)"/>`;
   s+=`<circle cx="${MAP_SUN.x}" cy="${MAP_SUN.y}" r="${f1(MAP_UA(50)+40)}" fill="url(#mapBelt2)"/>`;
   for(const p of PLANETS_DECO)s+=`<circle cx="${MAP_SUN.x}" cy="${MAP_SUN.y}" r="${f1(MAP_UA(p.ua))}" fill="none" stroke="#fff" stroke-opacity=".10"/>`;
-  if(!off){ s+=`<g id="asteroides">`+_champAsteroides(MAP_UA(2.1),MAP_UA(3.3),0.02,1.55,520,31,true)+_champAsteroides(MAP_UA(30),MAP_UA(50),0.02,1.55,260,37,false)+`</g>`; }
+  if(!off){ s+=`<g id="asteroides">`+_champAsteroides(MAP_UA(2.1),MAP_UA(3.3),-0.16,1.73,620,31,true)+_champAsteroides(MAP_UA(30),MAP_UA(50),-0.16,1.73,330,37,false)+`</g>`; }
   s+=`<circle cx="${MAP_SUN.x}" cy="${MAP_SUN.y}" r="105" fill="url(#mapSunDisk)"/>`;
-  // étiquettes des ceintures, le long de l'arc
-  const arcLab=(id,ua,t,c)=>{const r=MAP_UA(ua);const P=deg=>{const q=deg*Math.PI/180;return f1(MAP_SUN.x+r*Math.cos(q))+' '+f1(MAP_SUN.y-r*Math.sin(q));};return `<defs><path id="${id}" d="M ${P(80)} A ${f1(r)} ${f1(r)} 0 0 1 ${P(10)}"/></defs><text font-size="14" fill="${c}" font-family="Michroma,'Exo 2',sans-serif" letter-spacing="3" opacity=".8"><textPath href="#${id}" startOffset="50%" text-anchor="middle">${t}</textPath></text>`;};
-  s+=arcLab('mapLab1',3.45,"CEINTURE D'ASTÉROÏDES PRINCIPALE  ·  2,1 – 3,3 UA",'#d8c08a')+arcLab('mapLab2',44,'CEINTURE DE KUIPER  ·  30 – 50 UA','#a9cbe6');
+  // (Les noms des ceintures ne sont plus écrits en travers du dessin : ils sont dans l'étiquette
+  //  du cadre, en haut à gauche — voir `#map-legend`, posé par `renderMap`.)
   // planètes-décor, encarts de lunes, étiquettes
   const civsEnJeu=(()=>{ try{ return [G.player,...G.ais].map(p=>p.civ.name); }catch(e){ return []; } })();
   const couleurNation=nom=>{ try{ return Object.values(CIVS).find(c=>c.name===nom).color; }catch(e){ return '#fff'; } };

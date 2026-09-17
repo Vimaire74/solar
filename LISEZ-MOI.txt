@@ -1,4 +1,4 @@
-LOT 17 — MISE À JOUR LÉGÈRE (v10.70, sw v191) — 17/09/2026 : 🗺️ NOUVELLE CARTE (plateau carré en quart de disque, Soleil en bas à gauche, échelle logarithmique, planètes en vecteur, ceintures d'astéroïdes visibles, routes courbes, une seule carte zoomable) + RÈGLE des liaisons (− Vesta–Europe, − Lune–Vesta, + Encelade–Vesta 125 j, + Callisto–Encelade 78 j, + Ganymède–Triton 190 j). Précédent : (v10.69) ⚠️ Calmer la Population dit enfin quelle tension elle calme, une fois par nation et par tour, et l'ordinateur qui l'achète calme VRAIMENT sa tension ; ⚠️ les guerres se résolvent dans l'ordre et en entier, le joueur choisit sa cible AU MOMENT de frapper ; ⚠️ RÈGLE — l'avance technologique se juge en relatif, tous les deux tours ; ⚠️ NOUVELLE ACTION SOCIALE — Mission diplomatique ; ⚠️ NOUVEAU (16/09) — les nations se souviennent des agressions qu'elles ont subies et durcissent leurs réponses tant qu'on n'a pas fait un geste ; ⚠️ RÈGLE MAJEURE — attaquer une colonie NE DÉCLARE PLUS LA GUERRE : ça fait monter la tension, et c'est elle seule qui impose la guerre à 10, en fin de tour ; ⚠️ NOUVELLE RÈGLE — conquérir loin coûte plus d'actions (1, 2 ou 3 selon le temps de voyage) ; ⚠️ RÈGLE DE GUERRE — l'usure de moral attend le tour suivant, la fenêtre de guerre populaire annonce le prix — et tout le v10.63 (raid à 2 jetons, perte de colonie annoncée, largeurs)
+LOT 17 — MISE À JOUR LÉGÈRE (v10.70, sw v191) — 17/09/2026 : 🗺️ NOUVELLE CARTE (plateau carré en quart de disque, Soleil en bas à gauche, échelle logarithmique, planètes en vecteur, ceintures d'astéroïdes visibles, routes courbes, une seule carte zoomable) + RÈGLE des liaisons (− Vesta–Europe, − Lune–Vesta, + Encelade–Vesta 125 j, + Callisto–Encelade 78 j, + Ganymède–Triton 190 j, Cérès–Ganymède remplacée par Cérès–Europe 58 j). Précédent : (v10.69) ⚠️ Calmer la Population dit enfin quelle tension elle calme, une fois par nation et par tour, et l'ordinateur qui l'achète calme VRAIMENT sa tension ; ⚠️ les guerres se résolvent dans l'ordre et en entier, le joueur choisit sa cible AU MOMENT de frapper ; ⚠️ RÈGLE — l'avance technologique se juge en relatif, tous les deux tours ; ⚠️ NOUVELLE ACTION SOCIALE — Mission diplomatique ; ⚠️ NOUVEAU (16/09) — les nations se souviennent des agressions qu'elles ont subies et durcissent leurs réponses tant qu'on n'a pas fait un geste ; ⚠️ RÈGLE MAJEURE — attaquer une colonie NE DÉCLARE PLUS LA GUERRE : ça fait monter la tension, et c'est elle seule qui impose la guerre à 10, en fin de tour ; ⚠️ NOUVELLE RÈGLE — conquérir loin coûte plus d'actions (1, 2 ou 3 selon le temps de voyage) ; ⚠️ RÈGLE DE GUERRE — l'usure de moral attend le tour suivant, la fenêtre de guerre populaire annonce le prix — et tout le v10.63 (raid à 2 jetons, perte de colonie annoncée, largeurs)
 
 Ce dossier ne contient QUE ce qui a changé depuis la version en ligne : 7 fichiers à la racine
 (index.html, moteur.js, online.js, sw.js, tutorial.html, tutorial.js, regles.html) + 2 fichiers serveur (server/game-core.js
@@ -21,12 +21,15 @@ Neptune à l'échelle entre elles), ceintures avec un champ d'astéroïdes qu'on
 « Ceinture d'astéroïdes principale » et « Ceinture de Kuiper », distance au Soleil et période sous
 chaque planète. Routes : droites si courtes, courbes vers l'extérieur sinon, et elles contournent
 d'elles-mêmes une planète qu'elles frôleraient ; le « + » et le jeton sont au milieu du tracé.
-UNE SEULE carte : l'image peinte et ses zones cliquables ont disparu, tout est dans le plateau
-zoomable (1× à 5× ; au téléphone la carte s'ouvre à 2× sur ta capitale). Le bouton ⤳ masque les
-distances entre capitales ET les astéroïdes.
-⚠️ RÈGLE (décisions de Marc sur la maquette) : Vesta–Europe et Lune–Vesta n'existent plus ;
-Encelade–Vesta (125 j, 2 actions), Callisto–Encelade (78 j, 2 actions) et Ganymède–Triton (190 j,
-3 actions) existent. Toute liaison a désormais sa durée écrite dans DUREES_TRAJET — trois étaient
+DEUX cartes, comme avant : la carte peinte du système reste l'accueil, on touche une planète pour
+ouvrir le PLATEAU sur sa région, « ← Carte » revient. Le plateau s'ouvre à 2,5× (lisible sur un
+écran d'ordinateur), le zoom (1× à 5×) garde le point regardé au centre, et le dessin remplit le
+cadre au lieu de laisser des bandes noires. Les noms des ceintures sont en haut à gauche, hors du
+dessin. Le bouton ⤳ masque les distances entre capitales, les astéroïdes ET ces noms.
+⚠️ RÈGLE (décisions de Marc sur la maquette) : Vesta–Europe, Lune–Vesta et Cérès–Ganymède
+n'existent plus ; Cérès–Europe (58 j, la même durée que l'ancienne liaison vers Ganymède, donc
+aucun coût ne change de ce fait), Encelade–Vesta (125 j, 2 actions), Callisto–Encelade (78 j,
+2 actions) et Ganymède–Triton (190 j, 3 actions) existent. Toute liaison a désormais sa durée écrite dans DUREES_TRAJET — trois étaient
 calculées sur les pixels de l'écran (Io–Lune 121, Phobos–Vesta 43, Io–Vesta 49) et ont été gelées,
 sinon déplacer les nœuds aurait changé le coût des assauts en silence. Lune→Triton passe de 346 à
 306 jours (toujours 3 actions). Bancs : server/test_routes_carte.js (nouveau), test_cout_distance

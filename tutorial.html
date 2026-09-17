@@ -752,8 +752,12 @@ body.vue-carte #bottom-bar{border-radius:0;}
 #solar-svg{display:block;width:100%;height:100%;min-height:0;margin:0 auto;transition:none;}   /* repli : la taille exacte est posée par uiMapFit() */
 /* 2e carte (système entier index, scrollable) : SVG large 980x320 */
 /* (plus de règle spéciale `.mapzoom` : les deux vues suivent la même, ci-dessus.) */
-#map-back{display:none;position:absolute;top:8px;left:8px;z-index:6;padding:6px 13px;border-radius:16px;background:#13203f;border:1px solid #33509a;color:#bcd0ff;font-weight:700;font-size:.82em;cursor:pointer;}
-#map-wrap.mapzoom #map-back{display:block;}
+#map-back{display:none;position:absolute;top:10px;left:10px;z-index:20;padding:6px 13px;border-radius:10px;background:rgba(19,32,63,.9);border:1px solid #33509a;color:#bcd0ff;font-weight:700;font-size:.82em;cursor:pointer;backdrop-filter:blur(4px);}
+/* Noms des ceintures : étiquette du cadre, en haut à gauche, sous le bouton de retour (Marc, 17/09). */
+#map-legend{display:none;position:absolute;top:48px;left:10px;z-index:19;padding:5px 9px;border-radius:10px;background:rgba(8,10,28,.82);border:1px solid #2a3a6a;backdrop-filter:blur(4px);pointer-events:none;font-size:.62em;line-height:1.7;color:#9fb0d0;}
+#map-legend span{display:block;white-space:nowrap;}
+#map-legend i{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:6px;opacity:.85;}
+#map-legend b{color:#cfe0ff;font-weight:600;}
 #map-wrap.mapzoom .panel-nav{display:none!important;}
 .panel-nav{display:none!important;}
 #panel-label{display:none!important;}
@@ -1431,8 +1435,10 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
           <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
           <filter id="glow2"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         </defs>
-        <!-- v10.70 : un seul plateau dessiné par le moteur (drawConnections) ; plus d'image peinte. -->
         <rect x="-4000" y="-4000" width="10000" height="10000" fill="#03040a"/>
+        <!-- 1re vue : carte peinte `global2.webp` (2048 × 3072, 677 Ko ; `global2.jpg` en repli).
+             ⚠️ Changer ce dessin oblige à recalculer MAP_HOTSPOTS (moteur.js). Masquée sur le plateau. -->
+        <image id="map-bg-img" href="assets/map/global2.webp" xlink:href="assets/map/global2.webp" x="0" y="0" width="400" height="600" preserveAspectRatio="xMidYMid slice"/>
         <g id="stars"></g>
         <g id="connections"></g>
         <g id="routes-ai"></g>
@@ -1446,6 +1452,10 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
         <div class="npop-acts" id="npop-acts"></div>
       </div>
     </div>
+    <!-- Retour à la carte peinte et noms des ceintures : ancrés au PANNEAU comme le zoom (s'ils
+         étaient dans `#map-wrap`, qui défile, ils partiraient hors de vue dès qu'on fait glisser). -->
+    <div id="map-back" onclick="backToMap()">← Carte</div>
+    <div id="map-legend"></div>
     <!-- ⚠️ LES BOUTONS DE ZOOM NE DOIVENT PAS ÊTRE DANS `#map-wrap`.
          Je les y avais mis pour les poser « sur la carte ». Mais `#map-wrap` est le cadre qui
          DÉFILE : un élément en `position:absolute` à l'intérieur défile avec le contenu, donc les
@@ -2019,7 +2029,15 @@ function uiMapFit(){
     var dispo=Math.floor(plancher-haut);
     if(dispo>80){ wrap.style.maxHeight=dispo+'px'; wrap.style.height=dispo+'px'; }
     var w=wrap.clientWidth||0, h=wrap.clientHeight||0;
-    if(w>40&&h>40){ svg.style.width=Math.round(w*uiMZ)+'px'; svg.style.height=Math.round(h*uiMZ)+'px'; }
+    /* LE PLATEAU EST CARRÉ : on donne au dessin une boîte CARRÉE, sinon `xMidYMid meet` le centre
+       dans une boîte large et laisse deux bandes noires sur les côtés — on voyait le décor
+       s'arrêter net avant le bord du cadre (Marc, 17/09). Carré, il remplit le cadre dès qu'on
+       zoome et le champ d'astéroïdes meurt sur le bord. La carte peinte, elle, garde la boîte du
+       cadre (elle est en `slice` : elle le remplit toujours). */
+    if(w>40&&h>40){
+      if(wrap.classList.contains('mapzoom')){ var cote=Math.round(Math.min(w,h)*uiMZ); svg.style.width=cote+'px'; svg.style.height=cote+'px'; }
+      else { svg.style.width=Math.round(w*uiMZ)+'px'; svg.style.height=Math.round(h*uiMZ)+'px'; }
+    }
     if(typeof cadrerVueGlobale==='function')cadrerVueGlobale();   // paysage ↔ portrait : le cadrage suit
   }catch(e){}
 }
@@ -2027,16 +2045,30 @@ function uiApplyMZ(){
   var wrap=document.getElementById('map-wrap');
   if(wrap)wrap.style.setProperty('--mz',uiMZ);
   uiMapFit();
-  var lbl=document.getElementById('panel-label');
-  if(lbl)lbl.textContent='Zoom '+uiMZ.toFixed(1).replace(/\.0$/,'')+'×';
   var l2=document.getElementById('mz-lbl');
   if(l2)l2.textContent=uiMZ.toFixed(1).replace(/\.0$/,'')+'×';
 }
+/* Où regarde-t-on, en fraction du dessin (0…1) ? Sert à RETROUVER le même centre après un zoom :
+   sans ça, agrandir la carte la faisait glisser vers le coin haut-gauche (Marc, 17/09 : « il
+   faudrait que le zoom garde la carte centrée »). */
+function uiMapCentreFrac(){
+  var w=document.getElementById('map-wrap'); if(!w)return {x:0.5,y:0.5};
+  var fx=(w.scrollWidth>w.clientWidth+1)?(w.scrollLeft+w.clientWidth/2)/w.scrollWidth:0.5;
+  var fy=(w.scrollHeight>w.clientHeight+1)?(w.scrollTop+w.clientHeight/2)/w.scrollHeight:0.5;
+  return {x:fx,y:fy};
+}
+function uiMapRecentrer(f){
+  var w=document.getElementById('map-wrap'); if(!w||!f)return;
+  w.scrollLeft=Math.max(0,f.x*w.scrollWidth-w.clientWidth/2);
+  w.scrollTop=Math.max(0,f.y*w.scrollHeight-w.clientHeight/2);
+}
 function uiZoom(d){
-  /* Échelle d'origine : 1× = la carte remplit la hauteur du cadre, jusqu'à 5× (Marc, 15/09 : 4× ne suffit
-     pas sur mobile). */
+  /* 1× = le plateau entier dans le cadre, jusqu'à 5× (Marc, 15/09 : 4× ne suffit pas sur mobile).
+     Le point regardé reste au centre avant et après. */
+  var f=uiMapCentreFrac();
   uiMZ=Math.max(1,Math.min(5,Math.round((uiMZ+d*0.5)*10)/10));
   uiApplyMZ();
+  try{ requestAnimationFrame(function(){ uiMapRecentrer(f); }); }catch(e){ uiMapRecentrer(f); }
 }
 
 
