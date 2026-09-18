@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-18 · v10.71';
+const SOLAR_BUILD_MOTEUR = '2026-09-18 · v10.72';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -859,10 +859,37 @@ function _evCommPick(aiId,propId){
       +' sont déjà liés par un accord — la seconde proposition du sommet est sans objet.','dim');
     _suite();return;
   }
+  /* ═══ PROPOSITION CROISÉE : ON SIGNE, ON NE REDEMANDE RIEN (Marc, 18/09, partie 20C9) ═══
+     « J'ai proposé un accord aux Terriens et seulement à eux, et après j'ai accepté leur accord.
+     Le jeu gère mal une double proposition entre deux mêmes nations. »
+     Ce qu'il lisait, tour 8 : « Terriens propose un accord à Jupitériens — en attente de sa
+     réponse… », puis « Accord commercial conclu : Jupitériens ↔ Terriens », puis « étaient déjà
+     liés — il n'existe qu'un accord par couple ». Trois lignes pour un seul accord, dont la
+     dernière annule la première. Au sommet SIMULTANÉ, les IA choisissent toutes AVANT que l'humain
+     ne réponde : la question lui arrive donc avant que son propre choix ne soit traité.
+     Sa règle, posée le 26/08 : « si je le propose et qu'il le propose, alors on devrait juste voir
+     accord signé entre les deux nations, point. » C'est ce qu'on fait ici — la garde d'`_evAccordConclude`
+     couvrait déjà le cas IA↔IA, celle-ci couvre le cas où une question est encore EN VOL.
+     Banc : server/test_accords_croises.js */
+  {
+    const _dX=fluxDonnees(); const _pr=Array.isArray(_dX.accordsPaires)?_dX.accordsPaires:[];
+    const _j=_pr.findIndex(function(x){ return x&&!x.pacte
+      &&((x.prop===ai.civ.id&&x.part===prop.civ.id)||(x.prop===prop.civ.id&&x.part===ai.civ.id)); });
+    if(_j>=0){
+      const _paire=_pr[_j];
+      _pr.splice(_j,1); _dX.accordsPaires=_pr;
+      if(_dX.accordProp===_paire.prop&&_dX.accordPart===_paire.part){ _dX.accordProp=null; _dX.accordPart=null; }
+      _accordRetirerQuestion(_paire);      // la question posée n'a plus d'objet : on l'enlève
+      addLog('🤝 '+prop.civ.emoji+' '+prop.civ.name+' et '+ai.civ.emoji+' '+ai.civ.name
+        +' se sont proposé l\'accord l\'un à l\'autre — il est signé sans autre question.','gold');
+      _evAccordConclude(prop,ai);
+      _suite();return;
+    }
+  }
   // Partenaire HUMAIN en ligne → on lui DEMANDE son accord.
   if(_decisionActive()&&!ai._isAI){
     addLog('🤝 '+prop.civ.emoji+' '+prop.civ.name+' propose un accord commercial à '+ai.civ.emoji+' '+ai.civ.name+' — en attente de sa réponse…','dim');
-    _emitDecision('accord_request', ai,
+    const _qid=_emitDecision('accord_request', ai,
       {title:'🤝 Proposition d\'accord commercial',
        from:prop.civ.id, fromName:prop.civ.emoji+' '+prop.civ.name,
        texte:prop.civ.emoji+' '+prop.civ.name+' te propose un ACCORD COMMERCIAL : +3 VP pour chacun, tension −3, et fin de la guerre entre vous s\'il y en a une.',
@@ -878,7 +905,9 @@ function _evCommPick(aiId,propId){
        une LISTE de paires — deux identifiants par entrée, donc parfaitement sauvegardable. */
     const _d=fluxDonnees();
     _d.accordsPaires=_d.accordsPaires||[];
-    _d.accordsPaires.push({prop:prop.civ.id, part:ai.civ.id});
+    /* `id` : l'identifiant de la question posée. Il permet de la RETIRER si l'accord se signe
+       autrement entre-temps (proposition croisée) — voir `_accordRetirerQuestion`. */
+    _d.accordsPaires.push({prop:prop.civ.id, part:ai.civ.id, id:_qid});
     _d.accordProp=prop.civ.id; _d.accordPart=ai.civ.id;   // compat : parties enregistrées en cours
     if(!_simul)_d.suiteAccord=nomSuite;   // la suite du tour se joue APRÈS la réponse
     return;
@@ -6176,6 +6205,18 @@ function stAccordsSuivant(){
   _accordsVerifierFin();   // cas limite : aucune nation valide
 }
 /* Le sommet est fini quand plus personne ne doit répondre ET qu'aucune proposition n'est en vol. */
+/* ═══ RETIRER UNE QUESTION D'ACCORD DEVENUE SANS OBJET ═══
+   Une proposition croisée se signe toute seule (voir `_evCommPick`) : la question posée à l'autre
+   camp ne doit pas rester à l'écran. On efface sa suite ET la question elle-même ; sans les deux,
+   le joueur répond à une offre déjà conclue et lit « vous étiez déjà liés ». */
+function _accordRetirerQuestion(paire){
+  try{
+    if(!paire||!paire.id)return;
+    const reg=(typeof _decisionsRegistre==='function')?_decisionsRegistre():null;
+    if(reg&&reg[paire.id])delete reg[paire.id];
+    if(typeof _questionsRetirer==='function')_questionsRetirer(paire.id);
+  }catch(e){}
+}
 function _accordsVerifierFin(){
   const d=fluxDonnees();
   if(!Array.isArray(d.accordsRestants))return;
@@ -8401,12 +8442,21 @@ function _voisinsPris(x,y){
 }
 /* Combien de nœuds voisins restent LIBRES pour `x` ? À zéro ou un, elle est à l'étroit. */
 function _ouverturesLibres(x){
+  /* ⚠️ UN NŒUD QUE L'ON POSSÈDE SOI-MÊME N'EST PAS UNE SORTIE BOUCHÉE (Marc, partie 20C9).
+     Premier jet : `pris` contenait les colonies de TOUTES les nations, la sienne comprise. Une
+     nation qui colonisait beaucoup se bouchait donc elle-même et était déclarée « à l'étroit »
+     précisément parce qu'elle avait réussi son expansion. Au tour 8 de la partie 20C9, Marc menait
+     à 108 PV avec cinq colonies : ses propres voisins étant les siens, il ne lui restait qu'une
+     ouverture libre, et il a facturé +4 de tension aux TROIS autres nations le même tour.
+     Un nœud à soi n'est ni une ouverture ni un blocage : on le saute purement et simplement. */
+  const moi=new Set((x.colonies||[]).map(c=>c.nodeId));
   const pris=new Set();
   for(const n of allPlayers())for(const c of (n.colonies||[]))pris.add(c.nodeId);
   const vus=new Set(); let n=0;
   for(const c of (x.colonies||[]))
     for(const adj of ((NODES[c.nodeId]&&NODES[c.nodeId].conn)||[])){
       if(vus.has(adj))continue; vus.add(adj);
+      if(moi.has(adj))continue;                  // chez moi : ni libre, ni bouché par autrui
       const nd=NODES[adj];
       if(!nd||nd.decorative||nd.noColonize)continue;
       if(!pris.has(adj))n++;
@@ -8416,8 +8466,21 @@ function _ouverturesLibres(x){
 /* A. `y` barre-t-elle le chemin de `x` ? Il ne suffit pas d'être voisin — sinon la règle se
    déclencherait pour tout le monde en permanence. Il faut que `x` soit RÉELLEMENT à l'étroit
    (au plus une ouverture libre) ET que `y` occupe une de ses sorties. */
+const BLOCAGE_COLONIES_MAX = 2;   // « on considère l'expansion bloquée quand on a MOINS de trois colonies » (Marc)
 function bloqueLExpansion(x,y){
   if(!x||!y||x===y)return false;
+  /* ═══ UNE NATION QUI PROSPÈRE N'EST PAS BLOQUÉE (Marc, 18/09, partie 20C9) ═══
+     « On avait dit qu'on considérait l'expansion comme bloquée quand on a moins de trois colonies,
+     pas quand on en a plus que trois : je ne devrais pas avoir d'augmentation de tension. »
+     Sans cette porte, la règle se déclenchait sur une carte qui se REMPLIT — c'est-à-dire chez le
+     leader, en fin de partie, contre tout le monde à la fois. Deux nations tierces se prenant
+     Titan et Pluton ont ainsi fait monter la tension de Marc de +4 envers trois nations d'un coup,
+     dont les Terriens — de 6 à 10 — et sa guerre populaire est tombée le même soir.
+     Même seuil que l'étouffement (`estEtouffee`) : au plus deux colonies. Les deux griefs restent
+     distincts — A vise CELLE qui occupe la sortie (+4, une fois), B est l'état qui dure (+6 puis
+     +1/tour) — mais aucun des deux ne frappe une nation qui a réussi son expansion.
+     Banc : server/test_tension_blocage.js */
+  if((x.colonies||[]).length>BLOCAGE_COLONIES_MAX)return false;
   return _ouverturesLibres(x)<=1 && _voisinsPris(x,y)>=1;
 }
 /* B. `x` est-elle étouffée ? Deux colonies au plus, quand une autre en a au moins trois.
@@ -8473,6 +8536,10 @@ function griefTechnologique(){
     addTens(x.civ.id,y.civ.id,GRIEF_TECH_PAR_RANG3*ecart);
     const apres=getTens(x.civ.id,y.civ.id);
     out.push({de:x.civ.id,vers:y.civ.id,ecart,avant,apres});
+    /* ⚠️ « jalouse ton avance technologique … +0 → 10/10 » — la tension était DÉJÀ au plafond, le
+       delta est nul, et la ligne ne dit plus rien à personne (partie 20C9, tour 10). Le grief est
+       bien enregistré dans `out` ; on ne l'ÉCRIT que s'il a déplacé quelque chose. */
+    if(apres===avant) continue;
     /* Comme les autres griefs : on n'écrit que ce qui concerne le joueur qui lit. */
     if(x===G.player) addLog('🔬 Avance technologique de '+y.civ.emoji+' '+y.civ.name+' ('+ecart+' rang'+(ecart>1?'s':'')+' 3 de plus que toi) : ta tension +'+(apres-avant)+' → '+apres+'/10','red');
     else if(y===G.player) addLog('🔬 '+x.civ.emoji+' '+x.civ.name+' jalouse ton avance technologique ('+ecart+' rang'+(ecart>1?'s':'')+' 3 d\'écart) : sa tension envers toi +'+(apres-avant)+' → '+apres+'/10','red');
@@ -8546,8 +8613,14 @@ function updateTension(){
   const _chargesBlocage=new Map(), _chargesEtouffe=new Set();
   for(const x of _toutes){
     if(!x._blocageVu)x._blocageVu={};
+    /* ═══ UN SEUL COUPABLE PAR BLOCAGE (Marc, 18/09, partie 20C9) ═══
+       La boucle facturait +4 à CHAQUE nation occupant une sortie, donc aux trois autres en même
+       temps dès que la carte se fermait. « Y barre le chemin de x » désigne quelqu'un : c'est
+       `principalBloqueur`, celle qui occupe le plus de sorties. Les autres ne sont pas en cause. */
+    const _coupable=(typeof principalBloqueur==='function')?principalBloqueur(x):null;
     for(const y of _toutes){
       if(x===y)continue;
+      if(_coupable&&y!==_coupable)continue;
       /* ⚠️ LA MARQUE N'EST JAMAIS EFFACÉE, ET C'EST TOUT L'ENJEU. Premier jet : on oubliait le
          blocage dès qu'il cessait, donc il se refacturait à la réouverture. Sur une carte qui se
          remplit, `_ouverturesLibres` clignote — une colonie prise, une route posée — et les +4
@@ -8753,7 +8826,14 @@ function guerrePopulaireEntre(offense,offenseur){
     G.warWith=autre.civ.id;              // épingler la cible, sinon syncWarState pointe sur G.wars[0]
     G.playerTension=10; G.aiTension=10;
     addLog('💥 Guerre populaire ! Les malus (usure −4, −2 populaire) ne tomberont que si elle a lieu.','red');
-    _journalAuto(G.player.civ.name,'Guerre populaire forcée','malus si la guerre a lieu',true);
+    /* ═══ LE JOURNAL DOIT DIRE QUI EXIGE ET CONTRE QUI (Marc, 18/09, partie 20C9) ═══
+       Cette ligne écrivait `G.player.civ.name` sans jamais nommer la cible — alors que la branche
+       IA↔IA, dix lignes plus bas, écrit « contre <nation> ». Deux conséquences, vues en partie :
+       le journal montrait « [Terriens] Guerre populaire forcée → contre Martiens » suivi de
+       « [Jupitériens] Guerre populaire forcée », et Marc a lu un ENCHAÎNEMENT là où il n'y avait
+       qu'une chronologie ; et quand c'est le peuple ADVERSE qui exige la guerre, la ligne portait
+       quand même le nom de Marc. On nomme les deux, dans le bon sens. */
+    _journalAuto(offense.civ.name,'Guerre populaire forcée','contre '+offenseur.civ.name+' — malus si la guerre a lieu',true);
   }else{
     addLog('💥 Guerre populaire entre '+offense.civ.emoji+' '+offense.civ.name+' et '
       +offenseur.civ.emoji+' '+offenseur.civ.name+' — les malus tomberont si elle a lieu.','red');
@@ -9877,6 +9957,38 @@ function chooseInvestmentForAI(ai,level){
   return best.id;
 }
 // ── Achat IA d'une carte civique (forme de gouvernement ou sociale) ──
+/* ═════ LA RÈGLE DE LA RÉCOLTE, ÉCRITE UNE FOIS POUR LES DEUX CERVEAUX ═════
+   ⚠️ LE GARDE-FOU EXISTAIT, MAIS UN SEUL DES DEUX CERVEAUX LE VOYAIT (Marc, 18/09, partie 20C9).
+   `tryCivic` — le chemin heuristique — limitait déjà les récoltes à UNE par tour, seulement en
+   pénurie (ressource ≤ 2), et jamais en payant dans la ressource qui manque. Mais `coupsPossibles`,
+   le générateur du TACTICIEN — celui qui joue réellement — proposait chaque carte abordable sans
+   compteur ni condition. Deux règles pour la même question, et c'est la mauvaise qui s'appliquait.
+   Ce que ça donnait, partie 20C9 : les Martiens achètent Extraction d'He3 CINQ fois (2× au tour 6,
+   3× au tour 7) et finissent à 4⚡ pour 20🪨 et 10🔬, troisièmes à 76 VP. Marc avait raison sur
+   le fond — ils convertissaient un surplus vers leur goulot, et ce +6⚡ a payé le Réseau Empathique
+   et la Surtension — mais pas sur le PRIX : 1 AC pour +2⚡, trois AC d'un tour qui en comptait six,
+   quand une colonisation coûte le même AC et rapporte des PV et du revenu permanents.
+   On ne crée donc AUCUNE règle : on fait voir au tacticien celle que l'heuristique appliquait déjà.
+
+   Une « récolte » = une carte sociale RÉPÉTABLE qui rend des matériaux, de l'énergie ou de la
+   science (Extraction d'He3, Capture d'astéroïdes, Investissement dans la Recherche). Les cartes
+   à usage unique n'ont jamais pu être spammées : les limiter ne ferait que les interdire. Calmer la
+   Population et Mission diplomatique ont leurs propres compteurs. */
+function _estRecolte(card){
+  if(!card||!card.repeatable||card.type!=='social')return false;
+  if(card.calmAction||card.diploAction||!card.resGain)return false;
+  return ['materials','energy','science'].some(function(r){return (card.resGain[r]||0)>0;});
+}
+function _recolteAutorisee(nat,card){
+  if(!nat||!_estRecolte(card))return true;            // ce n'est pas une récolte : aucune limite ici
+  if((nat._recoltesTour||0)>=1)return false;          // une seule par tour
+  const cost=card.cost||{};
+  /* Il faut une pénurie RÉELLE sur ce que la carte rend, et ne pas s'appauvrir davantage :
+     on refuse une récolte qui coûte la ressource qu'on cherche justement à reconstituer. */
+  return ['materials','energy','science'].some(function(r){
+    return (card.resGain[r]||0)>0 && ((nat.res&&nat.res[r])||0)<=2 && !((cost[r]||0)>0);
+  });
+}
 function aiBuyCivic(ai,card){
   /* Calmer la Population : SA tension envers une nation — il calme celle qu'il déteste le plus (c'est
      elle qui le pousserait à une guerre populaire) et qu'il n'a pas encore calmée ce tour. */
@@ -9901,6 +10013,11 @@ function aiBuyCivic(ai,card){
     return true;
   }
   const cost=card.cost||{};
+  /* ⚠️ LE COMPTEUR SE TIENT ICI, PAS CHEZ L'APPELANT. Il était incrémenté dans `tryCivic`, donc
+     seulement sur le chemin heuristique : un achat passé par `appliquerCoup` (le tacticien) ne
+     comptait pas, et la règle « une récolte par tour » ne tenait pour personne. Un seul endroit
+     achète, un seul endroit compte. */
+  if(_estRecolte(card)) ai._recoltesTour=(ai._recoltesTour||0)+1;
   ai.acLeft-=1;ai.spentThisTurn+=1+Object.values(cost).reduce((s,v)=>s+v,0);
   for(const[r,a]of Object.entries(cost))ai.res[r]=(ai.res[r]||0)-a;
   const caps=getResCapFor(ai);
@@ -10839,6 +10956,9 @@ function coupsPossibles(nat){
     if(card.id===nat.govForm)continue;
     if(nat._civicTaken&&nat._civicTaken.has(card.id)&&!card.repeatable)continue;
     if(!abordable(card.cost))continue;
+    /* Récolte : même règle que sur le chemin heuristique (voir `_recolteAutorisee`). Sans cette
+       ligne, le tacticien pouvait acheter trois fois Extraction d'He3 dans le même tour. */
+    if(!_recolteAutorisee(nat,card))continue;
     /* Mission diplomatique : un coup seulement s'il reste quelqu'un à apaiser (≥ 3 de tension envers
        moi, pas encore apaisé ce tour) — sinon la simulation dépenserait pour rien. */
     if(card.diploAction){
@@ -10994,7 +11114,14 @@ function appliquerCoup(nat,coup){
          carnet — la fonction de règle — et le problème ne se pose plus.
          Surveillé par `test_carnet_civique.js`, §1 et §2. */
       case 'raid':      e={emoji:'💰',name:'Raid sur '+nom(coup.node),desc:coup.cible||''}; break;
-      case 'assaut':    e={emoji:'⚔️',name:'Assaut sur '+nom(coup.node),desc:''}; break;
+      /* ⚠️ PAS DE CAS `assaut` ICI NON PLUS — MÊME RAISON QUE LE CIVIQUE CI-DESSUS (partie 20C9).
+         `resoudreAssautIA` inscrit déjà son fait d'armes : « Capture Titan » quand la place tombe,
+         « Assaut repoussé par X » sinon, « Assaut sur X — frappe surprise » contre un humain. Le
+         garde-fou du bas compare les NOMS : « Capture Titan » ≠ « Assaut sur Titan », donc les deux
+         lignes passaient. Marc lisait, pour UNE action : « Capture Titan, 3 AC, −4⚡ −4🪨 −2⚔ »
+         puis « Assaut sur Titan, 3 AC, −4⚡ −4🪨 −2⚔ » — coût compté deux fois dans toute lecture
+         de ce carnet, bancs compris. Quatre occurrences dans la seule partie 20C9 (T6, T8×2, T9).
+         Le paiement réel, lui, n'a jamais été doublé : une seule ligne « ↳ paie » en face. */
       case 'accord':    e={emoji:'🤝',name:'Accord '+nom(coup.node),desc:''}; break;
       case 'pouvoir':   e={emoji:'💫',name:'Pouvoir national',desc:''}; break;
     }
@@ -12118,7 +12245,8 @@ function _doAITurnInterne(aiPlayer,oneShot){
           /* Ne pas s'appauvrir davantage : on refuse une récolte qui coûte la ressource qu'on
              cherche justement à reconstituer. */
           if((cost[m.r]||0)>0)continue;
-          ai._recoltesTour=(ai._recoltesTour||0)+1;   // une seule récolte par tour (voir `_civicUtil`)
+          if(!_recolteAutorisee(ai,c))continue;       // la règle commune aux deux cerveaux
+          /* Le compteur est tenu par `aiBuyCivic` — un seul endroit achète, un seul endroit compte. */
           aiBuyCivic(ai,c);return true;
         }
       }
