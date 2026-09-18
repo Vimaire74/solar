@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-17 · v10.70';
+const SOLAR_BUILD_MOTEUR = '2026-09-18 · v10.71';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -2788,6 +2788,22 @@ function reviserProjet(nat){
   /* Pour COMPARER des projets, un gain obtenu tôt vaut plus qu'un gain obtenu au dernier tour :
      il reste des tours pour en profiter, et le plan a moins d'occasions de dérailler. */
   const score=ev=>ev.gain*(restants-ev.tours+1)/restants;
+  /* ⚠️ RÈGLE FERME DU CONQUÉRANT : L'IA DÉFENSIVE D'ABORD (Marc, §139.2/139.4 — « il doit chercher
+     à prendre ça en priorité », « les tech militaires le plus vite possible »).
+     🛡️ IA Défensive est le rang 3 de `ia_renseignement` (drones1 → reseau2 → iadef3) : +4 jetons
+     PERMANENTS, immunité aux raids, aux pirates et aux Tempêtes Solaires, 5 VP. Le projet existait
+     déjà, mais il perdait la comparaison à chaque tour — mesuré : rang 2 pris par 1 nation sur 12
+     (au tour 10), rang 3 par PERSONNE, et une prime de 2,2 sur sa note n'y changeait rien (la
+     chaîne des mines vaut 26 contre 10). Une préférence ne suffit donc pas : pour lui, c'est une
+     DÉCISION. Elle ne dure que tant que le plan est faisable dans les tours restants, et elle
+     s'efface dès qu'il l'a terminé — après quoi il compare comme tout le monde. */
+  if(!courant&&nat._profil==='guerrier'){
+    const def=cands.find(p=>p&&p.cible&&p.cible.type==='tech'&&p.cible.branche==='ia_renseignement');
+    if(def&&def.etapes&&def.etapes.length){
+      const ev=evaluerProjet(nat,def);
+      if(ev){ def.gain=ev.gain; def.tours=ev.tours; nat._projet=def; _tracerProjet(nat,'choisi',def,ev.gain); return; }
+    }
+  }
   let meilleur=null, mv=-Infinity, valCourant=null, gainCourant=null;
   for(const p of cands){
     const nouveau=!courant||p.id!==courant.id;
@@ -2821,7 +2837,8 @@ function valeurTemperament(coup,nat){
     if(coup.type==='ameliorer'){
       const col=(nat.colonies||[]).find(c=>c.nodeId===coup.node);
       if(!col||!col.connected)return 0;
-      return TEMPERAMENT_PRIME_AMELIORER*horizon*(nat._profil==='batisseur'?2:1);
+      /* La prime doublée appartenait au Bâtisseur ; le Stratège n'a pas de penchant (§139.2). */
+      return TEMPERAMENT_PRIME_AMELIORER*horizon;
     }
     return 0;
   }catch(e){ return 0; }
@@ -7268,7 +7285,8 @@ function ordinateurProtegeSesRoutes(nat){
   if(!nat||!nat.civ) return false;
   if(nat.civ.id==='ceinturiens') return false;
   if(typeof routesProtegeesParTech==='function'&&routesProtegeesParTech(nat)) return false;
-  if(nat._profil==='batisseur') return true;
+  /* « Le Bâtisseur protège toutes ses routes » : c'était son caractère, le Stratège ne l'a plus
+     (§139.2). Le risque est déjà chiffré dans l'évaluation (`risquePirates`). */
   return chancePiratesDuTour()>=0.40;
 }
 function protegerRouteIA(nat, route){
@@ -8828,7 +8846,7 @@ function triggerGuereeForcee(offendedSide,targetAi,opts){
       .sort(function(a,b){return a.dist-b.dist;});
     const nearestAiCol=_fwCibles[0]||null;   // conservé : l'IA offensée et les vieux clients s'en servent
     let choicesHtml=
-      '<div class="fw-choice" onclick="forcedWarDemandPeace()">🕊️ Exiger la paix (tribut si ennemi faible, sinon la guerre continue)</div>'+
+      '<div class="fw-choice" onclick="forcedWarDemandPeace()">🕊️ Exiger la paix (tribut de 3 🪨/⚡ si l\'ennemi est plus faible et peut payer, sinon la guerre continue)</div>'+
       (aiAllRoutes.length?aiAllRoutes.map((r,i)=>{const prot=(r.tokens||0)>=1;const need=prot?2:1;const can=(G.player.forceTokens||0)>=need;return `<div class="fw-choice" onclick="forcedWarChoiceRoute(${i})" style="${can?'':'opacity:.5'}">${prot?'🛡️':'🔓'} Attaquer route ${NODES[r.from]?.name||r.from}→${NODES[r.to]?.name||r.to} — ${need} jeton${need>1?'s':''}</div>`;}).join(''):'<div style="color:#5a6a8a;font-size:.82em">Aucune route ennemie.</div>')+
       _fwCibles.map(function(t,i){
         const _n=NODES[t.col.nodeId]||{};
@@ -8939,42 +8957,78 @@ function stAssautForceReponse(committed){
   }
   stAssautJoueurChoisi(committed|0);
 }
+/* ═══ LE TRIBUT DE PAIX VAUT 3, IL N'EST PLUS « CE QU'IL RESTE » (Marc, 17/09 — partie 3092) ═══
+   Le tribut valait `min(2, matériaux)` + `min(2, énergie)` : une nation exsangue achetait donc la
+   paix pour ZÉRO. C'est ce qui s'est passé au tour 8 de la partie 3092 — « il a payé 0. Dingue
+   non ? ». Règle de Marc : au moins 3, en matériaux ou en énergie. Donc exactement 3 unités, prises
+   d'abord sur les matériaux, complétées en énergie (1🪨 restant → 1🪨 + 2⚡) ; et si la nation ne
+   réunit pas 3 à elles deux, elle NE PEUT PAS acheter la paix — la guerre continue. Une seule
+   fonction pour les deux cas (ordinateur et joueur humain), et le montant est RECALCULÉ au moment
+   du versement : entre la question posée à un humain et sa réponse, ses réserves ont pu fondre. */
+const TRIBUT_PAIX=3;
+function tributDe(nat){
+  const M=Math.max(0,((nat&&nat.res&&nat.res.materials)|0)), E=Math.max(0,((nat&&nat.res&&nat.res.energy)|0));
+  const m=Math.min(M,TRIBUT_PAIX), e=Math.min(E,TRIBUT_PAIX-m);
+  return {m:m, e:e, total:m+e, possible:(m+e)>=TRIBUT_PAIX,
+          texte:([m?m+'🪨':'', e?e+'⚡':''].filter(Boolean).join(' ')||'rien')};
+}
+function verserTribut(cible,dem,t){
+  cible.res.materials=Math.max(0,(cible.res.materials||0)-t.m);
+  cible.res.energy=Math.max(0,(cible.res.energy||0)-t.e);
+  const cap=(typeof getResCapFor==='function')?getResCapFor(dem):{materials:9999,energy:9999};
+  dem.res.materials=Math.min(cap.materials,(dem.res.materials||0)+t.m);
+  dem.res.energy=Math.min(cap.energy,(dem.res.energy||0)+t.e);
+}
+/* Le joueur ne voyait RIEN : contre un ordinateur, la décision était appliquée et seule une ligne
+   de journal en gardait trace (« je ne reçois pas de réponse »). On lui pose donc une fenêtre
+   d'information, comme pour un accord refusé. */
+function _avisTribut(titre,corps){ try{ if(typeof _emitNotice==='function')_emitNotice('accord_result', G.player, {title:titre, body:corps}, 'stRien'); }catch(e){} }
 function forcedWarDemandPeace(){
   document.getElementById('forced-war-modal').classList.add('hidden');
   const ai=G.warWith?G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0]:G.ais[0];
+  const fin=()=>{ G.playerTension=0;G.aiTension=0; if(!_guerrePopSuiteJouer())render(); };
+  if(!ai){ fin(); return; }
+  const nom=ai.civ.emoji+' '+ai.civ.name;
+  const t=tributDe(ai);
   /* ═══ UN HUMAIN N'EST PAS UNE FORMULE (partie 5B38, 07/09) ═══
      Marc exige la paix dans sa guerre populaire contre les Ceinturiens — tenus par son ami. La
-     règle « l'IA cède si elle n'est pas militairement supérieure » s'est appliquée à lui : 2🪨 2⚡
-     prélevés d'office, sans question. « Mon ami n'a pas vraiment pu répondre. » On lui pose la
-     question ; il peut refuser, et la guerre continue. */
-  if(ai&&ai._isAI===false&&_decisionActive()){
+     règle « l'IA cède si elle n'est pas militairement supérieure » s'est appliquée à lui : le
+     tribut était prélevé d'office, sans question. « Mon ami n'a pas vraiment pu répondre. » On lui
+     pose la question ; il peut refuser, et la guerre continue. */
+  if(ai._isAI===false&&_decisionActive()){
+    if(!t.possible){
+      addLog('⚔️ '+nom+' n\'a pas de quoi payer le tribut ('+TRIBUT_PAIX+' en 🪨 ou ⚡) — la guerre continue.','red');
+      _avisTribut('🕊️ Exigence de paix', nom+' n\'a pas les '+TRIBUT_PAIX+' ressources du tribut : la guerre continue.');
+      fin(); return;
+    }
     const d=fluxDonnees(); d.tributDemandeur=G.player.civ.id; d.tributCible=ai.civ.id;
-    const tM=Math.min(2,ai.res.materials||0),tE=Math.min(2,ai.res.energy||0);
-    addLog('🕊️ '+G.player.civ.emoji+' '+G.player.civ.name+' exige la paix de '+ai.civ.emoji+' '+ai.civ.name+' contre un tribut ('+tM+'🪨 '+tE+'⚡) — en attente de sa réponse…','dim');
+    addLog('🕊️ '+G.player.civ.emoji+' '+G.player.civ.name+' exige la paix de '+nom+' contre un tribut ('+t.texte+') — en attente de sa réponse…','dim');
     _emitDecision('peace_answer', ai,
       {title:'🕊️ Exigence de paix',
        from:G.player.civ.id, fromName:G.player.civ.emoji+' '+G.player.civ.name,
        offer:{materials:0,energy:0,science:0},
-       texte:G.player.civ.emoji+' '+G.player.civ.name+' — dont le peuple exige vengeance — te propose d\'éviter la guerre contre un <b>tribut de '+tM+'🪨 et '+tE+'⚡</b>. Si tu refuses, la guerre continue.',
+       texte:G.player.civ.emoji+' '+G.player.civ.name+' — dont le peuple exige vengeance — te propose d\'éviter la guerre contre un <b>tribut de '+t.texte+'</b>. Si tu refuses, la guerre continue.',
        options:[{id:'yes',name:'🕊️ Payer le tribut — paix'},{id:'no',name:'⚔️ Refuser — la guerre continue'}]},
       'stTributReponse', null);
     return;
   }
-  const weak=ai&&(ai.forceTokens||0)<=(G.player.forceTokens||0); // l'IA cède si elle n'est pas militairement supérieure
-  if(ai&&weak){
-    const tM=Math.min(2,ai.res.materials||0),tE=Math.min(2,ai.res.energy||0);
-    ai.res.materials=Math.max(0,(ai.res.materials||0)-tM);ai.res.energy=Math.max(0,(ai.res.energy||0)-tE);
-    const cap=(typeof getResCapFor==='function')?getResCapFor(G.player):{materials:9999,energy:9999};
-    G.player.res.materials=Math.min(cap.materials,(G.player.res.materials||0)+tM);
-    G.player.res.energy=Math.min(cap.energy,(G.player.res.energy||0)+tE);
-    const _i=_warIndexBetween(_moiId(),ai.civ.id);if(_i>=0)G.wars.splice(_i,1);
-    halveTensions('player',ai.civ.id);syncWarState();
-    addLog('🕊️ '+ai.civ.emoji+' '+ai.civ.name+' cède à la pression et achète la paix : tribut +'+tM+' matériaux +'+tE+' énergie.','gold');
-  }else if(ai){
-    addLog('⚔️ '+ai.civ.emoji+' '+ai.civ.name+' refuse de payer — la guerre continue (pas de combat ce tour).','red');
+  const weak=(ai.forceTokens||0)<=(G.player.forceTokens||0); // l'IA cède si elle n'est pas militairement supérieure
+  if(!weak){
+    addLog('⚔️ '+nom+' refuse de payer — la guerre continue (pas de combat ce tour).','red');
+    _avisTribut('🕊️ Exigence de paix', nom+' se sait le plus fort et refuse de payer : la guerre continue.');
+    fin(); return;
   }
-  G.playerTension=0;G.aiTension=0;
-  if(!_guerrePopSuiteJouer())render();
+  if(!t.possible){
+    addLog('⚔️ '+nom+' n\'a pas de quoi payer le tribut ('+TRIBUT_PAIX+' en 🪨 ou ⚡) — la guerre continue.','red');
+    _avisTribut('🕊️ Exigence de paix', nom+' est trop pauvre pour payer les '+TRIBUT_PAIX+' ressources du tribut : la guerre continue.');
+    fin(); return;
+  }
+  verserTribut(ai,G.player,t);
+  const _i=_warIndexBetween(_moiId(),ai.civ.id);if(_i>=0)G.wars.splice(_i,1);
+  halveTensions('player',ai.civ.id);syncWarState();
+  addLog('🕊️ '+nom+' cède à la pression et achète la paix : tribut '+t.texte+'.','gold');
+  _avisTribut('🕊️ Paix achetée', nom+' cède à la pression et te verse '+t.texte+'. La guerre est évitée.');
+  fin();
 }
 /* La réponse de l'humain à l'exigence de paix (voir `forcedWarDemandPeace`). Les deux nations sont
    relues dans `G` : la réponse peut arriver quand la perspective a changé. */
@@ -8986,14 +9040,18 @@ function stTributReponse(ans){
   const oui=!!(ans&&(ans.value==='yes'||ans.targetId==='yes'||ans.id==='yes'||ans.accept===true||ans.choice==='yes'));
   if(dem&&cib) logAuteur(dem, function(){
     if(oui){
-      const tM=Math.min(2,cib.res.materials||0),tE=Math.min(2,cib.res.energy||0);
-      cib.res.materials=Math.max(0,(cib.res.materials||0)-tM); cib.res.energy=Math.max(0,(cib.res.energy||0)-tE);
-      const cap=(typeof getResCapFor==='function')?getResCapFor(dem):{materials:9999,energy:9999};
-      dem.res.materials=Math.min(cap.materials,(dem.res.materials||0)+tM); dem.res.energy=Math.min(cap.energy,(dem.res.energy||0)+tE);
+      /* Montant RECALCULÉ ici : entre la question et la réponse, l'humain a pu dépenser. S'il ne
+         réunit plus les 3, la paix ne se fait pas — on n'achète pas la paix avec rien. */
+      const t=tributDe(cib);
+      if(!t.possible){
+        addLog('⚔️ '+cib.civ.emoji+' '+cib.civ.name+' voulait payer, mais n\'a plus les '+TRIBUT_PAIX+' ressources du tribut — la guerre continue.','red');
+      } else {
+      verserTribut(cib,dem,t);
       const _i=_warIndexBetween(dem.civ.id,cib.civ.id); if(_i>=0)G.wars.splice(_i,1);
       halveTensions(dem.civ.id,cib.civ.id); syncWarState();
-      addLog('🕊️ '+cib.civ.emoji+' '+cib.civ.name+' accepte de payer le tribut ('+tM+'🪨 '+tE+'⚡) — la paix est conclue.','gold');
+      addLog('🕊️ '+cib.civ.emoji+' '+cib.civ.name+' accepte de payer le tribut ('+t.texte+') — la paix est conclue.','gold');
       annoncerPaixAuxTiers(dem,cib,'tribut');
+      }
     } else {
       addLog('⚔️ '+cib.civ.emoji+' '+cib.civ.name+' refuse de payer — la guerre continue (pas de combat ce tour).','red');
     }
@@ -9773,10 +9831,14 @@ function chooseInvestmentForAI(ai,level){
      au tour 7. » La carte monte TOUTES ses colonies au niveau max : c'est son tempérament en une
      carte. Règle ferme dès qu'il a au moins deux colonies à monter et de quoi la payer ; sinon la
      simulation compare, comme pour tout le monde. */
-  if(level===2&&ai&&ai._profil==='batisseur'){
-    const carte=(INVESTMENT_CARDS_2||[]).find(c=>c.id==='inv2_colonies');
-    let aMonter=0; for(const c of (ai.colonies||[])){ const n=NODES[c.nodeId]; if(n&&!n.decorative&&(c.level||1)<(n.maxLv||3))aMonter++; }
-    if(carte&&aMonter>=2&&investPayable(carte,ai))return carte.id;
+  /* ⚠️ RÈGLE FERME POUR LE CONQUÉRANT (Marc, §139.4) : « il doit systématiquement prendre
+     stratégies militaires dans les investissements au tour 7 ». `inv2_war` était déjà noté 8 pour
+     lui contre 1 ou 2 pour les autres — une préférence, pas une décision. Elle le devient.
+     L'ancienne règle ferme visait le Bâtisseur (Colonies Avancées) : le Stratège n'a plus de
+     penchant, il compare comme tout le monde. */
+  if(level===2&&ai&&ai._profil==='guerrier'){
+    const carte=(INVESTMENT_CARDS_2||[]).find(c=>c.id==='inv2_war');
+    if(carte&&investPayable(carte,ai))return carte.id;
   }
   const parSimulation=iaSimuleInvestissement(ai,level);
   if(parSimulation)return parSimulation;
@@ -9882,13 +9944,18 @@ function aiBuyMilitary(ai,card){
    Le profil est une CHAÎNE rangée sur la nation : il se sauvegarde et survit à une reprise. */
 const PROFILS_IA = {
   batisseur: {
-    nom:'Bâtisseur', emoji:'🏗️',
-    desc:'développe ses colonies et ses technologies, ne pille jamais',
-    /* Demande de Marc : aucun raid, jamais. Quand il lui manque une ressource, il la RÉCOLTE
-       (He3, astéroïdes, recherche — voir `tryCivic`) au lieu d'aller la prendre chez le voisin.
-       D'où le `civic` haut : c'est par là qu'il se refait. */
-    mult:{ colonize:1.5, upgrade:1.6, tech:1.5, route:1.3, civic:1.7,
-           raid:0, raidAI:0, assaultAI:0.3, military:0.6, accord:1.4 }
+    /* ═══ LE BÂTISSEUR EST DEVENU LE STRATÈGE (Marc, 16/09 — §139.2) ═══
+       « On va l'appeler le Stratège. Celui-ci permet au cerveau tacticien d'agir sans frein, sans
+       morale, sans rancune, pour gagner. » « Sans morale » veut dire SANS SCRUPULES — pas « ignore
+       la ressource moral ». Il n'a donc plus AUCUN penchant : ni le refus de piller, ni la prime
+       d'amélioration, ni les routes toujours protégées, ni l'investissement imposé au tour 7. Il se
+       définit par l'ABSENCE de préférence — c'est le tacticien nu, et c'est ce qui le rend fort.
+       ⚠️ La clé interne reste `batisseur` : les sauvegardes en cours, les bancs et `mesure_profils_ia`
+       la connaissent. Seul le nom affiché change. */
+    nom:'Stratège', emoji:'♟️',
+    desc:'joue la position, sans frein ni rancune',
+    mult:{ colonize:1.0, upgrade:1.0, tech:1.0, route:1.0, civic:1.0,
+           raid:1.0, raidAI:1.0, assaultAI:1.0, military:1.0, accord:1.0 }
   },
   guerrier: {
     nom:'Conquérant', emoji:'⚔️',
@@ -9940,6 +10007,24 @@ const PROFILS_IA = {
   }
 };
 const PROFILS_ATTRIBUABLES = ['batisseur','guerrier','opportuniste'];
+/* ═══ QUI A LE DROIT DE PILLER, DEPUIS LE 17/09 (§139.2) ═══
+   Avant : « bâtisseur et conquérant ne raident jamais ». Les deux dictées de Marc du 16/09 changent
+   les deux moitiés de cette phrase. Le Stratège n'a plus de scrupules, donc plus d'interdit : c'est
+   l'évaluation qui décidera si un raid vaut ses 2 jetons. Le Conquérant, lui, « raide pour trouver
+   les ressources qu'il n'a pas » : il pille quand il MANQUE, pas par goût — sinon on retombe sur le
+   défaut corrigé le 16/08, où il dépensait en pillages les jetons qui devaient prendre des colonies.
+   L'Opportuniste est inchangé. */
+function _manqueRessources(nat){
+  try{
+    const r=nat&&nat.res||{};
+    return Math.min(r.materials||0,r.energy||0)<=3 || (r.energy||0)<=3 || (r.materials||0)<=3;
+  }catch(e){ return false; }
+}
+function _raidInterditPour(nat){
+  const b=nat&&nat._profil;
+  if(b==='guerrier')return !_manqueRessources(nat);   // il pille par nécessité, pas par plaisir
+  return false;                                        // Stratège et Opportuniste : l'évaluation tranche
+}
 const PROFIL_ASSIEGEE_TOURS = 3;   // durée de la bascule après la dernière agression subie
 
 /* Attribue un tempérament à chaque nation dirigée par l'ordinateur.
@@ -10085,8 +10170,67 @@ const POIDS_EVAL={
   action:0.45,            // VP par action et par tour restant (une action ≈ un coup moyen)
   plafondMoral:0.08,      // VP perdus par point de plafond sous 10, par tour restant (×2 en guerre)
   route:1.0,              // ce que vaut une route (≈ 1 VP + son revenu) — perdue avec la chance pirate du tour
-  immunite:0.5            // VP par tour restant que vaut l'immunité aux raids et aux pirates (IA Défensive)
+  immunite:0.5,           // VP par tour restant que vaut l'immunité aux raids et aux pirates (IA Défensive)
+  force:0.45,             // VP par jeton (plafonné à 12 jetons) — multiplié par la menace, plus par l'horizon (§139.5)
+  forceMin:1.0,           /* personne ne me menace : un jeton vaut le poids de base — soit ce qu'il
+                             valait au TOUR 1 avant le 17/09. Essayé à 0,5 (« en paix, ça vaut moins »)
+                             et MESURÉ PIRE : la chaîne de l'IA Défensive tombait de 42 % à 0 % sur le
+                             rang 2. Le plancher ne doit jamais descendre sous l'ancien maximum, sinon
+                             on remplace un défaut par un autre. */
+  forceMax:1.8,           // en guerre : presque le double
+  forceLouee:0.8          // un jeton perdu au tour suivant ne vaut que la menace du moment (§139.4)
 };
+/* ═══ LA MENACE RESSENTIE, DE 0 À 1 — ce qui donne sa valeur à une armée (§139.5) ═══
+   En guerre : 1, sans discussion. Sinon, la plus forte TENSION d'une autre nation envers moi : à
+   10 le peuple exige la guerre, la jauge est donc déjà l'échelle du danger, et elle est PUBLIQUE
+   (règles §14.8 — la lire n'est pas de la triche).
+   ⚠️ J'AVAIS AJOUTÉ « et un quart de plus si quelqu'un est mieux armé que moi » : `test_brouillard_ia`
+   l'a refusé sur-le-champ, et il a raison — le nombre de jetons d'un rival n'est exact qu'avec le
+   📡 Réseau Orbital, et ma propre note bougeait de 0,45 quand on donnait douze jetons au voisin,
+   c'est-à-dire que je lisais ce que je ne dois pas voir. Retiré : la tension suffit. */
+function _menaceRessentie(nat){
+  try{
+    if(typeof estEnGuerre==='function'&&estEnGuerre(nat))return 1;
+    if(typeof getTens!=='function')return 0;
+    let m=0;
+    for(const o of allPlayers()){
+      if(!o||o===nat||!o.civ)continue;
+      m=Math.max(m,Math.min(1,(getTens(o,nat)||0)/10));
+    }
+    return m;
+  }catch(e){ return 0.5; }
+}
+/* ═══ CE QU'ON DEVINE D'UN RIVAL QUAND ON N'A PAS LE RENSEIGNEMENT (18/09 — §143.4) ═══
+   ⚠️ LE DÉFAUT QUE CECI CORRIGE EST LE PLUS COÛTEUX DE L'ÉVALUATION. Sans le 📡 Réseau Orbital, la
+   production, la trésorerie et la force d'un rival étaient comptées ZÉRO. Conséquences mesurées :
+     1. toute IA aveugle se croyait en tête — ses rivaux avaient l'air destitués ;
+     2. ACHETER DU RENSEIGNEMENT FAISAIT BAISSER SA NOTE DE ~9 POINTS (16,3 contre 25 à 27 pour
+        n'importe quel autre coup) : en s'informant, elle rendait d'un coup toute leur substance à
+        ses rivaux. Personne n'achetait donc jamais le rang 2 — et comme il commande l'🛡️ IA
+        Défensive, la chaîne entière tombait avec lui. « Les IA ne vont JAMAIS chercher IA
+        Défensive » (Marc) : voilà la deuxième moitié de la réponse, après le poids de la force.
+   On ne compte donc plus zéro, mais une ESTIMATION bâtie UNIQUEMENT sur ce qui est public (§14.8) :
+   les colonies, leur niveau, leur raccordement, la carte et le tour. Aucune donnée cachée n'entre
+   ici — `test_brouillard_ia` §1 le vérifie : les stocks, le moral et les jetons réels du rival
+   peuvent varier, ma note ne bouge pas. Le renseignement AFFINE alors l'estimation au lieu de
+   révéler un gouffre, et il redevient ce qu'il doit être : un avantage, jamais une punition. */
+function _estimationAveugle(nat){
+  let e=0,m=0;
+  for(const c of (nat.colonies||[])){
+    const n=NODES[c.nodeId]; if(!n||n.decorative)continue;
+    if(!c.connected&&!c.foreignConnected)continue;      // une colonie isolée ne rapporte rien : public
+    const lv=Math.max(1,c.level||1);
+    e+=((n.res&&n.res.energy)||0)*lv; m+=((n.res&&n.res.materials)||0)*lv;
+  }
+  const nbCol=(nat.colonies||[]).length;
+  /* Le savoir ne se lit pas sur la carte : ordre de grandeur, pas prétention à la justesse. */
+  const sci=1+0.6*nbCol;
+  /* Les jetons non plus. ⚠️ NE PAS utiliser `perceivedForce` ici : elle lit le nombre RÉEL (±3), et
+     ma note se mettrait à bouger quand on arme le voisin — exactement ce que le brouillard interdit.
+     On estime donc par la taille et par le tour, comme on jauge une puissance de loin. */
+  const jetons=Math.min(12,3+0.45*nbCol+0.35*((G&&G.turn)||1));
+  return {energy:e,materials:m,science:sci,jetons:jetons};
+}
 function evaluerPosition(nat,observateur){
   if(!nat||!nat.civ)return 0;
   /* Ce que je vois d'un rival sans le Réseau Orbital : son SCORE et sa CARTE. Rien d'autre. */
@@ -10145,14 +10289,23 @@ function evaluerPosition(nat,observateur){
   /* 0,30 → 0,36 : contrepartie du poids réduit des VP ci-dessus. Le but n'est pas de gonfler la
      production dans l'absolu, c'est de rendre le MOTEUR ÉCONOMIQUE plus attirant que le point marqué
      tout de suite, tant qu'il reste des tours pour le faire tourner. */
-  const production=aveugle?0:parTour*restants*0.36;   // revenus : cachés (§14.7)
+  /* Aveugle : l'estimation publique, aux poids nominaux (le doublement du manque lit des stocks
+     cachés, il n'a donc pas sa place ici). */
+  const _est=aveugle?_estimationAveugle(nat):null;
+  const parTourEstime=aveugle?(_prod(_est.energy)*POIDS_EVAL.production.energy+_prod(_est.science)*POIDS_EVAL.production.science+_prod(_est.materials)*POIDS_EVAL.production.materials):0;
+  const production=(aveugle?parTourEstime:parTour)*restants*0.36;   // revenus : estimés sans renseignement (§14.7)
 
   /* TRÉSORERIE — convertible tout de suite, mais elle ne vaut que si l'on a encore le temps de la
      dépenser. Un stock de 20🪨 au dernier tour ne vaut rien. */
   /* Un stock au-delà du plafond de fin de tour (`realResCap`) ne vaut rien : il sera jeté. */
   const _cap=realResCap(nat);
   const _stock=r=>Math.min(_rs[r]||0,_cap[r]||9999);
-  const tresorerie=aveugle?0:(_stock('energy')*wT('energy')+_stock('science')*wT('science')+_stock('materials')*wT('materials'))*horizon;   // stocks : cachés
+  /* Aveugle : une nation garde en caisse quelque chose comme la moitié d'un tour de production —
+     assez pour ne pas la croire à sec, trop peu pour lui prêter un trésor. */
+  const _stockEstime=r=>Math.min((_cap[r]||9999),2+0.45*((_est&&_est[r])||0));
+  const tresorerie=aveugle
+    ?(_stockEstime('energy')*wT('energy')+_stockEstime('science')*wT('science')+_stockEstime('materials')*wT('materials'))*horizon
+    :(_stock('energy')*wT('energy')+_stock('science')*wT('science')+_stock('materials')*wT('materials'))*horizon;
 
   /* POTENTIEL DE DÉVELOPPEMENT — une colonie de niveau 1 reliée vaut bien plus que sa valeur
      actuelle, tant qu'il reste des tours pour l'améliorer. */
@@ -10210,7 +10363,36 @@ function evaluerPosition(nat,observateur){
      réessayer la version qui a déjà échoué.
      👉 La piste qui reste à explorer n'est PAS l'évaluation de position : c'est que le tacticien
      n'anticipe qu'UN coup. Refuser une T3 à un rival suppose de voir ce qu'il jouera ENSUITE. */
-  const force=aveugle?0:Math.min(12,nat.forceTokens||0)*0.45*horizon;   // force exacte : réservée au Réseau Orbital
+  /* ═══════ UN JETON NE VAUT PLUS MOINS PARCE QUE LA PARTIE FINIT (17/09 — §139.5) ═══════
+     La force valait `min(12, jetons) × 0,45 × HORIZON`. L'horizon décroît avec les tours restants :
+     les jetons étaient donc notés presque zéro aux tours 7 à 10, C'EST-À-DIRE EXACTEMENT QUAND ON SE
+     BAT. Conséquence mesurée (`mesure_ia_defensive.js`, 3 parties, 12 nations) : l'IA Défensive
+     (+4 jetons PERMANENTS, 5 VP) n'était prise que par 2 nations sur 12, et au tour 10 — donc pour
+     ses points, jamais pour ses jetons ; les nations ne LOUAIENT pas davantage (5 Investissements
+     militaires en tout) et finissaient la partie avec 6 à 8 jetons. « Les IA ne vont JAMAIS chercher
+     IA Défensive » (Marc) : ce n'était pas un manque de goût militaire, c'était l'arithmétique.
+     Désormais le poids ne suit plus le CALENDRIER mais la MENACE (`_menaceRessentie`) : un jeton vaut
+     le poids de base quand personne ne m'en veut — exactement ce qu'il valait au TOUR 1 avant ce
+     changement — et presque le double quand je suis en guerre. Une IA en paix au tour 2 ne
+     thésaurise donc pas plus qu'avant (même valeur qu'avant à ce tour-là), et une IA menacée au
+     tour 8 voit enfin ce que vaut une armée.
+     ⚠️ Ce terme sert à TOUTES les IA à chaque coup : tout changement ici se mesure en tête-à-tête
+     (`mesure_cerveaux.js`, A=tacticien) AVANT d'être gardé. */
+  /* ⚠️ UN JETON LOUÉ N'EST PAS UN JETON. 🪖 Investissements militaires donne « +2 jetons, PERDUS au
+     tour suivant » et 🛩️ Drones de Combat « +1, perdu au tour suivant » (`milLoseNext`,
+     `stratForceBonus`, dissous à l'ouverture du tour). Le tacticien ne simule qu'UN coup : il voyait
+     ces jetons comme les autres, et une fois la force correctement payée il s'est mis à LOUER au
+     lieu d'investir — mesuré le 17/09 : Investissements militaires 5 → 6 achats et Drones de Combat
+     2 → 5, pendant que la chaîne permanente restait à zéro. Doctrine de Marc (§139.4) : « permanent
+     plutôt que loué ». Un jeton qui disparaît demain ne vaut donc que ce qu'il fait AUJOURD'HUI —
+     et il ne fait quelque chose que si l'on se bat : on le compte à la menace, sans le reste. */
+  const loues=Math.max(0,(nat.milLoseNext||0)+(nat.stratForceBonus||0));
+  const permanents=Math.max(0,Math.min(12,nat.forceTokens||0)-loues);
+  const menace=_menaceRessentie(nat);
+  const force=aveugle
+    ?_est.jetons*POIDS_EVAL.force*(POIDS_EVAL.forceMin+(POIDS_EVAL.forceMax-POIDS_EVAL.forceMin)*menace)   // estimée, jamais lue (§143.4)
+    :(permanents*POIDS_EVAL.force*(POIDS_EVAL.forceMin+(POIDS_EVAL.forceMax-POIDS_EVAL.forceMin)*menace)
+      +Math.min(loues,Math.max(0,12-permanents))*POIDS_EVAL.force*POIDS_EVAL.forceLouee*menace);
 
   /* ═══════ LES ACTIONS PAR TOUR SE COMPTENT, ET LE PLAFOND DE MORAL SE PAIE (04/09) ═══════
      Marc, partie FD5F : les Terriens (IA) adoptent la Tyrannie au tour 3 — +1 AC, −2 moral, plafond
@@ -10258,7 +10440,71 @@ function evaluerPosition(nat,observateur){
     const pilleurs=allPlayers().some(o=>o&&o!==nat&&(o.forceTokens||0)>=1);
     if(pilleurs) immunite=POIDS_EVAL.immunite*restants;
   }
-  return acquis+production+tresorerie+potentiel+perilMoral+perilRessources+force+actions+plafondMoral+risquePirates+immunite;
+  /* Chaque tempérament ajoute SA définition d'une bonne position (§139.3). Jamais quand on regarde
+     un rival : on évalue alors SA position avec NOS yeux, et son caractère ne nous appartient pas. */
+  const temperament=(observateur&&observateur!==nat)?0:_termeTemperament(nat,restants,horizon);
+  return acquis+production+tresorerie+potentiel+perilMoral+perilRessources+force+actions+plafondMoral+risquePirates+immunite+temperament;
+}
+/* ═══ TROIS TEMPÉRAMENTS, TROIS FAÇONS DE NOTER UNE POSITION (§139.3, dicté par Marc le 16/09) ═══
+   ⚠️ LE FAIT QUI COMMANDE TOUT : le cerveau `tacticien` N'APPLIQUE PAS la table `PROFILS_IA[x].mult`
+   — elle ne pondère que l'ancien cerveau utilitaire. Sous le tacticien, un Bâtisseur et un
+   Conquérant se ressemblaient donc beaucoup plus que leurs fiches ne le disaient. On ne code donc
+   pas les tempéraments en empilant des consignes : on donne à chacun sa définition d'une BONNE
+   POSITION, et le caractère émerge de la simulation, comme le reste du cerveau.
+   · Stratège    : rien. Il est la fonction nue — il n'y a rien à maintenir pour lui.
+   · Conquérant  : les colonies possédées (davantage TÔT : « il doit attaquer rapidement dans la
+                   partie »), la capacité militaire PERMANENTE, et la chaîne défensive dont chaque
+                   maillon compte (sans quoi le rang 2, sans valeur propre, n'est jamais acheté et
+                   l'IA Défensive reste hors d'atteinte — cause n° 1 de `mesure_ia_defensive`).
+   · Opportuniste: son agenda secret d'abord, puis être PRÊT pour l'événement annoncé — les
+                   événements tombent aux tours 2, 4, 6, 8 et 10, et personne ne les regardait
+                   (§143.1). C'est le terme qui manquait.
+   ⚠️ On lit le tempérament DE BASE (`nat._profil`), jamais l'actif (`profilActifDe`) : une nation
+   passée en Assiégée changerait sinon de définition du bien en cours de partie (§139.2). */
+const POIDS_TEMP={
+  conqColonie:1.1,     // VP par colonie possédée, doublé au premier tour et décroissant (prime à frapper tôt)
+  conqForce:0.30,      // VP par jeton PERMANENT, EN PLUS du poids commun
+  conqChaine:1.4,      // VP par maillon acquis de drones1 → reseau2 → iadef3
+  oppAgenda:0.9,       // ce que pèse l'agenda secret déjà rempli
+  oppEvenement:2.2     // être prêt pour l'événement annoncé
+};
+const CHAINE_DEFENSIVE=['drones1','reseau2','iadef3'];
+/* Suis-je prêt pour l'événement de CE tour ? 0 à 1. L'événement est programmé dès le début de
+   partie et son aperçu est public : le lire n'est pas de la triche, c'est ce que fait un joueur. */
+function _pretPourEvenement(nat){
+  try{
+    const ev=(typeof eventForTurn==='function')?eventForTurn(G.turn):null;
+    if(!ev)return 0;
+    const rang=f=>{ const moi=f(nat); let mieux=0; for(const o of allPlayers()){ if(!o||o===nat)continue; if(f(o)>moi)mieux++; } return mieux===0?1:(mieux===1?0.35:0); };
+    switch(ev.id){
+      case 'storm':   return (typeof hasSpec==='function'&&hasSpec(nat,'storm_immune'))?1:0;
+      case 'pirates': return (nat.civ.id==='ceinturiens'||(typeof routesProtegeesParTech==='function'&&routesProtegeesParTech(nat))
+                              ||!(nat.routes||[]).some(r=>!((r.tokens||0)>0)))?1:0;
+      case 'ruee':    return rang(p=>(p.colonies||[]).length);
+      case 'sci':     return rang(p=>{ try{ return (revenusBruts(p)||{}).science||0; }catch(e){ return 0; } });
+      case 'tech':    return rang(p=>(p.cards||[]).filter(c=>c&&c.branch&&(c.tier||1)>=2).length);
+      case 'milsup':  return rang(p=>p.forceTokens||0);
+      case 'attract': return rang(p=>(p.res&&p.res.morale)||0);
+      default:        return 0;
+    }
+  }catch(e){ return 0; }
+}
+function _termeTemperament(nat,restants,horizon){
+  try{
+    const base=nat&&nat._profil;
+    if(base==='guerrier'){
+      const cols=(nat.colonies||[]).length;
+      const loues=(nat.milLoseNext||0)+(nat.stratForceBonus||0);
+      const permanents=Math.max(0,Math.min(12,(nat.forceTokens||0)-loues));
+      let chaine=0; for(const id of CHAINE_DEFENSIVE) if((nat.cards||[]).some(c=>c&&c.id===id)) chaine+=POIDS_TEMP.conqChaine;
+      return cols*POIDS_TEMP.conqColonie*(1+horizon)+permanents*POIDS_TEMP.conqForce+chaine;
+    }
+    if(base==='opportuniste'){
+      let ag=0; try{ ag=(nat.agenda&&typeof nat.agenda.score==='function')?(nat.agenda.score(nat)||0):0; }catch(e){ ag=0; }
+      return ag*POIDS_TEMP.oppAgenda+_pretPourEvenement(nat)*POIDS_TEMP.oppEvenement;
+    }
+    return 0;   // Stratège : la position nue, sans terme (§139.2)
+  }catch(e){ return 0; }
 }
 /* ══════════════════════════════════════════════════════════════════════════════════════════════
    ÉTAPE 3b — CE QU'UN COUP RETIRE À L'ADVERSAIRE COMPTE AUTANT QUE CE QU'IL ME RAPPORTE
@@ -10623,7 +10869,7 @@ function coupsPossibles(nat){
            le monde : le Jupitérien « Bâtisseur — ne pille jamais » a raidé six fois en dix tours.
            Même règle que pour le multiplicateur : bâtisseur et conquérant ne raident pas, quel que
            soit leur état de siège. */
-        const _raidInterdit=(nat._profil==='batisseur'||nat._profil==='guerrier');
+        const _raidInterdit=_raidInterditPour(nat);   // §139.2 — voir `_raidInterditPour`
         /* Garnison exclue (13/09) : même compte que la règle et la barre — test_raid_garnison.js. */
         /* Butin nul = pas de coup (1C29, 14/09) : les Ceinturiens ont pillé Europe puis Vesta « rien
            à prendre », deux actions et deux jetons pour rien. Le butin se calcule avant — test_raid_butin_vide.js. */
@@ -11596,7 +11842,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
        ces deux fonctions sont aussi atteignables par d'autres chemins (séquence de guerre, reprise
        de colonie). Un bâtisseur affichait donc encore des pillages résiduels. « Aucun raid » se
        vérifie ici, à l'entrée, là où aucun chemin ne peut la contourner. */
-    if(ai._profil==='batisseur'||ai._profil==='guerrier')return false;
+    if(_raidInterditPour(ai))return false;   // §139.2
     const raidTok=isPirate?1:2;const raidEn=0;
     if(ai.acLeft<1||engageableTokens(ai)<raidTok)return false; // garnison exclue (13/09)
     if((ai._attacksThisTurn||0)>=1)return false; // max 1 action agressive/tour
@@ -11907,7 +12153,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
        ces deux fonctions sont aussi atteignables par d'autres chemins (séquence de guerre, reprise
        de colonie). Un bâtisseur affichait donc encore des pillages résiduels. « Aucun raid » se
        vérifie ici, à l'entrée, là où aucun chemin ne peut la contourner. */
-    if(ai._profil==='batisseur'||ai._profil==='guerrier')return false;
+    if(_raidInterditPour(ai))return false;   // §139.2
     if(ai.acLeft<1)return false;
     if((ai._attacksThisTurn||0)>=1)return false; // max 2 actions agressives / manche / nation
     const raidTok=isPirate?1:2;
@@ -12310,7 +12556,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
        compteur ne descendait jamais tout à fait à zéro. Son tempérament de fond prime : il se
        défend et il construit, il ne pille pas. Le conquérant, lui, garde ce zéro par doctrine. */
     const _base=ai._profil;
-    if(_base==='batisseur'||_base==='guerrier'){ U.raid=0; U.raidAI=0; }
+    if(_raidInterditPour(ai)){ U.raid=0; U.raidAI=0; }   // §139.2 : plus d'interdit pour le Stratège
     /* BESOIN DE RESSOURCES → ON PRODUIT, ON NE PILLE PAS (demande de Marc, 2026-08-16).
        Une IA à court cherchait à se refaire par le raid, ce qui coûte 1 AC et 2 jetons pour deux
        ressources au mieux. Les actions Économie & Société donnent autant pour moins cher et sans

@@ -1,4 +1,4 @@
-LOT 17 — MISE À JOUR LÉGÈRE (v10.70, sw v191) — 17/09/2026 : 🗺️ NOUVELLE CARTE (plateau carré en quart de disque, Soleil en bas à gauche, échelle logarithmique, planètes en vecteur, ceintures d'astéroïdes visibles, routes courbes, une seule carte zoomable) + RÈGLE des liaisons (− Vesta–Europe, − Lune–Vesta, + Encelade–Vesta 125 j, + Callisto–Encelade 78 j, + Ganymède–Triton 190 j, Cérès–Ganymède remplacée par Cérès–Europe 58 j). Précédent : (v10.69) ⚠️ Calmer la Population dit enfin quelle tension elle calme, une fois par nation et par tour, et l'ordinateur qui l'achète calme VRAIMENT sa tension ; ⚠️ les guerres se résolvent dans l'ordre et en entier, le joueur choisit sa cible AU MOMENT de frapper ; ⚠️ RÈGLE — l'avance technologique se juge en relatif, tous les deux tours ; ⚠️ NOUVELLE ACTION SOCIALE — Mission diplomatique ; ⚠️ NOUVEAU (16/09) — les nations se souviennent des agressions qu'elles ont subies et durcissent leurs réponses tant qu'on n'a pas fait un geste ; ⚠️ RÈGLE MAJEURE — attaquer une colonie NE DÉCLARE PLUS LA GUERRE : ça fait monter la tension, et c'est elle seule qui impose la guerre à 10, en fin de tour ; ⚠️ NOUVELLE RÈGLE — conquérir loin coûte plus d'actions (1, 2 ou 3 selon le temps de voyage) ; ⚠️ RÈGLE DE GUERRE — l'usure de moral attend le tour suivant, la fenêtre de guerre populaire annonce le prix — et tout le v10.63 (raid à 2 jetons, perte de colonie annoncée, largeurs)
+LOT 17 — MISE À JOUR LÉGÈRE (v10.71, sw v192) — 18/09/2026 : 🤖 LES ORDINATEURS JOUENT AUTREMENT (poids de la force, fin de la punition du renseignement, tempéraments distincts — détail plus bas) + 🗺️ LA NOUVELLE CARTE du 17/09 (plateau carré en quart de disque, Soleil en bas à gauche, échelle logarithmique, planètes en vecteur, ceintures d'astéroïdes visibles, routes courbes, la carte peinte gardée en accueil, carte zoomable) + RÈGLE des liaisons (− Vesta–Europe, − Lune–Vesta, + Encelade–Vesta 125 j, + Callisto–Encelade 78 j, + Ganymède–Triton 190 j, Cérès–Ganymède → Cérès–Europe 58 j, Europe–Callisto → Europe–Ganymède 4 j) + le TRIBUT de paix passe à 3 minimum. Précédent : (v10.69) ⚠️ Calmer la Population dit enfin quelle tension elle calme, une fois par nation et par tour, et l'ordinateur qui l'achète calme VRAIMENT sa tension ; ⚠️ les guerres se résolvent dans l'ordre et en entier, le joueur choisit sa cible AU MOMENT de frapper ; ⚠️ RÈGLE — l'avance technologique se juge en relatif, tous les deux tours ; ⚠️ NOUVELLE ACTION SOCIALE — Mission diplomatique ; ⚠️ NOUVEAU (16/09) — les nations se souviennent des agressions qu'elles ont subies et durcissent leurs réponses tant qu'on n'a pas fait un geste ; ⚠️ RÈGLE MAJEURE — attaquer une colonie NE DÉCLARE PLUS LA GUERRE : ça fait monter la tension, et c'est elle seule qui impose la guerre à 10, en fin de tour ; ⚠️ NOUVELLE RÈGLE — conquérir loin coûte plus d'actions (1, 2 ou 3 selon le temps de voyage) ; ⚠️ RÈGLE DE GUERRE — l'usure de moral attend le tour suivant, la fenêtre de guerre populaire annonce le prix — et tout le v10.63 (raid à 2 jetons, perte de colonie annoncée, largeurs)
 
 Ce dossier ne contient QUE ce qui a changé depuis la version en ligne : 7 fichiers à la racine
 (index.html, moteur.js, online.js, sw.js, tutorial.html, tutorial.js, regles.html) + 2 fichiers serveur (server/game-core.js
@@ -10,6 +10,35 @@ Sur GitHub, à la RACINE du dépôt : Add file → Upload files, glisser les 7 f
 dossier server (il fusionne avec celui du dépôt), pas ce LISEZ-MOI, Commit changes. Puis Coolify : vérifier que les DEUX ressources se redéploient (solar-game.com ET
 live.solar-game.com) — moteur.js contient les règles et le serveur le lit aussi. Si l'une ne s'est
 pas redéployée toute seule : Redeploy à la main.
+
+🤖 LES ORDINATEURS (18/09, v10.71) — TROIS CORRECTIFS QUI CHANGENT LEUR FAÇON DE JOUER
+1. UN JETON NE VAUT PLUS MOINS PARCE QUE LA PARTIE FINIT. La force était notée « × horizon » : les
+   jetons valaient presque zéro aux tours 7 à 10, c'est-à-dire quand on se bat. Le poids suit
+   maintenant la MENACE (la tension, publique), pas le calendrier. Et un jeton LOUÉ (Investissements
+   militaires, Drones de Combat, perdus au tour suivant) ne compte plus comme un jeton permanent.
+2. L'ORDINATEUR N'EST PLUS PUNI QUAND IL S'INFORME. Sans Réseau Orbital, il comptait la production,
+   les réserves et la force de ses rivaux pour ZÉRO : ils avaient l'air pauvres, et acheter le
+   renseignement leur rendait d'un coup toute leur substance — acheter la carte lui FAISAIT PERDRE
+   9 points de note. Personne ne prenait donc jamais le rang 2, ni l'🛡️ IA Défensive derrière lui.
+   Il estime désormais ses rivaux avec ce qui est public (colonies, niveaux, carte). Résultat mesuré :
+   IA Défensive achetée par 0 nation sur 12 avant, 3 sur 12 maintenant ; Réseau Orbital 8 % → 42 %.
+3. LES TEMPÉRAMENTS SE DISTINGUENT VRAIMENT. Le 🏗️ Bâtisseur devient le ♟️ STRATÈGE : plus aucun
+   penchant, il joue la position, sans scrupules ni rancune (il peut donc piller). Le ⚔️ Conquérant
+   vise les colonies — davantage tôt —, la capacité militaire PERMANENTE, prend Stratégies Militaires
+   au tour 7 et l'IA Défensive en priorité, et ne pille que lorsqu'il MANQUE de ressources.
+   Le 🎯 Opportuniste poursuit son agenda secret et se prépare à l'événement annoncé — personne ne
+   regardait les événements programmés jusqu'ici.
+Le reste du chantier IA (la rancune graduée) viendra dans un prochain lot.
+
+💰 CORRECTION (17/09, v10.70) — LE TRIBUT DE PAIX VAUT 3, ET ON N'ACHÈTE PLUS LA PAIX AVEC RIEN
+Partie 3092 : « Exiger la paix » contre les Martiens, et au journal « tribut +0 matériaux +0
+énergie ». Le tribut valait ce qu'il restait à l'adversaire (au plus 2🪨 et 2⚡) : une nation à sec
+échappait donc à la guerre gratuitement. Désormais le tribut vaut exactement 3, pris d'abord sur les
+matériaux et complété en énergie (1🪨 restant → 1🪨 + 2⚡) ; sous 3 au total, la nation NE PEUT PAS
+acheter la paix et la guerre continue. Une nation plus forte que toi en jetons refuse toujours.
+Et tu vois enfin le résultat : une fenêtre te dit si l'adversaire a cédé, refusé, ou n'a pas pu
+payer — avant, contre un ordinateur, il n'y avait qu'une ligne de journal.
+Banc : server/test_tribut.js (6 sections). Règles §14.5 mises à jour.
 
 🗺️ NOUVELLE CARTE (17/09, v10.70) — LE PLATEAU EN QUART DE DISQUE
 Marc a validé sur maquettes un plateau carré : le Soleil dans le coin inférieur gauche, chaque corps
