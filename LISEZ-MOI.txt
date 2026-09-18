@@ -1,4 +1,4 @@
-LOT 17 — MISE À JOUR  ·  v10.72 / sw v193  ·  18/09/2026
+LOT 17 — MISE À JOUR  ·  v10.75 / sw v196  ·  18/09/2026
 
 À UPLOADER : index.html, moteur.js, online.js, sw.js, regles.html
 (+ server/ si tu déploies aussi le serveur)
@@ -42,6 +42,26 @@ FAUSSE ALERTE RETIRÉE
    parties entières (6 parties, 24 nations) : 2,96 colonies par nation, 0 nation sans
    colonie, chiffres stables depuis le 16/09. Tu avais raison.
 
+PARTIE 4112 (v10.73)
+   6. Pastilles de jours sur Phobos–Vesta, Io–Vesta (et Cérès–Vesta, Cérès–Phobos,
+      Éris–Pluton) : le seuil d'affichage passe de 50 à 10 jours.
+   7. Colonie non reliée : anneau plus clair (0,3 → 0,6) et TIRETÉ. C'est le tiret qui
+      dit « pas reliée », plus la pâleur.
+   8. Fenêtre « Pendant ton attente » (actions des autres nations) : la liste défile,
+      le bouton Compris reste visible sur ordinateur.
+   9. Prolifération des pirates : la nation « la plus riche en matériaux » est jugée sur
+      le stock d'AVANT le revenu du tour. Tu peux donc dépenser pour ne pas être visé.
+   Tes deux questions : au T9 tu étais à 8/10 (colonie prise = 8, ta règle), pas à 10 —
+   d'où pas de guerre populaire. Au T10 les Martiens avaient bien 6 AC et en ont payé 3
+   pour Triton (barème de distance) : légal.
+
+RÈGLE NOUVELLE (v10.74) — LA SURPRODUCTION RAPPORTE
+   À chaque fin de tour, +1 VP par ressource dont le stock dépasse le plafond (12⚡ 20🪨
+   10🔬, et 10🙂 quelle que soit ta forme de gouvernement — une Tyrannie plafonnée à 6 ne
+   surproduit jamais de moral). L'excédent reste perdu, mais il rapporte. 4 VP par tour au plus, dès le tour 1. Journal : ligne dorée « Surproduction »
+   ; rapport final : poste Événements, une ligne par tour.
+   Les IA en profitent comme toi mais ne le recherchent pas encore.
+
 À FAIRE DE TON CÔTÉ
    · uploader les 5 fichiers, redéployer les deux ressources Coolify ;
-   · reconstruire l'app si tu veux la version native (versionCode 1072 / 10.72).
+   · reconstruire l'app si tu veux la version native (versionCode 1075 / 10.75).

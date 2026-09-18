@@ -227,7 +227,7 @@ function corpsRapport(entry) {
     bloc('Agenda' + (s.agenda ? ' (' + s.agenda + ')' : ''), d.agendasVP,
       (d.agendasVP || 0) > 0 ? 'condition remplie' : 'condition NON remplie',
       det.agenda, 'aucun agenda secret enregistré pour cette nation');
-    bloc('Événements', d.evtVP, 'événements, victoires de combat (+2 chacune), découvertes, accords',
+    bloc('Événements', d.evtVP, 'événements, victoires de combat (+2 chacune), découvertes, accords, surproduction (+1 par ressource au plafond, par tour)',
       det.evt, 'aucun événement, combat gagné, découverte ni accord n\'a rapporté de point');
     /* « Bonus divers » restait opaque même à zéro : on dit maintenant CE QU'IL CONTIENDRAIT. */
     bloc('Bonus divers', d.extraVP, 'bonus de technologies particulières (Extra-Solaire, Éveil Collectif) et découvertes',

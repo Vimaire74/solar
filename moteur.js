@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-18 · v10.72';
+const SOLAR_BUILD_MOTEUR = '2026-09-18 · v10.75';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ============================================================================
    MOTEUR DU JEU SOLAR — moteur.js
@@ -540,8 +540,9 @@ const EVENTS=[
        +touches.map(t=>'• '+t).join('<br>')
        +(proteges.length?('<br><span style="color:#9ad89a">🛡️ Épargnées (IA Défensive) : '+proteges.join(', ')+'</span>'):'');
    }},
-  {id:'pirates',type:'menace',name:'Prolifération des pirates',emoji:'☠️',preview:'Les pirates frappent les routes de la nation la plus riche en <i class=ri-materials></i> : les routes sans jeton NI technologie de protection sont détruites ; celles avec un jeton ont 50% de chance d\'être perdues, mais 2 au maximum.',
-   resolve(G){const h=_evTop(function(p){return p.res.materials||0;});if(h.length!==1)return 'Prolifération des pirates — aucune cible claire.';const tgt=h[0];let unp=0,prot=0,tech=0;const keep=[];for(const r of tgt.routes){if((r.tokens||0)>0){/* jeton posé : 50% chacune, MAX 2 perdues */ if(prot<2&&Math.random()<0.5){tgt.forceCooldown.push({count:r.tokens,returnTurn:getCooldownTurn(tgt)});prot++;}else keep.push(r);}else if(routeProtegee(tgt,r)){keep.push(r);tech++;/* protégée par une TECHNOLOGIE : elle n'a pas besoin de jeton */}else unp++;/* ni jeton ni technologie : détruite */}tgt.routes=keep;updateConnections(tgt);
+  {id:'pirates',type:'menace',name:'Prolifération des pirates',emoji:'☠️',preview:'Les pirates frappent les routes de la nation la plus riche en <i class=ri-materials></i> (stock à la fin des actions, AVANT le revenu du tour) : les routes sans jeton NI technologie de protection sont détruites ; celles avec un jeton ont 50% de chance d\'être perdues, mais 2 au maximum.',
+   /* La cible se juge sur le stock d'AVANT le revenu du tour (photo prise dans `stFinDeTour`) : voir la note là-bas. */
+   resolve(G){const h=_evTop(function(p){return (p._stockAvantRevenu&&p._stockAvantRevenu.materials!==undefined)?p._stockAvantRevenu.materials:(p.res.materials||0);});if(h.length!==1)return 'Prolifération des pirates — aucune cible claire.';const tgt=h[0];let unp=0,prot=0,tech=0;const keep=[];for(const r of tgt.routes){if((r.tokens||0)>0){/* jeton posé : 50% chacune, MAX 2 perdues */ if(prot<2&&Math.random()<0.5){tgt.forceCooldown.push({count:r.tokens,returnTurn:getCooldownTurn(tgt)});prot++;}else keep.push(r);}else if(routeProtegee(tgt,r)){keep.push(r);tech++;/* protégée par une TECHNOLOGIE : elle n'a pas besoin de jeton */}else unp++;/* ni jeton ni technologie : détruite */}tgt.routes=keep;updateConnections(tgt);
     /* −1 moral SEULEMENT si les pirates ont mordu : une nation visée mais dont toutes les routes
        étaient protégées n'a rien subi, et son peuple n'a aucune raison de s'en émouvoir. */
     if((unp+prot)>0)tgt.res.morale=Math.max(0,(tgt.res.morale||0)-1);if(tech)addLog('🛡️ '+tech+' route(s) de '+_evName(tgt)+' épargnée(s) — protégées par une technologie, sans jeton nécessaire.','gold');if((unp+prot)===0)return 'Prolifération des pirates — '+_evName(tgt)+' est la nation la plus riche en <i class=ri-materials></i> et devient la cible des pirates, mais AUCUNE route n\'est perdue.';
@@ -2214,6 +2215,43 @@ function plafonnerMoral(){
   for(const p of allPlayers()){ if(!p||!p.res)continue; const cap=realResCap(p).morale; if((p.res.morale||0)>cap)p.res.morale=cap; }
 }
 function enforceCaps(){for(const p of allPlayers()){const cap=realResCap(p);for(const r in cap){if((p.res[r]||0)>cap[r])p.res[r]=cap[r];}}}
+/* ═══ SURPRODUCTION = POINTS DE VICTOIRE (règle de Marc, 18/09) ═══
+   « Chaque nation gagne +1 VP par tour à chaque tour où elle surproduit dans l'une des 4 ressources,
+   donc maximum 4 VP par tour. Dès le tour 1. »
+   SURPRODUIRE = dépasser le plafond (12⚡ 20🪨 10🔬 10🙂 — pour le moral, TOUJOURS 10 : le plafond d'une
+   forme autoritaire ne compte pas, Marc 18/09) au
+   moment où l'excédent est perdu : la frontière de tour, après revenu, entretien et événement — là
+   où `enforceCaps` écrête. L'excédent reste perdu ; il rapporte un point. Une nation qui remplit son
+   grenier n'a plus « gaspillé » : elle a produit plus que ce qu'elle savait ranger.
+   ⚠️ LE MORAL EST ÉCRÊTÉ AVANT, pas ici : `doRevenues` plafonne son revenu à la source (règle du 04/09,
+   « jamais au-dessus de 10, même pendant le tour »), et `plafonnerMoral` écrête après chaque action.
+   `enforceCaps` ne verrait donc jamais un excédent de moral. `doRevenues` pose `_surprodMorale = G.turn`
+   quand le revenu de moral déborde, et on le lit ici.
+   ⚠️ APPELÉE UNE FOIS PAR TOUR, DEPUIS `continueAfterEOT` SEULEMENT — pas depuis `_startTurnPrep`, qui
+   écrête aussi mais au début du tour suivant, après le tirage de stratégie (« Récolte Urgente » y
+   verse +2🪨 +2⚡) : compter là attribuerait au tour suivant une surproduction qui n'a pas eu lieu.
+   Le point va dans `_vpDetail` (poste « Événements » du rapport final), une ligne par tour.
+   Banc : server/test_vp_surproduction.js */
+const SURPROD_RES=[['energy','⚡'],['materials','🪨'],['science','🔬'],['morale','🙂']];
+const SURPROD_MORAL_SEUIL=10;   // le moral ne « surproduit » qu'au-delà de 10 — le plafond d'une forme autoritaire (6) ne compte pas
+function surproductionVP(){
+  if(!G||typeof allPlayers!=='function')return;
+  for(const p of allPlayers()){
+    if(!p||!p.res||!p.civ)continue;
+    if(p._surprodTour===G.turn)continue;                 // déjà compté ce tour
+    const cap=realResCap(p); const quoi=[];
+    for(const [r,ico] of SURPROD_RES){
+      const sur=(r==='morale')?(p._surprodMorale===G.turn):((p.res[r]||0)>cap[r]);
+      if(sur)quoi.push(ico);
+    }
+    if(!quoi.length)continue;
+    p._surprodTour=G.turn;
+    const n=Math.min(4,quoi.length);
+    gagnerVP(p,n,'Surproduction '+quoi.join(''));
+    if(p===G.player)addLog('🏭 Surproduction '+quoi.join(' ')+' : +'+n+' VP — l\'excédent au-delà du plafond est perdu, mais il rapporte.','gold');
+    else addLog('🏭 '+p.civ.emoji+' '+p.civ.name+' surproduit ('+quoi.join('')+') : +'+n+' VP.','dim');
+  }
+}
 function rEmoji(r){return{energy:'<i class=ri-energy></i>',materials:'<i class=ri-materials></i>',science:'<i class=ri-science></i>',morale:'<i class=ri-morale></i>',force:'⚔️'}[r]||r;}
 function rLabel(r){return{energy:'Énergie',materials:'Matériaux',science:'Savoir',morale:'Moral'}[r]||r;}
 function rHtml(r,amt){const cls={energy:'energy',materials:'materials',science:'science',morale:'morale',force:'force'}[r]||'';const e=rEmoji(r);return `<span class="res-tag ${cls}">${amt!=null?amt+' ':''}${e}</span>`;}
@@ -5748,6 +5786,15 @@ function guerreFraichePaixRepondue(peaceResult){
    ========================================================================== */
 function stFinDeTour(){
   encaisserPenalitesPopulairesRestantes();   // la guerre populaire a survécu à la question de paix : elle se paie
+  /* ═══ LE STOCK QUE LES PIRATES REGARDENT EST CELUI D'AVANT LE REVENU (Marc, 18/09, partie 4112) ═══
+     « L'événement Prolifération des pirates est évalué après le revenu, ce serait mieux avant car on
+     mesure la quantité de matériel en stock et donc on peut essayer de diminuer son stock pour pas
+     être agressé. » L'événement se résout toujours après le revenu (les autres événements en
+     dépendent, et le grief technologique vient après lui) ; c'est la MESURE qui change de moment.
+     On photographie le stock ici, juste avant `doRevenues`, et l'événement lit cette photo. Un joueur
+     qui a dépensé ses matériaux pendant ses actions n'est donc plus désigné « le plus riche » par
+     un revenu qu'il n'a pas encore touché. */
+  for(const _n of allPlayers()){ if(_n&&_n.res) _n._stockAvantRevenu={materials:(_n.res.materials||0),energy:(_n.res.energy||0),science:(_n.res.science||0)}; }
   const revs=doRevenues(); const maint=doMaintenance(); _emitNetRevenueLog(maint);
   _photographierTour();   // l'état de chaque nation, une fois le tour soldé — voir la note plus haut
   refillGeneralRiver();
@@ -6081,6 +6128,7 @@ function stApresEvenement(){
 }
 function continueAfterEOT(){
   document.getElementById('eot-modal').classList.add('hidden');
+  if(typeof surproductionVP==='function')surproductionVP();   // AVANT l'écrêtage : c'est l'excédent qu'on compte
   enforceCaps(); // DÉBUT DU TOUR SUIVANT : ressources plafonnées (12⚡ / 20🪨 / 10🔬 / 10🙂, moins sous forme autoritaire)
   if(G.turn>=G.maxTurns)doEndGame();
   else if(G.turn===2&&!G.player._inv1){showInvestmentModal();}   // niv.1 : choix fin T2, effet T3→T5
@@ -6782,6 +6830,10 @@ function doRevenues(){
     const gains=revenusBruts(p, _pourMoi?{journal:(m,c)=>addLog(m,c)}:{});
     /* 1) le moral d'abord, à plein */
     const _gm=gains.morale||0;
+    /* Surproduction de moral (VP) : SEULEMENT au-delà de 10, le plafond ordinaire — pas celui de la forme
+       de gouvernement (Marc, 18/09 : « pour le moral ça ne marche que quand on dépasse 10, donc on ignore
+       le gouvernement Tyrannie à 6 »). Une Tyrannie écrêtée à 6 ne surproduit jamais de moral. */
+    if(_gm&&((p.res.morale||0)+_gm)>SURPROD_MORAL_SEUIL)p._surprodMorale=G.turn;   // lu par `surproductionVP`
     if(_gm)p.res.morale=Math.min(caps.morale||10,(p.res.morale||0)+_gm);
     delete gains.morale;
     /* 2) le jugement, sur le moral obtenu */
@@ -12912,7 +12964,7 @@ function buildJournalReport(){
       'aucune ressource ne dépasse 5 de revenu par tour');
     _bloc('Agenda'+(p.agenda&&p.agenda.name?' ('+p.agenda.name+')':''),v.agendasVP,
       (v.agendasVP>0?'condition remplie':'condition NON remplie'),_d.agenda,'aucun agenda secret enregistré');
-    _bloc('Événements',v.evtVP,'événements, victoires de combat (+2 chacune), découvertes, accords',_d.evt,
+    _bloc('Événements',v.evtVP,'événements, victoires de combat (+2 chacune), découvertes, accords, surproduction (+1 par ressource au plafond, par tour)',_d.evt,
       'aucun événement, combat gagné, découverte ni accord n\'a rapporté de point');
     _bloc('Bonus divers',v.extraVP,'bonus de technologies particulières (Extra-Solaire, Éveil Collectif) et découvertes',
       v.extraDetail,'aucun — aucune de ces technologies n\'a été acquise, ou leur condition n\'est pas remplie');
@@ -13384,8 +13436,12 @@ function renderSystemMap(){
       if(mode==='route'){if(!routeFrom&&pCol)glow=`<circle cx="${node.x}" cy="${node.y}" r="${glowR}" fill="#44aaff" fill-opacity=".1" stroke="#44aaff" stroke-width="1.5" stroke-dasharray="3,3"/>`;if(routeFrom&&NODES[routeFrom]?.conn.includes(id))glow=`<circle cx="${node.x}" cy="${node.y}" r="${glowR}" fill="#ffaa00" fill-opacity=".12" stroke="#ffaa00" stroke-width="1.5" stroke-dasharray="3,3"/>`;}
     }
     let rings='';
-    if(pCol)rings+=`<circle cx="${node.x}" cy="${node.y}" r="${br+3+pCol.level*3}" fill="none" stroke="${G.player.civ.color}" stroke-width="${pCol.level+1}" stroke-opacity="${pCol.connected?.85:.3}"/>`;
-    _occ.forEach((o,i)=>{ rings+=`<circle cx="${node.x}" cy="${node.y}" r="${br+1+o.col.level*2+i*2}" fill="none" stroke="${o.ai.civ.color}" stroke-width="${o.col.level}" stroke-opacity="${o.col.connected?.65:.2}"${i?' stroke-dasharray="3,3"':''}/>`; });
+    /* COLONIE NON RELIÉE : PLUS CLAIRE, ET TIRETÉE (Marc, 18/09, partie 4112 : « sur ordinateur je vois
+       quasi pas que j'ai colonisé Pluton, la couleur est trop peu brillante quand la colonie n'est pas
+       connectée »). L'opacité à 0,3 disait « pas reliée » en rendant la colonie invisible. Le tiret
+       porte maintenant l'information ; l'opacité monte de 0,3 à 0,6 (joueur) et de 0,2 à 0,45 (autres). */
+    if(pCol)rings+=`<circle cx="${node.x}" cy="${node.y}" r="${br+3+pCol.level*3}" fill="none" stroke="${G.player.civ.color}" stroke-width="${pCol.level+1}" stroke-opacity="${pCol.connected?.85:.6}"${pCol.connected?'':' stroke-dasharray="6,4"'}/>`;
+    _occ.forEach((o,i)=>{ rings+=`<circle cx="${node.x}" cy="${node.y}" r="${br+1+o.col.level*2+i*2}" fill="none" stroke="${o.ai.civ.color}" stroke-width="${o.col.level}" stroke-opacity="${o.col.connected?.65:.45}"${(i||!o.col.connected)?' stroke-dasharray="3,3"':''}/>`; });
     // v10.70 : lunes et naines en VECTEUR (disque dégradé à la couleur du nœud), plus de photo — le
     // rendu « Système » retenu par Marc sur maquette. Les anneaux joviens décoratifs ne sont pas dessinés.
     const body=node.decorative?'':_vecLune(id,node,ir);
@@ -15672,7 +15728,11 @@ function drawConnections(){
   for(const[id,node]of Object.entries(NODES)){for(const adj of node.conn){const key=[id,adj].sort().join('|');if(drawn.has(key))continue;drawn.add(key);const t=NODES[adj];if(!t||node.type==='orbital_station'||t.type==='orbital_station'||node.decorative||t.decorative)continue;
     s+=`<path d="${routePathD(id,adj)}" fill="none" stroke="#5a7fc0" stroke-width="1.5" stroke-opacity=".7" stroke-dasharray="6,4"/>`;
     const d=joursEntreVoisins(id,adj);
-    if(d>=50){const P=routePoint(id,adj,0.74);s+=_pill(P.x,P.y,_range(d),false);}
+    /* Seuil 50 → 10 j (Marc, 18/09, partie 4112 : « Phobos–Vesta et Io–Vesta, il manque la durée »).
+       Sous 10 j ce sont les sauts intra-système (2 à 6 j) : leurs pastilles se chevaucheraient dans
+       les encarts de lunes sans rien apprendre. Gagnent une pastille : Cérès–Vesta 12, Cérès–Phobos 24,
+       Phobos–Vesta 43, Éris–Pluton 45, Io–Vesta 49. */
+    if(d>=10){const P=routePoint(id,adj,0.74);s+=_pill(P.x,P.y,_range(d),false);}
   }}
   /* DISTANCES ENTRE CAPITALES (jaune, purement visuelles) : Terre → Mars → Jupiter → Éris. Aucune règle :
      ni route constructible, ni adjacence — seulement des durées. Masquables (Marc, 14/08) ; le réglage
