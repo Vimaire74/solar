@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-19 · v10.78';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-19 · v10.79';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -1424,9 +1424,12 @@ function injectStyles(){
   #sc-ov .siege{background:#0b0d24;border:1px solid #232750;border-radius:12px;padding:8px 8px 8px 10px;margin:8px 0}
   #sc-ov .siege .haut{display:flex;align-items:center;gap:9px}
   #sc-ov .siege .medal2{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:18px;background:#0f1130;border:2px solid var(--c,#4a9eff);flex:0 0 auto;cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-  #sc-ov .siege .nom{flex:1;font-weight:600;color:#fff;line-height:1.2}
+  /* min-width:0 : sans lui, un nom long (« Jupitériens », grand réglage Aa) refuse de rétrécir et pousse
+     le menu IA/Moi hors de la carte (capture Samsung du 18/09). */
+  #sc-ov .siege .nom{flex:1;min-width:0;overflow-wrap:anywhere;font-weight:600;color:#fff;line-height:1.2}
   #sc-ov .siege .nom small{display:block;font-weight:400;color:#8f98bf;font-size:.8em}
-  #sc-ov .siege select{width:auto;flex:0 0 auto;margin:0;padding:9px 8px;font-family:var(--font-titre,inherit);font-size:.62em;letter-spacing:.04em;text-transform:uppercase;color:#c8d4ff;background:#131740;border-color:#2a3a6a;max-width:42vw}
+  #sc-ov .siege select{width:auto;flex:0 0 auto;margin:0;padding:9px 8px;font-family:var(--font-titre,inherit);font-size:.62em;letter-spacing:.04em;text-transform:uppercase;color:#c8d4ff;background:#131740;border-color:#2a3a6a;max-width:32vw;text-overflow:ellipsis}
+  @media (max-width:400px){ #sc-ov .siege .nom{font-size:.9em} }
   #sc-ov .siege select.moi{background:#163a6b;border-color:#2f6fbf;color:#e8f1ff}
   #sc-ov .siege .i{width:32px;height:32px;padding:0;border-radius:50%;border:1px solid #2a3a6a;display:grid;place-items:center;font-family:var(--font-titre,inherit);font-size:.7em;color:#4a9eff;background:transparent;flex:0 0 auto;text-transform:none}
   #sc-ov .siege .det{display:none;margin-top:8px;padding-top:8px;border-top:1px solid #1d2350;font-size:.86em;line-height:1.45}
@@ -1885,7 +1888,8 @@ function _siegesInteractifs(){
 function screenCreate(){
   const rows = CIVS_LIST.map(([id,label],i)=>{
     const c=(typeof CIVS!=='undefined')?CIVS[id]:null;
-    const home=((((c?{lune:'Lune',phobos:'Phobos',io:'Io',eris:'Éris'}[c.home]||c.home:''))));
+    /* Le nom de la base vient de NODES (retraduit en place au chargement) : « Moon » en anglais, plus « Lune » en dur. */
+    const home=c?((typeof NODES!=='undefined'&&NODES[c.home]&&NODES[c.home].name)||c.home):'';
     return `
     <div class="siege">
       <div class="haut">

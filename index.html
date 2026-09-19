@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-09-19 · v10.78';</script>
+<script>window.SOLAR_BUILD_HTML='2026-09-19 · v10.79';</script>
 <!-- i18n.js EN TÊTE, avant tout script du corps : il choisit la langue et charge lang/<code>.js (synchrone).
      Les écrans d'accueil (scripts inline plus bas) et moteur.js (qui porte t()) le trouvent déjà là. -->
 <script src="i18n.js"></script>
@@ -1180,6 +1180,8 @@ body{font-size:var(--sc-fs,16px);}
     radial-gradient(1px 1px at 311px 197px,rgba(255,255,255,.4) 50%,transparent 51%);
     background-size:340px 290px,340px 290px,470px 410px,470px 410px,530px 610px,530px 610px,710px 530px,710px 530px;}
 }
+/* Écran étroit (≤ 380 px) : lettres plus serrées pour que « MARTIENS » tienne à côté de Tour / AC / 🏛️ (capture du 18/09 : « MARTIE… »). */
+@media (max-width:380px){.cbt-nom{font-size:.56em;letter-spacing:.02em} #top-bar #turn-disp{font-size:.74em} #top-bar #ac-disp,#top-bar #gov-disp{font-size:.72em;padding:3px 5px} .tb-l1{gap:5px}}
 </style>
 </head>
 <body>

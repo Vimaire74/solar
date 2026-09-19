@@ -1,4 +1,4 @@
-LOT 17 — MISE À JOUR  ·  v10.78 / sw v199  ·  19/09/2026
+LOT 17 — MISE À JOUR  ·  v10.79 / sw v200  ·  19/09/2026
 
 À UPLOADER (site) : index.html, moteur.js, online.js, sw.js, i18n.js, tutorial.js, tutorial.html,
    regles.html, regles.en.html, confidentialite.en.html, lang/ (dossier entier), scripts/
@@ -112,6 +112,25 @@ LANGUES (v10.78) — TRANCHES 3, 4 ET 5 : TOUT LE RESTE
      « 15 % → 1 » alors que le jeu fait 20 % ; et le tempérament « Bâtisseur » y gardait son
      ancienne description alors que le jeu l'appelle ♟️ Stratège depuis la v10.72. Les deux pages
      disent 20 % et ♟️ Stratège / Strategist.
+
+v10.79 / sw v200 — APRÈS TA MISE EN LIGNE DU 19/09 (captures du dossier screenshots)
+   · « Versions incohérentes — jeu v10.78 · en ligne v10.75 » : le serveur envoyait bien tous
+     les fichiers v10.78 (vérifié depuis ton Mac à 22:00), mais ton téléphone gardait l'ANCIEN
+     online.js : l'hébergeur n'envoie pas d'en-tête Cache-Control, donc le navigateur juge un
+     fichier « encore frais » d'après sa date et ne redemande pas — et le service worker, qui
+     passe par ce même cache, pré-cachait le vieux fichier. Corrigé dans sw.js : le pré-cache
+     et les scripts sont toujours redemandés au serveur (requête conditionnelle : 304, rien à
+     retélécharger si inchangé). Une dernière fois, il faudra peut-être recharger deux fois.
+   · Au passage : la compression est active chez l'hébergeur (zstd sur .js/.html) — ton
+     point « vitesse du site » est réglé de ce côté-là, rien à faire.
+   · Écran « Les sièges » (capture du 18/09) : le menu IA/Moi sortait de la carte quand le nom
+     de la nation est long (Jupitériens, Ceinturiens) avec un grand réglage Aa — corrigé, et
+     le nom de la base vient des données (« Moon » en anglais, plus « Lune » en dur).
+   · Barre du haut sur écran étroit (« MARTIE… ») : nom, Tour, AC et 🏛️ légèrement resserrés
+     sous 380 px ; vérifié « JUPITÉRIENS » entier à 360 px au plus grand Aa.
+   · La fenêtre d'agenda dont les cartes passent « sous » la barre : sur ta capture, la fenêtre
+     est simplement défilée (son bord haut est juste sous la barre, comme prévu) ; je n'ai pas
+     pu reproduire un vrai chevauchement en v10.78/79. Dis-moi si tu le revois.
 
 CORRIGÉ — l'« assaut surprise d'une IA au tour 1 » (le point 2 du lot précédent)
    Ce n'était PAS l'IA qui attaquait. Le tacticien joue chaque coup possible « pour de faux »

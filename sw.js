@@ -9,7 +9,7 @@
      interceptées, elles passent directement. Rien n'est mis en cache du serveur de jeu.
    - HORS-LIGNE : le solo reste jouable ; en navigation hors-ligne on sert index.html depuis le cache.
    Le numéro de version ci-dessous purge les anciens caches à chaque mise à jour du SW. */
-const VERSION = 'v199-2026-09-19';
+const VERSION = 'v200-2026-09-19';
 const HTML_CACHE = 'sc-html-' + VERSION;     // documents + scripts (network-first)
 const ASSET_CACHE = 'sc-assets-' + VERSION;  // images, icônes, PDF (cache-first)
 
@@ -35,7 +35,12 @@ const SHELL = [
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(HTML_CACHE)
-      .then((c) => c.addAll(SHELL).catch(() => {}))  // tolère un fichier manquant sans bloquer
+      /* `cache:'reload'` : le pré-cache va chercher chaque fichier AU SERVEUR, jamais dans le cache HTTP du
+         navigateur. Sans ça, l'hébergeur n'envoyant pas de Cache-Control, le navigateur juge un vieux
+         online.js « encore frais » (fraîcheur heuristique sur Last-Modified) et le nouveau service worker
+         pré-cachait… l'ancien fichier. Vu le 19/09 : index v10.78 + online.js v10.75 → « Versions
+         incohérentes » sur le téléphone de Marc. */
+      .then((c) => Promise.all(SHELL.map((u) => c.add(new Request(u, { cache: 'reload' })).catch(() => {}))))
       .then(() => self.skipWaiting())                 // la nouvelle version s'active tout de suite
   );
 });
@@ -76,8 +81,10 @@ self.addEventListener('fetch', (e) => {
   }
 
   // HTML + JS + reste → network-first (toujours frais si en ligne), repli cache hors-ligne.
+  /* Même raison : `cache:'no-cache'` revalide auprès du serveur (requête conditionnelle If-Modified-Since,
+     donc 304 et rien à télécharger si le fichier n'a pas changé) au lieu de faire confiance au cache HTTP. */
   e.respondWith(
-    fetch(req)
+    fetch(req.mode === 'navigate' ? req : new Request(req, { cache: 'no-cache' }))
       .then((resp) => {
         const copy = resp.clone();
         caches.open(HTML_CACHE).then((c) => c.put(req, copy)).catch(() => {});
