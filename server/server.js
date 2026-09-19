@@ -26,6 +26,46 @@ const { GameDriver } = require('./driver.js');
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const HTML = process.env.GAME_HTML || path.join(__dirname, '..', 'index.html');
+/* ═══ LANGUES CÔTÉ SERVEUR (v10.78) ═══
+   Le serveur écrit en français ; chaque joueur lit dans SA langue. Deux mécanismes :
+     · ce qui part au client (journal, fenêtres, erreurs) voyage avec sa clé — `K(cle, fr, p)` ici,
+       `J(...)` dans le moteur — et le client re-rend avec son dictionnaire (`_i18nHydrater`) ;
+     · ce que le serveur rend lui-même pour un joueur donné (l'email de fin de partie) passe par
+       `tL(langue, cle, fr, p)` avec les dictionnaires `lang/<code>.js` chargés ici. La langue d'un
+       compte est celle que son client annonce (`hello`/`login`/`register`/`token` portent `lang`). */
+const DICTS = {};
+try {
+  for (const f of fs.readdirSync(path.join(__dirname, '..', 'lang'))) {
+    const m = /^([a-z]{2})\.js$/.exec(f); if (!m) continue;
+    const bac = { window: {} };
+    try { require('vm').runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'lang', f), 'utf8'), bac); DICTS[m[1]] = bac.window.SOLAR_LANG_DICT || {}; } catch (e) { console.error('lang/' + f + ' : ' + e.message); }
+  }
+} catch (e) {}
+function K(k, fr, p) { return { k, fr, p: p || null }; }
+function tL(lang, k, fr, p) {
+  const d = DICTS[lang] || null;
+  let s = (d && d[k] !== undefined) ? d[k] : fr;
+  if (s === undefined || s === null) s = k;
+  if (p) for (const x in p) {
+    let v = p[x];
+    if (typeof v === 'string' && v.charCodeAt(0) === 64 && v.length > 1) { const r = v.slice(1); v = (d && d[r] !== undefined) ? d[r] : r.split('.').slice(-2, -1)[0] || r; }
+    else if (v && typeof v === 'object' && typeof v.k === 'string') v = tL(lang, v.k, v.fr, v.p);
+    s = String(s).split('{' + x + '}').join(v);
+  }
+  return s;
+}
+/* Un message K → chaîne française + clé jumelle `<champ>_i18n`, comme `_i18nAplatir` du moteur. */
+function aplatirK(o, prof) {
+  prof = prof || 0; if (!o || typeof o !== 'object' || prof > 3) return o;
+  for (const f of Object.keys(o)) {
+    if (/_i18n$/.test(f)) continue;
+    const v = o[f];
+    if (v && typeof v === 'object' && typeof v.k === 'string' && v.fr !== undefined) { o[f] = tL('fr', v.k, v.fr, v.p); o[f + '_i18n'] = v; }
+    else if (v && typeof v === 'object' && !Buffer.isBuffer(v)) aplatirK(v, prof + 1);   // ex. `payload.msg` d'une notice
+  }
+  return o;
+}
+function langDe(user) { const u = user && users[String(user).toLowerCase()]; return (u && u.lang && DICTS[u.lang]) ? u.lang : 'fr'; }
 const DATA = process.env.DATA_DIR || path.join(__dirname, 'data');
 // AFK_MS a été SUPPRIMÉ (lot 17). C'était le levier « au bout de N secondes, l'IA joue à ta place ».
 // Plus aucun délai ne fait avancer une partie : voir « ABSENCE D'UN JOUEUR » plus bas. Le seul délai
@@ -183,19 +223,24 @@ function writeArch(user, list) {
    rapport de bug éventuel, puis le journal entier — dans cet ordre.
    Avant, il ne contenait qu'un classement en trois lignes : impossible de comprendre après coup
    d'où venaient les points, ni de relire une partie pour y chercher une anomalie. */
-function corpsRapport(entry) {
+function corpsRapport(entry, lang) {
+  /* `lang` : la langue du DESTINATAIRE (voir `langDe`). Les libellés passent par `tL`, le journal est
+     re-rendu ligne à ligne depuis les entrées brutes (`entry.journalEntries`, avec leur clé) quand la
+     langue n'est pas le français ; sinon les lignes déjà rendues (`entry.journal`) servent telles quelles. */
+  lang = lang || 'fr';
+  const T = (k, fr, p) => tL(lang, k, fr, p);
   const L = [];
-  L.push('Partie ' + entry.code + ' — terminée le ' + entry.dateFr + (entry.turn ? ' (tour ' + entry.turn + ')' : ''));
-  L.push('Joueurs : ' + entry.joueurs.map(j => j.civ + (j.user ? ' = ' + j.user : ' (IA)')).join(' · '));
+  L.push(T('rapport.partie_terminee', 'Partie {code} — terminée le {date}{tour}', { code: entry.code, date: entry.dateFr, tour: (entry.turn ? T('rapport.tour_paren', ' (tour {n})', { n: entry.turn }) : '') }));
+  L.push(T('rapport.joueurs', 'Joueurs : {liste}', { liste: entry.joueurs.map(j => j.civ + (j.user ? ' = ' + j.user : ' ' + T('rapport.ia_paren', '(IA)'))).join(' · ') }));
   /* Tempéraments et cerveau, juste sous la liste des joueurs : c'est la première chose qu'on veut
      savoir en relisant une partie (« qui était quoi ? »), et elle vivait au tour 1 du journal. */
   for (const l of (entry.profils || [])) L.push(l);
   L.push('');
-  L.push('═══════════ CALCUL FINAL DES POINTS DE VICTOIRE ═══════════');
+  L.push(T('rapport.titre_calcul', '═══════════ CALCUL FINAL DES POINTS DE VICTOIRE ═══════════'));
   for (let i = 0; i < entry.scores.length; i++) {
     const s = entry.scores[i], d = s.detail || {};
     L.push('');
-    L.push((i + 1) + '. ' + s.name + (s.user ? ' (' + s.user + ')' : ' (IA)') + ' — TOTAL ' + s.vp + ' VP');
+    L.push((i + 1) + '. ' + s.name + (s.user ? ' (' + s.user + ')' : ' ' + T('rapport.ia_paren', '(IA)')) + ' — ' + T('rapport.total_vp', 'TOTAL {vp} VP', { vp: s.vp }));
     /* ⚠️ UN DÉCOMPTE SANS SA RÈGLE N'EXPLIQUE RIEN. Marc, partie 140A : « c'est pas clair pourquoi.
        Il faut ajouter les mêmes textes que dans le fichier de règle. » Les libellés viennent donc du
        §17 des règles, mot pour mot — et « Bonus divers » énumère enfin sa provenance. */
@@ -211,37 +256,37 @@ function corpsRapport(entry) {
       const L2 = (lignes && lignes.length) ? lignes : (siVide ? [siVide] : []);
       for (const x of L2) L.push('          · ' + String(x).replace(/<[^>]+>/g, ''));
     };
-    bloc('Colonies', d.colVP, 'VP du nœud × niveau, ×1 si connectée, ×0,5 si isolée, +1 par colonie reliée',
-      det.colonies, 'aucune colonie');
-    bloc('Routes', d.routeVP, '+1 VP par route établie', det.routes, 'aucune route établie');
+    bloc(T('rapport.colonies', 'Colonies'), d.colVP, T('rapport.colonies_regle', 'VP du nœud × niveau, ×1 si connectée, ×0,5 si isolée, +1 par colonie reliée'),
+      det.colonies, T('rapport.aucune_colonie', 'aucune colonie'));
+    bloc(T('rapport.routes', 'Routes'), d.routeVP, T('rapport.routes_regle', '+1 VP par route établie'), det.routes, T('rapport.aucune_route', 'aucune route établie'));
     /* ⚠️ LA RÈGLE IMPRIMÉE CONTREDISAIT LA LISTE JUSTE EN DESSOUS. « 1 au niveau 1, 3 au niveau 2,
        5 au niveau 3 » est vrai des technologies, faux des cartes MILITAIRES : le Supercroiseur est
        de niveau 2 et vaut +5, les Flottes de Chasseurs de niveau 1 et valent +2. Une règle fausse
        à côté des chiffres justes, c'est le meilleur moyen de faire douter du calcul. */
-    bloc('Cartes', d.cardsVP, 'VP inscrit sur la carte — technologies : 1 au niveau 1, 3 au niveau 2, 5 au niveau 3 · cartes militaires : valeur propre',
-      det.cartes, 'aucune carte porteuse de VP');
-    bloc('Bonus technologiques', d.techBonusVP, '+0,5 VP par technologie (toute carte de l\'arbre technologique), arrondi à l\'inférieur',
-      det.tech, 'aucune carte de l\'arbre technologique');
-    bloc('Revenus par tour', d.rptVP, 'par ressource : +2 au-delà de 5/tour, +5 au-delà de 10/tour',
-      det.rpt, 'aucune ressource ne dépasse 5 de revenu par tour');
-    bloc('Agenda' + (s.agenda ? ' (' + s.agenda + ')' : ''), d.agendasVP,
-      (d.agendasVP || 0) > 0 ? 'condition remplie' : 'condition NON remplie',
-      det.agenda, 'aucun agenda secret enregistré pour cette nation');
-    bloc('Événements', d.evtVP, 'événements, victoires de combat (+2 chacune), découvertes, accords, surproduction (+1 par ressource au plafond, par tour)',
-      det.evt, 'aucun événement, combat gagné, découverte ni accord n\'a rapporté de point');
+    bloc(T('rapport.cartes', 'Cartes'), d.cardsVP, T('rapport.cartes_regle', 'VP inscrit sur la carte — technologies : 1 au niveau 1, 3 au niveau 2, 5 au niveau 3 · cartes militaires : valeur propre'),
+      det.cartes, T('rapport.aucune_carte_vp', 'aucune carte porteuse de VP'));
+    bloc(T('rapport.bonus_tech', 'Bonus technologiques'), d.techBonusVP, T('rapport.bonus_tech_regle', '+0,5 VP par technologie (toute carte de l\'arbre technologique), arrondi à l\'inférieur'),
+      det.tech, T('rapport.aucune_carte_arbre', 'aucune carte de l\'arbre technologique'));
+    bloc(T('rapport.revenus_tour', 'Revenus par tour'), d.rptVP, T('rapport.revenus_regle', 'par ressource : +2 au-delà de 5/tour, +5 au-delà de 10/tour'),
+      det.rpt, T('rapport.aucune_ressource_5', 'aucune ressource ne dépasse 5 de revenu par tour'));
+    bloc(T('rapport.agenda', 'Agenda') + (s.agenda ? ' (' + s.agenda + ')' : ''), d.agendasVP,
+      (d.agendasVP || 0) > 0 ? T('rapport.condition_remplie', 'condition remplie') : T('rapport.condition_non_remplie', 'condition NON remplie'),
+      det.agenda, T('rapport.aucun_agenda', 'aucun agenda secret enregistré pour cette nation'));
+    bloc(T('rapport.evenements', 'Événements'), d.evtVP, T('rapport.evenements_regle', 'événements, victoires de combat (+2 chacune), découvertes, accords, surproduction (+1 par ressource au plafond, par tour)'),
+      det.evt, T('rapport.aucun_evenement', 'aucun événement, combat gagné, découverte ni accord n\'a rapporté de point'));
     /* « Bonus divers » restait opaque même à zéro : on dit maintenant CE QU'IL CONTIENDRAIT. */
-    bloc('Bonus divers', d.extraVP, 'bonus de technologies particulières (Extra-Solaire, Éveil Collectif) et découvertes',
+    bloc(T('rapport.bonus_divers', 'Bonus divers'), d.extraVP, T('rapport.bonus_divers_regle', 'bonus de technologies particulières (Extra-Solaire, Éveil Collectif) et découvertes'),
       (d.extraDetail || []).length ? d.extraDetail
-        : ['aucun — aucune de ces technologies n\'a été acquise, ou leur condition n\'est pas remplie']);
+        : [T('rapport.aucun_bonus_divers', 'aucun — aucune de ces technologies n\'a été acquise, ou leur condition n\'est pas remplie')]);
     L.push('     ' + '─'.repeat(56));
-    L.push('     TOTAL .................... ' + s.vp + '   [somme des huit postes ci-dessus]');
+    L.push('     TOTAL .................... ' + s.vp + '   ' + T('rapport.somme_postes', '[somme des huit postes ci-dessus]'));
   }
   L.push('');
-  L.push('═══════════ RAPPORT DE BUG ═══════════');
-  if (!entry.bugs || !entry.bugs.length) L.push('(aucun rapport signalé pour cette partie)');
+  L.push(T('rapport.titre_bugs', '═══════════ RAPPORT DE BUG ═══════════'));
+  if (!entry.bugs || !entry.bugs.length) L.push(T('rapport.aucun_bug', '(aucun rapport signalé pour cette partie)'));
   else for (const b of entry.bugs) {
     L.push('');
-    L.push('— ' + (b.dateFr || '') + ' par ' + (b.user || 'anonyme') + ' :');
+    L.push('— ' + (b.dateFr || '') + ' ' + T('rapport.par', 'par {qui} :', { qui: (b.user || T('rapport.anonyme', 'anonyme')) }));
     L.push(String(b.text || '').split('\n').map(x => '   ' + x).join('\n'));
   }
   L.push('');
@@ -252,16 +297,17 @@ function corpsRapport(entry) {
      Le texte est produit par le MOTEUR (`_analyseTexte`) : solo et serveur ne peuvent donc pas dire
      deux choses différentes — c'est la règle qu'on a le plus souvent payée pour l'avoir oubliée. */
   if (Array.isArray(entry.analyse) && entry.analyse.length) { for (const l of entry.analyse) L.push(l); L.push(''); }
-  L.push('═══════════ JOURNAL COMPLET DE LA PARTIE ═══════════');
-  L.push('(' + (entry.journal || []).length + ' lignes, du début à la fin)');
+  L.push(T('rapport.titre_journal', '═══════════ JOURNAL COMPLET DE LA PARTIE ═══════════'));
+  const lignes = (lang !== 'fr' && Array.isArray(entry.journalEntries)) ? entry.journalEntries.map(e => (e.pref || '') + (e.k ? plainText(tL(lang, e.k, e.msg, e.p)) : e.msg)) : (entry.journal || []);
+  L.push(T('rapport.n_lignes', '({n} lignes, du début à la fin)', { n: lignes.length }));
   L.push('');
-  for (const l of (entry.journal || [])) L.push(l);
+  for (const l of lignes) L.push(l);
   L.push('');
-  L.push('Merci d\'avoir joué !');
+  L.push(T('rapport.merci', 'Merci d\'avoir joué !'));
   return L.join('\n');
 }
 function archiveGame(g) {
-  let scores = [], journal = [], turn = null, analyse = [], profils = [];
+  let scores = [], journal = [], journalEntries = [], turn = null, analyse = [], profils = [];
   try {
     const sb = g.driver.sb, G = g.driver.state();
     turn = G.turn;
@@ -291,6 +337,13 @@ function archiveGame(g) {
       if (!l || typeof l !== 'object') return txt;
       return ('T' + (l.turn !== undefined ? l.turn : '?')).padEnd(4) + String(l.civ || 'système').padEnd(12) + ' │ ' + txt;
     }).reverse();   // archive et email : journal ENTIER
+    /* Les mêmes lignes AVEC leur clé et leurs paramètres : l'email d'un joueur anglais est rendu dans sa
+       langue depuis ces entrées (voir `corpsRapport`). Le préfixe « T3 Martiens │ » est déjà dedans. */
+    journalEntries = (G.log || []).map(l => {
+      if (!l || typeof l !== 'object') return { msg: plainText(l), k: null, p: null, pref: '' };
+      const pref = ('T' + (l.turn !== undefined ? l.turn : '?')).padEnd(4) + String(l.civ || 'système').padEnd(12) + ' │ ';
+      return { msg: plainText(l.msg || ''), k: l.k || null, p: l.p || null, pref };
+    }).reverse();
     /* La trajectoire des nations et les décisions des IA, produites par le MOTEUR — une seule
        source pour le solo et pour le serveur. */
     try { if (typeof sb._analyseTexte === 'function') analyse = sb._analyseTexte(); } catch (e) {}
@@ -308,12 +361,13 @@ function archiveGame(g) {
     debut: g.cree || null, debutFr: g.cree ? frDate(g.cree) : '',
     hote: g.host || null,
     joueurs: g.seats.map(s => ({ civ: s.civId, ai: !!s.ai, user: s.user || null })),
-    scores, journal, analyse, profils, bugs: (g._bugs || [])
+    scores, journal, journalEntries, analyse, profils, bugs: (g._bugs || [])
   };
-  const corps = corpsRapport(entry);
+  const corps = corpsRapport(entry, 'fr');
   for (const s of humans) {
     const list = readArch(s.user); list.unshift(entry); writeArch(s.user, list);
-    sendMail(s.user, 'Solar — fin de partie ' + g.code + ' (' + entry.dateFr + ')', corps);
+    const lg = langDe(s.user);
+    sendMail(s.user, tL(lg, 'rapport.sujet_fin', 'Solar — fin de partie {code} ({date})', { code: g.code, date: entry.dateFr }), lg === 'fr' ? corps : corpsRapport(entry, lg));
   }
   /* La copie ADMIN n'est envoyée que si l'administrateur n'est pas DÉJÀ dans la partie : sinon il
      reçoit deux fois le même rapport. (Marc, 2026-08-10 : « je reçois 5-6 mails avec les
@@ -451,7 +505,7 @@ function mesParties(user, table) {
 function seatOf(g, wsOrUser) {
   return g.seats.find(s => s.ws === wsOrUser) || g.seats.find(s => s.user === wsOrUser) || null;
 }
-function sendTo(ws, obj) { if (ws && ws.readyState === 1) { try { ws.send(J(obj)); } catch (e) {} } }
+function sendTo(ws, obj) { if (ws && ws.readyState === 1) { try { aplatirK(obj); ws.send(J(obj)); } catch (e) {} } }
 function sendToCiv(g, civId, obj) { const s = g.seats.find(x => x.civId === civId); if (s) sendTo(s.ws, obj); }
 function broadcast(g, obj) { for (const s of g.seats) sendTo(s.ws, obj); }
 /* FENÊTRES COLLECTIVES — celles qui concernent TOUTE la table, pas une seule nation :
@@ -691,17 +745,16 @@ function attendre(g, civId) {
     g.voteOuvert = civId;
     broadcast(g, {
       t: 'absence', civId, votable: true,
-      msg: nomSiege(g, civId) + ' n\'a pas joué depuis un moment. Vous pouvez proposer de le remplacer par une IA — '
-         + 'ou simplement attendre : la partie l\'attendra aussi longtemps qu\'il le faudra.'
+      msg: K('srv.joue_depuis_moment_vous_pouvez_proposer','{v} n\'a pas joué depuis un moment. Vous pouvez proposer de le remplacer par une IA — ou simplement attendre : la partie l\'attendra aussi longtemps qu\'il le faudra.',{v:nomSiege(g, civId)})
     });
   }, ECHEANCE_MS);
 }
 /* Un joueur vote le remplacement de l'absent. Unanimité des humains PRÉSENTS requise.
    Un seul humain présent → son vote suffit (il est l'unanimité). */
 function voterRemplacement(g, votantCiv) {
-  if (g.status !== 'playing' || !g.voteOuvert) return { ok: false, msg: 'aucun remplacement à voter' };
+  if (g.status !== 'playing' || !g.voteOuvert) return { ok: false, msg: K('srv.aucun_remplacement_voter','aucun remplacement à voter') };
   const cible = g.voteOuvert;
-  if (votantCiv === cible) return { ok: false, msg: 'tu ne peux pas voter ton propre remplacement' };
+  if (votantCiv === cible) return { ok: false, msg: K('srv.pas_voter_propre_remplacement','tu ne peux pas voter ton propre remplacement') };
   if (!g.vote || g.vote.cible !== cible) g.vote = { cible, pour: [] };
   if (!g.vote.pour.includes(votantCiv)) g.vote.pour.push(votantCiv);
   const requis = humainsPresentsSauf(g, cible).map(s => s.civId);
@@ -724,7 +777,7 @@ function remplacerParIA(g, cible, motif) {
   const nom = (function () { if (s.user) return nomSiege(g, cible);
     try { const n = g.driver && g.driver.nation(cible); if (n && n.civ) return (n.civ.emoji ? n.civ.emoji + ' ' : '') + n.civ.name; } catch (e) {}
     return nomSiege(g, cible); })();
-  broadcast(g, { t: 'notice', kind: 'info', payload: { msg: '🤖 ' + nom + ' est remplacé par une IA ' + (motif || '(vote des joueurs présents)') + '.' } });
+  broadcast(g, { t: 'notice', kind: 'info', payload: { msg: K('srv.remplace_par_ia','🤖 {nom} est remplacé par une IA {motif}.',{nom:nom, motif:(motif || K('srv.vote_joueurs_presents','(vote des joueurs présents)'))}) } });
   broadcast(g, { t: 'game', game: gameView(g) });
   // La décision déjà émise pour cet humain doit être soldée, sinon la partie reste figée dessus.
   try {
@@ -771,16 +824,16 @@ function nomNation(g, civId) {
    dans l'email de fin. Une concession doit laisser une trace, sinon le classement final
    devient incompréhensible pour ceux qui le reçoivent. */
 function journaliserPartie(g, msg, cls) {
-  const e = { msg, cls: cls || 'gold' };
-  try { g.driver.sb.addLog(msg, e.cls); } catch (err) {}
+  const e = (msg && typeof msg === 'object' && msg.k) ? { msg: tL('fr', msg.k, msg.fr, msg.p), k: msg.k, p: msg.p || null, cls: cls || 'gold' } : { msg, cls: cls || 'gold' };
+  try { g.driver.sb.addLog(msg, e.cls); } catch (err) {}   // le moteur range k/p lui-même (voir `addLog`)
   broadcast(g, { t: 'log', entries: [e] });
 }
 function conceder(g, civId) {
-  if (!g || g.status !== 'playing') return { ok: false, msg: 'la partie n\'est pas en cours' };
+  if (!g || g.status !== 'playing') return { ok: false, msg: K('srv.partie_cours_2','la partie n\'est pas en cours') };
   const s = g.seats.find(x => x.civId === civId);
-  if (!s || s.ai) return { ok: false, msg: 'siège inconnu, ou déjà tenu par une IA' };
-  if (g.concede) return { ok: false, msg: 'une concession est déjà en cours' };
-  journaliserPartie(g, '🏳️ ' + nomSiege(g, civId) + ' (' + nomNation(g, civId) + ') concède la victoire et quitte la partie.');
+  if (!s || s.ai) return { ok: false, msg: K('srv.siege_inconnu_ia','siège inconnu, ou déjà tenu par une IA') };
+  if (g.concede) return { ok: false, msg: K('srv.concession_deja_cours','une concession est déjà en cours') };
+  journaliserPartie(g, K('srv.concede_victoire_quitte_partie','🏳️ {v} ({nation}) concède la victoire et quitte la partie.',{v:nomSiege(g, civId),nation:nomNation(g, civId)}));
   const restants = humainsPresentsSauf(g, civId).map(x => x.civId);
   g.concede = { cible: civId, choix: {} };
   broadcast(g, { t: 'concede_vote', civId, qui: nomSiege(g, civId), nation: nomNation(g, civId), restants });
@@ -792,7 +845,7 @@ function conceder(g, civId) {
    déconnecte entre-temps, on resterait sinon à attendre indéfiniment son avis. */
 function choixConcession(g, votantCiv, choix) {
   if (!g.concede) return { ok: false, msg: 'aucune concession en cours' };
-  if (votantCiv === g.concede.cible) return { ok: false, msg: 'tu ne décides pas de ta propre concession' };
+  if (votantCiv === g.concede.cible) return { ok: false, msg: K('srv.pas_decider_propre_concession','tu ne décides pas de ta propre concession') };
   if (choix !== 'ia' && choix !== 'stop') return { ok: false, msg: 'choix inconnu' };
   g.concede.choix[votantCiv] = choix;
   const restants = humainsPresentsSauf(g, g.concede.cible).map(x => x.civId);
@@ -810,11 +863,11 @@ function trancherConcession(g, issue, motif) {
   g.concede = null;
   broadcast(g, { t: 'concede_done', issue, civId: cible, motif: motif || '' });
   if (issue === 'ia') {
-    journaliserPartie(g, '🤖 ' + nomNation(g, cible) + ' est repris par une IA — la partie continue.');
+    journaliserPartie(g, K('srv.repris_ia_partie_continue','🤖 {nation} est repris par une IA — la partie continue.',{nation:nomNation(g, cible)}));
     remplacerParIA(g, cible);   // solde aussi la question ou le tour d'action laissé en plan
     return;
   }
-  journaliserPartie(g, '🛑 Les joueurs restants arrêtent la partie. Les scores sont calculés en l\'état.');
+  journaliserPartie(g, K('srv.joueurs_restants_arretent_partie_scores','🛑 Les joueurs restants arrêtent la partie. Les scores sont calculés en l\'état.'));
   try { route(g, { kind: 'over' }); } catch (e) { console.error('concession/arrêt:', e.message); }
 }
 
@@ -867,7 +920,7 @@ function renvoyerLaMain(g, s, ws) {
   // Et l'état d'absence en cours, sinon celui qui revient ne verrait pas qu'un vote est ouvert.
   if (g.voteOuvert && g.voteOuvert !== s.civId) {
     sendTo(ws, { t: 'absence', civId: g.voteOuvert, votable: true,
-                 msg: nomSiege(g, g.voteOuvert) + ' n\'a pas joué depuis un moment. Vous pouvez proposer de le remplacer par une IA.' });
+                 msg: K('srv.joue_depuis_moment_vous_pouvez_proposer_2','{v} n\'a pas joué depuis un moment. Vous pouvez proposer de le remplacer par une IA.',{v:nomSiege(g, g.voteOuvert)}) });
     if (g.vote && g.vote.cible === g.voteOuvert) {
       const requis = humainsPresentsSauf(g, g.voteOuvert).map(x => x.civId);
       sendTo(ws, { t: 'vote', cible: g.voteOuvert, pour: g.vote.pour.slice(), requis,
@@ -1576,21 +1629,21 @@ wss.on('connection', (ws) => {
   const sess = { user: null, game: null };
 
   const err = (msg, extra) => sendTo(ws, Object.assign({ t: 'error', msg }, extra || {}));
-  const requireAuth = () => { if (!sess.user) { err('non connecté (login d\'abord)'); return false; } return true; };
-  const requireGame = () => { if (!sess.game || !games.has(sess.game)) { err('pas de partie en cours'); return false; } return true; };
+  const requireAuth = () => { if (!sess.user) { err(K('srv.non_connecte_login_abord','non connecté (login d\'abord)')); return false; } return true; };
+  const requireGame = () => { if (!sess.game || !games.has(sess.game)) { err(K('srv.partie_cours','pas de partie en cours')); return false; } return true; };
 
   ws.on('message', (raw) => {
-    let m; try { m = JSON.parse(raw.toString()); } catch (e) { return err('JSON invalide'); }
+    let m; try { m = JSON.parse(raw.toString()); } catch (e) { return err(K('srv.json_invalide','JSON invalide')); }
     try {
       switch (m.t) {
 
         case 'register': {
           const u = String(m.user || '').trim().toLowerCase();
           // L'identifiant est désormais une ADRESSE EMAIL (sert aussi à envoyer les scores de fin de partie).
-          if (!/^[^@\s]+@[^@\s.]+\.[a-z]{2,}$/i.test(u)) return err('adresse email invalide (ex. prenom@domaine.ch)');
-          if (!m.pass || String(m.pass).length < 6) return err('mot de passe trop court (min. 6)');
-          if (users[u]) return err('cette adresse email est déjà inscrite');
-          users[u] = { pass: hashPass(m.pass), created: Date.now(), tier: 1 }; // tier = niveau d'abonnement (1 gratuit)
+          if (!/^[^@\s]+@[^@\s.]+\.[a-z]{2,}$/i.test(u)) return err(K('srv.adresse_email_invalide_ex_prenom_domaine','adresse email invalide (ex. prenom@domaine.ch)'));
+          if (!m.pass || String(m.pass).length < 6) return err(K('srv.mot_passe_trop_court_min_6','mot de passe trop court (min. 6)'));
+          if (users[u]) return err(K('srv.adresse_email_deja_inscrite','cette adresse email est déjà inscrite'));
+          users[u] = { pass: hashPass(m.pass), created: Date.now(), tier: 1, lang: sess.lang || 'fr' }; // tier = niveau d'abonnement (1 gratuit)
           saveUsers();
           sendMail(ADMIN_MAIL, 'Solar — nouvelle inscription : ' + u,
             'Nouveau joueur inscrit le ' + frDate(Date.now()) + '\nEmail : ' + u + '\nTotal joueurs : ' + Object.keys(users).length);
@@ -1600,7 +1653,7 @@ wss.on('connection', (ws) => {
 
         case 'bug_report': { // {t:'bug_report', text} — signalé depuis l'écran de fin de partie
           const txt = String(m.text || '').slice(0, 4000).trim();
-          if (!txt) return err('rapport vide');
+          if (!txt) return err(K('srv.rapport_vide','rapport vide'));
           const who = sess.user || 'anonyme';
           const g = (sess.game && games.get(sess.game)) || null;
           const rec = { at: Date.now(), dateFr: frDate(Date.now()), user: who, text: txt };
@@ -1625,22 +1678,23 @@ wss.on('connection', (ws) => {
           try {
             const listMaj = readArch(who);
             if (listMaj.length && listMaj[0].scores && listMaj[0].scores.length) {
-              const maj = corpsRapport(listMaj[0]);
-              sendMail(who, 'Solar — fin de partie ' + listMaj[0].code + ' (avec ton signalement)', maj);
+              const lg = langDe(who);
+              sendMail(who, tL(lg, 'rapport.sujet_fin_signalement', 'Solar — fin de partie {code} (avec ton signalement)', { code: listMaj[0].code }), corpsRapport(listMaj[0], lg));
               // Copie administrateur SEULEMENT s'il n'est pas déjà l'auteur du signalement.
-              if (!memeAdresse(who, ADMIN_MAIL)) sendMail(ADMIN_MAIL, 'Solar — partie ' + listMaj[0].code + ' + signalement', maj);
+              if (!memeAdresse(who, ADMIN_MAIL)) sendMail(ADMIN_MAIL, 'Solar — partie ' + listMaj[0].code + ' + signalement', corpsRapport(listMaj[0], 'fr'));
             }
           } catch (e) { console.error('bug_report renvoi:', e.message); }
-          sendTo(ws, { t: 'notice', kind: 'info', payload: { msg: 'Merci ! Ton signalement a été transmis.' } });
+          sendTo(ws, { t: 'notice', kind: 'info', payload: { msg: K('srv.merci_signalement_transmis','Merci ! Ton signalement a été transmis.') } });
           break;
         }
 
         case 'login': {
           const u = String(m.user || '').trim().toLowerCase();
-          if (!users[u] || !checkPass(m.pass, users[u].pass)) return err('identifiants incorrects');
+          if (!users[u] || !checkPass(m.pass, users[u].pass)) return err(K('srv.identifiants_incorrects','identifiants incorrects'));
           const token = crypto.randomBytes(24).toString('hex');
           tokens.set(token, { user: u, vu: Date.now() }); saveTokens(true); // création : écriture immédiate
           sess.user = u;
+          if (sess.lang && users[u].lang !== sess.lang) { users[u].lang = sess.lang; saveUsers(); }   // la langue du compte = celle de son client
           sendTo(ws, { t: 'logged', user: u, token, tier: users[u].tier || 1 });
           /* La liste part SANS qu'on la demande : le joueur qui se connecte doit voir tout de suite
              ce qui l'attend, pas avoir à deviner qu'un bouton existe. */
@@ -1650,8 +1704,9 @@ wss.on('connection', (ws) => {
 
         case 'token': { // reconnexion rapide avec un token encore valide
           const u = userDuToken(m.token);   // rafraîchit la péremption glissante
-          if (!u) return err('token inconnu ou expiré');
+          if (!u) return err(K('srv.token_inconnu_ou_expire','token inconnu ou expiré'));
           sess.user = u;
+          if (sess.lang && users[u] && users[u].lang !== sess.lang) { users[u].lang = sess.lang; saveUsers(); }
           sendTo(ws, { t: 'logged', user: u, token: m.token, tier: users[u].tier || 1 });
           sendTo(ws, { t: 'mes_parties', parties: mesParties(u) });
           break;
@@ -1660,14 +1715,14 @@ wss.on('connection', (ws) => {
         case 'create': { // {t:'create', civId, seats:[{civId,ai}...]} — l'hôte prend civId, le reste = sièges
           if (!requireAuth()) break;
           const civId = m.civId || 'terriens';
-          if (!CIVS.includes(civId)) return err('civilisation inconnue: ' + civId);
+          if (!CIVS.includes(civId)) return err(K('srv.civilisation_inconnue','civilisation inconnue: {civid}',{civid:civId}));
           const others = Array.isArray(m.seats) ? m.seats : CIVS.filter(c => c !== civId).slice(0, 1).map(c => ({ civId: c, ai: true }));
           const seats = [{ civId, ai: false, user: sess.user, ws }];
           for (const s of others) {
-            if (!CIVS.includes(s.civId) || seats.some(x => x.civId === s.civId)) return err('sièges invalides');
+            if (!CIVS.includes(s.civId) || seats.some(x => x.civId === s.civId)) return err(K('srv.sieges_invalides','sièges invalides'));
             seats.push({ civId: s.civId, ai: !!s.ai, user: null, ws: null });
           }
-          if (seats.length < 2 || seats.length > 4) return err('2 à 4 sièges requis');
+          if (seats.length < 2 || seats.length > 4) return err(K('srv.2_4_sieges_requis','2 à 4 sièges requis'));
           const g = { code: newCode(), host: sess.user, seats, status: 'lobby', driver: null, timer: null, lastRoute: null,
                       cree: Date.now() };
           games.set(g.code, g);
@@ -1679,14 +1734,14 @@ wss.on('connection', (ws) => {
         case 'join': { // {t:'join', code, civId?} — prend un siège humain libre
           if (!requireAuth()) break;
           const g = games.get(String(m.code || '').toUpperCase());
-          if (!g) return err('partie introuvable');
+          if (!g) return err(K('srv.partie_introuvable','partie introuvable'));
           // reconnexion : déjà un siège à ce nom ?
           let s = g.seats.find(x => x.user === sess.user);
           if (!s) {
-            if (g.status !== 'lobby') return err('partie déjà commencée');
+            if (g.status !== 'lobby') return err(K('srv.partie_deja_commencee','partie déjà commencée'));
             const free = g.seats.filter(x => !x.ai && !x.user);
             s = m.civId ? free.find(x => x.civId === m.civId) : free[0];
-            if (!s) return err('aucun siège libre' + (m.civId ? ' pour ' + m.civId : ''));
+            if (!s) return err(K('srv.aucun_siege_libre','aucun siège libre{v}',{v:(m.civId?t('srv.ligne'," pour {v}",{v:m.civId}):'')}));
             s.user = sess.user;
           }
           s.ws = ws;
@@ -1704,10 +1759,10 @@ wss.on('connection', (ws) => {
         case 'start': {
           if (!requireAuth() || !requireGame()) break;
           const g = games.get(sess.game);
-          if (g.host !== sess.user) return err('seul l\'hôte peut démarrer');
-          if (g.status !== 'lobby') return err('déjà démarrée');
+          if (g.host !== sess.user) return err(K('srv.seul_hote_peut_demarrer','seul l\'hôte peut démarrer'));
+          if (g.status !== 'lobby') return err(K('srv.deja_demarree','déjà démarrée'));
           const empty = g.seats.filter(s => !s.ai && !s.user);
-          if (empty.length) return err('sièges humains vides: ' + empty.map(s => s.civId).join(','));
+          if (empty.length) return err(K('srv.sieges_humains_vides','sièges humains vides: {v}',{v:empty.map(s => s.civId).join(',')}));
           g.driver = new GameDriver(HTML);
           g.status = 'playing';
           broadcast(g, { t: 'started', game: gameView(g) });
@@ -1723,7 +1778,7 @@ wss.on('connection', (ws) => {
           if (!requireAuth() || !requireGame()) break;
           const g = games.get(sess.game);
           const s = seatOf(g, ws) || seatOf(g, sess.user);
-          if (!g.driver || !s) return err('pas dans cette partie');
+          if (!g.driver || !s) return err(K('srv.dans_partie','pas dans cette partie'));
           /* On cherche la question dans TOUTE la file, plus seulement en tête : depuis que plusieurs
              joueurs sont interrogés en même temps, la réponse qui arrive en premier n'est pas
              forcément celle de la question de tête — la refuser comme « périmée » aurait bloqué
@@ -1747,7 +1802,7 @@ wss.on('connection', (ws) => {
                de répondeurs par question. */
             const dejaVus = g.repondues.get(m.id);
             if (dejaVus && dejaVus.has(s.civId)) break;   // déjà traité pour lui : rien à signaler
-            return err('décision périmée', { id: m.id });
+            return err(K('srv.decision_perimee','décision périmée'), { id: m.id });
           }
           g.repondues = g.repondues || new Map();
           if (!g.repondues.has(m.id)) g.repondues.set(m.id, new Set());
@@ -1769,7 +1824,7 @@ wss.on('connection', (ws) => {
             break;
           }
           const civ = (typeof p.nation === 'object' && p.nation) ? (p.nation.civ && p.nation.civ.id) : p.nation;
-          if (civ !== s.civId) return err('cette décision n\'est pas pour toi');
+          if (civ !== s.civId) return err(K('srv.decision_toi','cette décision n\'est pas pour toi'));
           try { route(g, g.driver.answer(m.id, assainirReponse(g, p, m.ans || {}))); }
           catch (e) { err(e.message.split('\n')[0]); recover(g, 'answer', e); }
           break;
@@ -1779,7 +1834,7 @@ wss.on('connection', (ws) => {
           if (!requireAuth() || !requireGame()) break;
           const g = games.get(sess.game);
           const s = seatOf(g, ws) || seatOf(g, sess.user);
-          if (!g.driver || !s) return err('pas dans cette partie');
+          if (!g.driver || !s) return err(K('srv.dans_partie','pas dans cette partie'));
           /* ⚠️ `_actingCiv` EXCLUT son porteur du journal des actions diffusé (les « fenêtres rouges »).
              Il DOIT donc être relâché quoi qu'il arrive. Il était remis à `null` juste après
              `driver.act()`, À L'INTÉRIEUR du `try` : si l'action levait une exception — ce qui
@@ -1819,7 +1874,7 @@ wss.on('connection', (ws) => {
           if (!requireAuth() || !requireGame()) break;
           const g = games.get(sess.game);
           const s = seatOf(g, ws) || seatOf(g, sess.user);
-          if (!g.driver || !s) return err('pas dans cette partie');
+          if (!g.driver || !s) return err(K('srv.dans_partie','pas dans cette partie'));
           const r = conceder(g, s.civId);
           if (!r.ok) return err(r.msg);
           break;
@@ -1829,12 +1884,12 @@ wss.on('connection', (ws) => {
           if (!requireAuth() || !requireGame()) break;
           const g = games.get(sess.game);
           const s = seatOf(g, ws) || seatOf(g, sess.user);
-          if (!g.driver || !s) return err('pas dans cette partie');
-          if (g.host !== sess.user) return err('seul le créateur de la partie peut renoncer à jouer');
-          if (g.status !== 'playing') return err('la partie n\'est pas en cours');
-          if (s.ai) return err('ce siège est déjà tenu par une IA');
-          journaliserPartie(g, '🤖 ' + nomSiege(g, s.civId) + ' renonce à jouer — une IA reprend ' + nomNation(g, s.civId) + '.', 'gold');
-          remplacerParIA(g, s.civId, '(a renoncé à jouer)');
+          if (!g.driver || !s) return err(K('srv.dans_partie','pas dans cette partie'));
+          if (g.host !== sess.user) return err(K('srv.seul_createur_partie_peut_renoncer_jouer','seul le créateur de la partie peut renoncer à jouer'));
+          if (g.status !== 'playing') return err(K('srv.partie_cours_2','la partie n\'est pas en cours'));
+          if (s.ai) return err(K('srv.siege_deja_tenu_ia','ce siège est déjà tenu par une IA'));
+          journaliserPartie(g, K('srv.renonce_jouer_ia_reprend','🤖 {v} renonce à jouer — une IA reprend {nation}.',{v:nomSiege(g, s.civId),nation:nomNation(g, s.civId)}), 'gold');
+          remplacerParIA(g, s.civId, K('srv.a_renonce_jouer','(a renoncé à jouer)'));
           /* Même épilogue côté clients que la concession tranchée « IA » : le partant voit « Tu as quitté
              la partie », les autres un toast. */
           broadcast(g, { t: 'concede_done', issue: 'ia', civId: s.civId, motif: 'renonce' });
@@ -1845,7 +1900,7 @@ wss.on('connection', (ws) => {
           if (!requireAuth() || !requireGame()) break;
           const g = games.get(sess.game);
           const s = seatOf(g, ws) || seatOf(g, sess.user);
-          if (!g.driver || !s) return err('pas dans cette partie');
+          if (!g.driver || !s) return err(K('srv.dans_partie','pas dans cette partie'));
           const r = choixConcession(g, s.civId, m.choix);
           if (!r.ok) return err(r.msg);
           break;
@@ -1855,7 +1910,7 @@ wss.on('connection', (ws) => {
           if (!requireAuth() || !requireGame()) break;
           const g = games.get(sess.game);
           const s = seatOf(g, ws) || seatOf(g, sess.user);
-          if (!g.driver || !s) return err('pas dans cette partie');
+          if (!g.driver || !s) return err(K('srv.dans_partie','pas dans cette partie'));
           try { route(g, g.driver.actAuto(s.civId)); }
           catch (e) { err(e.message.split('\n')[0]); recover(g, 'auto', e); }
           break;
@@ -1865,7 +1920,7 @@ wss.on('connection', (ws) => {
           if (!requireAuth() || !requireGame()) break;
           const g = games.get(sess.game);
           const s = seatOf(g, ws) || seatOf(g, sess.user);
-          if (!g.driver || !s) return err('pas dans cette partie');
+          if (!g.driver || !s) return err(K('srv.dans_partie','pas dans cette partie'));
           try { route(g, g.driver.commit(s.civId)); }
           catch (e) { err(e.message.split('\n')[0]); recover(g, 'confirm', e); }
           break;
@@ -1875,7 +1930,7 @@ wss.on('connection', (ws) => {
           if (!requireAuth() || !requireGame()) break;
           const g = games.get(sess.game);
           const s = seatOf(g, ws) || seatOf(g, sess.user);
-          if (!g.driver || !s) return err('pas dans cette partie');
+          if (!g.driver || !s) return err(K('srv.dans_partie','pas dans cette partie'));
           try { route(g, g.driver.undo(s.civId)); }
           catch (e) { err(e.message.split('\n')[0]); recover(g, 'undo', e); }
           break;
@@ -1885,7 +1940,7 @@ wss.on('connection', (ws) => {
           if (!requireAuth() || !requireGame()) break;
           const g = games.get(sess.game);
           const s = seatOf(g, ws) || seatOf(g, sess.user);
-          if (!g || !s) return err('pas dans cette partie');
+          if (!g || !s) return err(K('srv.dans_partie','pas dans cette partie'));
           const r = voterRemplacement(g, s.civId);
           if (!r.ok) return err(r.msg);
           break;
@@ -1895,7 +1950,7 @@ wss.on('connection', (ws) => {
           if (!requireGame()) break;
           const g = games.get(sess.game);
           const s = seatOf(g, ws) || seatOf(g, sess.user);
-          if (!g.driver || !s) return err('pas dans cette partie');
+          if (!g.driver || !s) return err(K('srv.dans_partie','pas dans cette partie'));
           renvoyerLaMain(g, s, ws);
           break;
         }
@@ -1903,13 +1958,13 @@ wss.on('connection', (ws) => {
         case 'state': { // état complet, FILTRÉ par joueur : les agendas adverses (secrets) sont masqués
           if (!requireGame()) break;
           const g = games.get(sess.game);
-          if (!g.driver) return err('partie pas démarrée');
+          if (!g.driver) return err(K('srv.partie_demarree','partie pas démarrée'));
           const seat = seatOf(g, ws) || seatOf(g, sess.user);
           const enc = safeEncode(g.driver.state());
           if (seat && g.status !== 'over') {
             const hide = (nat) => {
               if (nat && nat.civ && nat.civ.id !== seat.civId && nat.agenda) {
-                nat.agenda = { id: null, hidden: true, name: '🔒 Agenda secret', emoji: '🔒', desc: 'Révélé en fin de partie.' };
+                nat.agenda = { id: null, hidden: true, name: '🔒 Agenda secret', emoji: '🔒', desc: 'Révélé en fin de partie.', name_i18n: K('srv.agenda_secret','🔒 Agenda secret'), desc_i18n: K('srv.revele_fin_partie','Révélé en fin de partie.') };
               }
             };
             hide(enc.player); (enc.ais || []).forEach(hide);
@@ -1967,14 +2022,14 @@ wss.on('connection', (ws) => {
           if (!requireAuth()) break;
           const code = String(m.code || '').trim().toUpperCase();
           const g = games.get(code);
-          if (!g) { sendTo(ws, { t: 'err', msg: 'partie introuvable' }); break; }
+          if (!g) { sendTo(ws, { t: 'err', msg: K('srv.partie_introuvable','partie introuvable') }); break; }
           const moi = g.seats.find(x => x.user && String(x.user).toLowerCase() === String(sess.user).toLowerCase());
-          if (!moi) { sendTo(ws, { t: 'err', msg: 'tu n\'es pas dans cette partie' }); break; }
+          if (!moi) { sendTo(ws, { t: 'err', msg: K('srv.es_dans_partie','tu n\'es pas dans cette partie') }); break; }
           const autresHumains = g.seats.filter(x => !x.ai && x.user
             && String(x.user).toLowerCase() !== String(sess.user).toLowerCase()).length;
           const estHote = g.host && String(g.host).toLowerCase() === String(sess.user).toLowerCase();
           if (autresHumains > 0 && !estHote) {
-            sendTo(ws, { t: 'err', msg: 'seul l\'hôte peut supprimer une partie où jouent d\'autres humains' });
+            sendTo(ws, { t: 'err', msg: K('srv.seul_hote_peut_supprimer_partie_ou_jouen','seul l\'hôte peut supprimer une partie où jouent d\'autres humains') });
             break;
           }
           clearTimer(g);
@@ -2011,8 +2066,8 @@ wss.on('connection', (ws) => {
           if (!requireAuth()) break;
           const u = String(sess.user).toLowerCase();
           const rec = users[u];
-          if (!rec) return err('compte introuvable');
-          if (!m.pass || !checkPass(m.pass, rec.pass)) return err('mot de passe incorrect');
+          if (!rec) return err(K('srv.compte_introuvable','compte introuvable'));
+          if (!m.pass || !checkPass(m.pass, rec.pass)) return err(K('srv.mot_passe_incorrect','mot de passe incorrect'));
           const meme = x => x && String(x).toLowerCase() === u;
           let partiesFermees = 0, siegesRemplaces = 0;
           for (const g of [...games.values()]) {
@@ -2031,7 +2086,7 @@ wss.on('connection', (ws) => {
             }
             if (meme(g.host)) g.host = autresHumains[0].user;
             s.ws = null; s.user = null;   // effacé AVANT l'annonce : les autres voient la nation, pas l'adresse
-            remplacerParIA(g, s.civId, '(le joueur a supprimé son compte)');
+            remplacerParIA(g, s.civId, K('srv.joueur_supprime_compte','(le joueur a supprimé son compte)'));
             s.remplaceUser = null;        // plus aucune trace de l'adresse dans la partie
             siegesRemplaces++;
             broadcast(g, { t: 'game', game: gameView(g) });
@@ -2065,19 +2120,18 @@ wss.on('connection', (ws) => {
         }
 
         case 'hello': {
+          if (m.lang && DICTS[String(m.lang)]) sess.lang = String(m.lang); else if (m.lang === 'fr') sess.lang = 'fr';
           const proto = parseInt(m.proto, 10) || 0;
           sess.proto = proto; sess.build = String(m.build || '?').slice(0, 40);
           if (proto < PROTO_MIN || proto > PROTO_MAX) {
             sendTo(ws, { t: 'maj_requise', serveur: PROTO_MAX, client: proto,
-              msg: proto < PROTO_MIN
-                ? 'Ta version du jeu est trop ancienne pour ce serveur. Recharge la page (ou mets à jour l\'application).'
-                : 'Ce serveur est plus ancien que ta version du jeu. Réessaie plus tard.' });
+              msg: (proto < PROTO_MIN?t('srv.version_jeu_trop_ancienne_serveur_rechar','Ta version du jeu est trop ancienne pour ce serveur. Recharge la page (ou mets à jour l\'application).'):t('srv.serveur_ancien_version_jeu_reessaie_tard','Ce serveur est plus ancien que ta version du jeu. Réessaie plus tard.')) });
             break;
           }
           sendTo(ws, { t: 'hello_ok', proto: PROTO_MAX, serveur: SERVER_BUILD });
           break;
         }
-        default: err('message inconnu: ' + m.t);
+        default: err(K('srv.message_inconnu','message inconnu: {v}',{v:m.t}));
       }
     } catch (e) {
       err(e.message.split('\n')[0]);
@@ -2093,7 +2147,7 @@ wss.on('connection', (ws) => {
       // Une déconnexion ne déclenche RIEN. Surtout pas un tour joué à sa place : c'est le plus souvent
       // un simple rafraîchissement de page. On signale seulement l'absence aux autres.
       if (s) broadcast(g, { t: 'absence', civId: s.civId, votable: false,
-                            msg: nomSiege(g, s.civId) + ' s\'est déconnecté.' });
+                            msg: K('srv.deconnecte','{v} s\'est déconnecté.',{v:nomSiege(g, s.civId)}) });
     }
   });
 });

@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-18 · v10.75';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-19 · v10.78';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -63,10 +63,10 @@ const STATE = { ws:null, connected:false, user:null, token:null, tier:1,
 // ───────────────────────── Transport WebSocket ─────────────────────────
 function connect(onReady){
   if (STATE.ws && STATE.ws.readyState === 1){ if(onReady) onReady(); return; }
-  status('Connexion au serveur…');
+  status(t('web.connexion_serveur','Connexion au serveur…'));
   let ws;
   try { ws = new WebSocket(SERVER_URL); }
-  catch(e){ status('⚠️ Serveur injoignable'); return; }
+  catch(e){ status(t('web.serveur_injoignable','⚠️ Serveur injoignable')); return; }
   STATE.ws = ws;
   ws.onopen = () => {
     STATE.connected = true;
@@ -77,7 +77,7 @@ function connect(onReady){
        vieille version installée pendant des mois et parlerait à un serveur récent sans que rien ne
        le détecte — on se retrouverait à chercher un bug de jeu là où il n'y a qu'un décalage de
        version. Le serveur répond « maj_requise » si le protocole ne correspond plus. */
-    send({t:'hello', proto:SC_PROTO, build:SOLAR_BUILD_JS});
+    send({t:'hello', proto:SC_PROTO, build:SOLAR_BUILD_JS, lang:(window.SOLAR_LANG||'fr')});   // la langue du joueur : le serveur s'en sert pour l'email de fin
     // reprise de session : token puis re-join automatique de la partie en cours
     if (STATE.token) send({t:'token', token:STATE.token});
     if (onReady) onReady();
@@ -88,7 +88,7 @@ function connect(onReady){
     STATE.connected = false;
     clearInterval(STATE._pingTimer);
     // reconnexion systématique dès qu'on a une session (pas seulement en partie)
-    if (STATE.user || STATE.token){ status('🔌 Connexion perdue — reconnexion en cours…'); scheduleReconnect(); }
+    if (STATE.user || STATE.token){ status(t('web.connexion_perdue_reconnexion_cours','🔌 Connexion perdue — reconnexion en cours…')); scheduleReconnect(); }
     /* ⚠️ « JE TAPE MON MOT DE PASSE, RIEN NE SE PASSE » (Marc, 07/09, juste après un redéploiement).
        Sans session, si le serveur ne répond pas à l'ouverture (redémarrage en cours), le bouton
        ne produisait AUCUN retour : le statut « Connexion au serveur… » restait affiché, sans
@@ -96,7 +96,7 @@ function connect(onReady){
     else if (!etaitOuverte){
       status('');
       hideStatus();
-      const msg='⚠️ Serveur injoignable pour le moment (mise à jour en cours ?). Réessaie dans quelques secondes.';
+      const msg=t('web.serveur_injoignable_moment_mise_jour_cou','⚠️ Serveur injoignable pour le moment (mise à jour en cours ?). Réessaie dans quelques secondes.');
       if (typeof _errCb==='function') _errCb(msg);
       else { const e=document.getElementById('lv-err'); if(e) e.textContent=msg; }
     }
@@ -132,6 +132,9 @@ function reqState(force){
 let _errCb = null; // affichage d'erreur contextuel (formulaires)
 function handle(m){
   STATE._lastMsg = Date.now();
+  /* Les textes que le serveur a écrits en français voyagent avec leur clé (`<champ>_i18n`, voir
+     `_i18nAplatir` dans moteur.js) : on les re-rend ici dans la langue de CE joueur. */
+  try{ if(typeof _i18nHydrater==='function'&&m&&m.t!=='state'){ _i18nHydrater(m); if(m.pending&&m.pending.payload)_i18nHydrater(m.pending.payload); } }catch(e){}
   switch(m.t){
     case 'registered':
       send({t:'login', user:m.user, pass:STATE._pendingPass||''});
@@ -159,7 +162,7 @@ function handle(m){
       STATE.user=null; STATE.token=null; STATE.game=null; STATE.parties=[]; STATE._surLobby=false;
       try{ localStorage.removeItem('sc_ws_token'); localStorage.removeItem('sc_ws_game'); localStorage.removeItem('sc_ws_user'); }catch(e){}
       screenAuth('login');
-      try{ const e=document.getElementById('sc-err'); if(e){ e.style.color='#9ad89a'; e.textContent='Ton compte a été supprimé. Merci d\'avoir joué.'; } }catch(e){}
+      try{ const e=document.getElementById('sc-err'); if(e){ e.style.color='#9ad89a'; e.textContent=t('web.compte_ete_supprime_merci_avoir_joue','Ton compte a été supprimé. Merci d\'avoir joué.'); } }catch(e){}
       break;
     case 'mes_parties':
       STATE.parties = Array.isArray(m.parties) ? m.parties : [];
@@ -190,7 +193,7 @@ function handle(m){
       installIntercepts();
       concederVisible(true);   // « Concéder » n'a de sens qu'en ligne, partie lancée
       hideOverlay(); revealGameUI();
-      status('Partie lancée — synchronisation…');
+      status(t('web.partie_lancee_synchronisation','Partie lancée — synchronisation…'));
       reqState(true);
       break;
     case 'bilan_attente':
@@ -257,7 +260,7 @@ function handle(m){
         badgeTour(attendus[0]||m.civId);
         if(attendus.length>1){
           const qui=attendus.map(civLabel);
-          status('Choix de '+qui.slice(0,-1).join(', ')+' et '+qui[qui.length-1]+'…');
+          status(t('web.choix','Choix de {v} et {v2}…',{v:qui.slice(0,-1).join(', '),v2:qui[qui.length-1]}));
         }
         showWaitBlock();
       }
@@ -265,7 +268,7 @@ function handle(m){
       break;
     case 'log': // actions des autres joueurs → pop-up rouge (comme les tours d'IA en solo)
       try{
-        const txts=(m.entries||[]).map(e=>String((e&&e.msg)||e).replace(/<[^>]+>/g,'').trim()).filter(Boolean);
+        const txts=(m.entries||[]).map(e=>(typeof _logTexte==='function'?_logTexte(e):String((e&&e.msg)||e)).replace(/<[^>]+>/g,'').trim()).filter(Boolean);
         if(txts.length) showLogToast(txts);
         txts.forEach(t=>console.log('[JEU]', t));
       }catch(e){}
@@ -289,10 +292,7 @@ function handle(m){
     case 'hello_ok': break;   // protocole compatible : rien à signaler
     case 'maj_requise':       // versions incompatibles : le dire clairement plutôt que de dérailler
       status('');
-      overlay('<h2>🔄 Mise à jour nécessaire</h2>'
-        +'<div class="muted" style="margin:8px 0;line-height:1.5">'+(m.msg||'Ta version du jeu ne correspond plus à celle du serveur.')+'</div>'
-        +'<div class="muted" style="font-size:.8em">Protocole — toi : '+(m.client!==undefined?m.client:'?')+' · serveur : '+(m.serveur!==undefined?m.serveur:'?')+'</div>'
-        +'<button class="pri" id="sc-reload">↻ Recharger la page</button>');
+      overlay(t('web.mise_jour_necessaire_protocole_toi_serve','<h2>🔄 Mise à jour nécessaire</h2><div class="muted" style="margin:8px 0;line-height:1.5">{v}</div><div class="muted" style="font-size:.8em">Protocole — toi : {v2} · serveur : {v3}</div><button class="pri" id="sc-reload">↻ Recharger la page</button>',{v:(m.msg||t('web.version_jeu_correspond_celle_serveur','Ta version du jeu ne correspond plus à celle du serveur.')),v2:(m.client!==undefined?m.client:'?'),v3:(m.serveur!==undefined?m.serveur:'?')}));
       { const b=document.getElementById('sc-reload'); if(b)b.onclick=()=>location.reload(true); }
       break;
     case 'error':
@@ -318,10 +318,10 @@ function handle(m){
         const accueilVisible = accueil && !accueil.classList.contains('hidden') && accueil.offsetParent!==null;
         if(accueilVisible){
           const err=document.getElementById('lv-err');
-          if(err) err.textContent='Session expirée — saisis ton email et ton mot de passe.';
+          if(err) err.textContent=t('web.session_expiree_saisis_email_mot_passe','Session expirée — saisis ton email et ton mot de passe.');
           hideStatus();
         } else {
-          status('Session expirée — reconnecte-toi.');
+          status(t('web.session_expiree_reconnecte_toi','Session expirée — reconnecte-toi.'));
           screenAuth('login');
         }
       }
@@ -334,7 +334,7 @@ function handle(m){
       STATE.game=null; STATE.myCiv=null;
       try{ localStorage.removeItem('sc_ws_game'); }catch(e){}
       hideWaitBlock(); hideConfirmBar(); turnBar(false); closeDecision(); concedeFermer(); concederVisible(false);
-      status(m.by && m.by!==STATE.user ? (m.by+' a quitté — retour au lobby') : 'Partie quittée.');
+      status(((m.by && m.by!==STATE.user?t('web.quitte_retour_lobby','{v} a quitté — retour au lobby',{v:m.by}):t('web.partie_quittee','Partie quittée.'))));
       screenLobby();
       break;
     case 'pong': break;
@@ -388,7 +388,7 @@ function refreshJournal(g){
     /* v10.62 : même rendu qu'en solo (séparateurs « TOUR n », filet coloré, sous-lignes « ↳ paie »). */
     if (typeof window._journalHTML === 'function') { el.innerHTML = window._journalHTML(g.log); return; }
     const color = (window._logColorNations) ? window._logColorNations : (s=>s);
-    el.innerHTML = g.log.map(e => '<div class="log-e '+(e.cls||'')+'">'+color((e&&e.msg)||'')+'</div>').join('');
+    el.innerHTML = g.log.map(e => '<div class="log-e '+(e.cls||'')+'">'+color(typeof _logTexte==='function'?_logTexte(e):((e&&e.msg)||''))+'</div>').join('');
   } catch(e){}
 }
 
@@ -426,7 +426,7 @@ function onDecision(pending){
     showWaitBlock();
     /* « En attente des autres joueurs… » n'a de sens que s'il y a d'AUTRES HUMAINS (Marc, 15/09 : « ça
        reste affiché même si je joue contre les IA »). Les ordinateurs répondent dans l'instant. */
-    if(_autresHumains()) status('En attente des autres joueurs…'); else hideStatus();
+    if(_autresHumains()) status(t('web.attente_autres_joueurs','En attente des autres joueurs…')); else hideStatus();
     // Fenêtre suivante de la file, s'il y en a une (voir la note en tête de onDecision).
     if(STATE._queue && STATE._queue.length){ const nx=STATE._queue.shift(); setTimeout(()=>onDecision(nx), 60); }
   };
@@ -465,10 +465,10 @@ function showDysonReal(pending){
   const go=(ans)=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide(ans); };
   if(nations)nations.innerHTML='';
   if(k==='ai_dyson'||k==='human_dyson'){
-    const who=(window._scPseudo&&window._scPseudo[o.builder])||o.builderName||'Une nation';
-    if(title)title.innerHTML='⚡ '+who+' a construit la Sphère de Dyson !';
-    if(sub)sub.innerHTML='Monopole énergétique adverse. Accepte (+3<i class=ri-energy></i>/tour) ou refuse (= guerre).';
-    actions.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="eot-btn" id="scd-acc" style="flex:1;margin-top:0;background:#0e2a18;border-color:#3a8a5a;color:#9fe8b8">🤝 Accepter le monopole</button><button class="eot-btn" id="scd-ref" style="flex:1;margin-top:0;background:linear-gradient(135deg,#8a2222,#5a0a0a);border-color:#cc4444;color:#ffcccc">⚔️ Refuser — guerre</button></div>';
+    const who=(window._scPseudo&&window._scPseudo[o.builder])||o.builderName||t('avis.nation','Une nation');
+    if(title)title.innerHTML=t('web.construit_sphere_dyson','⚡ {who} a construit la Sphère de Dyson !',{who:who});
+    if(sub)sub.innerHTML=t('web.monopole_energetique_adverse_accepte_3_t','Monopole énergétique adverse. Accepte (+3<i class=ri-energy></i>/tour) ou refuse (= guerre).');
+    actions.innerHTML=t('web.accepter_monopole_refuser_guerre','<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="eot-btn" id="scd-acc" style="flex:1;margin-top:0;background:#0e2a18;border-color:#3a8a5a;color:#9fe8b8">🤝 Accepter le monopole</button><button class="eot-btn" id="scd-ref" style="flex:1;margin-top:0;background:linear-gradient(135deg,#8a2222,#5a0a0a);border-color:#cc4444;color:#ffcccc">⚔️ Refuser — guerre</button></div>');
     m.classList.remove('hidden');
     document.getElementById('scd-acc').onclick=()=>go({war:false});
     document.getElementById('scd-ref').onclick=()=>go({war:true});
@@ -476,11 +476,9 @@ function showDysonReal(pending){
   }
   if(k==='dyson_build'){
     const ref=o.refusing||[];
-    if(title)title.innerHTML='⚡ Sphère de Dyson construite !';
-    if(sub)sub.innerHTML=ref.length?('Des nations refusent le monopole — forcer déclenche la guerre contre elles, ou renonce.'):'Toutes les nations acceptent le monopole énergétique.';
-    actions.innerHTML=ref.length
-      ? '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="eot-btn" id="scd-f" style="flex:1;margin-top:0;background:linear-gradient(135deg,#8a2222,#5a0a0a);border-color:#cc4444;color:#ffcccc"><i class=ri-energy></i> Forcer — guerre</button><button class="eot-btn" id="scd-r" style="flex:1;margin-top:0;background:#14182e;border-color:#5a6a8a;color:#aab8d8">↩️ Renoncer</button></div>'
-      : '<button class="eot-btn" id="scd-f">Continuer</button>';
+    if(title)title.innerHTML=t('web.sphere_dyson_construite','⚡ Sphère de Dyson construite !');
+    if(sub)sub.innerHTML=((((ref.length?t('web.nations_refusent_monopole_forcer_declenc','Des nations refusent le monopole — forcer déclenche la guerre contre elles, ou renonce.'):t('web.toutes_nations_acceptent_monopole_energe','Toutes les nations acceptent le monopole énergétique.')))));
+    actions.innerHTML=((((ref.length?t('web.forcer_guerre_renoncer','<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="eot-btn" id="scd-f" style="flex:1;margin-top:0;background:linear-gradient(135deg,#8a2222,#5a0a0a);border-color:#cc4444;color:#ffcccc"><i class=ri-energy></i> Forcer — guerre</button><button class="eot-btn" id="scd-r" style="flex:1;margin-top:0;background:#14182e;border-color:#5a6a8a;color:#aab8d8">↩️ Renoncer</button></div>'):'<button class="eot-btn" id="scd-f">Continuer</button>'))));
     m.classList.remove('hidden');
     const f=document.getElementById('scd-f'); if(f)f.onclick=()=>go({force:true});
     const r=document.getElementById('scd-r'); if(r)r.onclick=()=>go({force:false});
@@ -500,14 +498,14 @@ function showEotReal(pending){
     return parts.length?('<div class="eot-item"><span class="eot-name">'+lbl+' : '+parts.join(' ')+'</span></div>'):''; };
   const cout=[]; if(mt.energyCost)cout.push('−'+mt.energyCost+rE('energy')); if(mt.matCost)cout.push('−'+mt.matCost+rE('materials'));
   if(mt.routeEnergyCost)cout.push('routes −'+mt.routeEnergyCost+rE('energy'));
-  const ti=document.getElementById('eot-title'); if(ti)ti.textContent='📊 Bilan du Tour '+(o.turn||'');
+  const ti=document.getElementById('eot-title'); if(ti)ti.textContent=t('web.bilan_tour','📊 Bilan du Tour {tour}',{tour:o.turn||''});
   // Le serveur envoie le bilan COMPLET (construit par buildEOTBody dans index.html) : actions du tour,
   // entretien détaillé, revenus, une section par nation, guerre, pillages, pirates. On l'injecte tel quel
   // dans la vraie fenêtre — bilan rigoureusement identique au solo. Le résumé court ci-dessous ne sert
   // que de filet si un serveur plus ancien n'envoie pas le HTML.
-  if(body)body.innerHTML = o.html || ('<div class="eot-section"><h4>📊 Fin du tour '+(o.turn||'')+'</h4>'
+  if(body)body.innerHTML = o.html || (t('web.fin_tour_titre','<div class="eot-section"><h4>📊 Fin du tour {n}</h4>',{n:(o.turn||'')})
     +li('Revenus',rv,'+')
-    +(cout.length?('<div class="eot-item"><span class="eot-name">Entretien : '+cout.join(' ')+'</span></div>'):'<div class="eot-item"><span class="eot-name">Entretien : aucun</span></div>')
+    +(cout.length?t('web.entretien','<div class="eot-item"><span class="eot-name">Entretien : {v}</span></div>',{v:cout.join(' ')}):t('web.entretien_aucun','<div class="eot-item"><span class="eot-name">Entretien : aucun</span></div>'))
     +'</div>');
   const go=()=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide({}); };
   const btn=m.querySelector('.eot-btn'); if(btn)btn.onclick=go; else { const b2=m.querySelector('button'); if(b2)b2.onclick=go; }
@@ -518,16 +516,16 @@ function showEotReal(pending){
 function showHitReal(pending){
   const o=pending.payload||{};
   const m=document.getElementById('war-modal'); if(!m) return false;
-  const t=document.getElementById('wm-title'), b=document.getElementById('wm-body'), r=document.getElementById('wm-result');
-  if(t)t.textContent=o.title||'⚔️ Tu es attaqué';
+  const _ti=document.getElementById('wm-title'), b=document.getElementById('wm-body'), r=document.getElementById('wm-result');
+  if(_ti)_ti.textContent=(o.title||t('web.es_attaque','⚔️ Tu es attaqué'));
   /* Cette fenêtre partage `#war-modal` avec le résultat de combat : sans cela elle gardait le médaillon
      et le nom du DERNIER combat (Martiens, puis Ceinturiens…) — l'un des « il me fait passer pour »
      de D538. Ici le titre dit tout : médaillon neutre, pas de nom. */
   try{ const e=document.getElementById('wm-emoji'), nm=document.getElementById('wm-nation'), kk=document.getElementById('wm-kicker');
     /* Blason B : si le titre nomme la nation qui te frappe → « attaqué par NATION » ; sinon médaillon neutre. */
-    let n=null; try{ const G=scGetG(); const t=String(o.title||''); n=[G.player].concat(G.ais||[]).find(x=>x&&x.civ&&t.indexOf(x.civ.name)>=0&&x.civ.id!==STATE.myCiv)||null; }catch(e){}
+    let n=null; try{ const G=scGetG(); const _tt=String(o.title||''); n=[G.player].concat(G.ais||[]).find(x=>x&&x.civ&&_tt.indexOf(x.civ.name)>=0&&x.civ.id!==STATE.myCiv)||null; }catch(e){}
     if(e)e.textContent=n?n.civ.emoji:'⚔️'; if(nm)nm.textContent=n?n.civ.name:'';
-    if(kk){ kk.textContent=n?'attaqué par':'Guerre'; kk.classList.toggle('fen-prep',!!n); } }catch(e){}
+    if(kk){ kk.textContent=((((n?t('web.attaque','attaqué par'):'Guerre')))); kk.classList.toggle('fen-prep',!!n); } }catch(e){}
   if(b)b.innerHTML=o.body||'';
   if(r)r.classList.add('hidden');
   const go=()=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide({}); };
@@ -539,8 +537,8 @@ function showHitReal(pending){
 function showWarResultReal(pending){
   const o=pending.payload||{};
   const m=document.getElementById('war-modal'); if(!m) return false;
-  const t=document.getElementById('wm-title'), b=document.getElementById('wm-body'), r=document.getElementById('wm-result');
-  if(t)t.textContent=o.title||'⚔️ Combat';
+  const _ti=document.getElementById('wm-title'), b=document.getElementById('wm-body'), r=document.getElementById('wm-result');
+  if(_ti)_ti.textContent=o.title||'⚔️ Combat';
   /* Blason (14/09) : l'adversaire en médaillon. `civs` = [propriétaire, adversaire] ; « Vu par X » si on
      est le tiers spectateur (préfixe ajouté par le serveur dans ownerName). */
   try{ const G=scGetG(); const me=(typeof myNation==='function'&&myNation())||G.player; const civs=o.civs||[];
@@ -583,9 +581,9 @@ function showEventAnnounceBlocking(pending){
 function showRouteCaptureReal(pending){
   const o=pending.payload||{};
   const m=document.getElementById('route-capture-modal'); if(!m) return false;
-  const t=document.getElementById('rcm-title'), d=document.getElementById('rcm-desc'), keep=document.getElementById('rcm-keep');
-  if(t)t.textContent='🛤️ '+(o.name||'');
-  if(d)d.innerHTML=o.prot?'Tu as <b>brisé la protection</b> ennemie (jeton détruit). 2 jetons engagés : 1 part en récupération. Que faire de la route ?':'Route ennemie <b>non protégée</b>, prise sans coût. Que faire ?';
+  const _ti=document.getElementById('rcm-title'), d=document.getElementById('rcm-desc'), keep=document.getElementById('rcm-keep');
+  if(_ti)_ti.textContent='🛤️ '+(o.name||'');
+  if(d)d.innerHTML=((((o.prot?t('web.as_brise_protection_ennemie_jeton_detrui','Tu as <b>brisé la protection</b> ennemie (jeton détruit). 2 jetons engagés : 1 part en récupération. Que faire de la route ?'):t('web.route_ennemie_non_protegee_prise_sans_co','Route ennemie <b>non protégée</b>, prise sans coût. Que faire ?')))));
   const go=(ans)=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide(ans); };
   /* Par RÔLE (Blason : rouge = détruire à gauche, vert = récupérer à droite), plus par rang. */
   const bKeep=m.querySelector('#rcm-keep')||m.querySelectorAll('.atk-btns button')[0];
@@ -604,24 +602,21 @@ function showForcedWarReal(pending){
   const enemy=(window._scPseudo&&window._scPseudo[o.enemy])||o.enemyName||'l\'ennemi';
   /* Blason : médaillon + nom de l'ennemi, le titre devient le verbe. */
   try{ const G=scGetG(); const n=[G.player].concat(G.ais||[]).find(x=>x&&x.civ&&x.civ.id===o.enemy); const e=document.getElementById('fw-emoji'), nm=document.getElementById('fw-nation'); if(e)e.textContent=n?n.civ.emoji:'😡'; if(nm)nm.textContent=enemy; }catch(e){}
-  if(title)title.textContent='Ton peuple exige la guerre. Choisis ta cible.';
+  if(title)title.textContent=t('web.peuple_exige_guerre_choisis_cible','Ton peuple exige la guerre. Choisis ta cible.');
   /* `o.prix` vient du moteur (voir `prixDeLaGuerreHTML`) : même texte qu'en solo, chiffré pour toi. */
-  if(desc)desc.innerHTML='Tension à 10 : le peuple exige que tu attaques <b>'+enemy+'</b> maintenant.'+(o.prix||'');
+  if(desc)desc.innerHTML=t('web.tension_10_peuple_exige_attaques_mainten','Tension à 10 : le peuple exige que tu attaques <b>{enemy}</b> maintenant.{v}',{enemy:enemy,v:o.prix||''});
   const go=(ans)=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide(ans); };
-  let html='<div class="fw-choice" id="fw-peace">🕊️ Exiger la paix (tribut si ennemi faible, sinon la guerre continue)</div>';
-  (o.routes||[]).forEach(r=>{ const can=(o.myForce||0)>=r.need; html+='<div class="fw-choice" data-rt="'+r.i+'" style="'+(can?'':'opacity:.5')+'">'+(r.prot?'🛡️':'🔓')+' Attaquer route '+r.name+' — '+r.need+' jeton'+(r.need>1?'s':'')+'</div>'; });
+  let html=t('web.exiger_paix_tribut_si_ennemi_faible_sino','<div class="fw-choice" id="fw-peace">🕊️ Exiger la paix (tribut si ennemi faible, sinon la guerre continue)</div>');
+  (o.routes||[]).forEach(r=>{ const can=(o.myForce||0)>=r.need; html+=t('web.attaquer_route_jeton','<div class="fw-choice" data-rt="{v}" style="{v2}">{v3} Attaquer route {nom} — {v4} jeton{v5}</div>',{v:r.i,v2:(can?'':'opacity:.5'),v3:(r.prot?'🛡️':'🔓'),nom:r.name,v4:r.need,v5:(r.need>1?'s':'')}); });
   /* ⚠️ ON MONTRE TOUTES LES COLONIES À PORTÉE, pas seulement la plus proche. Avant, cette fenêtre
      n'offrait que `colTarget` et la fenêtre d'assaut qui suivait les proposait toutes : deux règles
      pour une seule décision (Marc, 083E tour 7). `cols` vient du moteur et applique la vraie règle
      de portée ; le repli sur `colTarget` ne sert qu'aux parties reprises d'une version antérieure. */
   const _cols=(o.cols&&o.cols.length)?o.cols:(o.colTarget?[{node:o.colTarget,name:(o.colName||o.colTarget)}]:[]);
   _cols.forEach(function(c,i){
-    html+='<div class="fw-choice" data-col="'+c.node+'">🏗️ Attaquer '+(c.name||c.node)
-      +(c.level?(' Nv.'+c.level):'')+(c.isHome?' 🏛️ capitale (10 de garnison)':'')
-      +(c.dist!==undefined?(' <span style="opacity:.6;font-size:.85em">— '+c.dist+' nœud'+(c.dist>1?'s':'')+(i===0?', la plus proche':'')+'</span>'):'')
-      +'</div>';
+    html+=t('web.attaquer','<div class="fw-choice" data-col="{v}">🏗️ Attaquer {v2}{v3}{v4}{v5}</div>',{v:c.node,v2:c.name||c.node,v3:(c.level?' Nv.'+c.level:''),v4:(c.isHome?t('web.capitale_10_garnison',' 🏛️ capitale (10 de garnison)'):''),v5:(c.dist!==undefined?t('web.ud',' <span style="opacity:.6;font-size:.85em">— {v} nœud{v2}{v3}</span>',{v:c.dist,v2:(c.dist>1?'s':''),v3:(i===0?t('web.proche',', la plus proche'):'')}):'')});
   });
-  if(!(o.routes||[]).length && !_cols.length)html+='<div class="fw-choice" id="fw-none">✖️ Passer — aucune cible, la pression populaire retombe</div>';
+  if(!(o.routes||[]).length && !_cols.length)html+=t('web.passer_aucune_cible_pression_populaire_r','<div class="fw-choice" id="fw-none">✖️ Passer — aucune cible, la pression populaire retombe</div>');
   choices.innerHTML=html;
   const pe=document.getElementById('fw-peace'); if(pe)pe.onclick=()=>go({peace:true});
   choices.querySelectorAll('.fw-choice[data-rt]').forEach(el=>{ el.onclick=()=>go({route:parseInt(el.getAttribute('data-rt'))}); });
@@ -637,7 +632,7 @@ function showAccordReal(pending){
   const body=document.getElementById('accord-body'); const conf=document.getElementById('accord-confirm');
   if(!body||!conf) return false;
   try{ const G=scGetG(); const n=[G.player].concat(G.ais||[]).find(x=>x&&x.civ&&(x.civ.id===o.withId||x.civ.name===o.withName)); const e=document.getElementById('accord-emoji'), nm=document.getElementById('accord-nation'); if(e)e.textContent=n?n.civ.emoji:'🤝'; if(nm)nm.textContent=o.withName||(n?n.civ.name:''); }catch(e){}
-  body.innerHTML='Conclure un accord commercial'+(o.nodeName?(' sur <b>'+o.nodeName+'</b>'):'')+' ? (+3 VP chacun, met fin à une guerre)';
+  body.innerHTML=t('web.conclure_accord_commercial_3_vp_chacun_m','Conclure un accord commercial{v} ? (+3 VP chacun, met fin à une guerre)',{v:(o.nodeName?' sur <b>'+o.nodeName+'</b>':'')});
   const go=(ans)=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide(ans); };
   conf.onclick=()=>go({confirm:true});
   const cancel=m.querySelector('button.npop-btn')||m.querySelector('.fen-btn.ghost'); if(cancel)cancel.onclick=()=>go({confirm:false});
@@ -722,11 +717,7 @@ function _confirmerGuerreSansMoyens(o){
   const n=(o&&o.maxEngage!==undefined)?o.maxEngage:null;
   if(n===null||n>=2) return true;
   const s=(o&&o.stocks)||{};
-  return confirm('⚠️ Tu manques de ressources pour attaquer.\n\n'
-    +'Tu ne peux engager que '+n+' jeton'+(n>1?'s':'')+' ce tour-ci'
-    +' (stocks : '+(s.materials||0)+'🪨 '+(s.energy||0)+'⚡ — il faut 1🪨 +1⚡ par jeton engagé).\n\n'
-    +'Refuser la paix maintenant, c\'est poursuivre une guerre que tu n\'as pas les moyens de mener.\n\n'
-    +'Continuer quand même ?');
+  return confirm(t('web.manques_ressources_attaquer_peux_engager','⚠️ Tu manques de ressources pour attaquer.\n\nTu ne peux engager que {n} jeton{v} ce tour-ci (stocks : {cout}🪨 {cout2}⚡ — il faut 1🪨 +1⚡ par jeton engagé).\n\nRefuser la paix maintenant, c\'est poursuivre une guerre que tu n\'as pas les moyens de mener.\n\nContinuer quand même ?',{n:n,v:(n>1?'s':''),cout:s.materials||0,cout2:s.energy||0}));
 }
 // VRAIE modale de paix (#peace-modal) : offre de ressources +/− + Proposer la paix / Se battre.
 function showPeaceReal(pending){
@@ -745,13 +736,13 @@ function showPeaceReal(pending){
   /* Marc, 15/09 : si l'adversaire VIENT de déclarer la guerre, cette fenêtre est l'annonce elle-même :
      « Paix ou guerre ? » / NATION / « Ils t'ont déclaré la guerre. Que veux-tu faire ? ». Sinon « contre NATION ». */
   const _declParAdv=!!o.isJustDeclared&&o.declaredBy!=='player';
-  set('pm-kicker', _declParAdv?'Paix ou guerre ?':'contre');
+  set('pm-kicker', (_declParAdv?t('web.paix_ou_guerre','Paix ou guerre ?'):'contre'));
   try{ document.getElementById('pm-kicker').classList.toggle('fen-prep',!_declParAdv); }catch(e){}
-  set('pm-verb', _declParAdv?'Ils t\'ont déclaré la guerre. Que veux-tu faire ?':(o.declaredBy==='player'?'Tu as déclaré la guerre. Proposer la paix ?':'Proposer la paix ?'));
-  set('pm-declaredby', o.declaredBy==='player'?'Guerre déclarée par toi — l\'adversaire répond.':(o.isJustDeclared?'':'Guerre déclarée par '+atkName+'.'));
+  set('pm-verb', (_declParAdv?t('web.ils_ont_declare_guerre_veux_faire','Ils t\'ont déclaré la guerre. Que veux-tu faire ?'):(o.declaredBy==='player'?t('web.as_declare_guerre_proposer_paix','Tu as déclaré la guerre. Proposer la paix ?'):t('web.proposer_paix','Proposer la paix ?'))));
+  set('pm-declaredby', (o.declaredBy==='player'?t('web.guerre_declaree_toi_adversaire_repond','Guerre déclarée par toi — l\'adversaire répond.'):(o.isJustDeclared?'':t('web.guerre_declaree','Guerre déclarée par {atkname}.',{atkname:atkName}))));
   const vy=(o.vpYou&&o.vpYou.total!==undefined)?o.vpYou.total:(o.vpYou||0);
   const ve=(o.vpEnemy&&o.vpEnemy.total!==undefined)?o.vpEnemy.total:(o.vpEnemy||0);
-  set('pm-context','VP — Toi : <b>'+vy+'</b> | Adversaire : <b>'+ve+'</b><br>Offre des ressources pour tenter la paix, ou refuse et combats.');
+  set('pm-context',t('web.vp_toi_adversaire_offre_ressources_tente','VP — Toi : <b>{vy}</b> | Adversaire : <b>{ve}</b><br>Offre des ressources pour tenter la paix, ou refuse et combats.',{vy:vy,ve:ve}));
   if(typeof _updatePeaceDisplay==='function'){try{_updatePeaceDisplay();}catch(e){}}
   const close=()=>{ m.classList.add('hidden'); m.style.display='none'; };
   /* Les boutons sont désignés par leur RÔLE (.ok / .no), plus par leur rang : l'ordre a changé avec
@@ -782,8 +773,7 @@ function showAgendaReal(pending){
     /* Marc, 14/09 : plus de ressources ni de revenus ici (visibles en haut) — le prochain événement seul, sur
        toute la largeur, une ligne. */
     void resStr; void gainStr;
-    if(ctx) ctx.innerHTML='<div class="agsel-ctx-box agsel-ctx-wide" title="'+(evNext?esc(String(evNext.name||'')+' — '+String(evNext.preview||'').replace(/<[^>]+>/g,'')):'')+'">'
-      +'<span class="agsel-ctx-label">Prochain événement</span> <span class="agsel-ctx-val">'+(evNext?(evNext.emoji+' T.'+((G.turn||1)+1)+' — <b>'+esc(evNext.name||'')+'</b> · '+evNext.preview):'Aucun')+'</span></div>';
+    if(ctx) ctx.innerHTML=t('web.prochain_evenement','<div class="agsel-ctx-box agsel-ctx-wide" title="{v}"><span class="agsel-ctx-label">Prochain événement</span> <span class="agsel-ctx-val">{tour}</span></div>',{v:(evNext?esc(String(evNext.name||'')+' — '+String(evNext.preview||'').replace(/<[^>]+>/g,'')):''),tour:(evNext?evNext.emoji+' T.'+((G.turn||1)+1)+' — <b>'+esc(evNext.name||'')+'</b> · '+evNext.preview:'Aucun')});
   }catch(e){ if(ctx) ctx.innerHTML=''; }
   cont.innerHTML=opts.map(ag=>'<div class="agsel-ag" id="agsel-ag-'+ag.id+'" onclick="selectAgenda(\''+ag.id+'\')">'
     +'<div class="agsel-ag-emoji">'+(ag.emoji||'')+'</div>'
@@ -797,12 +787,9 @@ function showStrategyReal(pending){
   const o=pending.payload||{}, opts=o.options||[];
   const el=document.getElementById('strat-options'), modal=document.getElementById('strategy-modal');
   if(!el || !modal) return false;
-  el.innerHTML=opts.map(c=>'<div class="strat-opt" id="strat-opt-'+c.id+'" onclick="selectStrategy(\''+c.id+'\')">'
-    +'<div class="so-emoji">'+(c.emoji||'')+'</div>'
-    +'<div class="so-name">'+(c.name||c.id)+'</div>'
-    +'<div class="so-desc">'+(c.desc||'')+(c.calmTension?' 🕊️ (calme une tension)':'')+'</div></div>').join('');
+  el.innerHTML=opts.map(c=>t('web.ligne_7','<div class="strat-opt" id="strat-opt-{v}" onclick="selectStrategy(\'{v2}\')"><div class="so-emoji">{v3}</div><div class="so-name">{v4}</div><div class="so-desc">{v5}{tension}</div></div>',{v:c.id,v2:c.id,v3:c.emoji||'',v4:c.name||c.id,v5:c.desc||'',tension:(c.calmTension?t('web.calme_tension_2',' 🕊️ (calme une tension)'):'')})).join('');
   const b=document.getElementById('strat-confirm-btn'); if(b) b.disabled=true;
-  const sub=document.getElementById('strat-sub'); if(sub) sub.textContent='Draft : à toi en '+(o.rank||1)+((o.rank||1)===1?'er':'e')+'/'+(o.total||'?')+'.';
+  const sub=document.getElementById('strat-sub'); if(sub) sub.textContent=t('web.draft_toi','Draft : à toi en {v}{v2}/{v3}.',{v:o.rank||1,v2:((o.rank||1)===1?'er':'e'),v3:o.total||'?'});
   modal.classList.remove('hidden');
   return true;
 }
@@ -819,13 +806,7 @@ function showInvestReal(pending, lvl){
      champ, et tout griser serait pire que ne rien griser. */
   optsEl.innerHTML=opts.map(c=>{
     const ok=(c.payable!==false);
-    return '<div class="inv-opt'+(ok?'':' inv-nope')+'"'+(ok?' onclick="'+selFn+'(\''+c.id+'\')"':'')+'>'
-    +'<div class="inv-opt-emoji">'+(c.emoji||'')+'</div>'
-    +'<div class="inv-opt-name">'+(c.name||c.id)+'</div>'
-    +'<div class="inv-opt-benefit">✅ '+(c.benefit||'')+'</div>'
-    +'<div class="inv-opt-cost">⚠️ '+(c.contrepartie||'')+'</div>'
-    +(ok?'':'<div class="inv-opt-cost" style="color:#ff8a8a;font-weight:700">🚫 Il te manque '+(c.manque||'')+'</div>')
-    +'</div>';}).join('');
+    return t('web.ligne_8','<div class="inv-opt{v}"{v2}><div class="inv-opt-emoji">{v3}</div><div class="inv-opt-name">{v4}</div><div class="inv-opt-benefit">✅ {v5}</div><div class="inv-opt-cost">⚠️ {v6}</div>{cout}</div>',{v:(ok?'':' inv-nope'),v2:(ok?' onclick="'+selFn+'(\''+c.id+'\')"':''),v3:c.emoji||'',v4:c.name||c.id,v5:c.benefit||'',v6:c.contrepartie||'',cout:(ok?'':t('web.te_manque','<div class="inv-opt-cost" style="color:#ff8a8a;font-weight:700">🚫 Il te manque {v}</div>',{v:c.manque||''}))});}).join('');
   const aiEl=document.getElementById(two?'inv2-ai-pick':'inv-ai-pick');
   if(aiEl && Array.isArray(o.ai) && o.ai.length){
     const nm=(id)=>{ const x=opts.find(y=>y.id===id); return x?((x.emoji||'')+' '+x.name):id; };
@@ -878,7 +859,7 @@ function _toastLigne(t){
    humain (pas de ligne 🤖), les seules lignes d'ACTION (colonie, route, achat, amélioration, raid, pouvoir,
    accord, capture). Tout le reste reste dans le journal. */
 function _lignesActions(txts){
-  const brut=(txts||[]).map(t=>String((t&&t.msg)||t||'').replace(/<[^>]+>/g,'').trim()).filter(Boolean);
+  const brut=(txts||[]).map(x=>(typeof _logTexte==='function'?_logTexte(x):String((x&&x.msg)||x||'')).replace(/<[^>]+>/g,'').trim()).filter(Boolean);
   const ia=brut.filter(t=>/^\u{1F916}/u.test(t));
   if(ia.length) return ia;
   return brut.filter(t=>/^(🏗️|🛤️ Route [^p]|✅|💼|⬆️|⚔️ Raid|💫|🤝|🏴|🕊️ Mission|🧬|🕵️)/u.test(t) && !_TOAST_IGNORE.test(t));
@@ -893,7 +874,7 @@ function showLogToast(txts, tout){
      On garde les 4 dernières lignes, comme le toast rouge qu'elle remplace. */
   if(typeof fenDepechesMontrer==='function'){
     window._scDepBuf=(window._scDepBuf||[]).concat(lignes).slice(-4);
-    const p0=fenDepechesMontrer(window._scDepBuf,{kicker:'Pendant ton attente',duree:8000});
+    const p0=fenDepechesMontrer(window._scDepBuf,{kicker:t('web.pendant_attente','Pendant ton attente'),duree:8000});
     if(p0){ clearTimeout(window._scDepReset); window._scDepReset=setTimeout(()=>{ window._scDepBuf=[]; },((typeof fenDepechesDuree==='function')?fenDepechesDuree(8000):8000)+200); return; }
   }
   let p=document.getElementById('sc-logtoast');
@@ -942,17 +923,17 @@ function showEventReal(o, isAnnounce){
   if(isAnnounce){
     const m=document.getElementById('event-announce-modal'); if(!m) return false;
     const em=document.getElementById('ea-emoji'), nm=document.getElementById('ea-name'), ds=document.getElementById('ea-desc');
-    if(em)em.textContent=ev.emoji||'⭐'; if(nm)nm.textContent=ev.name||'Événement'; if(ds)ds.innerHTML=ev.preview||'';
+    if(em)em.textContent=ev.emoji||'⭐'; if(nm)nm.textContent=(ev.name||t('web.evenement','Événement')); if(ds)ds.innerHTML=ev.preview||'';
     const b=m.querySelector('.ea-btn'); if(b)b.onclick=()=>m.classList.add('hidden');
     m.classList.remove('hidden'); return true;
   }
   const m=document.getElementById('event-modal'); if(!m) return false;
   const card=document.getElementById('evm-card'); if(card){card.className='fen fen-event evt-card'+(ev.type?(' '+ev.type):''); card.style.borderColor='';}
   const em=document.getElementById('evm-emoji'), bd=document.getElementById('evm-badge'), nm=document.getElementById('evm-name'), rs=document.getElementById('evm-result'), cq=document.getElementById('evm-consequence');
-  const T={competition:'COMPÉTITION',menace:'MENACE',opportunite:'OPPORTUNITÉ'};
+  const T={competition:t('web.competition','COMPÉTITION'),menace:'MENACE',opportunite:t('web.opportunite','OPPORTUNITÉ')};
   if(em)em.textContent=ev.emoji||'🎯';
-  if(bd){bd.textContent=T[ev.type]||'ÉVÉNEMENT';bd.style.color=ev.type==='menace'?'#ffb347':ev.type==='competition'?'#ff6b62':ev.type==='opportunite'?'#5fd08a':'#ffd34d';}
-  if(nm)nm.textContent=ev.name||'Événement';
+  if(bd){bd.textContent=(T[ev.type]||t('web.evenement_2','ÉVÉNEMENT'));bd.style.color=ev.type==='menace'?'#ffb347':ev.type==='competition'?'#ff6b62':ev.type==='opportunite'?'#5fd08a':'#ffd34d';}
+  if(nm)nm.textContent=(ev.name||t('web.evenement','Événement'));
   if(rs)rs.innerHTML=o.msg||'—';
   if(cq)cq.classList.add('hidden');
   const b=m.querySelector('.evm-btn'); if(b)b.onclick=()=>m.classList.add('hidden');
@@ -996,7 +977,7 @@ function showNotice(m){
      ferment simplement leur fenêtre. */
   if(k==='eot'){
     const em=document.getElementById('eot-modal'); if(!em) return;
-    const ti=document.getElementById('eot-title'); if(ti)ti.textContent='📊 Bilan du Tour '+(o.turn||'');
+    const ti=document.getElementById('eot-title'); if(ti)ti.textContent=t('web.bilan_tour','📊 Bilan du Tour {tour}',{tour:o.turn||''});
     const body=document.getElementById('eot-body'); if(body)body.innerHTML=o.html||'';
     const go=()=>em.classList.add('hidden');
     const btn=em.querySelector('.eot-btn'); if(btn){ btn.textContent='Fermer'; btn.onclick=go; }
@@ -1098,7 +1079,7 @@ function listUpgrades(){
     const me=myNation(); if(!me||me.acLeft<1) return out;
     for(const c of me.colonies){ const n=NODES[c.nodeId]; if(!n) continue;
       if(c.noUpgrade) continue; if(c.level>=(n.maxLv||1)) continue;
-      out.push({id:c.nodeId, label:'⬆️ '+n.name+' Nv.'+c.level+' → '+(c.level+1), sub:'1 AC + coût du niveau'});
+      out.push({id:c.nodeId, label:'⬆️ '+n.name+' Nv.'+c.level+' → '+(c.level+1), sub:t('web.1_ac_cout_niveau','1 AC + coût du niveau')});
     }
   }catch(e){ console.warn('[SC] listUpgrades:', e); }
   return out;
@@ -1110,7 +1091,7 @@ function sendAction(action){
   bandeauATonTour(false);   // ← tu viens de jouer : le badge s'éteint sans attendre un message du serveur
   window._scOnPass=null; window._scOnSkip=null;
   send({t:'act', action});
-  showWaitBlock(); statusBref('Coup envoyé…');
+  showWaitBlock(); statusBref(t('web.coup_envoye','Coup envoyé…'));
   // anti-flicker : redemander l'état autoritaire rapidement (le round-trip est court),
   // pour que le plateau reflète le résultat réel sans rester sur l'affichage local périmé.
   setTimeout(()=>reqState(true), 120);
@@ -1120,7 +1101,7 @@ function sendAction(action){
 function showConfirmBar(){
   try{
     const b=document.getElementById('sc-confirm'); if(!b) return;
-    const lbl=document.getElementById('sc-confirm-label'); if(lbl) lbl.innerHTML='<span class="scc-act">Action jouée</span>';
+    const lbl=document.getElementById('sc-confirm-label'); if(lbl) lbl.innerHTML=t('web.action_jouee','<span class="scc-act">Action jouée</span>');
     b.classList.add('show');
     hideWaitBlock();
   }catch(e){}
@@ -1248,7 +1229,7 @@ function installIntercepts(){
       const o=window.scAbandonGame;
       window.scAbandonGame=function(){
         if(STATE.started || (STATE.game&&STATE.game.code)){
-          if(!confirm('Quitter cette partie en ligne et revenir au menu ? La partie sera terminée pour tous les joueurs.')) return;
+          if(!confirm(t('web.quitter_partie_ligne_revenir_menu_partie','Quitter cette partie en ligne et revenir au menu ? La partie sera terminée pour tous les joueurs.'))) return;
           try{ localStorage.removeItem('sc_ws_game'); }catch(e){}
           send({t:'leave'});
           return;
@@ -1321,12 +1302,12 @@ function installIntercepts(){
     // Boutons ✓ Valider / ↩ Annuler : en ligne, valident/annulent l'action tenue par le SERVEUR.
     if(typeof window.scConfirmValidate==='function' && !window.scConfirmValidate._scOff){
       const o=window.scConfirmValidate;
-      window.scConfirmValidate=function(){ if(STATE.started){ hideConfirmBar(); STATE._confirmPending=false; send({t:'confirm'}); showWaitBlock(); statusBref('Validé…'); return; } return o.apply(this,arguments); };
+      window.scConfirmValidate=function(){ if(STATE.started){ hideConfirmBar(); STATE._confirmPending=false; send({t:'confirm'}); showWaitBlock(); statusBref(t('web.valide','Validé…')); return; } return o.apply(this,arguments); };
       window.scConfirmValidate._scOff=true;
     }
     if(typeof window.scConfirmCancel==='function' && !window.scConfirmCancel._scOff){
       const o=window.scConfirmCancel;
-      window.scConfirmCancel=function(){ if(STATE.started){ hideConfirmBar(); STATE._confirmPending=false; send({t:'undo'}); showWaitBlock(); statusBref('Annulé — retour en arrière…'); return; } return o.apply(this,arguments); };
+      window.scConfirmCancel=function(){ if(STATE.started){ hideConfirmBar(); STATE._confirmPending=false; send({t:'undo'}); showWaitBlock(); statusBref(t('web.annule_retour_arriere','Annulé — retour en arrière…')); return; } return o.apply(this,arguments); };
       window.scConfirmCancel._scOff=true;
     }
     ['selectInvestment','selectInvestment2'].forEach(function(fn){
@@ -1346,9 +1327,7 @@ function installIntercepts(){
   }catch(e){ console.warn('[SC] neutralisation confirm:', e); }
 }
 function askRouteToken(action){
-  decisionPanel(`<h2>🛤️ Protéger la route ?</h2><div class="muted">Un jeton maintient la connexion et repousse les pirates.</div>
-    <button class="opt" id="sc-t1">⚔️ Oui, déployer 1 jeton</button>
-    <button class="opt" id="sc-t0">Non, laisser sans protection militaire</button>`);
+  decisionPanel(t('web.proteger_route_jeton_maintient_connexion','<h2>🛤️ Protéger la route ?</h2><div class="muted">Un jeton maintient la connexion et repousse les pirates.</div>\n    <button class="opt" id="sc-t1">⚔️ Oui, déployer 1 jeton</button>\n    <button class="opt" id="sc-t0">Non, laisser sans protection militaire</button>'));
   document.getElementById('sc-t1').onclick=()=>{ action.token=true; sendAction(action); };
   document.getElementById('sc-t0').onclick=()=>{ action.token=false; sendAction(action); };
 }
@@ -1390,17 +1369,10 @@ function actionMenu(){
   const me = myNation();
   const acLeft = me ? ' — '+me.acLeft+' AC' : '';
   const cols=listColonize(), rts=listRoutes(), techs=listTechs(), ups=listUpgrades();
-  const btn=(id,label,n)=>`<button class="opt" id="${id}"${n?'':' disabled style="opacity:.45"'}>${label}${n?' <span class="muted">('+n+' choix)</span>':' <span class="muted">(aucune cible)</span>'}</button>`;
-  decisionPanel(`<h2>🎮 Ton tour${acLeft}</h2>
-    ${btn('sc-a-col','🏗 Coloniser',cols.length)}
-    ${btn('sc-a-rte','🛤 Route',rts.length)}
-    ${btn('sc-a-tech','🔬 Acheter une tech',techs.length)}
-    ${btn('sc-a-up','⬆️ Améliorer une colonie',ups.length)}
-    <button class="opt" id="sc-auto">🤖 L'IA joue ce coup pour moi</button>
-    <button class="opt" id="sc-pass">⏭ Passer (fin de ma manche)</button>
-    <div class="muted" style="margin-top:6px">Ce menu est un secours : le mieux est de jouer directement sur le plateau (coloniser, routes, techs, gouvernement, raid, attaque, pouvoir — tout est branché). 1 action = la main passe, puis revient à toi s'il te reste des AC.</div>`);
+  const btn=(id,label,n)=>t('web.ligne_9','<button class="opt" id="{id}"{v}>{label}{v2}</button>',{id:id,v:(n?'':' disabled style="opacity:.45"'),label:label,v2:(n?' <span class="muted">('+n+' choix)</span>':t('web.aucune_cible',' <span class="muted">(aucune cible)</span>'))});
+  decisionPanel(t('web.tour_ia_joue_coup_moi_passer_fin_ma_manc','<h2>🎮 Ton tour{ac}</h2>\n    {v}\n    {v2}\n    {v3}\n    {v4}\n    <button class="opt" id="sc-auto">🤖 L\'IA joue ce coup pour moi</button>\n    <button class="opt" id="sc-pass">⏭ Passer (fin de ma manche)</button>\n    <div class="muted" style="margin-top:6px">Ce menu est un secours : le mieux est de jouer directement sur le plateau (coloniser, routes, techs, gouvernement, raid, attaque, pouvoir — tout est branché). 1 action = la main passe, puis revient à toi s\'il te reste des AC.</div>',{ac:acLeft,v:btn('sc-a-col','🏗 Coloniser',cols.length),v2:btn('sc-a-rte','🛤 Route',rts.length),v3:btn('sc-a-tech','🔬 Acheter une tech',techs.length),v4:btn('sc-a-up','⬆️ Améliorer une colonie',ups.length)}));
   const sub=(items, mk)=>{ // sous-menu générique
-    decisionPanel('<h2>Choisis</h2>'+items.map((it,i)=>`<button class="opt" data-i="${i}"><b>${it.label}</b><br><span class="muted">${it.sub||''}</span></button>`).join('')+'<button class="opt" id="sc-back">↩ Retour</button>');
+    decisionPanel(t('web.choisis_retour','<h2>Choisis</h2>{v}<button class="opt" id="sc-back">↩ Retour</button>',{v:items.map((it,i)=>`<button class="opt" data-i="${i}"><b>${it.label}</b><br><span class="muted">${it.sub||''}</span></button>`).join('')}));
     document.querySelectorAll('#sc-decision .opt[data-i]').forEach(b=>{ b.onclick=()=>mk(items[parseInt(b.getAttribute('data-i'))]); });
     document.getElementById('sc-back').onclick = actionMenu;
   };
@@ -1409,9 +1381,7 @@ function actionMenu(){
   bind('sc-a-rte', ()=>sub(rts, it=>{
     const me2=myNation(); const hasTok=me2&&me2.forceTokens>0;
     if(!hasTok) return sendAction({type:'route', from:it.from, to:it.to, token:false});
-    decisionPanel(`<h2>${it.label}</h2><div class="muted">Protéger la route avec un jeton de force ?</div>
-      <button class="opt" id="sc-t1">⚔️ Oui, déployer 1 jeton</button>
-      <button class="opt" id="sc-t0">Non, laisser sans protection militaire</button>`);
+    decisionPanel(t('web.proteger_route_avec_jeton_force_oui_depl','<h2>{v}</h2><div class="muted">Protéger la route avec un jeton de force ?</div>\n      <button class="opt" id="sc-t1">⚔️ Oui, déployer 1 jeton</button>\n      <button class="opt" id="sc-t0">Non, laisser sans protection militaire</button>',{v:it.label}));
     document.getElementById('sc-t1').onclick=()=>sendAction({type:'route', from:it.from, to:it.to, token:true});
     document.getElementById('sc-t0').onclick=()=>sendAction({type:'route', from:it.from, to:it.to, token:false});
   }));
@@ -1532,23 +1502,7 @@ function absenceBanner(m){
      le bas de l'écran, là où sont les boutons. Le déplacer suffit ; le réduire vaut mieux. */
   let pos=null, replie=false;
   try{ pos=JSON.parse(localStorage.getItem('sc_abs_pos')||'null'); replie=localStorage.getItem('sc_abs_replie')==='1'; }catch(e){}
-  const b=el('<div id="sc-absence" style="position:fixed;z-index:8200;'
-    +'max-width:min(94vw,560px);background:rgba(24,30,44,.97);border:1px solid #45557a;border-radius:12px;'
-    +'padding:8px 12px;color:#dbe6ff;font:600 .82em system-ui;box-shadow:0 8px 28px rgba(0,0,0,.5);text-align:center">'
-    +'<div id="sc-abs-tete" style="display:flex;align-items:center;gap:8px;cursor:move;user-select:none;touch-action:none">'
-      +'<span id="sc-abs-poignee" style="flex:1;text-align:left;color:#9fb4d8;font-size:.9em">⠿ Joueur absent</span>'
-      +'<button id="sc-abs-reduire" title="Réduire" style="background:#1a2444;color:#9fb4d8;border:1px solid #45557a;'
-        +'border-radius:7px;min-width:26px;height:22px;cursor:pointer;font-weight:800;line-height:1">–</button>'
-    +'</div>'
-    +'<div id="sc-abs-corps">'
-      +'<div id="sc-absence-msg" style="margin:6px 0 '+(m.votable?'8px':'0')+'"></div>'
-      +(m.votable
-        ? '<button id="sc-absence-vote" style="background:linear-gradient(135deg,#a2542f,#7a3c20);color:#fff;border:0;'
-          +'border-radius:9px;padding:7px 13px;font:700 .95em system-ui;cursor:pointer">🤖 Proposer de le remplacer par une IA</button>'
-          +'<div id="sc-absence-vote-etat" style="margin-top:6px;color:#9fb4d8;font-weight:500"></div>'
-        : '')
-    +'</div>'
-    +'</div>');
+  const b=el(t('web.joueur_absent','<div id="sc-absence" style="position:fixed;z-index:8200;max-width:min(94vw,560px);background:rgba(24,30,44,.97);border:1px solid #45557a;border-radius:12px;padding:8px 12px;color:#dbe6ff;font:600 .82em system-ui;box-shadow:0 8px 28px rgba(0,0,0,.5);text-align:center"><div id="sc-abs-tete" style="display:flex;align-items:center;gap:8px;cursor:move;user-select:none;touch-action:none"><span id="sc-abs-poignee" style="flex:1;text-align:left;color:#9fb4d8;font-size:.9em">⠿ Joueur absent</span><button id="sc-abs-reduire" title="Réduire" style="background:#1a2444;color:#9fb4d8;border:1px solid #45557a;border-radius:7px;min-width:26px;height:22px;cursor:pointer;font-weight:800;line-height:1">–</button></div><div id="sc-abs-corps"><div id="sc-absence-msg" style="margin:6px 0 {v}"></div>{v2}</div></div>',{v:(m.votable?'8px':'0'),v2:(m.votable?t('web.proposer_remplacer_ia','<button id="sc-absence-vote" style="background:linear-gradient(135deg,#a2542f,#7a3c20);color:#fff;border:0;border-radius:9px;padding:7px 13px;font:700 .95em system-ui;cursor:pointer">🤖 Proposer de le remplacer par une IA</button><div id="sc-absence-vote-etat" style="margin-top:6px;color:#9fb4d8;font-weight:500"></div>'):'')}));
   b.querySelector('#sc-absence-msg').textContent = m.msg || '';
   document.body.appendChild(b);
   /* Position : celle qu'on avait laissée, sinon en bas au centre comme avant. */
@@ -1556,7 +1510,7 @@ function absenceBanner(m){
   else { b.style.left='50%'; b.style.bottom='64px'; b.style.transform='translateX(-50%)'; }
   const corps=b.querySelector('#sc-abs-corps'), btR=b.querySelector('#sc-abs-reduire');
   const appliquerRepli=()=>{ corps.style.display=replie?'none':''; btR.textContent=replie?'+':'–';
-    btR.title=replie?'Déplier':'Réduire'; b.style.padding=replie?'4px 8px':'8px 12px'; };
+    btR.title=((((replie?t('web.deplier','Déplier'):t('web.reduire','Réduire'))))); b.style.padding=replie?'4px 8px':'8px 12px'; };
   appliquerRepli();
   btR.onclick=(ev)=>{ ev.stopPropagation(); replie=!replie; appliquerRepli();
     try{ localStorage.setItem('sc_abs_replie', replie?'1':'0'); }catch(e){} };
@@ -1582,7 +1536,7 @@ function absenceBanner(m){
   tete.addEventListener('pointerup', fin);
   tete.addEventListener('pointercancel', fin);
   const bt=document.getElementById('sc-absence-vote');
-  if(bt) bt.onclick=()=>{ bt.disabled=true; bt.textContent='✓ Ton vote est enregistré'; bt.style.opacity=.65; send({t:'vote_ia'}); };
+  if(bt) bt.onclick=()=>{ bt.disabled=true; bt.textContent=t('web.vote_enregistre','✓ Ton vote est enregistré'); bt.style.opacity=.65; send({t:'vote_ia'}); };
 }
 function hideAbsence(){ const b=document.getElementById('sc-absence'); if(b) b.remove(); }
 
@@ -1605,23 +1559,17 @@ function concederVisible(oui){
   show('recommencer-btn', !humains);
 }
 window.scRenoncer = function(){
-  if(!STATE.game || !STATE.started){ alert('Aucune partie en cours.'); return; }
-  const ok = confirm('RENONCER À JOUER\n\nUne IA reprend ta nation immédiatement et la partie continue sans toi. Tu ne pourras pas revenir.\n\nConfirmer ?');
+  if(!STATE.game || !STATE.started){ alert(t('web.aucune_partie_cours','Aucune partie en cours.')); return; }
+  const ok = confirm(t('web.renoncer_jouer_ia_reprend_nation_immedia','RENONCER À JOUER\n\nUne IA reprend ta nation immédiatement et la partie continue sans toi. Tu ne pourras pas revenir.\n\nConfirmer ?'));
   if(!ok) return;
   send({t:'renoncer'});
 };
 window.scConcede = function(){
-  if(!STATE.game || !STATE.started){ alert('Aucune partie en cours.'); return; }
-  const ok = confirm('CONCÉDER LA VICTOIRE\n\n'
-    + 'Tu renonces à la victoire et tu quittes définitivement cette partie.\n\n'
-    + 'Les autres joueurs choisiront alors, à l\'unanimité, si la partie continue avec une IA '
-    + 'à ta place ou si elle s\'arrête là.\n\nConfirmer ?');
+  if(!STATE.game || !STATE.started){ alert(t('web.aucune_partie_cours','Aucune partie en cours.')); return; }
+  const ok = confirm(t('web.conceder_victoire_renonces_victoire_quit','CONCÉDER LA VICTOIRE\n\nTu renonces à la victoire et tu quittes définitivement cette partie.\n\nLes autres joueurs choisiront alors, à l\'unanimité, si la partie continue avec une IA à ta place ou si elle s\'arrête là.\n\nConfirmer ?'));
   if(!ok) return;
   send({t:'concede'});
-  concedePanelHTML('<h2>🏳️ Tu as concédé</h2>'
-    + '<p style="color:#c7d4ee;font-size:.9em;line-height:1.5">Les autres joueurs décident si la partie '
-    + 'continue avec une IA à ta place, ou si elle s\'arrête.</p>'
-    + '<div id="sc-concede-etat" style="color:#9fb4d8;font-size:.84em;margin-top:10px">En attente de leur réponse…</div>');
+  concedePanelHTML(t('web.as_concede_autres_joueurs_decident_si_pa','<h2>🏳️ Tu as concédé</h2><p style="color:#c7d4ee;font-size:.9em;line-height:1.5">Les autres joueurs décident si la partie continue avec une IA à ta place, ou si elle s\'arrête.</p><div id="sc-concede-etat" style="color:#9fb4d8;font-size:.84em;margin-top:10px">En attente de leur réponse…</div>'));
 };
 function concedePanelHTML(html){
   let p=document.getElementById('sc-concede');
@@ -1639,18 +1587,7 @@ function concedePanel(m){
   if(!m || !m.civId) return;
   if(m.civId===STATE.myCiv) return;            // c'est MOI qui ai concédé : mon panneau est déjà affiché
   if(m.dejaChoisi){ concedeAttente(null); return; }
-  concedePanelHTML('<h2 style="margin:0 0 12px;color:#ffd0d0;font-size:1.25em">🏳️ '
-      + esc(m.qui||'Un joueur') + ' concède la victoire</h2>'
-    + '<p style="color:#c7d4ee;font-size:.92em;line-height:1.5;margin:0 0 16px">Il quitte la partie. '
-    + 'Sa nation, <b>' + esc(m.nation||'') + '</b>, est encore sur le plateau.<br>Que faites-vous ?</p>'
-    + '<button id="sc-cc-ia" style="display:block;width:100%;margin:7px 0;padding:12px;border-radius:10px;border:1px solid #3f7a4a;'
-    + 'background:#14301c;color:#cdf0d6;font:700 .95em system-ui;cursor:pointer">🤖 Continuer — une IA reprend sa nation</button>'
-    + '<button id="sc-cc-stop" style="display:block;width:100%;margin:7px 0;padding:12px;border-radius:10px;border:1px solid #7a3f3f;'
-    + 'background:#301414;color:#f0cdcd;font:700 .95em system-ui;cursor:pointer">🛑 Arrêter la partie maintenant</button>'
-    + '<div style="color:#8fa2c4;font-size:.78em;margin-top:12px;line-height:1.45">L\'accord de tous les joueurs '
-    + 'restants est nécessaire. En cas de désaccord, la partie continue avec l\'IA.<br>'
-    + 'Si vous arrêtez, les scores sont calculés en l\'état et l\'email de fin part normalement.</div>'
-    + '<div id="sc-concede-etat" style="color:#9fb4d8;font-size:.82em;margin-top:8px"></div>');
+  concedePanelHTML(t('web.concede_victoire_quitte_partie_nation_en','<h2 style="margin:0 0 12px;color:#ffd0d0;font-size:1.25em">🏳️ {v} concède la victoire</h2><p style="color:#c7d4ee;font-size:.92em;line-height:1.5;margin:0 0 16px">Il quitte la partie. Sa nation, <b>{v2}</b>, est encore sur le plateau.<br>Que faites-vous ?</p><button id="sc-cc-ia" style="display:block;width:100%;margin:7px 0;padding:12px;border-radius:10px;border:1px solid #3f7a4a;background:#14301c;color:#cdf0d6;font:700 .95em system-ui;cursor:pointer">🤖 Continuer — une IA reprend sa nation</button><button id="sc-cc-stop" style="display:block;width:100%;margin:7px 0;padding:12px;border-radius:10px;border:1px solid #7a3f3f;background:#301414;color:#f0cdcd;font:700 .95em system-ui;cursor:pointer">🛑 Arrêter la partie maintenant</button><div style="color:#8fa2c4;font-size:.78em;margin-top:12px;line-height:1.45">L\'accord de tous les joueurs restants est nécessaire. En cas de désaccord, la partie continue avec l\'IA.<br>Si vous arrêtez, les scores sont calculés en l\'état et l\'email de fin part normalement.</div><div id="sc-concede-etat" style="color:#9fb4d8;font-size:.82em;margin-top:8px"></div>',{v:esc(m.qui||'Un joueur'),v2:esc(m.nation||'')}));
   const rep=(choix)=>{
     send({t:'concede_choice', choix});
     document.getElementById('sc-cc-ia').disabled=true; document.getElementById('sc-cc-stop').disabled=true;
@@ -1662,21 +1599,16 @@ function concedePanel(m){
 }
 function concedeAttente(manquants){
   const d=document.getElementById('sc-concede-etat'); if(!d) return;
-  d.textContent = (manquants && manquants.length)
-    ? 'En attente de : ' + manquants.join(', ')
-    : 'Réponse enregistrée. En attente des autres joueurs…';
+  d.textContent = ((((manquants && manquants.length?t('web.attente','En attente de : {v}',{v:manquants.join(', ')}):t('web.reponse_enregistree_attente_autres_joueu','Réponse enregistrée. En attente des autres joueurs…')))));
 }
 function concedeFini(m){
   concedeFermer();
   const jeSuisLePartant = (m && m.civId===STATE.myCiv);
   if(m && m.issue==='ia'){
     if(jeSuisLePartant){
-      concedePanelHTML('<h2 style="margin:0 0 12px;color:#ffd0d0">🏳️ Tu as quitté la partie</h2>'
-        + '<p style="color:#c7d4ee;font-size:.92em;line-height:1.5">Une IA a repris ta nation ; la partie continue sans toi.</p>'
-        + '<button onclick="location.reload()" style="margin-top:14px;padding:11px 20px;border-radius:10px;border:0;'
-        + 'background:linear-gradient(135deg,#2f6fd0,#1f4fa0);color:#fff;font:700 .95em system-ui;cursor:pointer">Retour à l\'accueil</button>');
+      concedePanelHTML(t('web.as_quitte_partie_ia_repris_nation_partie','<h2 style="margin:0 0 12px;color:#ffd0d0">🏳️ Tu as quitté la partie</h2><p style="color:#c7d4ee;font-size:.92em;line-height:1.5">Une IA a repris ta nation ; la partie continue sans toi.</p><button onclick="location.reload()" style="margin-top:14px;padding:11px 20px;border-radius:10px;border:0;background:linear-gradient(135deg,#2f6fd0,#1f4fa0);color:#fff;font:700 .95em system-ui;cursor:pointer">Retour à l\'accueil</button>'));
     }else{
-      showLogToast(['🤖 Une IA reprend la nation du joueur parti — la partie continue.']);
+      showLogToast([t('web.ia_reprend_nation_joueur_parti_partie_co','🤖 Une IA reprend la nation du joueur parti — la partie continue.')]);
     }
     return;
   }
@@ -1692,9 +1624,7 @@ function bilanAttente(restants){
   const autres=(restants||[]).filter(c=>c!==moi);
   const b=document.getElementById('sc-bilan-attente');
   if(!restants||!restants.length||( restants.length===1 && restants[0]===moi )){ if(b)b.remove(); return; }
-  const txt = autres.length
-    ? '⏳ Bilan : on attend encore '+autres.map(civLabel).join(', ')+'.'
-    : '⏳ Bilan : les autres joueurs ont terminé.';
+  const txt = ((((autres.length?t('web.bilan_attend_encore','⏳ Bilan : on attend encore {nation}.',{nation:autres.map(civLabel).join(', ')}):t('web.bilan_autres_joueurs_ont_termine','⏳ Bilan : les autres joueurs ont terminé.')))));
   if(b){ const d=b.querySelector('span'); if(d)d.textContent=txt; return; }
   const el2=el('<div id="sc-bilan-attente" style="position:fixed;left:50%;transform:translateX(-50%);bottom:64px;z-index:8300;'
     +'max-width:min(94vw,560px);background:rgba(24,30,44,.97);border:1px solid #45557a;border-radius:12px;'
@@ -1720,7 +1650,7 @@ function hideBilanAttente(){ const b=document.getElementById('sc-bilan-attente')
    « LE CEINTURIEN JOUE », ou « IA JOUE » si le siège est tenu par l'ordinateur. Avant, cette
    information vivait dans une pastille flottante séparée (`#sc-status`) qui disait « Choix de… » —
    deux endroits pour une seule question, « est-ce mon tour ? ». Il n'y en a plus qu'un. */
-const _SINGULIER={terriens:'LE TERRIEN',martiens:'LE MARTIEN',jupiteriens:'LE JUPITÉRIEN',ceinturiens:'LE CEINTURIEN'};
+const _SINGULIER={terriens:'LE TERRIEN',martiens:'LE MARTIEN',jupiteriens:t('web.jupiterien','LE JUPITÉRIEN'),ceinturiens:'LE CEINTURIEN'};
 function _estIA(civId){
   try{ const s=(STATE.game&&STATE.game.seats||[]).find(x=>x.civId===civId); return !!(s&&s.ai); }catch(e){ return false; }
 }
@@ -1742,7 +1672,7 @@ function badgeTour(qui){
   { const te=document.getElementById('tb-etat'); if(te) te.classList.toggle('avec-passer', !!(_pb&&_pb.classList.contains('on'))); }
   if(!qui){ b.classList.remove('on'); if(tb)tb.classList.remove('a-toi'); return; }
   if(qui==='moi'){
-    b.textContent='À TOI'; b.dataset.etat='moi';
+    b.textContent=t('web.toi','À TOI'); b.dataset.etat='moi';
   }else if(_estIA(qui)){
     b.textContent='IA joue…'; b.dataset.etat='calme';
   }else{
@@ -1757,8 +1687,7 @@ function bandeauATonTour(afficher){ badgeTour(afficher?'moi':null); }
 function absenceVoteEtat(m){
   const d=document.getElementById('sc-absence-vote-etat'); if(!d) return;
   const n=(m.manquants||[]).length;
-  d.textContent = n ? ('En attente de '+n+' autre'+(n>1?'s':'')+' joueur'+(n>1?'s':'')+' pour que le remplacement ait lieu.')
-                    : 'Vote complet — remplacement en cours…';
+  d.textContent = ((((n?t('web.attente_autre_joueur_remplacement_ait_li','En attente de {n} autre{v} joueur{v2} pour que le remplacement ait lieu.',{n:n,v:(n>1?'s':''),v2:(n>1?'s':'')}):t('web.vote_complet_remplacement_cours','Vote complet — remplacement en cours…')))));
 }
 let _notYourTurnTs=0;
 function notYourTurnToast(){
@@ -1766,7 +1695,7 @@ function notYourTurnToast(){
   // en bas du plateau — pas de pop-up en plus.
   const now=Date.now(); if(now-_notYourTurnTs<1500) return; _notYourTurnTs=now;
   try{ const el2=document.getElementById('sc-nyt'); if(el2)el2.remove(); }catch(e){}
-  try{ if(typeof setHint==='function'){ setHint('⏳ Ce n\'est pas ton tour — tu peux consulter la carte, le journal, l\'empire et la diplomatie.'); setTimeout(()=>{ try{ setHint(''); }catch(e){} },2500); } }catch(e){}
+  try{ if(typeof setHint==='function'){ setHint(t('web.tour_peux_consulter_carte_journal_empire','⏳ Ce n\'est pas ton tour — tu peux consulter la carte, le journal, l\'empire et la diplomatie.')); setTimeout(()=>{ try{ setHint(''); }catch(e){} },2500); } }catch(e){}
 }
 
 // Étiquette de version affichée sur l'écran de connexion. Si index.html et online.js portent des
@@ -1774,34 +1703,15 @@ function notYourTurnToast(){
 function _buildLabel(){
   const h=(typeof window!=='undefined'&&window.SOLAR_BUILD_HTML)||null;
   const j=SOLAR_BUILD_JS;
-  if(!h) return 'Version '+j+' <span style="color:#ff8a8a">(jeu : version inconnue — index.html non à jour)</span>';
-  if(h===j) return 'Version '+h;
-  return '<span style="color:#ff8a8a">Versions incohérentes — jeu : '+h+' · en ligne : '+j+'</span>';
+  if(!h) return t('accueil.version','Version {v}',{v:j})+' <span style="color:#ff8a8a">'+t('accueil.version_html_inconnue','(jeu : version inconnue — index.html non à jour)')+'</span>';
+  if(h===j) return t('accueil.version','Version {v}',{v:h});
+  return '<span style="color:#ff8a8a">'+t('accueil.versions_incoherentes','Versions incohérentes — jeu : {h} · en ligne : {j}',{h:h,j:j})+'</span>';
 }
 // ── Connexion / inscription (pseudo, pas email — comptes du serveur live) ──
 function screenAuth(mode){
   const isReg = mode==='register';
   let savedUser=''; try{ savedUser=localStorage.getItem('sc_ws_user')||''; }catch(e){}
-  overlay(`
-    <div class="fen-medal">🚀</div>
-    <div class="fen-kicker">Solar</div>
-    <h2>${isReg?'Créer un compte':'Connexion'}</h2>
-    <div class="sous">&nbsp;</div>
-    <input id="sc-u" type="email" inputmode="email" placeholder="Ton adresse email" autocomplete="email" enterkeyhint="next" value="${savedUser}">
-    <div style="position:relative">
-      <input id="sc-p" type="password" placeholder="Mot de passe (min. 6)" autocomplete="${isReg?'new-password':'current-password'}" enterkeyhint="go" style="padding-right:44px">
-      <button type="button" id="sc-eye" title="Afficher / masquer le mot de passe" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#8fb0e0;font-size:1.1em;cursor:pointer;padding:4px 8px">👁</button>
-    </div>
-    <div class="muted" style="font-size:.78em;margin:2px 0 6px">Ton email sert d'identifiant et reçoit les scores de fin de partie.</div>
-    <div class="err" id="sc-err"></div>
-    <button class="pri" id="sc-go">${isReg?'Créer le compte':'Se connecter'}</button>
-    <button class="sec" id="sc-alt">${isReg?"J'ai déjà un compte":'Créer un compte'}</button>
-    <button class="sec" id="sc-close">↩ Retour au jeu solo</button>
-    <div class="liens">
-      <a href="tutorial.html">🎓 Tutoriel</a><a href="regles.html">📖 Règles</a><a href="confidentialite.html">🔒 Confidentialité</a>
-    </div>
-    <div class="muted" style="font-size:.72em;opacity:.7;margin-top:9px;text-align:center">${_buildLabel()}</div>
-  `);
+  overlay(t('web.solar_nbsp','\n    <div class="fen-medal">🚀</div>\n    <div class="fen-kicker">Solar</div>\n    <h2>{v}</h2>\n    <div class="sous">&nbsp;</div>\n    <input id="sc-u" type="email" inputmode="email" placeholder="{v2}" autocomplete="email" enterkeyhint="next" value="{saveduser}">\n    <div style="position:relative">\n      <input id="sc-p" type="password" placeholder="{v3}" autocomplete="{v4}" enterkeyhint="go" style="padding-right:44px">\n      <button type="button" id="sc-eye" title="{v5}" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#8fb0e0;font-size:1.1em;cursor:pointer;padding:4px 8px">👁</button>\n    </div>\n    <div class="muted" style="font-size:.78em;margin:2px 0 6px">{v6}</div>\n    <div class="err" id="sc-err"></div>\n    <button class="pri" id="sc-go">{v7}</button>\n    <button class="sec" id="sc-alt">{v8}</button>\n    <button class="sec" id="sc-close">{tour}</button>\n    <div class="liens">\n      <a href="tutorial.html">{v9}</a><a href="regles.html">{v10}</a><a href="confidentialite.html">{v11}</a>\n    </div>\n    <div class="lv-langue">{v12}</div>\n    <div class="muted" style="font-size:.72em;opacity:.7;margin-top:9px;text-align:center">{v13}</div>\n  ',{v:(isReg?t('auth.creer_compte','Créer un compte'):t('auth.titre_connexion','Connexion')),v2:t('auth.ph_email','Ton adresse email'),saveduser:savedUser,v3:t('auth.ph_mdp6','Mot de passe (min. 6)'),v4:(isReg?'new-password':'current-password'),v5:t('auth.oeil','Afficher / masquer le mot de passe'),v6:t('auth.email_info',"Ton email sert d'identifiant et reçoit les scores de fin de partie."),v7:(isReg?t('auth.btn_creer','Créer le compte'):t('auth.connexion','Se connecter')),v8:(isReg?t('auth.deja_compte',"J'ai déjà un compte"):t('auth.creer_compte','Créer un compte')),tour:t('auth.retour_solo','↩ Retour au jeu solo'),v9:t('lien.tutoriel','🎓 Tutoriel'),v10:t('lien.regles','📖 Règles'),v11:t('lien.confidentialite','🔒 Confidentialité'),v12:(typeof i18nSelecteurHTML==='function'?i18nSelecteurHTML():''),v13:_buildLabel()}));
   _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
   /* Touche « Aller » du clavier : ces champs ne sont pas dans un <form>, il n'y a donc aucune
      validation implicite. Sans ça, la flèche du clavier mobile ne fait rien (signalé par Marc). */
@@ -1817,7 +1727,7 @@ function screenAuth(mode){
   document.getElementById('sc-close').onclick = ()=>{ _errCb=null; hideOverlay(); };
   document.getElementById('sc-go').onclick = ()=>{
     const user=document.getElementById('sc-u').value.trim(), pass=document.getElementById('sc-p').value;
-    if(!/^[^@\s]+@[^@\s.]+\.[a-z]{2,}$/i.test(user)){ _errCb('Entre une adresse email valide (ex. prenom@domaine.ch)'); return; }
+    if(!/^[^@\s]+@[^@\s.]+\.[a-z]{2,}$/i.test(user)){ _errCb(t('auth.email_invalide','Entre une adresse email valide (ex. prenom@domaine.ch)')); return; }
     STATE._pendingPass = pass;
     STATE._afterLogin = ()=>{ _errCb=null; screenLobby(); };
     send(isReg ? {t:'register', user, pass} : {t:'login', user, pass});
@@ -1826,34 +1736,30 @@ function screenAuth(mode){
 }
 
 // ── Lobby ──
-const CIVS_LIST = [['terriens','🌍 Terriens'],['martiens','🔴 Martiens'],['jupiteriens','🟠 Jupitériens'],['ceinturiens','☄️ Ceinturiens']];
-function civLabel(id){ const c=CIVS_LIST.find(x=>x[0]===id); return c?c[1]:id; }
+const CIVS_LIST = [['terriens','🌍 Terriens'],['martiens','🔴 Martiens'],['jupiteriens',t('web.jupiteriens','🟠 Jupitériens')],['ceinturiens','☄️ Ceinturiens']];
+function civLabel(id){ try{ if(typeof CIVS!=='undefined'&&CIVS[id]) return CIVS[id].emoji+' '+CIVS[id].name; }catch(e){} const c=CIVS_LIST.find(x=>x[0]===id); return c?c[1]:id; }   // CIVS d'abord : traduit (tranche 2)
 /* Date et heure EUROPÉENNES, comme le reste des rapports (Marc). */
 function _dateFr(ms){
   if(!ms) return '';
-  try{ return new Date(ms).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+  /* Le format de date suit la langue choisie (i18n.js) : fr-FR, en-GB… `SOLAR_LANG` est un code à deux lettres. */
+  const _loc=({fr:'fr-FR',en:'en-GB',de:'de-DE',es:'es-ES',zh:'zh-CN'})[(typeof SOLAR_LANG!=='undefined'&&SOLAR_LANG)||'fr']||'fr-FR';
+  try{ return new Date(ms).toLocaleString(_loc,{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
   catch(e){ return ''; }
 }
 /* Une ligne de partie reprenable : qui joue, où en est-on, et faut-il y aller MAINTENANT. */
 function _ligneReprise(p){
-  const nomCiv = id => { const t={terriens:'🌍 Terriens',martiens:'🔴 Martiens',jupiteriens:'🟠 Jupitériens',ceinturiens:'☠️ Ceinturiens'}; return t[id]||id; };
+  /* Les noms viennent de CIVS (traduits dans la langue du joueur, tranche 2) ; la table en dur ne sert que de repli. */
+  const nomCiv = id => { try{ if(typeof CIVS!=='undefined'&&CIVS[id]) return CIVS[id].emoji+' '+CIVS[id].name; }catch(e){} const _n={terriens:'🌍 Terriens',martiens:'🔴 Martiens',jupiteriens:'🟠 Jupitériens',ceinturiens:'☠️ Ceinturiens'}; return _n[id]||id; };
   const joueurs = (p.joueurs||[]).map(j=>{
-    if(j.ia) return '<span style="opacity:.6">'+nomCiv(j.civId)+' (IA)</span>';
+    if(j.ia) return '<span style="opacity:.6">'+nomCiv(j.civId)+' ('+t('commun.ia','IA')+')</span>';
     const pastille = j.connecte ? '🟢' : '⚪';
-    return pastille+' '+nomCiv(j.civId)+(j.moi?' <b>(toi)</b>':(j.user?' <span style="opacity:.7">'+esc(j.user)+'</span>':''));
+    return t('web.ligne_10','{pastille} {nation}{v}',{pastille:pastille,nation:nomCiv(j.civId),v:(j.moi?' <b>('+t('commun.toi','toi')+')</b>':(j.user?' <span style="opacity:.7">'+esc(j.user)+'</span>':''))});
   }).join(' · ');
-  const tour = p.tour ? ('tour '+p.tour+(p.maxTours?('/'+p.maxTours):'')) : (p.statut==='lobby'?'pas encore commencée':'—');
+  const tour = ((((p.tour?t('lobby.tour','tour {n}',{n:p.tour})+(p.maxTours?('/'+p.maxTours):''):(p.statut==='lobby'?t('lobby.pas_commencee','pas encore commencée'):'—')))));
   const urgent = p.aMoiDeJouer;
   /* La corbeille est À CÔTÉ du bouton, jamais DEDANS : un bouton dans un bouton n'est pas du HTML
      valide et le clic partirait au mauvais endroit. (Marc, 04/09 : « supprimer les parties test ».) */
-  return '<div class="rep">'
-    +'<button class="'+(urgent?'pri':'sec')+' sc-reprise" data-code="'+esc(p.code)+'">'
-    +'<div>'+(urgent?'▶ À TOI DE JOUER — ':'')+'<b>'+esc(p.code)+'</b> · '+tour+'</div>'
-    +'<div style="font-size:.88em;opacity:.9;margin-top:3px">'+joueurs+'</div>'
-    +'<div style="font-size:.8em;opacity:.65;margin-top:3px">dernière activité : '+_dateFr(p.maj)+'</div>'
-    +'</button>'
-    +'<button class="sec sc-suppr" data-code="'+esc(p.code)+'" title="Supprimer cette partie">🗑</button>'
-    +'</div>';
+  return t('web.ligne_11','<div class="rep"><button class="{v} sc-reprise" data-code="{v2}"><div>{v3}<b>{v4}</b> · {tour}</div><div style="font-size:.88em;opacity:.9;margin-top:3px">{joueurs}</div><div style="font-size:.8em;opacity:.65;margin-top:3px">{v5}</div></button><button class="sec sc-suppr" data-code="{v6}" title="{v7}">🗑</button></div>',{v:(urgent?'pri':'sec'),v2:esc(p.code),v3:(urgent?t('lobby.a_toi','▶ À TOI DE JOUER — '):''),v4:esc(p.code),tour:tour,joueurs:joueurs,v5:t('lobby.derniere_activite','dernière activité : {d}',{d:_dateFr(p.maj)}),v6:esc(p.code),v7:t('lobby.supprimer_partie','Supprimer cette partie')});
 }
 function screenLobby(){
   STATE.game=null; STATE.myCiv=null; STATE.started=false;
@@ -1863,25 +1769,23 @@ function screenLobby(){
      partie mémorisée en local : vider le cache, changer d'appareil ou mener deux parties de front,
      et la partie devenait introuvable — alors qu'elle vivait toujours côté serveur. */
   const parties = Array.isArray(STATE.parties) ? STATE.parties : [];
-  const bloc = parties.length
-    ? ('<div class="fen-kicker gauche">Reprendre une partie</div>'
-       + parties.map(_ligneReprise).join(''))
-    : '';
+  const bloc = ((((parties.length?'<div class="fen-kicker gauche">'+t('lobby.reprendre','Reprendre une partie')+'</div>'
+       + parties.map(_ligneReprise).join(''):''))));
   /* Blason (15/09, §124) : médaillon, « Bonjour », le prénom de l'adresse en grand, l'adresse en dessous. */
   const _prenom=(()=>{ const u=String(STATE.user||''); const m=u.split('@')[0]||u; return m.charAt(0).toUpperCase()+m.slice(1); })();
   overlay(`
     <div class="fen-medal">👋</div>
-    <div class="fen-kicker">Bonjour</div>
+    <div class="fen-kicker">${t('lobby.bonjour','Bonjour')}</div>
     <h2>${esc(_prenom)}</h2>
     <div class="sous">${esc(STATE.user||'')}</div>
     ${bloc}
-    <button class="pri" id="sc-create" style="margin-top:12px">Créer une partie</button>
-    <div class="row" style="margin-top:8px"><input id="sc-code" placeholder="Code d'invitation" style="margin:0"><button class="sec" id="sc-join" style="margin:0;flex:0 0 auto;width:auto">Rejoindre</button></div>
+    <button class="pri" id="sc-create" style="margin-top:12px">${t('lobby.creer','Créer une partie')}</button>
+    <div class="row" style="margin-top:8px"><input id="sc-code" placeholder="${t('lobby.ph_code',"Code d'invitation")}" style="margin:0"><button class="sec" id="sc-join" style="margin:0;flex:0 0 auto;width:auto">${t('lobby.rejoindre','Rejoindre')}</button></div>
     <div class="err" id="sc-err"></div>
     <!-- Supprimer son compte DEPUIS l'appli : exige par Apple (5.1.1) et Google Play. Discret,
          mais present la ou l'on gere son compte — pas cache dans une page de reglement. -->
     <div class="liens">
-      <span id="sc-refresh">🔄 Rafraîchir</span><span id="sc-logout">Se déconnecter</span><span id="sc-close">↩ Solo</span><a href="#" id="sc-suppr-compte" style="color:#c88">Supprimer mon compte</a>
+      <span id="sc-refresh">${t('lobby.rafraichir','🔄 Rafraîchir')}</span><span id="sc-logout">${t('lobby.deconnexion','Se déconnecter')}</span><span id="sc-close">${t('lobby.solo','↩ Solo')}</span>
     </div>
     <!-- ATTENTION : ce bloc est dans un gabarit JS. Pas de guillemet oblique ici, il refermerait
          le gabarit et casserait tout le fichier (erreur commise en écrivant ce commentaire).
@@ -1890,9 +1794,13 @@ function screenLobby(){
          voit plus : on arrive directement ICI. C'est donc cet ecran-la qui est la fenetre de
          connexion pour un joueur qui revient. Les deux le portent maintenant : un lien d'aide doit
          etre la ou l'on hesite, pas la ou l'on tape. -->
-    <div class="liens">
-      <a href="tutorial.html">🎓 Tutoriel</a><a href="regles.html">📖 Règles</a><a href="confidentialite.html">🔒 Confidentialité</a>
+    <!-- LE LIEN DE SUPPRESSION EST A PART (Marc, 18/09 : trop pres des autres boutons, clics par erreur).
+         Il quitte la rangee des actions courantes (Rafraichir / Deconnexion / Solo) pour rejoindre
+         Confidentialite, avec un ecart au-dessus et a gauche : on ne le touche pas en visant autre chose. -->
+    <div class="liens" style="margin-top:14px">
+      <a href="tutorial.html">${t('lien.tutoriel','🎓 Tutoriel')}</a><a href="regles.html">${t('lien.regles','📖 Règles')}</a><a href="confidentialite.html">${t('lien.confidentialite','🔒 Confidentialité')}</a><a href="#" id="sc-suppr-compte" style="color:#c88;margin-left:22px;opacity:.75;font-size:.92em">${t('compte.supprimer','Supprimer mon compte')}</a>
     </div>
+    <div class="lv-langue">${(typeof i18nSelecteurHTML==='function')?i18nSelecteurHTML():''}</div>
     <!-- La version ICI aussi (Marc, 13/09) : un joueur dont le compte est memorise arrive
          directement sur cet ecran et devait se deconnecter pour lire le numero de version. -->
     <div class="muted" style="font-size:.72em;opacity:.7;margin-top:9px;text-align:center">${_buildLabel()}</div>
@@ -1905,7 +1813,7 @@ function screenLobby(){
   [...document.querySelectorAll('.sc-suppr')].forEach(b=>{
     b.onclick = ()=>{
       const code=b.getAttribute('data-code');
-      if(!confirm('Supprimer définitivement la partie '+code+' ?')) return;
+      if(!confirm(t('lobby.confirm_suppr','Supprimer définitivement la partie {code} ?',{code:code}))) return;
       send({t:'supprimer_partie', code});
     };
   });
@@ -1923,25 +1831,25 @@ function screenLobby(){
    redemandé (le serveur le verifie) ; « Annuler » ramene au lobby sans rien faire. */
 function screenSupprimerCompte(){
   overlay(`
-    <h2>Supprimer mon compte</h2>
-    <p style="font-size:.9em;color:#e0c0c0">Cette action est <b>définitive</b>. Elle efface :</p>
+    <h2>${t('compte.supprimer','Supprimer mon compte')}</h2>
+    <p style="font-size:.9em;color:#e0c0c0">${t('compte.definitif','Cette action est <b>définitive</b>. Elle efface :')}</p>
     <ul style="font-size:.88em;color:#c8c8d8;margin:4px 0 10px 18px;padding:0">
-      <li>ton compte (<b>${STATE.user}</b>) et tes sessions sur tous tes appareils ;</li>
-      <li>tes parties en cours contre l'ordinateur et tes parties archivées ;</li>
-      <li>dans une partie en cours avec d'autres joueurs, ta nation passe à l'ordinateur — leur partie continue sans toi.</li>
+      <li>${t('compte.efface_compte','ton compte (<b>{user}</b>) et tes sessions sur tous tes appareils ;',{user:STATE.user})}</li>
+      <li>${t('compte.efface_parties',"tes parties en cours contre l'ordinateur et tes parties archivées ;")}</li>
+      <li>${t('compte.efface_multi','dans une partie en cours avec d\'autres joueurs, ta nation passe à l\'ordinateur — leur partie continue sans toi.')}</li>
     </ul>
-    <p style="font-size:.88em;color:#9fb0d0">Les parties jouées hors connexion sur cet appareil ne sont pas concernées.</p>
-    <div class="row"><input id="sc-p" type="password" placeholder="Ton mot de passe, pour confirmer" autocomplete="current-password"></div>
+    <p style="font-size:.88em;color:#9fb0d0">${t('compte.hors_ligne','Les parties jouées hors connexion sur cet appareil ne sont pas concernées.')}</p>
+    <div class="row"><input id="sc-p" type="password" placeholder="${t('compte.ph_mdp','Ton mot de passe, pour confirmer')}" autocomplete="current-password"></div>
     <div class="err" id="sc-err"></div>
-    <button class="pri" id="sc-go" style="background:linear-gradient(135deg,#b03030,#7a1a1a)">Supprimer définitivement</button>
-    <button class="sec" id="sc-close">Annuler</button>
+    <button class="pri" id="sc-go" style="background:linear-gradient(135deg,#b03030,#7a1a1a)">${t('compte.btn_supprimer','Supprimer définitivement')}</button>
+    <button class="sec" id="sc-close">${t('commun.annuler','Annuler')}</button>
   `);
   _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
   document.getElementById('sc-close').onclick = ()=>{ _errCb=null; screenLobby(); };
   document.getElementById('sc-go').onclick = ()=>{
     const pass=document.getElementById('sc-p').value;
-    if(!pass){ _errCb('Entre ton mot de passe pour confirmer.'); return; }
-    if(!confirm('Supprimer définitivement le compte '+STATE.user+' ?')) return;
+    if(!pass){ _errCb(t('compte.err_mdp','Entre ton mot de passe pour confirmer.')); return; }
+    if(!confirm(t('compte.confirm','Supprimer définitivement le compte {user} ?',{user:STATE.user}))) return;
     send({t:'supprimer_compte', pass});
   };
 }
@@ -1953,9 +1861,9 @@ function _ficheNation(id){
     const home={lune:'Lune',phobos:'Phobos',io:'Io',eris:'Éris'}[c.home]||c.home;
     const st=c.start||{};
     const tb=(typeof TECH_BRANCHES!=='undefined'&&TECH_BRANCHES[c.techBonus])?TECH_BRANCHES[c.techBonus].label:c.techBonus;
-    return '<div class="r"><span>Départ '+(st.energy||0)+'⚡ '+(st.materials||0)+'🪨 '+(st.science||0)+'🔬 '+(st.morale||0)+'❤️</span><span>⚔️ '+(c.startForce||0)+' jetons</span><span>🏠 '+esc(home)+'</span></div>'
+    return '<div class="r"><span>'+t('creer.depart','Départ')+' '+(st.energy||0)+'⚡ '+(st.materials||0)+'🪨 '+(st.science||0)+'🔬 '+(st.morale||0)+'❤️</span><span>⚔️ '+t('creer.jetons','{n} jetons',{n:(c.startForce||0)})+'</span><span>🏠 '+esc(home)+'</span></div>'
       +'<p><b>'+esc(c.active.name)+'</b> — '+c.active.desc+'</p>'
-      +'<p class="m">'+c.passive+(tb?' · Bonus tech : '+esc(tb)+' −1🔬':'')+'</p>';
+      +'<p class="m">'+c.passive+(tb?' · '+t('creer.bonus_tech','Bonus tech : {b} −1🔬',{b:esc(tb)}):'')+'</p>';
   }catch(e){ return ''; }
 }
 function _siegesInteractifs(){
@@ -1977,30 +1885,30 @@ function _siegesInteractifs(){
 function screenCreate(){
   const rows = CIVS_LIST.map(([id,label],i)=>{
     const c=(typeof CIVS!=='undefined')?CIVS[id]:null;
-    const home=c?({lune:'Lune',phobos:'Phobos',io:'Io',eris:'Éris'}[c.home]||c.home):'';
+    const home=((((c?{lune:'Lune',phobos:'Phobos',io:'Io',eris:'Éris'}[c.home]||c.home:''))));
     return `
     <div class="siege">
       <div class="haut">
-        <div class="medal2" style="--c:${c?c.color:'#4a9eff'}" title="Fiche de la nation">${c?c.emoji:label.split(' ')[0]}</div>
-        <div class="nom">${c?esc(c.name):label}<small>Base : ${esc(home)}</small></div>
+        <div class="medal2" style="--c:${c?c.color:'#4a9eff'}" title="${t('creer.fiche','Fiche de la nation')}">${c?c.emoji:label.split(' ')[0]}</div>
+        <div class="nom">${c?esc(c.name):label}<small>${t('creer.base','Base : {b}',{b:esc(home)})}</small></div>
         <select data-civ="${id}">
-          <option value="none">— absente —</option>
-          <option value="host"${i===0?' selected':''}>Moi</option>
-          <option value="open">Humain</option>
-          <option value="ai"${i>0?' selected':''}>IA</option>
+          <option value="none">${t('creer.absente','— absente —')}</option>
+          <option value="host"${i===0?' selected':''}>${t('creer.moi','Moi')}</option>
+          <option value="open">${t('creer.humain','Humain')}</option>
+          <option value="ai"${i>0?' selected':''}>${t('commun.ia','IA')}</option>
         </select>
       </div>
       <div class="det">${_ficheNation(id)}</div>
     </div>`; }).join('');
   overlay(`
     <div class="fen-medal">🚀</div>
-    <div class="fen-kicker">Nouvelle partie</div>
-    <h2>Les sièges</h2>
-    <div class="sous">Choisis ta nation, et qui joue les autres.</div>
+    <div class="fen-kicker">${t('creer.kicker','Nouvelle partie')}</div>
+    <h2>${t('creer.titre','Les sièges')}</h2>
+    <div class="sous">${t('creer.sous','Choisis ta nation, et qui joue les autres.')}</div>
     ${rows}
-    <div class="astuce">Appui long sur un médaillon pour les valeurs de départ des nations.</div>
+    <div class="astuce">${t('creer.astuce','Appui long sur un médaillon pour les valeurs de départ des nations.')}</div>
     <div class="err" id="sc-err"></div>
-    <div class="btns2"><button class="sec" id="sc-back">Retour</button><button class="pri" id="sc-make">Créer</button></div>
+    <div class="btns2"><button class="sec" id="sc-back">${t('commun.retour','Retour')}</button><button class="pri" id="sc-make">${t('creer.btn','Créer')}</button></div>
   `);
   _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
   _siegesInteractifs();
@@ -2009,11 +1917,11 @@ function screenCreate(){
     document.querySelectorAll('#sc-ov select[data-civ]').forEach(s=>{
       const k=s.value, civId=s.getAttribute('data-civ');
       if(k==='none') return;
-      if(k==='host'){ if(myCiv){ _errCb('Un seul siège « Moi (hôte) ».'); return; } myCiv=civId; }
+      if(k==='host'){ if(myCiv){ _errCb(t('creer.err_un_seul','Un seul siège « Moi (hôte) ».')); return; } myCiv=civId; }
       else seats.push({civId, ai:(k==='ai')});
     });
-    if(!myCiv){ _errCb('Choisis un siège « Moi (hôte) ».'); return; }
-    if(seats.length<1){ _errCb('Au moins 2 nations.'); return; }
+    if(!myCiv){ _errCb(t('creer.err_moi','Choisis un siège « Moi (hôte) ».')); return; }
+    if(seats.length<1){ _errCb(t('creer.err_deux','Au moins 2 nations.')); return; }
     STATE.myCiv = myCiv;
     send({t:'create', civId:myCiv, seats});
   };
@@ -2022,18 +1930,11 @@ function screenCreate(){
 function renderWait(){
   const g = STATE.game; if(!g) return;
   const list = g.seats.map(s=>{
-    const who = s.ai ? '🤖 IA' : (s.user ? (s.user + (s.connected?'':' ⚠️ déconnecté')) : '⏳ libre');
+    const who = ((((s.ai?'🤖 '+t('commun.ia','IA'):(s.user?s.user + (s.connected?'':' ⚠️ '+t('attente.deconnecte','déconnecté')):'⏳ '+t('attente.libre','libre'))))));
     return `<div>${civLabel(s.civId)} — ${who}</div>`;
   }).join('');
   const allSeated = g.seats.every(s=>s.ai || s.user);
-  overlay(`<div class="fen-medal">⏳</div>
-    <div class="fen-kicker">Salle d'attente</div>
-    <h2 style="letter-spacing:.2em">${g.code}</h2>
-    <div class="sous">Code d'invitation — partage-le.</div>
-    <div id="sc-players" style="margin:12px 0;line-height:1.7">${list}</div>
-    <div class="err" id="sc-err"></div>
-    ${STATE.isHost ? `<button class="pri" id="sc-start"${allSeated?'':' disabled style="opacity:.5"'}>Démarrer la partie</button>` : '<div class="muted">En attente que l&rsquo;hôte démarre…</div>'}
-    <button class="sec" id="sc-leave">Quitter</button>`);
+  overlay(t('web.ligne','<div class="fen-medal">⏳</div>\n    <div class="fen-kicker">{v}</div>\n    <h2 style="letter-spacing:.2em">{v2}</h2>\n    <div class="sous">{v3}</div>\n    <div id="sc-players" style="margin:12px 0;line-height:1.7">{list}</div>\n    <div class="err" id="sc-err"></div>\n    {v4}\n    <button class="sec" id="sc-leave">{v5}</button>',{v:t('attente.kicker',"Salle d'attente"),v2:g.code,v3:t('attente.sous',"Code d'invitation — partage-le."),list:list,v4:(STATE.isHost?`<button class="pri" id="sc-start"${allSeated?'':' disabled style="opacity:.5"'}>${t('attente.demarrer','Démarrer la partie')}</button>`:'<div class="muted">'+t('attente.hote','En attente que l&rsquo;hôte démarre…')+'</div>'),v5:t('attente.quitter','Quitter')}));
   _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
   if(STATE.isHost){ const b=document.getElementById('sc-start'); if(b) b.onclick=()=>send({t:'start'}); }
   document.getElementById('sc-leave').onclick = ()=>{ try{ send({t:'leave'}); }catch(e){} screenLobby(); };
@@ -2107,7 +2008,7 @@ function askLocalDecision(pending){
   return new Promise(resolve=>{
     const o=pending.payload||{}; const k=pending.kind;
     const done=(ans)=>{ closeDecision(); resolve(ans); };
-    const TITLES={raid_result:'💰 Résultat du raid',raid_hit:'⚠️ Tu es pillé',accord_result:'🤝 Réponse à ton accord',raid_target:'💰 Quelle nation piller ?',accord_request:'🤝 Proposition d\'accord commercial',agenda:'Choisis ton agenda secret',strategy:'Carte Stratégie',strategy_calm:'Calmer une tension',invest1:'Investissement (Niv.1)',invest2:'Investissement (Niv.2)',espionage:'🕵️ Espionnage : quelle filière copies-tu ?',extrasolar:'Exploration extra-solaire',empath_copy:'Télépathie : carte à copier',ai_dyson:'Sphère de Dyson adverse',dyson_build:'Ta Sphère de Dyson',peace_offer:'Offre de paix',war_combat:'Combat',accord_confirm:'Accord commercial',defense:'Défense !',peace_answer:'🕊️ Proposition de paix',war_initiative:'🌀 Hyperpropulsion : qui frappe en premier ?'};
+    const TITLES={raid_result:t('web.resultat_raid','💰 Résultat du raid'),raid_hit:t('web.es_pille','⚠️ Tu es pillé'),accord_result:t('web.reponse_accord','🤝 Réponse à ton accord'),raid_target:t('web.quelle_nation_piller','💰 Quelle nation piller ?'),accord_request:'🤝 Proposition d\'accord commercial',agenda:t('web.choisis_agenda_secret','Choisis ton agenda secret'),strategy:t('web.carte_strategie','Carte Stratégie'),strategy_calm:t('web.calmer_tension','Calmer une tension'),invest1:'Investissement (Niv.1)',invest2:'Investissement (Niv.2)',espionage:t('web.espionnage_quelle_filiere_copies','🕵️ Espionnage : quelle filière copies-tu ?'),extrasolar:'Exploration extra-solaire',empath_copy:t('web.telepathie_carte_copier','Télépathie : carte à copier'),ai_dyson:t('web.sphere_dyson_adverse','Sphère de Dyson adverse'),dyson_build:t('web.sphere_dyson','Ta Sphère de Dyson'),peace_offer:t('web.offre_paix','Offre de paix'),war_combat:'Combat',accord_confirm:'Accord commercial',defense:t('web.defense_2','Défense !'),peace_answer:t('web.proposition_paix','🕊️ Proposition de paix'),war_initiative:t('web.hyperpropulsion_frappe_premier','🌀 Hyperpropulsion : qui frappe en premier ?')};
     /* ⚠️ LE REPLI AFFICHAIT LE NOM TECHNIQUE DE LA FENÊTRE. Marc, 27/08 : « le résultat du raid
        indique : raid_result mais pas ce qu'on a gagné ». `TITLES[k]||k` : quand le type n'est pas
        dans la table, l'utilisateur lisait `raid_result` — un identifiant de code, sans le moindre
@@ -2124,7 +2025,7 @@ function askLocalDecision(pending){
       // CHOIX TACTIQUE DE DÉFENSE : combien de jetons engager (0 = ne pas défendre) + Supercroiseur éventuel.
       const max=o.maxDef||0;
       const who=(window._scPseudo&&window._scPseudo[o.attacker])||o.attackerName||o.attacker;
-      const cible=o.target?((o.target.type==='route'?'🛤️ route ':'🏙️ ')+o.target.name):'tes positions';
+      const cible=((((o.target?(o.target.type==='route'?'🛤️ route ':'🏙️ ')+o.target.name:t('web.positions','tes positions')))));
       const cc=o.cruiserCost||{materials:5,energy:5};
       /* ═══ BLASON (Marc, 14/09) : l'assaillant d'abord — médaillon, nom, puis le verbe et deux gros chiffres.
          Même fenêtre qu'en solo (`showAiAssaultDefenseModal`). Les ids sc-d / sc-dv / sc-dt / sc-cru / sc-ok /
@@ -2132,53 +2033,26 @@ function askLocalDecision(pending){
       if(typeof fenBlason==='function'){
         let _emo='⚔️'; try{ const _G=scGetG(); const _n=[_G.player].concat(_G.ais||[]).find(x=>x&&x.civ&&x.civ.id===o.attacker); if(_n)_emo=_n.civ.emoji||'⚔️'; }catch(e){}
         const _v0=Math.min(2,max), _base=(o.garrison||0)+(o.empath||0);
-        const _cibleB=o.target?((o.target.type==='route'?'la route ':'')+'<b>'+esc(o.target.name)+'</b>'):'<b>tes positions</b>';
-        const _milieu='<div class="fen-vs">'
-          +'<div><div class="n them">'+(o.threat!==undefined?('≈'+o.threat):'?')+'</div><div class="l">Leur force</div></div><div class="x">VS</div>'
-          +'<div><div class="n me" id="sc-dt">'+(_v0+_base)+'</div><div class="l">Ta défense</div></div></div>'
-          +'<div class="fen-slider">'
-          +'<div class="row"><span>Jetons engagés</span><b><span id="sc-dv">'+_v0+'</span> / '+max+'</b></div>'
-          +'<input type="range" id="sc-d" min="0" max="'+max+'" value="'+_v0+'" aria-label="Jetons engagés en défense">'
-          +'<div class="row"><span>'+(o.navDemi?'½🪨 ½⚡ par jeton (IA de Navigation)':'1🪨 1⚡ par jeton')+' · tu as '+(o.myTokens!==undefined?o.myTokens:max)+' jetons, '+(o.myMat!==undefined?o.myMat:'?')+'🪨 '+(o.myEnergy!==undefined?o.myEnergy:'?')+'⚡</span></div>'
-          +(o.garrison!==undefined?'<div class="row"><span>🏛️ Garnison <b>'+o.garrison+'</b>'+(o.garrisonLabel?' ('+esc(o.garrisonLabel)+')':'')+(o.empath?' · 🔮 +'+o.empath+' Empathes':'')+'</span></div>':'')
-          +(o.cruiser?('<label><input type="checkbox" id="sc-cru"><span>⚓ Déployer le <b>Supercroiseur</b> (+'+(o.cruiserPower||5)+'⚔️, −'+cc.materials+'🪨 −'+cc.energy+'⚡)</span></label>'):'')
-          +'</div>';
+        const _cibleB=((((o.target?(o.target.type==='route'?t('web.la_route','la route '):'')+'<b>'+esc(o.target.name)+'</b>':t('web.positions_2','<b>tes positions</b>')))));
+        const _milieu=t('web.leur_force_vs_defense_jetons_engages_as','<div class="fen-vs"><div><div class="n them">{v}</div><div class="l">Leur force</div></div><div class="x">VS</div><div><div class="n me" id="sc-dt">{v0}</div><div class="l">Ta défense</div></div></div><div class="fen-slider"><div class="row"><span>Jetons engagés</span><b><span id="sc-dv">{v02}</span> / {max}</b></div><input type="range" id="sc-d" min="0" max="{max2}" value="{v03}" aria-label="Jetons engagés en défense"><div class="row"><span>{jetons} · tu as {jetons2} jetons, {cout}🪨 {cout2}⚡</span></div>{v2}{cout3}</div>',{v:(o.threat!==undefined?'≈'+o.threat:'?'),v0:(_v0+_base),v02:_v0,max:max,max2:max,v03:_v0,jetons:(o.navDemi?t('web.jeton_ia_navigation','½🪨 ½⚡ par jeton (IA de Navigation)'):t('web.1_1_jeton','1🪨 1⚡ par jeton')),jetons2:(o.myTokens!==undefined?o.myTokens:max),cout:(o.myMat!==undefined?o.myMat:'?'),cout2:(o.myEnergy!==undefined?o.myEnergy:'?'),v2:(o.garrison!==undefined?'<div class="row"><span>🏛️ Garnison <b>'+o.garrison+'</b>'+(o.garrisonLabel?' ('+esc(o.garrisonLabel)+')':'')+(o.empath?' · 🔮 +'+o.empath+' Empathes':'')+'</span></div>':''),cout3:(o.cruiser?t('web.deployer_supercroiseur','<label><input type="checkbox" id="sc-cru"><span>⚓ Déployer le <b>Supercroiseur</b> (+{v}⚔️, −{cout}🪨 −{cout2}⚡)</span></label>',{v:o.cruiserPower||5,cout:cc.materials,cout2:cc.energy}):'')});
         const _chips=[];
         if(o.threatDetail) _chips.push(esc(o.threatDetail));
-        if(o.attackerCruiser) _chips.push('⚓ Supercroiseur déployé');
-        if(o.renfort) _chips.push('🤝 Tu partages '+esc(o.target?o.target.name:'ce nœud')+' avec '+esc(o.principal||'le propriétaire'));
-        body=fenBlason({ton:'war', emoji:_emo, kicker:'attaqué par', prep:true, nation:esc(who),
-          verbe:(o.renfort?'Renfort — nœud partagé — assaillent ':'Assaut surprise — attaquent ')+_cibleB, chips:_chips, milieu:_milieu,
-          boutons:[{k:o.renfort?'Rien':'Ne rien engager', s:o.renfort?'le propriétaire défend seul':'la garnison seule', cls:'ghost', id:'sc-none'},
-                   {k:o.renfort?'Renforcer':'Défendre', s:'<span id="sc-dbs">avec '+_v0+' jeton'+(_v0>1?'s':'')+'</span>', cls:'no', id:'sc-ok'}]});
+        if(o.attackerCruiser) _chips.push(t('web.supercroiseur_deploye','⚓ Supercroiseur déployé'));
+        if(o.renfort) _chips.push(t('web.partages_avec','🤝 Tu partages {v} avec {v2}',{v:esc(o.target?o.target.name:'ce nœud'),v2:esc(o.principal||'le propriétaire')}));
+        body=fenBlason({ton:'war', emoji:_emo, kicker:t('web.attaque','attaqué par'), prep:true, nation:esc(who),
+          verbe:t('web.ligne_6','{v}{cibleb}',{v:(o.renfort?t('web.renfort_ud_partage_assaillent','Renfort — nœud partagé — assaillent '):'Assaut surprise — attaquent '),cibleb:_cibleB}), chips:_chips, milieu:_milieu,
+          boutons:[{k:(o.renfort?'Rien':t('web.rien_engager','Ne rien engager')), s:(o.renfort?t('web.proprietaire_defend_seul','le propriétaire défend seul'):t('web.garnison_seule','la garnison seule')), cls:'ghost', id:'sc-none'},
+                   {k:(o.renfort?'Renforcer':t('web.defendre_2','Défendre')), s:t('web.avec_jeton','<span id="sc-dbs">avec {v0} jeton{v}</span>',{v0:_v0,v:(_v0>1?'s':'')}), cls:'no', id:'sc-ok'}]});
         decisionPanel(body);
         const sl=document.getElementById('sc-d'), dv=document.getElementById('sc-dv'), dt=document.getElementById('sc-dt'), dbs=document.getElementById('sc-dbs');
         const cru=()=>{ const c=document.getElementById('sc-cru'); return !!(c&&c.checked); };
-        const maj=()=>{ const v=parseInt(sl.value)||0; dv.textContent=v; if(dt)dt.textContent=v+_base+(cru()?(o.cruiserPower||5):0); if(dbs)dbs.textContent=v>0?('avec '+v+' jeton'+(v>1?'s':'')):'la garnison seule'; };
+        const maj=()=>{ const v=parseInt(sl.value)||0; dv.textContent=v; if(dt)dt.textContent=v+_base+(cru()?(o.cruiserPower||5):0); if(dbs)dbs.textContent=v>0?t('assaut.avec_n_jetons','avec {n} jeton(s)',{n:v}):t('assaut.garnison_seule','la garnison seule'); };
         if(sl)sl.oninput=maj; { const c=document.getElementById('sc-cru'); if(c)c.onchange=maj; }
         document.getElementById('sc-ok').onclick=()=>done({defTokens:parseInt(sl.value)||0, cruiser:cru()});
         document.getElementById('sc-none').onclick=()=>done({defTokens:0, cruiser:false});
         return;
       }
-      body='<h2>'+(o.renfort?'🤝 Renfort !':'🛡️ Défense !')+'</h2>'
-        /* Défense à deux (Marc, 07/09) : l'hôte d'un nœud partagé est consulté APRÈS le propriétaire ;
-           ses jetons s'ajoutent à ceux du principal et à la garnison. */
-        +(o.renfort?'<div style="background:#0e2a18;border:1px solid #3a8a5a;border-radius:8px;padding:6px 9px;margin-bottom:8px;color:#9fe8b8;font-size:.85em">Tu partages <b>'+(o.target?o.target.name:'ce nœud')+'</b> avec <b>'+(o.principal||'son propriétaire')+'</b>, qui a déjà choisi sa défense. Tes jetons <b>s\'ajoutent</b> aux siens. Si la place tombe, vous êtes chassés tous les deux.</div>':'')
-        +'<div style="margin-bottom:8px"><b>'+who+'</b> assaille <b>'+cible+'</b>.<br>'
-        /* La force annoncée est la PUISSANCE RÉELLE (jetons + Empathes + Stratégie + Supercroiseur) :
-           voir `showAiAssaultDefenseModal`. Le détail est écrit à côté, sinon le joueur croit
-           défendre contre des jetons et se retrouve devant un croiseur (E682, tour 9). */
-        +'<span class="muted">Force de l\'assaut : ~'+(o.threat||0)+'⚔️'+(o.threatDetail?(' ('+o.threatDetail+')'):'')+' · tes jetons engageables : '+max+(o.navDemi?' (½🪨 +½⚡ chacun — IA de Navigation)':' (1🪨 +1⚡ chacun)')+'</span></div>'
-        +(o.attackerCruiser?'<div style="background:#2a1200;border:1px solid #cc6622;border-radius:8px;padding:6px 9px;margin-bottom:8px;color:#ffcfa0;font-size:.85em">⚓ Il déploie son <b>Supercroiseur</b> — déjà compté ci-dessus.</div>':'')
-        /* La garnison compte dans le combat, elle doit compter dans la fenêtre (Marc, 06/09 : « je vois
-           pas combien j'ai en défense de base dans ma capitale une fois reprise »). Serveurs plus
-           anciens : pas de garnison dans le payload → ligne absente, rien de faux affiché. */
-        +(o.garrison!==undefined?'<div style="background:#0e2a18;border:1px solid #3a8a5a;border-radius:8px;padding:6px 9px;margin-bottom:8px;color:#9fe8b8;font-size:.85em">🏛️ Garnison sur place : <b>'+o.garrison+'</b>'+(o.garrisonLabel?(' ('+o.garrisonLabel+')'):'')+(o.empath?(' · 🔮 +'+o.empath+' Empathes'):'')+' — comptés dans ta défense.</div>':'')
-        +'<input type="range" id="sc-d" min="0" max="'+max+'" value="'+Math.min(2,max)+'" style="width:100%">'
-        +'<div style="margin:4px 0 8px">Défense : <b id="sc-dv">'+Math.min(2,max)+'</b> jeton(s)'+(o.garrison!==undefined?' → total <b id="sc-dt">'+(Math.min(2,max)+(o.garrison||0)+(o.empath||0))+'</b>🛡️ contre ~'+(o.threat||0)+'⚔️':'')+'</div>'
-        +(o.cruiser?('<label class="opt" style="display:block;text-align:left;cursor:pointer"><input type="checkbox" id="sc-cru" style="margin-right:8px">⚓ Déployer le <b>Supercroiseur</b> (+'+(o.cruiserPower||5)+'⚔️, −'+cc.materials+'🪨 −'+cc.energy+'⚡)</label>'):'')
-        +'<button class="opt" id="sc-ok">'+(o.renfort?'🤝 Renforcer':'🛡️ Défendre')+'</button>'
-        +'<button class="opt" id="sc-none" style="background:#2a2f45">'+(o.renfort?'Je n\'engage rien — le propriétaire défend seul':'La colonie se défend toute seule avec ses jetons (1 pour une colonie, 10 pour la base de ta nation)')+'</button>';
+      body=t('web.assaille_force_assaut_jetons_engageables','<h2>{v}</h2>{jetons}<div style="margin-bottom:8px"><b>{who}</b> assaille <b>{cible}</b>.<br><span class="muted">Force de l\'assaut : ~{v2}⚔️{v3} · tes jetons engageables : {max}{v4}</span></div>{v5}{v6}<input type="range" id="sc-d" min="0" max="{max2}" value="{cout}" style="width:100%"><div style="margin:4px 0 8px">Défense : <b id="sc-dv">{cout2}</b> jeton(s){cout3}</div>{cout4}<button class="opt" id="sc-ok">{jetons2}</button><button class="opt" id="sc-none" style="background:#2a2f45">{jetons3}</button>',{v:(o.renfort?'🤝 Renfort !':t('web.defense','🛡️ Défense !')),jetons:(o.renfort?t('web.partages_avec_deja_choisi_defense_jetons','<div style="background:#0e2a18;border:1px solid #3a8a5a;border-radius:8px;padding:6px 9px;margin-bottom:8px;color:#9fe8b8;font-size:.85em">Tu partages <b>{v}</b> avec <b>{v2}</b>, qui a déjà choisi sa défense. Tes jetons <b>s\'ajoutent</b> aux siens. Si la place tombe, vous êtes chassés tous les deux.</div>',{v:(o.target?o.target.name:t('web.ud_2','ce nœud')),v2:(o.principal||t('web.proprietaire','son propriétaire'))}):''),who:who,cible:cible,v2:o.threat||0,v3:(o.threatDetail?' ('+o.threatDetail+')':''),max:max,v4:(o.navDemi?t('web.chacun_ia_navigation',' (½🪨 +½⚡ chacun — IA de Navigation)'):' (1🪨 +1⚡ chacun)'),v5:(o.attackerCruiser?t('web.deploie_supercroiseur_deja_compte_ci_des','<div style="background:#2a1200;border:1px solid #cc6622;border-radius:8px;padding:6px 9px;margin-bottom:8px;color:#ffcfa0;font-size:.85em">⚓ Il déploie son <b>Supercroiseur</b> — déjà compté ci-dessus.</div>'):''),v6:(o.garrison!==undefined?t('web.garnison_place_comptes_dans_defense','<div style="background:#0e2a18;border:1px solid #3a8a5a;border-radius:8px;padding:6px 9px;margin-bottom:8px;color:#9fe8b8;font-size:.85em">🏛️ Garnison sur place : <b>{v}</b>{v2}{v3} — comptés dans ta défense.</div>',{v:o.garrison,v2:(o.garrisonLabel?' ('+o.garrisonLabel+')':''),v3:(o.empath?' · 🔮 +'+o.empath+' Empathes':'')}):''),max2:max,cout:Math.min(2,max),cout2:Math.min(2,max),cout3:(o.garrison!==undefined?' → total <b id="sc-dt">'+(Math.min(2,max)+(o.garrison||0)+(o.empath||0))+'</b>🛡️ contre ~'+(o.threat||0)+'⚔️':''),cout4:(o.cruiser?t('web.deployer_supercroiseur_2','<label class="opt" style="display:block;text-align:left;cursor:pointer"><input type="checkbox" id="sc-cru" style="margin-right:8px">⚓ Déployer le <b>Supercroiseur</b> (+{v}⚔️, −{cout}🪨 −{cout2}⚡)</label>',{v:o.cruiserPower||5,cout:cc.materials,cout2:cc.energy}):''),jetons2:(o.renfort?'🤝 Renforcer':t('web.defendre','🛡️ Défendre')),jetons3:(o.renfort?t('web.engage_rien_proprietaire_defend_seul','Je n\'engage rien — le propriétaire défend seul'):t('web.colonie_defend_toute_seule_avec_jetons_1','La colonie se défend toute seule avec ses jetons (1 pour une colonie, 10 pour la base de ta nation)'))});
       decisionPanel(body);
       const sl=document.getElementById('sc-d'), dv=document.getElementById('sc-dv');
       const cru=()=>{ const c=document.getElementById('sc-cru'); return !!(c&&c.checked); };
@@ -2208,36 +2082,27 @@ function askLocalDecision(pending){
       /* Tour de guerre (comme en solo : 1/2 puis 2/2) et FORCE ENNEMIE — exacte avec Réseau Orbital, ±3
          sinon (Marc, FE37 : « on ne peut pas voir la force ennemie alors que j'ai la technologie »). */
       const _chipsGuerre=()=>{ const c=[];
-        if(o.warTurnsLeft!==undefined) c.push('Tour de guerre <b>'+(o.warTurnsLeft>=2?'1':'2')+'/2</b>');
+        if(o.warTurnsLeft!==undefined) c.push(t('web.tour_guerre_2','Tour de guerre <b>{v}/2</b>',{v:(o.warTurnsLeft>=2?'1':'2')}));
         if(o.enemyForce) c.push('Force ennemie <b>'+(o.enemyForce.exact?'':'~')+o.enemyForce.val+'⚔️</b>'+(o.enemyForce.exact?' (renseignement exact)':' (±3, sans renseignement)'));
         return c; };
       /* Ce que le défenseur peut aligner : garnison de la colonie (règle connue : 1, ou 10 pour une
          capitale) + ce qu'il engage, borné par sa force (exacte ou estimée). */
       const _defenseTexte=(c)=>{ const g=(c.garrison!==undefined)?c.garrison:(c.isHome?10:1);
         const f=o.enemyForce; const fx=f?((f.exact?'':'~')+f.val):'?';
-        return (c.isHome?'🏛️ CAPITALE : ':'')+'Défense = garnison <b>'+g+'</b> + ce que l\'ennemi engage (il a <b>'+fx+'</b> jeton'+((f&&f.val>1)?'s':'')+(f&&!f.exact?', estimation ±3':'')+'). Fourchette : <b>'+g+'</b> à <b>'+(f?(g+f.val):'?')+'</b>⚔️'+(f&&f.exact?' — renseignement exact.':'.'); };
+        return t('web.defense_garnison_ennemi_engage_jeton_fou','{v}Défense = garnison <b>{g}</b> + ce que l\'ennemi engage (il a <b>{fx}</b> jeton{v2}{cout}). Fourchette : <b>{g2}</b> à <b>{v3}</b>⚔️{v4}',{v:(c.isHome?'🏛️ CAPITALE : ':''),g:g,fx:fx,v2:(f&&f.val>1?'s':''),cout:(f&&!f.exact?', estimation ±3':''),g2:g,v3:(f?g+f.val:'?'),v4:(f&&f.exact?' — renseignement exact.':'.')}); };
       const tokenPick=(title,hint,onOk)=>{ // sous-écran : choisir les jetons engagés (+ supercroiseur)
-        const limite=(maxF<force)?('<div style="color:#ffcc88;font-size:.82em;margin-bottom:4px">⚠️ Tu possèdes '+force+' jeton(s) mais ne peux en <b>payer</b> que '+maxF+' (1🪨 +1⚡ par jeton engagé).</div>'):'';
-        const cruLigne=cru.has
-          ? ('<label style="display:flex;align-items:center;gap:8px;margin:8px 0;'+(cru.afford?'':'opacity:.5')+'">'
-             +'<input type="checkbox" id="sc-cru" style="width:auto"'+(cru.afford?'':' disabled')+'>'
-             +'<span>⚓ Déployer le Supercroiseur <b>+'+(cru.power||5)+'⚔️</b>'+(cru.afford?'':' — ressources insuffisantes')+'</span></label>')
-          : '';
+        const limite=((((maxF<force?t('web.possedes_jeton_mais_peux_payer_1_1_jeton','<div style="color:#ffcc88;font-size:.82em;margin-bottom:4px">⚠️ Tu possèdes {jetons} jeton(s) mais ne peux en <b>payer</b> que {maxf} (1🪨 +1⚡ par jeton engagé).</div>',{jetons:force,maxf:maxF}):''))));
+        const cruLigne=((((cru.has?t('web.deployer_supercroiseur_3','<label style="display:flex;align-items:center;gap:8px;margin:8px 0;{v}"><input type="checkbox" id="sc-cru" style="width:auto"{v2}><span>⚓ Déployer le Supercroiseur <b>+{v3}⚔️</b>{v4}</span></label>',{v:(cru.afford?'':'opacity:.5'),v2:(cru.afford?'':' disabled'),v3:cru.power||5,v4:(cru.afford?'':' — ressources insuffisantes')}):''))));
         if(_blason){
           decisionPanel(fenBlason({ton:'war', emoji:_enEmo, kicker:'contre', prep:true, nation:esc(o.enemyName||'ennemi'),
             verbe:title, chips:_chipsGuerre(), corps:(hint?hint:'')+limite,
-            milieu:'<div class="fen-slider"><div class="row"><span>Jetons engagés</span><b><span id="sc-wcv">'+Math.min(1,maxF)+'</span> / <span id="sc-wcmax">'+maxF+'</span></b></div>'
-              +'<input type="range" id="sc-wc" min="0" max="'+maxF+'" value="'+Math.min(1,maxF)+'" aria-label="Jetons engagés">'
+            milieu:'<div class="fen-slider"><div class="row"><span>'+t('assaut.jetons_engages','Jetons engagés')+'</span><b><span id="sc-wcv">'+Math.min(1,maxF)+'</span> / <span id="sc-wcmax">'+maxF+'</span></b></div>'
+              +'<input type="range" id="sc-wc" min="0" max="'+maxF+'" value="'+Math.min(1,maxF)+'" aria-label="'+t('assaut.jetons_engages','Jetons engagés')+'">'
               +cruLigne.replace('style="display:flex;align-items:center;gap:8px;margin:8px 0;','style="')
               +'<div id="sc-wclim" class="row" style="color:#ffcc88;min-height:1em"></div></div>',
-            boutons:[{k:'Retour', s:'choisir autre chose', cls:'ghost', id:'sc-wcback'},{k:'Engager', s:'ces jetons', cls:'no', id:'sc-wcok'}]}));
+            boutons:[{k:'Retour', s:'choisir autre chose', cls:'ghost', id:'sc-wcback'},{k:'Engager', s:t('web.ces_jetons','ces jetons'), cls:'no', id:'sc-wcok'}]}));
         } else
-        decisionPanel('<h2>'+title+'</h2>'+(hint?'<div class="muted" style="margin-bottom:6px">'+hint+'</div>':'')+limite
-          +'<div>Jetons engagés : <b id="sc-wcv">'+Math.min(1,maxF)+'</b> / <b id="sc-wcmax">'+maxF+'</b></div>'
-          +'<input type="range" id="sc-wc" min="0" max="'+maxF+'" value="'+Math.min(1,maxF)+'" style="width:100%">'
-          +cruLigne
-          +'<div id="sc-wclim" style="color:#ffcc88;font-size:.8em;min-height:1em"></div>'
-          +'<button class="opt" id="sc-wcok">✓ Engager</button><button class="opt" id="sc-wcback">↩ Retour</button>');
+        decisionPanel(t('web.jetons_engages_engager_retour','<h2>{title}</h2>{v}{limite}<div>Jetons engagés : <b id="sc-wcv">{cout}</b> / <b id="sc-wcmax">{maxf}</b></div><input type="range" id="sc-wc" min="0" max="{maxf2}" value="{cout2}" style="width:100%">{cruligne}<div id="sc-wclim" style="color:#ffcc88;font-size:.8em;min-height:1em"></div><button class="opt" id="sc-wcok">✓ Engager</button><button class="opt" id="sc-wcback">↩ Retour</button>',{title:title,v:(hint?'<div class="muted" style="margin-bottom:6px">'+hint+'</div>':''),limite:limite,cout:Math.min(1,maxF),maxf:maxF,maxf2:maxF,cout2:Math.min(1,maxF),cruligne:cruLigne}));
         const sl=document.getElementById('sc-wc'), dv=document.getElementById('sc-wcv'); if(sl)sl.oninput=()=>dv.textContent=sl.value;
         /* La case du croiseur rabat le maximum du curseur, et l'annonce. */
         const _cb=document.getElementById('sc-cru'), _lim=document.getElementById('sc-wclim');
@@ -2246,9 +2111,8 @@ function askLocalDecision(pending){
           const m=(_cb&&_cb.checked)?maxFCru:maxF;
           sl.max=m; if((parseInt(sl.value)||0)>m) sl.value=m;
           if(dv)dv.textContent=sl.value;
-          const t=document.getElementById('sc-wcmax'); if(t)t.textContent=m;
-          if(_lim)_lim.textContent=(_cb&&_cb.checked&&maxFCru<maxF)
-            ? ('⚓ Le Supercroiseur réserve des ressources : maximum ramené à '+maxFCru+' jeton(s).') : '';
+          const _el=document.getElementById('sc-wcmax'); if(_el)_el.textContent=m;
+          if(_lim)_lim.textContent=((((_cb&&_cb.checked&&maxFCru<maxF?t('web.supercroiseur_reserve_ressources_maximum','⚓ Le Supercroiseur réserve des ressources : maximum ramené à {maxfcru} jeton(s).',{maxfcru:maxFCru}):''))));
         };
         if(_cb)_cb.onchange=_maj;
         _maj();
@@ -2259,83 +2123,75 @@ function askLocalDecision(pending){
         document.getElementById('sc-wcback').onclick=()=>main();
       };
       const main=()=>{
-        let b=_blason?'':('<h2>⚔️ Combat de guerre — '+(o.enemyName||'ennemi')+'</h2>');
-        if(!_blason) b+='<div class="muted" style="margin-bottom:8px">Jetons engageables : <b>'+maxF+'</b>'+((maxF<force)?(' <span style="color:#ffcc88">(sur '+force+' possédés — limité par tes ressources)</span>'):'')+' · Tour de guerre restant : '+(o.warTurnsLeft||'?')+'</div>';
-        if(threat&&!_blason) b+='<div style="background:#2a1200;border:1px solid #cc6622;border-radius:8px;padding:7px 10px;margin-bottom:8px;color:#ffcfa0;font-size:.85em">🛡️ L\'ennemi menace : <b>'+(threat.type==='colony'?'🏙️ ':'🛤️ ')+threat.name+'</b>. Tu peux <b>défendre</b>.</div>';
+        let b=((((_blason?'':t('web.combat_guerre','<h2>⚔️ Combat de guerre — {v}</h2>',{v:o.enemyName||'ennemi'})))));
+        if(!_blason) b+=t('web.jetons_engageables_tour_guerre_restant','<div class="muted" style="margin-bottom:8px">Jetons engageables : <b>{maxf}</b>{jetons} · Tour de guerre restant : {v}</div>',{maxf:maxF,jetons:(maxF<force?t('web.possedes_limite_ressources',' <span style="color:#ffcc88">(sur {jetons} possédés — limité par tes ressources)</span>',{jetons:force}):''),v:o.warTurnsLeft||'?'});
+        if(threat&&!_blason) b+=t('web.ennemi_menace_peux_defendre','<div style="background:#2a1200;border:1px solid #cc6622;border-radius:8px;padding:7px 10px;margin-bottom:8px;color:#ffcfa0;font-size:.85em">🛡️ L\'ennemi menace : <b>{v}{nom}</b>. Tu peux <b>défendre</b>.</div>',{v:(threat.type==='colony'?'🏙️ ':'🛤️ '),nom:threat.name});
         // Attaquer une colonie ennemie
         if(cols.length){
-          b+='<div style="font-weight:700;color:#ff9966;margin:4px 0 3px">⚔️ Attaquer une colonie</div>';
-          b+=cols.map((c,i)=>'<button class="opt" data-col="'+i+'"'+(maxF<1?' disabled style="opacity:.45"':'')+'>'+(c.isFocus?'🎯 ':'')+(c.emoji||'')+' <b>'+c.name+'</b> Nv.'+c.level+(c.isHome?' 🏠 QG':'')+' <span class="muted">('+c.dist+' nœud'+(c.dist>1?'s':'')+')</span>'+(c.isFocus?' <span style="color:#ffcc66">— gagne = capture !</span>':'')+'</button>').join('');
-        } else b+='<div class="muted">Aucune colonie ennemie à portée.</div>';
+          b+=t('web.attaquer_colonie','<div style="font-weight:700;color:#ff9966;margin:4px 0 3px">⚔️ Attaquer une colonie</div>');
+          b+=cols.map((c,i)=>t('web.nv_ud','<button class="opt" data-col="{i}"{v}>{v2}{v3} <b>{nom}</b> Nv.{v4}{v5} <span class="muted">({v6} nœud{v7})</span>{v8}</button>',{i:i,v:(maxF<1?' disabled style="opacity:.45"':''),v2:(c.isFocus?'🎯 ':''),v3:c.emoji||'',nom:c.name,v4:c.level,v5:(c.isHome?' 🏠 QG':''),v6:c.dist,v7:(c.dist>1?'s':''),v8:(c.isFocus?' <span style="color:#ffcc66">— gagne = capture !</span>':'')})).join('');
+        } else b+=t('web.aucune_colonie_ennemie_portee','<div class="muted">Aucune colonie ennemie à portée.</div>');
         /* ═══ ATTAQUER UNE ROUTE — CETTE LISTE ÉTAIT ENVOYÉE ET JAMAIS AFFICHÉE ═══
            Le serveur remplit `payload.routes` depuis toujours ; ce panneau ne l'a jamais lue. En
            multijoueur, la guerre offrait donc strictement moins d'options qu'en solo, en silence.
            Une route non protégée coûte 1 jeton et rien d'autre, une route protégée en coûte 2 :
            c'est souvent le seul coup jouable quand on n'a plus de quoi monter un assaut. */
         if(routes.length){
-          b+='<div style="font-weight:700;color:#88bbee;margin:8px 0 3px">🛤️ Attaquer une route</div>';
+          b+=t('web.attaquer_route','<div style="font-weight:700;color:#88bbee;margin:8px 0 3px">🛤️ Attaquer une route</div>');
           b+=routes.map(r=>{ const peut=force>=r.cost;
-            return '<button class="opt" data-rt="'+r.i+'"'+(peut?'':' disabled style="opacity:.45"')+'>'
-              +(r.protected?'🛡️':'🔓')+' <b>'+r.name+'</b> — '+r.cost+' jeton'+(r.cost>1?'s':'')
-              +(r.protected?' <span class="muted">(protégée)</span>':' <span class="muted">(non protégée)</span>')+'</button>'; }).join('');
+            return t('web.jeton','<button class="opt" data-rt="{v}"{v2}>{v3} <b>{nom}</b> — {cout} jeton{cout2}{v4}</button>',{v:r.i,v2:(peut?'':' disabled style="opacity:.45"'),v3:(r.protected?'🛡️':'🔓'),nom:r.name,cout:r.cost,cout2:(r.cost>1?'s':''),v4:(r.protected?t('web.protegee',' <span class="muted">(protégée)</span>'):t('web.non_protegee',' <span class="muted">(non protégée)</span>'))}); }).join('');
         }
         // Défendre / Se retirer
-        if(threat) b+='<button class="opt" id="sc-wc-def" style="border-color:#cc6622">🛡️ Défendre (choisir jetons)</button>';
+        if(threat) b+=t('web.defendre_choisir_jetons','<button class="opt" id="sc-wc-def" style="border-color:#cc6622">🛡️ Défendre (choisir jetons)</button>');
         /* ⚠️ CE BOUTON N'EST PLUS CONDITIONNEL, ET C'EST TOUT LE CORRECTIF DU 17/08.
            Il n'apparaissait pas pour celui qui avait déclaré la guerre. Sans ressources pour
            attaquer et sans menace à repousser, la fenêtre n'avait plus rien de cliquable : deux
            amis de Marc y ont perdu leur partie. Il y a désormais toujours une sortie. */
-        b+='<button class="opt" id="sc-wc-hold" style="border-color:#4488cc">'
-          +(estAgresseur?'🚪 Renoncer à l\'assaut ce tour <span class="muted">(la guerre continue)</span>'
-                        :'🕊️ Tenir position (ne rien engager)')+'</button>';
+        b+=t('web.ligne_2','<button class="opt" id="sc-wc-hold" style="border-color:#4488cc">{tour}</button>',{tour:(estAgresseur?t('web.renoncer_assaut_tour_guerre_continue','🚪 Renoncer à l\'assaut ce tour <span class="muted">(la guerre continue)</span>'):t('web.tenir_position_rien_engager','🕊️ Tenir position (ne rien engager)'))});
         /* Et on DIT pourquoi tout est gris, au lieu de laisser croire à une fenêtre cassée. */
-        if(maxF<1) b+='<div style="color:#ffcc88;font-size:.82em;margin-top:6px">⚠️ Tu n\'as pas de quoi engager un seul jeton (1🪨 +1⚡ chacun) : aucune attaque n\'est possible ce tour-ci.</div>';
+        if(maxF<1) b+=t('web.as_quoi_engager_seul_jeton_1_1_chacun_au','<div style="color:#ffcc88;font-size:.82em;margin-top:6px">⚠️ Tu n\'as pas de quoi engager un seul jeton (1🪨 +1⚡ chacun) : aucune attaque n\'est possible ce tour-ci.</div>');
         if(_blason){
           b=fenBlason({ton:'war', emoji:_enEmo, kicker:'contre', prep:true, nation:esc(o.enemyName||'ennemi'),
-            verbe:'Que fais-tu ce tour ?', chips:_chipsGuerre().concat(['Engageables <b>'+maxF+'</b>'+((maxF<force)?' / '+force+' possédés':'')]).concat(threat?['🛡️ Menace sur <b>'+esc(threat.name||'')+'</b>']:[]),
+            verbe:t('web.fais_tour','Que fais-tu ce tour ?'), chips:_chipsGuerre().concat([t('web.engageables_possedes','Engageables <b>{n}</b>{v}',{n:maxF,v:((maxF<force)?t('web.sur_possedes',' / {n} possédés',{n:force}):'')})]).concat(threat?[t('web.menace_sur','🛡️ Menace sur <b>{n}</b>',{n:esc(threat.name||'')})]:[]),
             milieu:'<div style="text-align:left">'+b+'</div>'});
         }
         decisionPanel(b);
         document.querySelectorAll('#sc-decision .opt[data-col]').forEach(btn=>{ if(btn.disabled)return; btn.onclick=()=>{ const c=cols[parseInt(btn.getAttribute('data-col'))]; tokenPick('⚔️ Attaquer '+c.name, _defenseTexte(c), (t,cr)=>done({action:'attack', node:c.node, tokens:t, cruiser:cr})); }; });
         document.querySelectorAll('#sc-decision .opt[data-rt]').forEach(btn=>{ if(btn.disabled)return; btn.onclick=()=>done({action:'route', route:parseInt(btn.getAttribute('data-rt'))}); });
-        const dfn=document.getElementById('sc-wc-def'); if(dfn) dfn.onclick=()=>tokenPick('🛡️ Défense', 'Jetons engagés en défense de tes colonies.', (t,cr)=>done({action:'defend', tokens:t, cruiser:cr}));
+        const dfn=document.getElementById('sc-wc-def'); if(dfn) dfn.onclick=()=>tokenPick(t('web.defense_3','🛡️ Défense'), t('web.jetons_engages_defense_colonies','Jetons engagés en défense de tes colonies.'), (t,cr)=>done({action:'defend', tokens:t, cruiser:cr}));
         const hld=document.getElementById('sc-wc-hold'); if(hld) hld.onclick=()=>done({action:'hold'});
       };
       main();
       return;
     }
     if(k==='peace_offer'){
-      body+=`<div>En guerre contre ${o.attackerName||o.attacker}. (VP toi ${o.vpYou} / lui ${o.vpEnemy})</div>
-        <button class="opt" id="sc-peace">🕊️ Proposer la paix</button>
-        <button class="opt" id="sc-war">⚔️ Continuer la guerre</button>`;
+      body+=t('web.guerre_contre_vp_toi_lui_proposer_paix_c','<div>En guerre contre {v}. (VP toi {vp} / lui {vp2})</div>\n        <button class="opt" id="sc-peace">🕊️ Proposer la paix</button>\n        <button class="opt" id="sc-war">⚔️ Continuer la guerre</button>',{v:o.attackerName||o.attacker,vp:o.vpYou,vp2:o.vpEnemy});
       decisionPanel(body);
       document.getElementById('sc-peace').onclick=()=>done({accept:true, offer:{materials:0,energy:0,science:0}});
       // Même garde-fou que dans la vraie modale : le panneau de repli ne doit pas être plus permissif.
       document.getElementById('sc-war').onclick=()=>{ if(_confirmerGuerreSansMoyens(o)) done({accept:false}); };
       return;
     }
-    if(k==='ai_dyson'){ body+=`<div>${o.builderName||'Une nation'} a bâti la Sphère de Dyson.</div>
-        <button class="opt" id="sc-acc">🤝 Accepter</button><button class="opt" id="sc-ref">⚔️ Refuser (guerre)</button>`;
+    if(k==='ai_dyson'){ body+=t('web.bati_sphere_dyson_accepter_refuser_guerr','<div>{v} a bâti la Sphère de Dyson.</div>\n        <button class="opt" id="sc-acc">🤝 Accepter</button><button class="opt" id="sc-ref">⚔️ Refuser (guerre)</button>',{v:(o.builderName||t('avis.nation','Une nation'))});
       decisionPanel(body);
       document.getElementById('sc-acc').onclick=()=>done({war:false});
       document.getElementById('sc-ref').onclick=()=>done({war:true}); return;
     }
-    if(k==='human_dyson'){ body='<h2>⚡ Sphère de Dyson adverse</h2>'+`<div>${o.builderName||'Un joueur'} a bâti la Sphère de Dyson (monopole énergétique). Accepte (+3⚡/tour) ou refuse (= guerre).</div>
-        <button class="opt" id="sc-acc">🤝 Accepter le monopole</button><button class="opt" id="sc-ref">⚔️ Refuser (guerre)</button>`;
+    if(k==='human_dyson'){ body=t('web.sphere_dyson_adverse_bati_sphere_dyson_m','<h2>⚡ Sphère de Dyson adverse</h2><div>{v} a bâti la Sphère de Dyson (monopole énergétique). Accepte (+3⚡/tour) ou refuse (= guerre).</div>\n        <button class="opt" id="sc-acc">🤝 Accepter le monopole</button><button class="opt" id="sc-ref">⚔️ Refuser (guerre)</button>',{v:(o.builderName||t('web.joueur','Un joueur'))});
       decisionPanel(body);
       document.getElementById('sc-acc').onclick=()=>done({war:false});
       document.getElementById('sc-ref').onclick=()=>done({war:true}); return;
     }
-    if(k==='dyson_build'){ body+=`<button class="opt" id="sc-f">Forcer (guerre aux refusants)</button><button class="opt" id="sc-r">Renoncer</button>`;
+    if(k==='dyson_build'){ body+=t('web.forcer_guerre_refusants_renoncer','<button class="opt" id="sc-f">Forcer (guerre aux refusants)</button><button class="opt" id="sc-r">Renoncer</button>');
       decisionPanel(body); document.getElementById('sc-f').onclick=()=>done({force:true}); document.getElementById('sc-r').onclick=()=>done({force:false}); return; }
-    if(k==='accord_confirm'){ body+=`<div>Accord avec ${o.withName||''} sur ${o.nodeName||''} ?</div><button class="opt" id="sc-y">Confirmer</button><button class="opt" id="sc-n">Annuler</button>`;
+    if(k==='accord_confirm'){ body+=t('web.accord_avec_confirmer_annuler','<div>Accord avec {v} sur {v2} ?</div><button class="opt" id="sc-y">Confirmer</button><button class="opt" id="sc-n">Annuler</button>',{v:o.withName||'',v2:o.nodeName||''});
       decisionPanel(body); document.getElementById('sc-y').onclick=()=>done({confirm:true}); document.getElementById('sc-n').onclick=()=>done({confirm:false}); return; }
     if(k==='event_comm'){ // Événement Accords Commerciaux : choisir UNE nation (accord gratuit +3 VP, met fin à une guerre) ou passer
       const cands=o.cands||[];
-      let b='<h2>🤝 Accords Commerciaux</h2><div class="muted" style="margin-bottom:8px">Accord commercial <b>gratuit</b> : +3 VP pour chaque nation, met fin à une guerre si elle existe. Un leader trop en avance peut refuser.</div>';
-      if(!cands.length) b+='<div class="muted" style="margin-bottom:6px">Toutes les nations ont déjà un accord avec toi.</div>';
-      else b+=cands.map((c,i)=>'<button class="opt" data-comm="'+i+'">'+(c.emoji||'')+' <b>'+c.name+'</b>'+(c.war?' <span style="color:#ff7766">⚔️ en guerre</span>':'')+(c.info?'<br><span class="muted">'+c.info+'</span>':'')+'</button>').join('');
-      b+='<button class="opt" id="sc-comm-pass" style="background:#2a2f45">Passer (aucun accord)</button>';
+      let b=t('web.accords_commerciaux_accord_commercial_gr','<h2>🤝 Accords Commerciaux</h2><div class="muted" style="margin-bottom:8px">Accord commercial <b>gratuit</b> : +3 VP pour chaque nation, met fin à une guerre si elle existe. Un leader trop en avance peut refuser.</div>');
+      if(!cands.length) b+=t('web.toutes_nations_ont_deja_accord_avec_toi','<div class="muted" style="margin-bottom:6px">Toutes les nations ont déjà un accord avec toi.</div>');
+      else b+=cands.map((c,i)=>t('web.ligne_12','<button class="opt" data-comm="{i}">{v} <b>{nom}</b>{v2}{v3}</button>',{i:i,v:c.emoji||'',nom:c.name,v2:(c.war?t('web.guerre',' <span style="color:#ff7766">⚔️ en guerre</span>'):''),v3:(c.info?'<br><span class="muted">'+c.info+'</span>':'')})).join('');
+      b+=t('web.passer_aucun_accord','<button class="opt" id="sc-comm-pass" style="background:#2a2f45">Passer (aucun accord)</button>');
       decisionPanel(b);
       document.querySelectorAll('#sc-decision .opt[data-comm]').forEach(btn=>{ btn.onclick=()=>done({aiId:cands[parseInt(btn.getAttribute('data-comm'))].id}); });
       document.getElementById('sc-comm-pass').onclick=()=>done({aiId:null});
@@ -2343,9 +2199,9 @@ function askLocalDecision(pending){
     }
     if(k==='event_diplo'){ // Événement Accords Diplomatiques : sélectionner plusieurs pactes (6 matériaux chacun, +2 énergie si guerre)
       const rows=o.rows||[]; const sel={};
-      let b='<h2>🕊️ Accords Diplomatiques</h2><div class="muted" style="margin-bottom:8px">Pacte de non-agression : 4 tours, 6🪨 par nation. Met fin à une guerre. +1🙂 par pacte conclu, tension 0 avec le partenaire. Tu as '+(o.mat||0)+'🔩 '+(o.energy||0)+'⚡.</div>';
-      b+=rows.map((r,i)=>'<label class="opt" style="display:block;text-align:left;cursor:pointer"><input type="checkbox" data-diplo="'+i+'" style="margin-right:8px">'+(r.emoji||'')+' <b>'+r.name+'</b> — 4 tours · '+(r.war?'6🪨 <span style="color:#ff7766">met fin à la guerre</span>':'6🪨')+(r.info?'<br><span class="muted" style="margin-left:24px">'+r.info+'</span>':'')+'</label>').join('');
-      b+='<button class="opt" id="sc-diplo-ok">Conclure les pactes sélectionnés</button><button class="opt" id="sc-diplo-none" style="background:#2a2f45">Aucun pacte</button>';
+      let b=t('web.accords_diplomatiques_pacte_non_agressio','<h2>🕊️ Accords Diplomatiques</h2><div class="muted" style="margin-bottom:8px">Pacte de non-agression : 4 tours, 6🪨 par nation. Met fin à une guerre. +1🙂 par pacte conclu, tension 0 avec le partenaire. Tu as {cout}🔩 {cout2}⚡.</div>',{cout:o.mat||0,cout2:o.energy||0});
+      b+=rows.map((r,i)=>t('web.4_tours','<label class="opt" style="display:block;text-align:left;cursor:pointer"><input type="checkbox" data-diplo="{i}" style="margin-right:8px">{v} <b>{nom}</b> — 4 tours · {v2}{v3}</label>',{i:i,v:r.emoji||'',nom:r.name,v2:(r.war?t('web.6_met_fin_guerre','6🪨 <span style="color:#ff7766">met fin à la guerre</span>'):'6🪨'),v3:(r.info?'<br><span class="muted" style="margin-left:24px">'+r.info+'</span>':'')})).join('');
+      b+=t('web.conclure_pactes_selectionnes_aucun_pacte','<button class="opt" id="sc-diplo-ok">Conclure les pactes sélectionnés</button><button class="opt" id="sc-diplo-none" style="background:#2a2f45">Aucun pacte</button>');
       decisionPanel(b);
       document.getElementById('sc-diplo-ok').onclick=()=>{ const chosen=[]; document.querySelectorAll('#sc-decision input[data-diplo]').forEach(cb=>{ if(cb.checked)chosen.push(rows[parseInt(cb.getAttribute('data-diplo'))].id); }); done({selected:chosen}); };
       document.getElementById('sc-diplo-none').onclick=()=>done({selected:[]});
@@ -2380,12 +2236,12 @@ function askLocalDecision(pending){
        choses différentes. Et « rang d'initiative » était faux de toute façon — l'ordre du draft va du
        plus faible au plus fort, il n'a rien à voir avec l'initiative du tour. */
     if(k==='strategy' && o.rappel){ body += '<div style="color:#ffd27a;margin-bottom:6px">'+o.rappel+'</div>'; }   // Initiative planifiée au tour précédent : dit AVANT le choix (Marc, 06/09)
-    if(k==='strategy' && (o.phrase||o.rank)){ body += '<div class="muted" style="margin-bottom:6px">'+(o.phrase||('Tu choisis en '+o.rank+'/'+(o.total||'?')))+'</div>'; }
+    if(k==='strategy' && (o.phrase||o.rank)){ body += t('web.ligne_3','<div class="muted" style="margin-bottom:6px">{v}</div>',{v:o.phrase||('Tu choisis en '+o.rank+'/'+(o.total||'?'))}); }
     // Chaque option : nom + (bénéfice/contrepartie pour invest, effet tension pour stratégie, desc sinon)
     body += opts.map((op,i)=>{
       let sub='';
       if(op.benefit||op.contrepartie){ sub = (op.benefit?'<span style="color:#8fe0a0">✅ '+op.benefit+'</span>':'') + (op.contrepartie?'<br><span style="color:#e0a86a">⚠️ '+op.contrepartie+'</span>':''); }
-      else if(op.desc){ sub = op.desc + (op.calmTension?'<br><span style="color:#8fb6e6">🕊️ Calme la tension</span>':''); }
+      else if(op.desc){ sub = t('web.ligne_4','{v}{tension}',{v:op.desc,tension:(op.calmTension?t('web.calme_tension','<br><span style="color:#8fb6e6">🕊️ Calme la tension</span>'):'')}); }
       return `<button class="opt" data-i="${i}">${op.emoji||''} <b>${op.name||op.id||op.branch||op.node}</b>${sub?'<br><span class="muted">'+sub+'</span>':''}</button>`;
     }).join('');
     /* ═══ CALMER UNE TENSION : LE RENDU GÉNÉRIQUE NE MONTRAIT MÊME PAS LE CHIFFRE ═══
@@ -2394,24 +2250,18 @@ function askLocalDecision(pending){
        les autres nations, sinon ça sert à rien. » Le moteur envoie désormais les trois (§`tensionsCroisees`). */
     if(k==='strategy_calm'){
       const _amt=o.amount||0, _leur=(o.sens==='eux');
-      body='<h2>🕊️ '+(_leur?'Apaiser une nation':'Calmer une tension')+'</h2>'
-        +'<div class="muted" style="margin-bottom:8px">'+(_leur
-          ? ('Une mission diplomatique : <b>sa</b> tension envers toi baisse de <b>'+_amt+'</b>. Moins elle t\'en veut, moins son peuple peut la pousser à te déclarer la guerre.')
-          : ('<b>Ta</b> tension envers la nation choisie baisse de <b>'+_amt+'</b>.'))
-        +'</div>';
+      body=t('web.ligne_5','<h2>🕊️ {tension}</h2><div class="muted" style="margin-bottom:8px">{tension2}</div>',{tension:(_leur?t('web.apaiser_nation','Apaiser une nation'):t('web.calmer_tension','Calmer une tension')),tension2:(_leur?t('web.mission_diplomatique_tension_envers_toi','Une mission diplomatique : <b>sa</b> tension envers toi baisse de <b>{amt}</b>. Moins elle t\'en veut, moins son peuple peut la pousser à te déclarer la guerre.',{amt:_amt}):t('web.tension_envers_nation_choisie_baisse','<b>Ta</b> tension envers la nation choisie baisse de <b>{amt}</b>.',{amt:_amt}))});
       body+=opts.map(function(op,i){
         const v=op.tension||0, ap=Math.max(0,v-_amt);
         const col=v>=8?'#ff6644':v>=5?'#ffaa44':v>=3?'#ffcc66':'#66cc88';
-        let sub='<span style="color:'+col+'">'+(_leur?'Sa tension envers toi':'Ta tension')+' : '+v+'/10 → '+ap+'/10</span>'
-          +'<span style="color:#5a6a8a"> | '+(_leur?'la tienne':'la leur')+' : '+(op.reciproque||0)+'/10</span>';
+        let sub=t('web.10_10_10','<span style="color:{col}">{tension} : {v}/10 → {ap}/10</span><span style="color:#5a6a8a"> | {v2} : {v3}/10</span>',{col:col,tension:(_leur?t('web.tension_envers_toi','Sa tension envers toi'):t('web.tension','Ta tension')),v:v,ap:ap,v2:(_leur?t('web.tienne','la tienne'):t('web.leur','la leur')),v3:op.reciproque||0});
         const cr=(op.croisees||[]);
         if(cr.length){
-          sub+='<br><span style="color:#7880a0;font-size:.92em">ses autres tensions <span style="opacity:.7">(envers / de)</span> : '
-            +cr.map(function(x){
+          sub+=t('web.autres_tensions_envers','<br><span style="color:#7880a0;font-size:.92em">ses autres tensions <span style="opacity:.7">(envers / de)</span> : {cout}</span>',{cout:cr.map(function(x){
                 const chaud=Math.max(x.vers||0,x.de||0);
                 const c2=chaud>=8?'#ff6644':chaud>=5?'#ffaa44':chaud>=3?'#ffcc66':'#66cc88';
                 return '<span style="color:'+c2+'">'+(x.emoji||'')+' '+esc(x.name||x.id)+' '+(x.vers||0)+'/'+(x.de||0)+(x.guerre?' ⚔️':'')+'</span>';
-              }).join(' · ')+'</span>';
+              }).join(' · ')});
         }
         return '<button class="opt" data-i="'+i+'">'+(op.emoji||'')+' <b>'+esc(op.name||op.id)+'</b><br><span class="muted">'+sub+'</span></button>';
       }).join('');
@@ -2419,7 +2269,7 @@ function askLocalDecision(pending){
       document.querySelectorAll('#sc-decision .opt').forEach(function(b){ b.onclick=function(){ done({targetId:opts[parseInt(b.getAttribute('data-i'))].id}); }; });
       return;
     }
-    if(k==='empath_copy') body+='<button class="opt" data-skip="1">Aucune copie</button>';
+    if(k==='empath_copy') body+=t('web.aucune_copie','<button class="opt" data-skip="1">Aucune copie</button>');
     decisionPanel(body);
     document.querySelectorAll('#sc-decision .opt').forEach(b=>{ b.onclick=()=>{
       if(b.getAttribute('data-skip')){ done({cardId:null}); return; }
@@ -2445,9 +2295,9 @@ function revealGameUI(){
    les postes, y compris ceux à 0, pour qu'on voie aussi les points qu'on n'a PAS gagnés. */
 function _vpDetailHTML(d){
   if(!d) return '';
-  const L=[['Colonies (+1/connectée)','colVP'],['Routes (1 VP/route)','routeVP'],['Cartes','cardsVP'],
-           ['Bonus Tech (×0.5/tech)','techBonusVP'],['Bonus Revenus/tour','rptVP'],['Agendas','agendasVP'],
-           ['Événements','evtVP'],['Bonus spéciaux','extraVP']];
+  const L=[[t('web.colonies_1_connectee','Colonies (+1/connectée)'),'colVP'],[t('web.routes_1_vp_route','Routes (1 VP/route)'),'routeVP'],['Cartes','cardsVP'],
+           ['Bonus Tech (×0.5/tech)','techBonusVP'],[t('web.bonus_revenus_tour','Bonus Revenus/tour'),'rptVP'],['Agendas','agendasVP'],
+           [t('web.evenements','Événements'),'evtVP'],[t('web.bonus_speciaux','Bonus spéciaux'),'extraVP']];
   return '<div style="margin:-2px 0 9px;padding:7px 12px;border:1px solid #22305a;border-top:0;border-radius:0 0 9px 9px;background:#101528;font-size:.8em">'
     + L.map(([lbl,k])=>{const v=d[k]||0;
         return '<div style="display:flex;justify-content:space-between;gap:10px;padding:1px 0;color:'+(v?'#c8d8f8':'#6a7a98')+'">'
@@ -2467,30 +2317,21 @@ function showFinal(scores, info){
       +'<b style="color:#ffd34d">'+s.vp+' VP</b></div>'
       + _vpDetailHTML(s.detail);
   }).join('');
-  const when=(info&&info.dateFr)?('<div class="muted" style="margin-bottom:8px">Partie '+(info.code||'')+' — terminée le '+info.dateFr+'</div>'):'';
-  overlay('<h2>🏆 Fin de partie</h2>'+when+(rows||'<div class="muted">Scores indisponibles.</div>')
-    +'<div class="muted" style="margin-top:8px;font-size:.8em">Le classement t\'est aussi envoyé par email.</div>'
-    +'<button class="pri" id="sc-again">↩ Retour au lobby</button>'
-    +'<button class="sec" id="sc-bug">🐞 Signaler un bug</button>');
+  const when=((((info&&info.dateFr?t('web.partie_terminee','<div class="muted" style="margin-bottom:8px">Partie {v} — terminée le {v2}</div>',{v:info.code||'',v2:info.dateFr}):''))));
+  overlay(t('web.fin_partie_classement_aussi_envoye_email','<h2>🏆 Fin de partie</h2>{when}{v}<div class="muted" style="margin-top:8px;font-size:.8em">Le classement t\'est aussi envoyé par email.</div><button class="pri" id="sc-again">↩ Retour au lobby</button><button class="sec" id="sc-bug">🐞 Signaler un bug</button>',{when:when,v:rows||'<div class="muted">Scores indisponibles.</div>'}));
   document.getElementById('sc-again').onclick = ()=> screenLobby();
   document.getElementById('sc-bug').onclick = ()=> showBugReport(scores, info);
 }
 // Fenêtre « Signaler un bug » : le texte est conservé dans le log de la partie (visible dans /stats) et
 // envoyé par email à l'administrateur.
 function showBugReport(scores, info){
-  overlay('<h2>🐞 Signaler un bug</h2>'
-    +'<div class="muted" style="margin-bottom:6px">Décris ce qui s\'est mal passé (ce que tu faisais, ce que tu attendais, ce qui est arrivé). Ton message est joint au journal de cette partie.</div>'
-    +'<textarea id="sc-bugtxt" rows="7" style="width:100%;box-sizing:border-box;padding:9px 11px;border-radius:8px;border:1px solid #2c4a7e;background:#091020;color:#dce8ff;font:inherit" placeholder="Ex. : après avoir capturé Titan, la colonie est revenue aux Ceinturiens au tour suivant…"></textarea>'
-    +'<div class="err" id="sc-err"></div>'
-    +'<button class="pri" id="sc-bugsend">Envoyer</button>'
-    +'<button class="sec" id="sc-bugback">↩ Retour</button>');
+  overlay(t('web.signaler_bug_decris_mal_passe_faisais_at','<h2>🐞 Signaler un bug</h2><div class="muted" style="margin-bottom:6px">Décris ce qui s\'est mal passé (ce que tu faisais, ce que tu attendais, ce qui est arrivé). Ton message est joint au journal de cette partie.</div><textarea id="sc-bugtxt" rows="7" style="width:100%;box-sizing:border-box;padding:9px 11px;border-radius:8px;border:1px solid #2c4a7e;background:#091020;color:#dce8ff;font:inherit" placeholder="Ex. : après avoir capturé Titan, la colonie est revenue aux Ceinturiens au tour suivant…"></textarea><div class="err" id="sc-err"></div><button class="pri" id="sc-bugsend">Envoyer</button><button class="sec" id="sc-bugback">↩ Retour</button>'));
   document.getElementById('sc-bugback').onclick = ()=> showFinal(scores, info);
   document.getElementById('sc-bugsend').onclick = ()=>{
-    const t=document.getElementById('sc-bugtxt').value.trim();
-    if(!t){ const e=document.getElementById('sc-err'); if(e)e.textContent='Écris quelques mots avant d\'envoyer.'; return; }
-    send({t:'bug_report', text:t});
-    overlay('<h2>🐞 Merci !</h2><div class="muted">Ton signalement a été enregistré avec le journal de la partie.</div>'
-      +'<button class="pri" id="sc-again2">↩ Retour au lobby</button>');
+    const _txt=document.getElementById('sc-bugtxt').value.trim();
+    if(!_txt){ const e=document.getElementById('sc-err'); if(e)e.textContent=t('web.ecris_quelques_mots_avant_envoyer','Écris quelques mots avant d\'envoyer.'); return; }
+    send({t:'bug_report', text:_txt});
+    overlay(t('web.merci_signalement_ete_enregistre_avec_jo','<h2>🐞 Merci !</h2><div class="muted">Ton signalement a été enregistré avec le journal de la partie.</div><button class="pri" id="sc-again2">↩ Retour au lobby</button>'));
     document.getElementById('sc-again2').onclick = ()=> screenLobby();
   };
 }
@@ -2504,7 +2345,7 @@ function hijackBuiltinAuth(){
     const err = document.getElementById('lv-err');
     const uEl = document.getElementById('lv-user');
     // L'identifiant est une ADRESSE EMAIL (elle reçoit les scores de fin de partie).
-    if (uEl){ uEl.placeholder='Ton adresse email'; try{ uEl.type='email'; uEl.setAttribute('inputmode','email'); uEl.setAttribute('autocomplete','email'); }catch(e){} }
+    if (uEl){ uEl.placeholder=t('auth.ph_email','Ton adresse email'); try{ uEl.type='email'; uEl.setAttribute('inputmode','email'); uEl.setAttribute('autocomplete','email'); }catch(e){} }
     /* Le bouton œil n'est PLUS créé ici : il fait partie du HTML de l'écran d'accueil (index.html),
        positionné par le CSS dans un conteneur relatif. L'injecter au forceps le faisait passer à la
        ligne et se décaler (les champs font width:100%) — il apparaissait « à des endroits bizarres »
@@ -2515,8 +2356,8 @@ function hijackBuiltinAuth(){
       // ⚠️ AVANT : on coupait l'email avant le « @ » (héritage des pseudos) → le serveur recevait « marc »
       // et refusait l'inscription en réclamant une adresse email. On envoie désormais l'adresse COMPLÈTE.
       const user=u.trim().toLowerCase();
-      if (!/^[^@\s]+@[^@\s.]+\.[a-z]{2,}$/i.test(user)){ if(err) err.textContent='Entre une adresse email valide (ex. prenom@domaine.ch).'; return; }
-      if (p.length<6){ if(err) err.textContent='Mot de passe trop court (min. 6).'; return; }
+      if (!/^[^@\s]+@[^@\s.]+\.[a-z]{2,}$/i.test(user)){ if(err) err.textContent=t('web.entre_adresse_email_valide_ex_prenom_dom','Entre une adresse email valide (ex. prenom@domaine.ch).'); return; }
+      if (p.length<6){ if(err) err.textContent=t('web.mot_passe_trop_court_min_6','Mot de passe trop court (min. 6).'); return; }
       let reg=false; try{ reg=(typeof _lvMode!=='undefined' && _lvMode==='register'); }catch(e){}
       _errCb = (msg)=>{ if(err) err.textContent=msg; };
       STATE._pendingPass = p;
@@ -2543,7 +2384,7 @@ function init(){
   // Rafraîchir l'affichage de version : online.js est chargé APRÈS le premier rendu de l'accueil,
   // c'est seulement maintenant que SOLAR_BUILD_JS est connu (et donc une éventuelle incohérence).
   try{ if(typeof lvShowBuild==='function') lvShowBuild(); }catch(e){}
-  const btn=el('<button id="sc-online-btn" style="position:fixed;bottom:12px;right:12px;z-index:8000;background:linear-gradient(135deg,#2f6fd0,#1f4fa0);color:#fff;border:0;border-radius:10px;padding:9px 14px;font:700 .85em system-ui;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.4)">🌐 Jouer en ligne</button>');
+  const btn=el(t('web.jouer_ligne','<button id="sc-online-btn" style="position:fixed;bottom:12px;right:12px;z-index:8000;background:linear-gradient(135deg,#2f6fd0,#1f4fa0);color:#fff;border:0;border-radius:10px;padding:9px 14px;font:700 .85em system-ui;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.4)">🌐 Jouer en ligne</button>'));
   btn.onclick = ()=>{
     let tok=null; try{ tok=localStorage.getItem('sc_ws_token'); }catch(e){}
     STATE.token = tok;

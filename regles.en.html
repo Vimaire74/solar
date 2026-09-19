@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Solar — rules of the game</title>
+  <style>
+    html{font-size:100%;-webkit-text-size-adjust:100%}
+    @font-face{font-family:'Exo 2';src:url(assets/fonts/Exo2.woff2) format('woff2');font-weight:100 900;font-style:normal;font-display:swap}
+    @font-face{font-family:'Exo 2';src:url(assets/fonts/Exo2-Italic.woff2) format('woff2');font-weight:100 900;font-style:italic;font-display:swap}
+    @font-face{font-family:'Michroma';src:url(assets/fonts/Michroma.woff2) format('woff2');font-weight:400;font-display:swap}
+    h1,h2,h3{font-family:'Michroma','Exo 2',sans-serif;font-weight:400;letter-spacing:.03em}
+    body{max-width:44rem;margin:0 auto;padding:1.1rem 1rem 3rem;font-family:'Exo 2',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:1.05rem;line-height:1.6;color:#f0f0f0;background:#0e1220}
+    h1{font-size:1.7rem;line-height:1.2;color:#8fb4e8;margin:1.2rem 0 .3rem;text-align:center}
+    h2{font-size:1.35rem;color:#8fb4e8;border-bottom:2px solid #2f5fa0;padding-bottom:.25rem;margin:2rem 0 .55rem}
+    h3{font-size:1.12rem;color:#a9c7ef;margin:1.3rem 0 .4rem}
+    p,li{margin:.45rem 0}
+    ul,ol{padding-left:1.4rem}
+    strong,b{color:#ffd98a}
+    table{display:block;max-width:100%;overflow-x:auto;border-collapse:collapse;margin:.9rem 0;font-size:.95em;-webkit-overflow-scrolling:touch}
+    th,td{border:1px solid #2a3a5a;padding:.45rem .55rem;text-align:left;vertical-align:top}
+    th{background:#182444;color:#cfe0ff;font-weight:600}
+    a{color:#7fb0ff}
+    hr{border:none;border-top:1px solid #2a3a5a;margin:1.4rem 0}
+    .sous{text-align:center;color:#9fb0d0;font-size:.95rem;margin:0 0 1.2rem}
+    .som{background:#131a2e;border:1px solid #22304e;border-radius:.5rem;padding:.7rem .9rem;margin:1.2rem 0;font-size:.95rem}
+    .som ul{columns:2;column-gap:1.4rem;margin:.3rem 0;padding-left:1.1rem}
+    .cle{background:#131a2e;border-left:3px solid #2f6fd0;padding:.55rem .8rem;margin:.8rem 0;border-radius:0 .35rem .35rem 0}
+    .backtop{position:fixed;right:.9rem;bottom:.9rem;background:#2f6fd0;color:#fff;text-decoration:none;padding:.55rem .8rem;border-radius:.5rem;font-size:.9rem;box-shadow:0 4px 14px rgba(0,0,0,.5)}
+  </style>
+</head>
+<body>
+
+<h1 id="haut">Solar — rules of the game</h1>
+<p class="sous">2 to 4 nations • 10 turns • interplanetary strategy</p>
+
+<nav class="som">
+<strong>Contents</strong>
+<ul>
+<li><a href="#s1">1. In brief</a></li>
+<li><a href="#s2">2. Nations</a></li>
+<li><a href="#s3">3. Resources</a></li>
+<li><a href="#s4">4. Actions and government</a></li>
+<li><a href="#s5">5. The map</a></li>
+<li><a href="#s6">6. Actions</a></li>
+<li><a href="#s7">7. Technologies</a></li>
+<li><a href="#s8">8. Investments</a></li>
+<li><a href="#s9">9. Strategy cards</a></li>
+<li><a href="#s10">10. Discoveries</a></li>
+<li><a href="#s11">11. Income and upkeep</a></li>
+<li><a href="#s12">12. Tension</a></li>
+<li><a href="#s13">13. Pirates</a></li>
+<li><a href="#s14">14. War</a></li>
+<li><a href="#s15">15. Events</a></li>
+<li><a href="#s16">16. Secret agendas</a></li>
+<li><a href="#s17">17. Victory points</a></li>
+<li><a href="#s18">18. Sequence of a turn</a></li>
+</ul>
+</nav>
+
+<h2 id="s1">1. In brief</h2>
+<p>Colonise the solar system, develop your technologies, accumulate victory points (VP). The game lasts <strong>10 turns</strong>; the most VP wins. Each turn you spend <strong>Action Points</strong> (AP); the colonies connected to your base produce at the end of the turn.</p>
+
+<h2 id="s2">2. Nations</h2>
+<p>You choose your nation; the others are drawn at random. Its bonus branch gives <strong>−1🔬</strong> on the technologies of that branch.</p>
+<table>
+<tr><th>Nation</th><th>Start</th><th>Force</th><th>Bonus branch</th><th>Passive and base</th></tr>
+<tr><td>🌍 Terrans</td><td>2⚡ 6🪨 3🔬 4❤️</td><td>5</td><td>Spirituality &amp; Nature</td><td>Morale ≥ 7 → +1 AP. Base: Moon.</td></tr>
+<tr><td>🔴 Martians</td><td>4⚡ 4🪨 2🔬 3❤️</td><td>5</td><td>Expansion</td><td>Colonisation −1🪨 −1⚡. Base: Phobos.</td></tr>
+<tr><td>🟠 Jovians</td><td>5⚡ 2🪨 3🔬 3❤️</td><td>4</td><td>Mining &amp; Energy</td><td>Base: Io, 3⚡/turn from turn 1.</td></tr>
+<tr><td>☠️ Belters</td><td>6⚡ 4🪨 1🔬 2❤️</td><td>3</td><td>Navigation &amp; Drives</td><td>Immune to pirates. +1⚡/turn. Base: Eris.</td></tr>
+</table>
+<p>Nation power (the “Power” button in the top bar), once per turn:</p>
+<table>
+<tr><th>Nation</th><th>Power</th><th>Cost</th></tr>
+<tr><td>🌍 Terrans</td><td>Green Diplomacy: +3 Government pts</td><td>3🪨</td></tr>
+<tr><td>🔴 Martians</td><td>Overdrive: +1 AP this turn</td><td>2⚡</td></tr>
+<tr><td>🟠 Jovians</td><td>Orbital Forge: one moon of Jupiter goes to level 2</td><td>1🪨 1⚡</td></tr>
+<tr><td>☠️ Belters</td><td>Pirate Trade: 75% → 2 random resources, 20% → 1, 5% → nothing</td><td>free</td></tr>
+</table>
+
+<h3>Temperaments of computer-controlled nations</h3>
+<table>
+<tr><th>Temperament</th><th>Way of playing</th></tr>
+<tr><td>♟️ Strategist</td><td>Plays the position, without restraint or grudge: no leaning, no scruples, it takes whatever pays.</td></tr>
+<tr><td>⚔️ Conqueror</td><td>Saves its tokens to conquer. Seeks intelligence, then strikes whoever can no longer defend.</td></tr>
+<tr><td>🎯 Opportunist</td><td>Chases events, diplomacy and its agenda.</td></tr>
+<tr><td>🛡️ Besieged</td><td><em>Temporary, 3 turns.</em> A nation that has been attacked, raided or dispossessed strikes back and arms itself before anything else.</td></tr>
+<tr><td>😰 Cornered</td><td><em>Temporary.</em> A nation that is boxed in (see Suffocation, §12.1) arms itself first, then forces its way through.</td></tr>
+</table>
+
+<h2 id="s3">3. Resources</h2>
+<table>
+<tr><th>Symbol</th><th>Resource</th><th>Role</th></tr>
+<tr><td>⚡</td><td>Energy</td><td>Actions and upkeep</td></tr>
+<tr><td>🪨</td><td>Materials</td><td>Construction, colonisation, routes</td></tr>
+<tr><td>🔬</td><td>Knowledge</td><td>Technologies</td></tr>
+<tr><td>❤️</td><td>Morale</td><td>Protects your AP and your income</td></tr>
+</table>
+<p><strong>Caps</strong>: 12⚡, 20🪨, 10🔬, 10❤️. The excess is lost at the end of the turn; some technologies raise these caps.</p>
+<table>
+<tr><th>Morale</th><th>Effect</th></tr>
+<tr><td>0</td><td>Civil war: no energy, materials or knowledge income this turn, and AP halved next turn</td></tr>
+<tr><td>1</td><td>Energy, materials and knowledge income halved</td></tr>
+<tr><td colspan="2"><em>Morale is judged at the end of the turn, AFTER the morale income is paid (which is never reduced). A nation that has prepared its recovery gets through; one that has planned nothing pays for it.</em></td></tr>
+</table>
+<p class="cle">These penalties are calculated on the morale you have <strong>at the moment you end your turn</strong>, not on what is left once the wars are resolved. A drop caused by one or more wars therefore only penalises you at the end of the following turn: you have a whole turn to fix it.</p>
+
+<h2 id="s4">4. Action points and government</h2>
+<p><strong>AP per turn = government level + 1</strong>, plus bonuses (Tyranny, Overdrive, Mobilisation). The game maximum is 5.</p>
+<table>
+<tr><th>Level</th><th>Points required</th><th>Base AP</th></tr>
+<tr><td>1</td><td>0</td><td>2</td></tr>
+<tr><td>2</td><td>5</td><td>3</td></tr>
+<tr><td>3</td><td>10</td><td>4</td></tr>
+<tr><td>4</td><td>15</td><td>5</td></tr>
+</table>
+<p>Points come from <strong>technologies</strong> and from the 📜 Institutional Reform — acquired permanently — or from your <strong>form of government</strong>. Adopting a new one replaces the old one and loses its contribution; morale losses, on the other hand, are immediate and are never recovered.</p>
+<table>
+<tr><th>Form</th><th>Effect</th><th>Cost (1 AP +)</th></tr>
+<tr><td>Tyranny</td><td>+1 AP/turn, no government points, morale capped at 6</td><td>−2❤️</td></tr>
+<tr><td>Corporate Rule</td><td>+5 pts, morale capped at 7</td><td>2🪨, −1❤️</td></tr>
+<tr><td>Solar Senate</td><td>+5 pts</td><td>3🪨</td></tr>
+<tr><td>Instant Democracy</td><td>+10 pts, +1❤️/turn</td><td>3🪨 2⚡ 1🔬, then 2🪨 2⚡/turn</td></tr>
+</table>
+<p class="cle">When a form imposes a <strong>morale maximum</strong>, your morale cannot exceed that point, whatever your technologies, agreements or income. The excess is trimmed at the end of the turn, at the same time as the ordinary cap of 10❤️. Changing form lifts the cap at once — but morale already lost does not come back.</p>
+
+<h2 id="s5">5. The map</h2>
+<table>
+<tr><th>Zone</th><th>Nodes</th></tr>
+<tr><td>Inner</td><td>Moon, Phobos, Deimos, Ceres, Vesta</td></tr>
+<tr><td>Jovian</td><td>Io, Europa, Ganymede, Callisto</td></tr>
+<tr><td>Saturnian</td><td>Titan, Enceladus</td></tr>
+<tr><td>Outer</td><td>Triton, Pluto, Eris</td></tr>
+</table>
+<p>The planets (Mercury to Neptune) are scenery: neither colonisable nor attackable. Play takes place on their moons, on the asteroids and on the dwarf planets. The board shows the Sun at the bottom left and each body at its real distance (logarithmic scale); the moons are drawn in an inset around their planet, without respecting distance, only order.</p>
+<p>The <strong>possible links</strong> are the blue dotted lines on the map (30 in all). A route can only be built on a link; the travel time (in days) is written on the long links and is used for the cost of conquests (§14). Since v10.70: Vesta–Europa, Moon–Vesta, Ceres–Ganymede and Europa–Callisto no longer exist; Ceres–Europa (58 d), Europa–Ganymede (4 d), Enceladus–Vesta (125 d), Callisto–Enceladus (78 d) and Ganymede–Triton (190 d) do.</p>
+
+<h2 id="s6">6. Actions</h2>
+<table>
+<tr><th>Action</th><th>AP</th><th>Cost</th></tr>
+<tr><td>Colonise</td><td>1</td><td>2🪨 1⚡ (Martians −1🪨 −1⚡) — gives 1 Force token</td></tr>
+<tr><td>Upgrade a colony</td><td>1</td><td>3🪨 1⚡ 1🔬</td></tr>
+<tr><td>Establish a route</td><td>1</td><td>1🪨 (+1 Force token to protect it)</td></tr>
+<tr><td>Raid</td><td>1</td><td>2 Force tokens (1 for the Belters)</td></tr>
+<tr><td>Trade agreement</td><td>1</td><td>2🪨 <strong>given</strong> to the other nation</td></tr>
+<tr><td>Assault</td><td>1 to 3 depending on the journey</td><td>tokens committed — raises the tension of the assaulted nation, does not declare war</td></tr>
+<tr><td>Buy a card</td><td>1 (2 at level 3)</td><td>cost of the card</td></tr>
+<tr><td>Nation power</td><td>0</td><td>see §2</td></tr>
+</table>
+
+<h3>6.1 Upgrading</h3>
+<p><strong>Level 2</strong>: income ×1.5, +1❤️/turn, +1🔬/turn.<br>
+<strong>Level 3</strong>: income ×2, +2❤️/turn, +2🔬/turn.</p>
+<p class="cle">The ×1.5 is rounded down: a colony producing 1⚡ still produces 1 at level 2. The yield of all three levels is shown on each node of the map — look at it before colonising.</p>
+
+<h3>6.2 Routes</h3>
+<p>Upkeep 1⚡/turn, offset by 1🪨 of trade income. A route stays connected as long as it exists; the token placed on it serves <strong>only</strong> to protect it from pirates.</p>
+<p><strong>A route only counts if it is yours</strong>: both its ends are your colonies (capital and cohabitation included), or one is yours and the other is <strong>free</strong>. A route to another nation's colony yields neither 🪨 nor victory points (nor for the Master of Routes agenda) — it still costs its upkeep.</p>
+<p><strong>A route with no end of yours falls.</strong> At the start of each turn, any route neither end of which is one of your colonies (your capital counts, even when occupied) is abandoned and its token comes back to you — for instance when you lose the colony that held it. A route with only one end of yours holds.</p>
+
+<h3>6.3 Raid</h3>
+<p>You take the <strong>production of a colony</strong> — its income for the turn in ⚡, 🪨 and 🔬, never its ❤️ — within the limit of what the nation owns. Without a designated target, it is the most productive one. A colony can only be raided <strong>once per turn</strong>, by anyone: the Raid button says so (“already raided this turn”). Your tokens go into recovery for 2 turns (1 with War Strategy). Tension: <strong>+3</strong> victim, <strong>+1</strong> raider. The raid does not touch the victim's morale — tension (demonstrations, popular war) does the rest.</p>
+<p>🔍 Defensive AI cancels the theft, 🛰️ Surveillance Drones remove <strong>1 unit from each resource stolen</strong>. A blocked raid still costs AP and tokens, gives +1 tension, and the raider is told about it.</p>
+
+<h3>6.4 Trade agreement</h3>
+<ul>
+<li>Tension −3 on both sides. While it holds: <strong>+1🪨 +1❤️/turn for each</strong> — per agreement, not per colony.</li>
+<li>Your routes on its colonies no longer create tension, and you can <strong>cross its territory</strong> to connect more distant colonies of yours without risking war. Colonising its nodes remains forbidden.</li>
+<li><strong>One agreement per pair.</strong> If both propose it to each other at the same summit, only one is signed — and both are told.</li>
+<li>Broken by a declaration of war or an assault, not by a raid. (What happens to routes in war is described in 14.4; an assault alone breaks no route.)</li>
+</ul>
+
+<h3>6.5 Cohabitation</h3>
+<p>Only Extra-Solar Exploration lets two nations occupy the same node, on Eris, Pluto or Triton.</p>
+<ul>
+<li>The original occupant keeps its colony intact.</li>
+<li>The newcomer receives a <strong>level 1, non-upgradable</strong> colony, with a <strong>forced trade agreement</strong> on that node. It counts fully for VP and agendas.</li>
+<li>A cohabitant may assault the other: the winner stays alone, its colony takes the level of the conquered one minus one, the upgrade ban and the forced agreement fall away.</li>
+<li><strong>Except under a non-aggression pact</strong>: as long as a diplomatic pact binds the two cohabitants, neither can assault the other on the shared node. A mere <strong>trade agreement</strong> does not protect: the assault remains possible (it breaks the agreement).</li>
+<li>Against an outside nation, the two cohabitants defend <strong>together</strong>: the <strong>original owner</strong> chooses its tokens first, <strong>then the guest</strong> is consulted in turn; both defences <strong>add up</strong> to the garrison. Each pays what it commits. If the attacker wins, it expels both (and collects the +10 VP if it is a capital).</li>
+<li>If the shared node is the <strong>capital</strong> of one of the two, <strong>its owner</strong> defends it first (garrison of 10); the guest is warned, then consulted after it.</li>
+<li>A war between the two cohabitants drives the <strong>guest</strong> off the shared node; the original owner keeps its colony.</li>
+</ul>
+
+<h2 id="s7">7. Technologies</h2>
+<p>7 branches, 3 levels. Unlocking is <strong>shared</strong>: as soon as one nation buys a level 1, level 2 opens for everyone. Level 3 costs 2 AP.</p>
+<p class="cle"><strong>Exclusivity:</strong> only <strong>level 3</strong> technologies are reserved for their first buyer. Levels 1 and 2 can be bought by several nations. The non-repeatable Economy &amp; Society actions (§7.1) are also exclusive: one buyer per game.</p>
+<table>
+<tr><th>Lv</th><th>Card</th><th>Effect</th><th>Cost</th><th>VP</th></tr>
+<tr><td>T1</td><td>🏗️ Autonomous Biosphere</td><td>Level 1 colonies without ⚡ upkeep</td><td>2🪨 1🔬</td><td>1</td></tr>
+<tr><td>T2</td><td>🏗️ Advanced Biosphere</td><td>+1🪨/turn per colony; levels 2-3 without ⚡ upkeep</td><td>4🔬 2⚡ 2🪨</td><td>3</td></tr>
+<tr><td>T3</td><td>🏗️ Terraforming</td><td>+1🪨 +1❤️/turn per colony; levels 2-3 without any upkeep</td><td>6🔬 4🪨 4⚡</td><td>5</td></tr>
+<tr><td>T1</td><td>⚗️ Ion Propulsion</td><td>Route: 0🪨 instead of 1 (⚡ upkeep still due)</td><td>2🔬 1⚡</td><td>1</td></tr>
+<tr><td>T2</td><td>⚗️ Navigation AI</td><td>+2 Force tokens; war cost halved</td><td>4🔬 1⚡</td><td>3</td></tr>
+<tr><td>T3</td><td>⚗️ Hyperdrive</td><td>+5 Government pts, free routes, +3 tokens, and <strong>you choose the order of the battles</strong> (§14.3)</td><td>6🔬 2⚡ 2🪨</td><td>5</td></tr>
+<tr><td>T1</td><td>🔍 Surveillance Drones</td><td>+1🔬/turn; raids suffered: −1 on each resource stolen</td><td>2🔬 1⚡ 1🪨</td><td>1</td></tr>
+<tr><td>T2</td><td>🔍 Orbital Network</td><td>+1🔬/turn; complete information on rivals; pirate immunity</td><td>3🔬 2⚡ 2🪨</td><td>3</td></tr>
+<tr><td>T3</td><td>🔍 Defensive AI</td><td>+4 Force tokens; immunity to raids and pirates</td><td>5🔬 2⚡ 2🪨</td><td>5</td></tr>
+<tr><td>T1</td><td>🧪 Quantum Computer</td><td>+3🔬/turn, −1⚡/turn</td><td>2🔬 2🪨</td><td>1</td></tr>
+<tr><td>T2</td><td>🧪 Advanced Robotics</td><td>+2🪨/turn</td><td>3🔬 2🪨 2⚡</td><td>3</td></tr>
+<tr><td>T3</td><td>🧪 Extra-Solar Exploration</td><td>Colonise Eris, Pluto or Triton even if occupied (§6.5). +8 VP if you have 5 technologies or more</td><td>5🔬 3⚡ 2🪨</td><td>5</td></tr>
+<tr><td>T1</td><td>🕊️ Greening</td><td>+2❤️ at once, +1❤️/turn</td><td>2🪨 1🔬</td><td>1</td></tr>
+<tr><td>T2</td><td>🕊️ Empathic Network</td><td>+1❤️ at once, +2❤️/turn, +1🔬/turn</td><td>2🔬 2🪨 2⚡</td><td>3</td></tr>
+<tr><td>T3</td><td>🕊️ Collective Awakening</td><td>+2🔬/turn; +1 VP per connected colony in the final score</td><td>5🔬 2🪨</td><td>5</td></tr>
+<tr><td>T1</td><td>⛏️ Asteroid Mining</td><td>+3🪨/turn</td><td>1🪨 2⚡ 1🔬</td><td>1</td></tr>
+<tr><td>T2</td><td>⛏️ Solar Extractors</td><td>+3⚡/turn</td><td>4🪨 1⚡ 2🔬</td><td>3</td></tr>
+<tr><td>T3</td><td>⛏️ Dyson Sphere</td><td>+5⚡/turn; the other nations are asked the moment you buy it: whoever accepts your monopoly receives +3⚡/turn from this turn on, whoever refuses declares war on you</td><td>6🪨 3⚡ 6🔬</td><td>5</td></tr>
+<tr><td>T1</td><td>🔮 Empath Links</td><td>Routes without tokens, +1⚡ per 2 routes, <strong>+2⚔️ permanent power</strong> in battle (these are not tokens: nothing to commit, nothing to pay, never lost)</td><td>4🔬</td><td>1</td></tr>
+<tr><td>T2</td><td>🔮 Instant Communications</td><td>+2❤️/turn, +1🔬/turn, +5 Government pts</td><td>5🔬</td><td>3</td></tr>
+<tr><td>T3</td><td>🔮 Telepathy</td><td>Copies an enemy technology, +2 battle tokens, +3🔬/turn, −2❤️/turn while at war</td><td>6🔬</td><td>5</td></tr>
+</table>
+<p>The 🔮 Empaths branch only opens through the “Sacred Union” investment (§8), with 3 turns of exclusivity for whoever unlocks it.</p>
+
+<h3>7.1 Economy &amp; Society actions</h3>
+<p>Always available, 1 AP each.</p>
+<table>
+<tr><th>Card</th><th>Effect</th><th>Cost</th><th>Frequency</th></tr>
+<tr><td>⚛️ He3 Extraction</td><td>+2⚡</td><td>1🪨 1🔬</td><td>repeatable</td></tr>
+<tr><td>☄️ Asteroid Capture</td><td>+2🪨</td><td>1⚡ 1🔬</td><td>repeatable</td></tr>
+<tr><td>🌿 Social Programmes</td><td>+2❤️ +1🔬</td><td>2🪨</td><td>repeatable</td></tr>
+<tr><td>🕊️ Calm the People</td><td>+1❤️; −3 to <strong>your</strong> tension towards a nation of your choice</td><td>1🪨 1⚡</td><td>repeatable — once per nation per turn</td></tr>
+<tr><td>🕊️ Diplomatic Mission</td><td>−3 to a nation's tension <strong>towards you</strong></td><td>2🪨</td><td>repeatable — once per nation per turn</td></tr>
+<tr><td>🎨 Cultural Campaign</td><td>+3❤️</td><td>2🪨</td><td>1× per game</td></tr>
+<tr><td>📣 Propaganda</td><td>+1❤️</td><td>1⚡</td><td>1× per game</td></tr>
+<tr><td>📖 Research Investment</td><td>+2🔬</td><td>2🪨</td><td>1× per game</td></tr>
+<tr><td>🎓 Colony Universities</td><td>+1🔬/turn, permanent</td><td>1⚡ 1🪨</td><td>1× per game</td></tr>
+<tr><td>📜 Institutional Reform</td><td>+5 Government pts, permanent</td><td>3🔬</td><td>1× per game</td></tr>
+</table>
+
+<h3>7.2 Military cards</h3>
+<p>Always visible, once per card per turn.</p>
+<table>
+<tr><th>Card</th><th>Effect</th><th>Cost</th><th>Prerequisite</th></tr>
+<tr><td>🪖 Military Investments</td><td>+2 tokens, lost next turn</td><td>1 AP, 2⚡ 1🪨</td><td>—</td></tr>
+<tr><td>🛩️ Combat Drones</td><td>+1 token, lost next turn</td><td>1 AP, 1⚡ 1🪨</td><td>Surveillance Drones</td></tr>
+<tr><td>🛸 Fighter Fleets</td><td>+4 tokens, half of them lost next turn. <strong>1× per game per nation.</strong></td><td>2 AP, 3⚡ 3🪨 1🔬</td><td>Advanced Robotics</td></tr>
+<tr><td>⚔️ Supercruiser</td><td>+5 power in war, permanent (§14.7). <strong>1× per game per nation</strong> — everyone can buy it.</td><td>3 AP, 4🪨 3⚡ 1🔬</td><td>—</td></tr>
+</table>
+
+<h2 id="s8">8. Investments</h2>
+<p>Two choices in the game, not exclusive: several nations can take the same one.</p>
+<p><strong>Level 1</strong> — chosen on turn 2, active from turn 3 to 5.</p>
+<table>
+<tr><th>Card</th><th>Benefit</th><th>Price to pay</th></tr>
+<tr><td>🕵️ Espionage</td><td>Once on turn 3, 4 or 5 (can be postponed): you take 1 to 3 rival technologies, in <strong>a single category from a single nation</strong>.</td><td>Victim's tension: +6, +8 or +10</td></tr>
+<tr><td>🏭 Heavy Industrialisation</td><td>+4🪨/turn</td><td>−3❤️</td></tr>
+<tr><td>🔬 Intensive Research</td><td>+3🔬/turn</td><td>−3🪨 −1⚡</td></tr>
+<tr><td>🌾 Sustainable Agriculture</td><td>+2❤️/turn</td><td>−2🪨 −1🔬</td></tr>
+<tr><td>🚀 Rapid Expansion</td><td>1 free colonisation and 1 free route</td><td>−1❤️ −1🪨 −1⚡</td></tr>
+</table>
+<p><strong>Level 2</strong> — chosen on turn 6, active from turn 7 to 9.</p>
+<table>
+<tr><th>Card</th><th>Benefit</th><th>Price to pay</th></tr>
+<tr><td>⚔️ War Strategy</td><td>Tokens come back in 1 turn instead of 2</td><td>−4🪨 −2⚡</td></tr>
+<tr><td>🕊️ Comfort of the People</td><td>+4❤️/turn</td><td>−4🪨</td></tr>
+<tr><td>🏗️ Advanced Colonies</td><td>Your <em>current</em> colonies go to the maximum level for free. Those acquired later are not affected; upkeep is still due.</td><td>🪨 halved, −3⚡</td></tr>
+<tr><td>🔮 Sacred Union</td><td>Unlocks the Empaths branch, 3 turns of exclusivity</td><td>−3🪨 −4🔬</td></tr>
+</table>
+
+<h2 id="s9">9. Strategy cards</h2>
+<p>At the start of each turn, a common batch is offered (number of nations + 2). Picking goes in <strong>reverse order of VP</strong> — the weakest is served first, and on a tie the least armed. One card per nation, or pass. Effects expire at the end of the turn.</p>
+<table>
+<tr><th>Card</th><th>Effect</th></tr>
+<tr><td>Rapid Expansion</td><td>Free colonisation this turn</td></tr>
+<tr><td>Military Surge</td><td>+2 tokens, lost at the end of the turn</td></tr>
+<tr><td>Knowledge Sprint</td><td>+3🔬</td></tr>
+<tr><td>Urgent Harvest</td><td>+2🪨 +2⚡</td></tr>
+<tr><td>Diplomacy</td><td>You choose a nation: ITS tension towards you −3</td></tr>
+<tr><td>Mobilisation</td><td>+1 AP this turn</td></tr>
+<tr><td>War Effort</td><td>+1 token, kept</td></tr>
+<tr><td>Consolidation</td><td>+1❤️ +1⚡</td></tr>
+<tr><td>Ease Tensions</td><td>You choose a nation: YOUR tension towards it −3</td></tr>
+<tr><td>🥇 Initiative</td><td>You play first this turn, but 2nd if a player chose Planned Initiative the previous turn.</td></tr>
+<tr><td>📅 Planned Initiative</td><td>You will play first next turn.</td></tr>
+</table>
+<p>When an Initiative is taken, everyone is told at once; the Planned Initiative is recalled the next turn, at the head of the card selection. Turn order: Planned Initiative (previous turn), then Initiative (this turn), then the others drawn at random.</p>
+
+<h2 id="s10">10. Discoveries</h2>
+<p>A tile is drawn at random with each colonisation.</p>
+<table>
+<tr><th>Tile</th><th>Effect</th></tr>
+<tr><td>Rich Deposit</td><td>+2🪨</td></tr>
+<tr><td>Energy Source</td><td>+3⚡</td></tr>
+<tr><td>Scientific Data</td><td>+2🔬</td></tr>
+<tr><td>Alien Relic</td><td>+2🔬 and +1 VP</td></tr>
+<tr><td>Secret Orbital Arsenal</td><td>+2 tokens, kept</td></tr>
+<tr><td>Rare Ores</td><td>+1🪨/turn, permanent</td></tr>
+<tr><td>Space Anomaly</td><td>+1 VP</td></tr>
+<tr><td>Rocky Ground</td><td>no effect</td></tr>
+</table>
+
+<h2 id="s11">11. Income and upkeep</h2>
+<p>A <strong>connected</strong> colony yields the resources of its node × its level (×1, ×1.5, ×2), plus +1❤️ at level 2 or +2❤️ at level 3, plus card bonuses — within the storage limit. Each colony founded during the turn gives 1 Force token, once only.</p>
+<table>
+<tr><th>Element</th><th>Upkeep per turn</th></tr>
+<tr><td>Level 1 colony</td><td>1⚡</td></tr>
+<tr><td>Level 2 colony</td><td>1⚡ 1🪨</td></tr>
+<tr><td>Level 3 colony</td><td>1⚡ 2🪨</td></tr>
+<tr><td>Route</td><td>1⚡ (offset by 1🪨 of trade)</td></tr>
+</table>
+<p>Your base is exempt. Each missing resource costs 1❤️. Tap the resource bar to see the detail colony by colony.</p>
+
+<h2 id="s12">12. Tension</h2>
+<p>A gauge from 0 to 10 per <strong>pair of nations</strong>, including between two nations you do not play: two rivals can go to war without you having anything to do with it. An ongoing war only freezes the pair concerned.</p>
+
+<h3>12.1 What raises it</h3>
+<p><strong>Neighbourhood</strong> grievances are paid again every turn as long as the situation lasts; grievances of <strong>deed</strong> are paid the moment they occur.</p>
+<table>
+<tr><th>Cause</th><th>Points</th><th>When</th></tr>
+<tr><td>Enemy route touching one of your colonies, without an agreement between you</td><td>+1 per route</td><td>every turn</td></tr>
+<tr><td>Shared route with an enemy defence token</td><td>+1 per route</td><td>every turn</td></tr>
+<tr><td>Dominant nation — 4 connected colonies ahead</td><td>+3</td><td>every turn</td></tr>
+<tr><td>Supreme nation — 6 colonies ahead</td><td>+6</td><td>every turn</td></tr>
+<tr><td><strong>Technological lead</strong> — the other nation has more rank 3 technologies than you</td><td>+2 per rank 3 of difference</td><td>every two turns (the event turns), after the event — the war that would result is only judged at the end of the following turn</td></tr>
+<tr><td><strong>Path blocking</strong> — you have <em>at most 2 colonies</em>, at most one free exit remains, and it holds one. Only the nation occupying the most of your exits is targeted (nodes you own yourself do not count as blocked exits).</td><td>+4</td><td>once only</td></tr>
+<tr><td><strong>Suffocation</strong> — 2 colonies when <em>all</em> the others have 3 or more (from turn 2). Only the nation occupying the most of your exits is targeted.</td><td>+6 then +1</td><td>+6 when it sets in, +1 per turn afterwards</td></tr>
+<tr><td>Raid suffered</td><td>+3 victim, +1 raider</td><td>at each raid</td></tr>
+<tr><td>Raid blocked by 🔍 Defensive AI</td><td>+1 victim</td><td>at each attempt</td></tr>
+<tr><td>Espionage detected</td><td>+6, +8 or +10 for the victim</td><td>on detection</td></tr>
+<tr><td>Assault on a colony</td><td>the assaulted nation is brought to <strong>8</strong> if the colony falls, to <strong>6</strong> if it holds — the attacker adds nothing</td><td>at each assault (floor: a higher tension does not come down)</td></tr>
+<tr><td>Pirate attack on your routes</td><td>+1 towards the Belters</td><td>at each attack</td></tr>
+<tr><td>Declaration of war</td><td>both gauges to 10</td><td>immediately</td></tr>
+</table>
+
+<h3>12.2 What lowers it</h3>
+<table>
+<tr><th>Cause</th><th>Effect</th></tr>
+<tr><td>No grievance this turn</td><td>−1</td></tr>
+<tr><td>Trade agreement signed</td><td>−3 on both sides</td></tr>
+<tr><td>🕊️ Calm the People (society action)</td><td>−3 to your tension towards a nation of your choice — once per nation per turn</td></tr>
+<tr><td>🕊️ Diplomatic Mission (society action)</td><td>−3 to a nation's tension towards you — once per nation per turn</td></tr>
+<tr><td>Agreements summit — proposal accepted</td><td>−5 between the proposer and each nation that accepts</td></tr>
+<tr><td>Non-aggression pact</td><td>both gauges to 0</td></tr>
+<tr><td>Trade Summit event</td><td>−2 with every nation</td></tr>
+<tr><td>Diplomatic Summit event</td><td>−5 everywhere</td></tr>
+<tr><td>Diplomacy card</td><td>−3 to a chosen nation's tension TOWARDS YOU, <strong>and its grudge is wiped</strong> (see 12.4)</td></tr>
+<tr><td>Accepting the Dyson Sphere monopoly</td><td>both gauges to 2, the war just declared stops</td></tr>
+<tr><td>End of war</td><td>winner 0, loser 5 · white peace: 4 everywhere</td></tr>
+</table>
+
+<h3>12.3 Effects</h3>
+<table>
+<tr><th>Tension</th><th>Effect</th></tr>
+<tr><td>6 or more</td><td>Demonstrations: −1❤️/turn per nation concerned. Nothing towards a nation you are already at war with.</td></tr>
+<tr><td>10</td><td>Forced popular war: both sides lose 2❤️. The other nations pay nothing.</td></tr>
+</table>
+<p>A trade agreement or a pact is refused above <strong>7</strong> tension, or in case of war.</p>
+
+<h3>12.4 The grudge — what a nation does not forget</h3>
+<p>Tension fades: it comes down on its own, a peace halves it, a summit lowers it everywhere. The <strong>grudge</strong>, however, does not fade with time. Every raid and every assault you inflict on a nation — <strong>successful or not</strong> — is added to its counter, and that counter <strong>hardens all its answers to your requests</strong>: trade agreement, non-aggression pact, peace offer.</p>
+<p>Concretely, when it decides, it feels your tension <strong>+1</strong> from the first aggression and <strong>+2</strong> from the third onwards. An agreement that would have passed at 6 tension is refused if you have already attacked it, and the refusal tells you why. At low tension, on the other hand, a grudge alone blocks nothing: a nation at peace stays open.</p>
+<p><strong>And reconciliation is always possible.</strong> A 🕊️ <strong>Diplomacy</strong> mission aimed at that nation wipes its slate clean in one go — it does not depend on its consent, so blocked diplomacy can always be unblocked. A signed non-aggression pact wipes it too, on both sides.</p>
+
+<h2 id="s13">13. Pirates</h2>
+<p>They occupy Triton and spare the Belters, who smuggle with them. Each <strong>unprotected</strong> route risks being destroyed: <strong>20% on turn 1, +10 points per turn</strong>, certain from turn 9. Rebuilding: 1 AP + 1🪨. Colonies are never touched, and tension towards the Belters rises by 1 at each attack.</p>
+<p>🔍 Orbital Network, 🔍 Defensive AI and 🔮 Empath Links make you immune — on purchase, the tokens placed on your routes come back for free.</p>
+
+<h2 id="s14">14. War</h2>
+
+<h3>14.1 How it starts</h3>
+<p class="cle"><strong>An assault is not a declaration of war.</strong> It is a <strong>surprise strike</strong> — the attacker gives no warning. The assaulted nation learns of it when it comes to resist: it chooses its tokens (and its Supercruiser) and the battle is resolved at once. But <strong>no war opens</strong>: what the aggression leaves behind is the <strong>tension</strong> of the nation attacked.</p>
+<p><strong>Tension is the only road to war.</strong> A captured colony brings the attacked nation's tension to <strong>8/10</strong>, a repelled assault to <strong>6/10</strong> — a failed attack is not forgiven. The attacker adds nothing to its own. These are floors: a higher tension does not come down. <strong>At 10, at the end of the turn, the people demand war</strong>: that is the forced popular war, and it is the only door — along with refusing a Dyson Sphere and unmasked espionage. At that moment you can still buy or propose peace; the window tells you what the war will cost you.</p>
+<p>Whoever wants war at any price therefore still gets it: it is enough to attack as long as actions remain. It simply does not arrive in the middle of the turn in which you have just lost morale by losing a colony.</p>
+<p>Same sequence whether the assault comes from a player or from the computer. An assault <strong>breaks the trade agreement</strong> that bound the two nations — you do not trade with those you attack — but it breaks neither routes nor cohabitation colonies: that only happens on the declaration of a real war.</p>
+
+<h3>14.2 Battle</h3>
+<p>Everything is played in <strong>Force tokens</strong>. Each token committed costs <strong>1🪨 + 1⚡</strong>: you can only commit what you can pay for (Navigation AI halves that cost). Added for free are the Empaths bonus (+2 or +4) and the Supercruiser (+5) if you deploy it.</p>
+<ul>
+<li>The defender <strong>chooses</strong> its defence. Without defence, the attacker takes the target without spending anything: committing tokens is the only way to make it lose forces.</li>
+<li>Your assaults are not capped — only your AP, your tokens and your resources limit them. A computer-controlled nation only assaults you once per turn.</li>
+<li><strong>Hold position</strong>: you may keep your tokens; if both sides hold, nothing happens. As long as the battle is not resolved, you can step back without spending anything.</li>
+</ul>
+
+<h3>14.3 The order of battles at the end of the turn</h3>
+<p>Once war is open, the <strong>first turn</strong> belongs to whoever opened it: only they strike. From the <strong>following turn</strong>, each side leads an assault and suffers the other's — <strong>two battles</strong> per evening. Since each token has to be paid for, tokens and resources must be split between attack and defence: that is where the war is decided.</p>
+<p>The <strong>initiative</strong> does not say who strikes first, but <em>who chooses</em> which of the two strikes first. It is decided by the first rule that separates them:</p>
+<table>
+<tr><th>#</th><th>Criterion</th><th>Who wins it</th></tr>
+<tr><td>1</td><td>🌀 Hyperdrive</td><td>Its holder. If both have it, the powers cancel out and we move on to the next criterion.</td></tr>
+<tr><td>2</td><td>Restraint</td><td>Whoever assaulted the other the <em>least</em> during the action phase.</td></tr>
+<tr><td>3</td><td>Technologies</td><td>The most rank 2 or 3 technologies.</td></tr>
+<tr><td>4</td><td>Force tokens</td><td>The most tokens.</td></tr>
+<tr><td>5</td><td>Resources</td><td>The most <em>payable</em> tokens — 20🪨 without energy are worth nothing.</td></tr>
+<tr><td>6</td><td>Last resort</td><td>Whoever opened the war.</td></tr>
+</table>
+<p class="cle">Defending first means knowing what you have left before choosing your assault. Attacking first means striking while you still have your tokens. Neither is better: it all depends on what the opponent can still pay. The log says each time who holds the initiative and why.</p>
+
+<h3>14.4 Reserve and garrison</h3>
+<p>Each connected colony other than your base ties up <strong>1 token in reserve</strong>: your attack-capable tokens are your total tokens minus your connected colonies. The more you expand, the less you can attack.</p>
+<p>Every colony adds <strong>1 garrison token</strong> to the defence committed: none is defenceless. If it falls, that token is destroyed.</p>
+<p><strong>The capital.</strong> Held by its original nation, it can be attacked but is defended by <strong>10 garrison tokens</strong>. Taking it from its original nation yields <strong>+10 VP</strong> — <strong>as long as you hold it</strong>: if it escapes its conqueror (retaken by its owner, or taken by a third party), those 10 VP vanish at once; the third party gets nothing. Once conquered, it defends itself like an ordinary colony (<strong>1 token</strong>): its original nation can take it back — without any VP bonus. Once retaken, its garrison starts again at <strong>1</strong> and gains <strong>+1 per turn</strong> up to 10; all players are told at the moment it is retaken.</p>
+<p><strong>Routes in war.</strong> On the declaration of war, any route neither end of which is yours and one end of which belongs to the enemy is broken and its token comes back to you. Exception: a route that touches <strong>your capital</strong>, even one occupied by the enemy, holds — it is the way home.</p>
+<p>The defence window announces the garrison of the place attacked (10 capital, 1 colony, retaken capital: its current value) and the total of your defence.</p>
+<p><strong>A nation with no colony at all no longer plays</strong>: it is over for it until the end of the game (it keeps its cards, its tokens and its points, but no longer acts and can no longer be attacked). A nation that has lost its capital but keeps other colonies goes on playing.</p>
+
+<h3>14.5 Outcomes</h3>
+<table>
+<tr><th>Outcome</th><th>Consequences</th></tr>
+<tr><td>Victory</td><td>+2 VP — <strong>for every battle won, whether you attack or defend</strong>, against a player or a computer (an attacked route is not a battle: no VP, see 14.6). Capture of the colony one level below. <strong>If it is the enemy capital: +10 VP</strong> more, as long as you hold it (see 14.4). Half of your tokens come back at once, the other half goes into recovery for 2 turns (1 with War Strategy).</td></tr>
+<tr><td>Defeat</td><td>You permanently lose half of the tokens committed, and −1❤️.</td></tr>
+<tr><td>Draw</td><td>−1❤️ for both sides.</td></tr>
+</table>
+<p>A conquered colony is hostile: −2❤️ the first turn, then −1❤️ for the next two. Upgrading it calms the population.</p>
+<p>A war lasts as long as the two sides do not make peace. At the end, the winner gains +1❤️, its tension falls to 0 and the loser's to 5. A war still open on turn 10 is concluded in the log, with the tally of battles as evidence.</p>
+<p class="cle"><strong>Demanding peace (popular war).</strong> When your people force war on you, you can demand peace against a <strong>tribute of 3</strong> — taken first from the opponent's 🪨, topped up in ⚡ if it does not have enough (1🪨 left → 1🪨 + 2⚡). A nation <strong>stronger than you in tokens refuses</strong>, and a nation that cannot gather 3 in total <strong>cannot buy peace</strong>: in both cases the war goes on, with no battle that turn. A human opponent receives the question and may refuse; the amount is recalculated at the moment it accepts.</p>
+
+<h3>14.6 Attacking a route</h3>
+<p>Attacking a route is a choice of the <strong>end-of-turn war window</strong> — for everyone, computers included: nobody destroys a route during its action phase. A single assault is enough, and a route does not defend itself. 1 token if it is unprotected, 2 if it is protected — the defending token is then destroyed. Then you <strong>take it over</strong> (it becomes yours, upkeep included) or you <strong>destroy it</strong>; in both cases the opponent loses its income. <strong>No VP</strong>: taking or destroying a route is not a battle victory.</p>
+
+<h3>14.7 Supercruiser</h3>
+<p>+5 power in war — nothing against raids or pirates. The game asks at each battle whether you deploy it; deployment costs <strong>5🪨 + 5⚡</strong>. Never lost: in case of defeat, 2 turns of repairs (1 with War Strategy) — <strong>the game tells you at the moment of the battle</strong>, with the turn of return. Usable once in attack and once in defence in the same turn, if you can pay twice.</p>
+
+<h3>14.8 Intelligence</h3>
+<p>Without 🔍 Orbital Network: <strong>estimate to ±3</strong> of the rivals' strength, economy and morale hidden, enemy defence unknown at the moment of committing. Colonies, routes, VP <strong>and tensions</strong> remain public — including tensions between two other nations, visible in the Diplomacy tab and in the “ease a tension” window (“towards / from” format). Computer-controlled nations suffer the same fog and therefore get it wrong too.</p>
+
+<h2 id="s15">15. Events</h2>
+<p>An event occurs on even turns, announced the previous turn, resolved at the end of the turn.</p>
+<table>
+<tr><th>Event</th><th>Effect</th></tr>
+<tr><td>⛏️ Mining Rush</td><td>+6 VP to whoever has the most colonies. Shared between two; nobody at three or more.</td></tr>
+<tr><td>🔬 Science Conference</td><td>+6 VP to whoever produces the most 🔬</td></tr>
+<tr><td>⚔️ Military Supremacy</td><td>+6 VP to whoever has the most tokens, recovery included</td></tr>
+<tr><td>🛠️ Technological Development</td><td>+6 VP to whoever has the most level 2 and 3 technologies</td></tr>
+<tr><td>✨ Most Attractive Nation</td><td>To the best morale: +2🪨 +2🔬 +3 VP</td></tr>
+<tr><td>🌩️ Solar Storms</td><td>Without Defensive AI: −1 token, −1 route, −2🪨 for every nation</td></tr>
+<tr><td>☠️ Pirate Proliferation</td><td>Routes of the nation richest in 🪨 (stock at the end of the actions, before the turn's income): unprotected ones destroyed, protected ones a 1 in 2 chance.</td></tr>
+<tr><td>🤝 Trade Agreements</td><td><strong>Free</strong> agreement with the nation of your choice: +3 VP each, immediate end of a war. It may refuse if you are far ahead.</td></tr>
+<tr><td>🕊️ Diplomatic Agreements</td><td>Non-aggression pact for 4 turns: 6🪨 (+2⚡ if you are at war). Ends the war, tension to 0, +1❤️. The event lowers tension by 5 everywhere.</td></tr>
+<tr><td>🏆 Final Judgement (turn 10)</td><td>Scores are calculated</td></tr>
+</table>
+<p class="cle"><strong>The non-aggression pact really binds.</strong> During its 4 turns, neither signatory can assault the other, raid it or declare war on it — not even by popular war. It binds only those two: each remains free to attack the others. A refusal is notified to the proposer, who then pays nothing.</p>
+
+<h2 id="s16">16. Secret agendas</h2>
+<p>On turn 2, each nation secretly chooses an agenda among 5 drawn at random. The bonus is only counted in the final score.</p>
+<table>
+<tr><th>Agenda</th><th>Condition</th><th>Bonus</th></tr>
+<tr><td>🚀 Explorer</td><td>5 connected colonies or more</td><td>+8 VP</td></tr>
+<tr><td>⚗️ Tech Superpower</td><td>More technologies than any other nation</td><td>+8 VP</td></tr>
+<tr><td>⚔️ Solar Armada</td><td>15 tokens or more: reserve + recovery + tokens placed on routes + Empath bonus. Colony garrisons and tokens destroyed in battle do not count.</td><td>+8 VP</td></tr>
+<tr><td>🏛️ Enlightened Governance</td><td>Government level 4 and morale ≥ 8</td><td>+8 VP</td></tr>
+<tr><td>🛤️ Master of Routes</td><td>5 routes or more</td><td>+6 VP</td></tr>
+<tr><td>🟠 Jovian Hub</td><td>3 Jovian colonies or more</td><td>+6 VP</td></tr>
+<tr><td>⚡ Energy Empire</td><td>All the technologies producing ⚡</td><td>+12 VP</td></tr>
+<tr><td>🪨 Material Opulence</td><td>All the technologies producing 🪨</td><td>+12 VP</td></tr>
+</table>
+
+<h2 id="s17">17. Victory points</h2>
+<table>
+<tr><th>Source</th><th>Calculation</th></tr>
+<tr><td>Colonies</td><td>VP of the node × level, ×1 if connected, ×0.5 if isolated, <strong>+1 per connected colony</strong></td></tr>
+<tr><td>Routes</td><td>+1 VP each</td></tr>
+<tr><td>Cards</td><td>VP written on the card: technologies 1 / 3 / 5 by level; military cards, their own value</td></tr>
+<tr><td>Technology bonus</td><td>+0.5 VP per card of the technology tree, rounded down</td></tr>
+<tr><td>Income per turn</td><td>Per resource, on your real gross income (colonies, cards, agreements): +2 VP above 5/turn, +5 VP above 10/turn</td></tr>
+<tr><td>Agenda</td><td>Bonus if the condition is met — <strong>revealed and counted at the end only</strong>: the VP shown during the game do not include it</td></tr>
+<tr><td>Events</td><td>VP from events, +2 per battle won, <strong>+10 per capital conquered</strong> (taken back if it escapes you), discoveries, agreements, <strong>overproduction</strong>: at each end of turn, +1 VP per resource whose stock exceeds the cap (12⚡ 20🪨 10🔬, and 10🙂 whatever the form of government — a Tyranny capped at 6 never overproduces morale); the excess is still lost — at most 4 VP per turn, from turn 1</td></tr>
+<tr><td>Miscellaneous bonuses</td><td>Extra-Solar Exploration (+8), Collective Awakening (+1 per connected colony)</td></tr>
+</table>
+<p>The end-of-game report details each item line by line: colony by colony, card by card, and the origin of each event point.</p>
+
+<h2 id="s18">18. Sequence of a turn</h2>
+<ol>
+<li>Announcement of the event, if there is one.</li>
+<li>Strategy cards, from the weakest nation to the strongest.</li>
+<li>Action phase: each spends its AP. The order is drawn at random each turn — except for whoever played Initiative or Planned Initiative (see 9).</li>
+<li>Tension update.</li>
+<li>Battles, if a war is in progress.</li>
+<li>Income, then upkeep.</li>
+<li>Pirate attack.</li>
+<li>Event resolution.</li>
+<li>On turns 2 and 6: choice of an investment.</li>
+</ol>
+
+<hr />
+<p class="sous">Solar — version 18</p>
+<a class="backtop" href="#haut">↑</a>
+
+</body>
+</html>

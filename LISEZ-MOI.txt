@@ -1,7 +1,10 @@
-LOT 17 — MISE À JOUR  ·  v10.75 / sw v196  ·  18/09/2026
+LOT 17 — MISE À JOUR  ·  v10.78 / sw v199  ·  19/09/2026
 
-À UPLOADER : index.html, moteur.js, online.js, sw.js, regles.html
-(+ server/ si tu déploies aussi le serveur)
+À UPLOADER (site) : index.html, moteur.js, online.js, sw.js, i18n.js, tutorial.js, tutorial.html,
+   regles.html, regles.en.html, confidentialite.en.html, lang/ (dossier entier), scripts/
+À REDÉPLOYER (serveur) : server/server.js et server/driver.js ont changé — le serveur DOIT être
+   redéployé avec le site, sinon les fenêtres en ligne et les courriels restent en français et
+   la ligne « passe une action » du journal s'affiche en français chez un joueur anglais.
 
 CE QUI CHANGE — partie 20C9
 
@@ -62,6 +65,71 @@ RÈGLE NOUVELLE (v10.74) — LA SURPRODUCTION RAPPORTE
    ; rapport final : poste Événements, une ligne par tour.
    Les IA en profitent comme toi mais ne le recherchent pas encore.
 
+LANGUES (v10.76) — TRANCHE 0
+   · Nouveau : i18n.js (dans le <head>) + dossier lang/ (en.js, LISEZ-MOI.md, _source.fr.json)
+     + scripts/i18n_extract.js. Le français reste dans le code ; l'anglais est dans lang/en.js.
+   · Sélecteur « FR · EN » sur l'accueil et l'écran de connexion. Par défaut : la langue du
+     téléphone / navigateur, sinon le français. Changer recharge la page.
+   · Traduit : accueil, connexion, lobby, création de partie, salle d'attente, suppression
+     de compte. Le reste (plateau, cartes, journal, tutoriel) suit par tranches — il
+     s'affiche en français en attendant, rien ne casse.
+   · Le lien « Supprimer mon compte » est déplacé à côté de Confidentialité, avec un écart.
+
+LANGUES (v10.77) — TRANCHES 1 ET 2 : TOUT LE PLATEAU ET LES DONNÉES
+   · 870 textes traduits (contre 81) : onglets, Empire, Techs, Marché, Diplo, Journal
+     (en-têtes et légende), bilan, fenêtres de guerre / défense / paix / événement / moral /
+     Dyson / accord / pouvoir / calme, fin de partie — et les DONNÉES : cartes, civiques,
+     nations (Terrans, Martians, Jovians, Belters), nœuds (Moon, Europa, Ganymede…),
+     planètes, événements, agendas, investissements, découvertes, stratégies, tempéraments.
+     AC devient « AP » en anglais.
+   · Reste en français pour l'instant : les lignes du journal et les toasts (tranche 3),
+     le tutoriel, le rapport de fin, les courriels (tranche 4), les règles (tranche 5).
+   · La carte peinte de l'accueil du plateau a ses noms de planètes DANS l'image : ils
+     restent en français tant qu'on n'a pas une image par langue.
+
+CORRIGÉ EN CHEMIN — le bandeau ✓/↩ armé par une IA
+   Quand une IA jouait AVANT toi (initiative gagnée au tirage), son amélioration ou sa
+   route armait TON bandeau « Valider / Annuler » et bloquait ses propres coups suivants
+   (« Valide ou annule ton action » en boucle dans le journal). Invisible sur les bancs,
+   visible en navigateur. Corrigé : garde, annulation et bandeau ne concernent que toi.
+
+LANGUES (v10.78) — TRANCHES 3, 4 ET 5 : TOUT LE RESTE
+   · 1933 textes traduits (contre 870). Le JOURNAL et les toasts : chaque ligne voyage avec sa
+     clé et ses paramètres, donc en ligne chaque joueur lit le journal dans SA langue — deux
+     joueurs, deux langues, même partie. Les noms de cartes, de nœuds et de nations dans une
+     ligne sont des références résolues chez le lecteur.
+   · Les fenêtres et notices en ligne (guerre, défense, accord, tribut, vote, concession…) :
+     le serveur envoie le français plus la clé ; le client re-rend.
+   · Le TUTORIEL (36 étapes), les messages d'erreur du serveur, le rapport de fin de partie et
+     le COURRIEL de fin de partie : rédigés dans la langue de chaque destinataire (la langue
+     est envoyée à la connexion et gardée sur le compte). Ta copie d'éditeur reste en français.
+   · Les RÈGLES et la CONFIDENTIALITÉ : regles.en.html et confidentialite.en.html, ouvertes
+     automatiquement quand le jeu est en anglais (liens réécrits). Le PDF reste en français.
+   · Nouveau : `?lang=en` dans l'adresse force la langue sans la mémoriser (un lien à envoyer).
+   · Vocabulaire : AC → « AP », Terrans / Martians / Jovians / Belters, Moon, Europa, Ganymede,
+     Enceladus, Pluto, Eris, Supercruiser, Force tokens, « Lv. ».
+   · Deux écarts corrigés dans regles.html (sur GO de Marc, 19/09) : le Commerce pirate y disait
+     « 15 % → 1 » alors que le jeu fait 20 % ; et le tempérament « Bâtisseur » y gardait son
+     ancienne description alors que le jeu l'appelle ♟️ Stratège depuis la v10.72. Les deux pages
+     disent 20 % et ♟️ Stratège / Strategist.
+
+CORRIGÉ — l'« assaut surprise d'une IA au tour 1 » (le point 2 du lot précédent)
+   Ce n'était PAS l'IA qui attaquait. Le tacticien joue chaque coup possible « pour de faux »
+   pour le noter ; quand il simulait un assaut sur ta capitale, la simulation ouvrait ta VRAIE
+   fenêtre de défense (et les toasts « raid sur… » étaient des raids simulés). Le coup n'était
+   jamais joué. Corrigé : rien de ce qui est simulé ne touche l'écran ; 0 fenêtre sur 12
+   parties de test après, 4 sur 12 avant ; un banc le garde (test_simulation_sans_fenetre).
+   Défaut présent depuis l'arrivée du tacticien (v10.72), invisible sur les bancs (pas d'écran).
+
+BANCS
+   Suite complète passée sur le Mac. Deux bancs intermittents, vérifiés identiques sur la
+   v10.77 (donc pas liés à ce lot) : test_ws (« décision périmée » de l'invité, 2 fois sur 4 —
+   doublon de réponse, connu dans server.js) et test_alternance (~1 sur 3). test_redemarrage
+   passe seul, échoue sous charge parallèle. test_cerveau_ia passe (3 min).
+
 À FAIRE DE TON CÔTÉ
-   · uploader les 5 fichiers, redéployer les deux ressources Coolify ;
-   · reconstruire l'app si tu veux la version native (versionCode 1075 / 10.75).
+   · uploader les fichiers listés en tête, redéployer les DEUX ressources Coolify (site ET
+     serveur, cette fois le serveur a changé) ;
+   · reconstruire l'app si tu veux la version native (versionCode 1078 / 10.78) ;
+   · vérifier sur l'hébergeur que gzip/brotli est actif sur .js/.html (moteur.js fait 1,3 Mo ;
+     lang/en.js 170 Ko) — c'est le point « vitesse du site » que tu m'as demandé de rappeler.

@@ -125,7 +125,7 @@ class GameDriver {
     const before = this.sb.__G.log ? this.sb.__G.log.length : 0;
     if(action && action.type==='skip'){   // renoncer à UN coup (cf. act()) : consomme 1 AC, ne sort pas de la manche
       if((me.acLeft||0)>0) me.acLeft-=1;
-      try{ this.sb.addLog(((me.civ&&me.civ.name)||civId)+' passe une action.'); }catch(e){}
+      try{ const sb=this.sb; sb.addLog(sb.J?sb.J('journal.passe_action','{nation} passe une action.',{nation:(me.civ?sb._i18nRef(me.civ,'name'):civId)}):(((me.civ&&me.civ.name)||civId)+' passe une action.')); }catch(e){}
       this._emitLog(before);
       if(me.acLeft<=0) me._passedRound=true;
       this._advance();
@@ -485,7 +485,7 @@ class GameDriver {
     if(action && action.type==='skip'){
       const b0 = G.log?G.log.length:0;
       if((nat.acLeft||0)>0) nat.acLeft-=1;
-      try{ this.sb.addLog(((nat.civ&&nat.civ.name)||civId)+' passe une action.'); }catch(e){}
+      try{ const sb=this.sb; sb.addLog(sb.J?sb.J('journal.passe_action','{nation} passe une action.',{nation:(nat.civ?sb._i18nRef(nat.civ,'name'):civId)}):(((nat.civ&&nat.civ.name)||civId)+' passe une action.')); }catch(e){}
       this._emitLog(b0);
       this._lastActionLog=[];
       if(nat.acLeft<=0) nat._passedRound=true;

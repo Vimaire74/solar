@@ -6,7 +6,10 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-09-18 · v10.75';</script>
+<script>window.SOLAR_BUILD_HTML='2026-09-19 · v10.78';</script>
+<!-- i18n.js EN TÊTE, avant tout script du corps : il choisit la langue et charge lang/<code>.js (synchrone).
+     Les écrans d'accueil (scripts inline plus bas) et moteur.js (qui porte t()) le trouvent déjà là. -->
+<script src="i18n.js"></script>
 <script>/* Taille du texte mémorisée (menu Journal → Aa) : appliquée avant le premier rendu, sans à-coup. */
 (function(){try{var t=localStorage.getItem('sc_taille');var m={'11':'14','13':'16','15':'18','17':'20'};if(m[t]){t=m[t];localStorage.setItem('sc_taille',t);}if(t&&/^(14|16|18|20)$/.test(t))document.documentElement.style.setProperty('--sc-fs',t+'px');}catch(e){}})();</script><!-- ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE : celle-ci, `SOLAR_BUILD_JS` (online.js) et `SOLAR_BUILD_MOTEUR` (moteur.js). Surveillé par test_versions.js. -->
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
@@ -842,7 +845,7 @@ body.vue-carte #bottom-bar{border-radius:0;}
 .dip-status.hot{color:#ff9844;background:#2a1808;}
 .dip-status.war{color:#ff6060;background:#2a0a0a;}
 .dip-row{display:flex;align-items:center;gap:7px;margin-top:4px;font-size:.7em;}
-.dip-lbl{width:62px;flex-shrink:0;color:#8898b8;}
+.dip-lbl{width:62px;flex-shrink:0;color:#8898b8;white-space:nowrap;}
 .dip-bar{flex:1;height:9px;border-radius:6px;background:#10101e;overflow:hidden;min-width:40px;}
 .dip-bar i{display:block;height:100%;border-radius:6px;transition:width .3s;}
 .dip-val{width:36px;text-align:right;font-weight:700;flex-shrink:0;}
@@ -988,6 +991,13 @@ body{font-size:var(--sc-fs,16px);}
 #sc-depeches{position:fixed;top:calc(var(--topband,56px) + 34px);left:50%;transform:translateX(-50%);width:min(92vw,420px);z-index:360;display:none;pointer-events:none}
 #sc-depeches .fen{pointer-events:auto;box-shadow:0 18px 50px rgba(0,0,0,.65)}
 #sc-depeches .fen-medal{cursor:default}
+/* Sélecteur de langue (accueil et connexion) — voir i18n.js */
+.i18n-sel{display:inline-flex;align-items:center;gap:6px;font-family:Michroma,'Exo 2',sans-serif;font-size:.72em;letter-spacing:.12em}
+.i18n-btn{background:transparent;border:1px solid transparent;color:#8fa0c8;padding:3px 7px;border-radius:7px;cursor:pointer;font:inherit;letter-spacing:inherit}
+.i18n-btn.on{color:#e6eeff;border-color:#3a4a7a;background:rgba(74,158,255,.12)}
+.i18n-btn:hover{color:#e6eeff}
+.i18n-dot{color:#3a4a7a}
+.lv-langue{text-align:center;margin:6px 0 10px}
 /* La liste des dépêches défile au lieu de pousser le bouton hors de l'écran (Marc, 18/09, partie 4112 : « sur
    ordinateur la fenêtre qui décrit les actions des autres nations tombe trop bas, on voit pas le bas »).
    230 px = blason + bouton ; le reste de la hauteur utile va à la liste. */
@@ -1206,7 +1216,7 @@ body{font-size:var(--sc-fs,16px);}
   #civ-sel{background-image:url(assets/fond_accueil_desk.jpg);background-position:center}
   #civ-sel::before{background:linear-gradient(90deg,rgba(7,7,24,0) 0%,rgba(7,7,24,0) 52%,rgba(7,7,24,.6) 72%,rgba(7,7,24,.86) 100%)}
   #lv-panel{align-items:flex-end;justify-content:center;padding:28px 48px}
-  #lv-panel .lv-logo,#lv-panel .lv-links,#lv-panel .lv-pied{width:360px;box-sizing:border-box;text-align:center;margin-left:0}
+  #lv-panel .lv-logo,#lv-panel .lv-links,#lv-panel .lv-langue,#lv-panel .lv-pied{width:360px;box-sizing:border-box;text-align:center;margin-left:0}
   #lv-panel .lv-logo{font-size:1.6em;margin-bottom:2px}
   #lv-auth{margin-top:8px;max-width:360px}
 }
@@ -1226,57 +1236,60 @@ body{font-size:var(--sc-fs,16px);}
   <div id="lv-panel">
     <h1 class="lv-logo">SOLAR</h1>
     <div class="lv-links">
-      <a href="tutorial.html">🎓 Tutoriel</a>
-      <a href="regles.html">📖 Règles</a>
-      <a href="confidentialite.html">🔒 Confidentialité</a>
+      <a href="tutorial.html" data-i18n="lien.tutoriel">🎓 Tutoriel</a>
+      <a href="regles.html" data-i18n="lien.regles">📖 Règles</a>
+      <a href="confidentialite.html" data-i18n="lien.confidentialite">🔒 Confidentialité</a>
     </div>
+    <div class="lv-langue" id="lv-langue"></div>
     <div id="lv-auth">
       <div class="lv-tabs">
-        <button type="button" id="lv-tab-login" class="lv-on" onclick="lvMode('login')">Se connecter</button>
-        <button type="button" id="lv-tab-reg" onclick="lvMode('register')">Créer un compte</button>
+        <button type="button" id="lv-tab-login" class="lv-on" onclick="lvMode('login')" data-i18n="auth.connexion">Se connecter</button>
+        <button type="button" id="lv-tab-reg" onclick="lvMode('register')" data-i18n="auth.creer_compte">Créer un compte</button>
       </div>
       <!-- enterkeyhint : le clavier mobile affiche « Aller » au lieu de « Entrée », et la touche
            valide vraiment le formulaire (voir lvKey ci-dessous). -->
-      <input id="lv-user" type="email" placeholder="Ton adresse email" autocomplete="email" enterkeyhint="next" onkeydown="lvKey(event)">
+      <input id="lv-user" type="email" placeholder="Ton adresse email" data-i18n-ph="auth.ph_email" autocomplete="email" enterkeyhint="next" onkeydown="lvKey(event)">
       <!-- Le champ mot de passe est dans un conteneur POSITIONNÉ : sans lui, le bouton œil part à la
            ligne suivante (les champs font width:100%) et se retrouve n'importe où. -->
       <div class="lv-pass-wrap">
-        <input id="lv-pass" type="password" placeholder="Mot de passe" autocomplete="current-password" enterkeyhint="go" onkeydown="lvKey(event)">
-        <button type="button" id="lv-eye" onclick="lvEye()" title="Afficher / masquer le mot de passe" aria-label="Afficher ou masquer le mot de passe">👁</button>
+        <input id="lv-pass" type="password" placeholder="Mot de passe" data-i18n-ph="auth.ph_mdp" autocomplete="current-password" enterkeyhint="go" onkeydown="lvKey(event)">
+        <button type="button" id="lv-eye" onclick="lvEye()" title="Afficher / masquer le mot de passe" aria-label="Afficher ou masquer le mot de passe" data-i18n-title="auth.oeil">👁</button>
       </div>
       <label class="lv-souvenir">
-        <input type="checkbox" id="lv-remember" checked style="width:auto;margin:0;accent-color:#4a9eff"> Se souvenir de moi
+        <input type="checkbox" id="lv-remember" checked style="width:auto;margin:0;accent-color:#4a9eff"> <span data-i18n="auth.souvenir">Se souvenir de moi</span>
       </label>
       <div class="lv-err" id="lv-err"></div>
-      <button type="button" class="lv-go" id="lv-go" onclick="lvSubmit()">Se connecter →</button>
-      <button type="button" class="lv-solo" onclick="lvSolo()" style="display:none">Jouer en solo (hors-ligne)</button>
+      <button type="button" class="lv-go" id="lv-go" onclick="lvSubmit()" data-i18n="auth.go_connexion">Se connecter →</button>
+      <button type="button" class="lv-solo" onclick="lvSolo()" style="display:none" data-i18n="auth.solo">Jouer en solo (hors-ligne)</button>
     </div>
-    <div class="lv-pied"><span id="lv-build"></span> <a class="lv-pdf" href="Solar_Conquest_Livret.pdf" target="_blank" rel="noopener">📖 Livret PDF</a></div>
+    <div class="lv-pied"><span id="lv-build"></span> <a class="lv-pdf" href="Solar_Conquest_Livret.pdf" target="_blank" rel="noopener" data-i18n="lien.livret">📖 Livret PDF</a></div>
   </div>
   <div id="lv-solo-pick" class="hidden">
     <div id="difficulty-sel" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:8px 0">
-      <button class="diff-btn active" id="diff-easy" onclick="setDifficulty('easy')">🟢 Facile<br><small>1 adv.</small></button>
-      <button class="diff-btn" id="diff-normal" onclick="setDifficulty('normal')">🟡 Normal<br><small>2 adv.</small></button>
-      <button class="diff-btn" id="diff-hard" onclick="setDifficulty('hard')">🔴 Difficile<br><small>3 adv.</small></button>
+      <button class="diff-btn active" id="diff-easy" onclick="setDifficulty('easy')" data-i18n="solo.facile">🟢 Facile<br><small>1 adv.</small></button>
+      <button class="diff-btn" id="diff-normal" onclick="setDifficulty('normal')" data-i18n="solo.normal">🟡 Normal<br><small>2 adv.</small></button>
+      <button class="diff-btn" id="diff-hard" onclick="setDifficulty('hard')" data-i18n="solo.difficile">🔴 Difficile<br><small>3 adv.</small></button>
     </div>
     <div class="civ-cards" id="civ-cards"></div>
-    <button class="btn-go" id="btn-start" disabled onclick="startGame()">Commencer →</button>
+    <button class="btn-go" id="btn-start" disabled onclick="startGame()" data-i18n="ui.commencer">Commencer →</button>
   </div>
 </div>
 <script>
 let _lvMode='login';
-function lvMode(m){_lvMode=m;document.getElementById('lv-tab-login').classList.toggle('lv-on',m==='login');document.getElementById('lv-tab-reg').classList.toggle('lv-on',m==='register');document.getElementById('lv-go').textContent=m==='register'?'Créer le compte →':'Se connecter →';document.getElementById('lv-pass').setAttribute('autocomplete',m==='register'?'new-password':'current-password');}
+/* Le sélecteur de langue s'écrit ici, au chargement : i18n.js est chargé avant, il connaît la langue. */
+try{ var _lvL=document.getElementById('lv-langue'); if(_lvL&&typeof i18nSelecteurHTML==='function') _lvL.innerHTML=i18nSelecteurHTML(); }catch(e){}
+function lvMode(m){_lvMode=m;document.getElementById('lv-tab-login').classList.toggle('lv-on',m==='login');document.getElementById('lv-tab-reg').classList.toggle('lv-on',m==='register');document.getElementById('lv-go').textContent=m==='register'?t('auth.go_creer','Créer le compte →'):t('auth.go_connexion','Se connecter →');document.getElementById('lv-pass').setAttribute('autocomplete',m==='register'?'new-password':'current-password');}
 async function lvSubmit(){
   const u=document.getElementById('lv-user').value.trim(),p=document.getElementById('lv-pass').value,err=document.getElementById('lv-err');err.textContent='';
   const remember=!!document.getElementById('lv-remember')?.checked;
-  if(!u||!p){err.textContent='Email et mot de passe requis.';return;}
+  if(!u||!p){err.textContent=t('auth.err_requis','Email et mot de passe requis.');return;}
   try{
     const r=await fetch('api/'+(_lvMode==='register'?'register.php':'login.php'),{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({email:u,password:p,remember})});
     const d=await r.json().catch(()=>({}));
-    if(!r.ok||d.error){err.textContent=d.error||('Erreur ('+r.status+').');return;}
+    if(!r.ok||d.error){err.textContent=d.error||t('auth.err_http','Erreur ({code}).',{code:r.status});return;}
     try{ if(remember){localStorage.setItem('sc_remember','1');localStorage.setItem('sc_user',u);} else {localStorage.removeItem('sc_remember');localStorage.removeItem('sc_user');} }catch(e){}
-    const ob=document.getElementById('sc-online-btn');if(ob){ob.click();}else{err.textContent='Couche en ligne indisponible.';}
-  }catch(e){err.textContent='Serveur injoignable (hors-ligne ?). Utilise « Jouer en solo ».';}
+    const ob=document.getElementById('sc-online-btn');if(ob){ob.click();}else{err.textContent=t('auth.err_couche','Couche en ligne indisponible.');}
+  }catch(e){err.textContent=t('auth.err_serveur','Serveur injoignable (hors-ligne ?). Utilise « Jouer en solo ».');}
 }
 /* TOUCHE « ALLER » DU CLAVIER. Les champs ne sont pas dans un <form> : il n'y a donc AUCUNE
    validation implicite, et la flèche du clavier mobile ne faisait rien (signalé par Marc). On
@@ -1312,12 +1325,12 @@ function lvShowBuild(){
        sans qu'aucun écran ne le dise. C'est ce qui a rendu indécidable le compte des cartes
        Stratégie. Si l'un des trois diffère, on nomme LEQUEL. */
     const h=window.SOLAR_BUILD_HTML||null, j=window.SOLAR_BUILD_JS||null, m=window.SOLAR_BUILD_MOTEUR||null;
-    const parts=[['page',h],['en ligne',j],['moteur',m]].filter(x=>x[1]);
+    const parts=[[t('accueil.v_page','page'),h],[t('accueil.v_en_ligne','en ligne'),j],[t('accueil.v_moteur','moteur'),m]].filter(x=>x[1]);
     const distinctes=[...new Set(parts.map(x=>x[1]))];
     if(distinctes.length>1)
-      el.innerHTML='<span style="color:#ff8a8a">Versions incohérentes — '
-        +parts.map(x=>x[0]+' : '+x[1]).join(' · ')+' — recharge (Cmd+Maj+R) ou renvoie les fichiers manquants</span>';
-    else el.textContent='Version '+(h||m||'inconnue');
+      el.innerHTML='<span style="color:#ff8a8a">'+t('accueil.versions_incoherentes_court','Versions incohérentes —')+' '
+        +parts.map(x=>x[0]+' : '+x[1]).join(' · ')+t('accueil.versions_recharge',' — recharge (Cmd+Maj+R) ou renvoie les fichiers manquants')+'</span>';
+    else el.textContent=t('accueil.version','Version {v}',{v:(h||m||t('accueil.inconnue','inconnue'))});
   }catch(e){}
 }
 // Auto-connexion au chargement si « se souvenir de moi » était coché et la session serveur est encore valide.
@@ -1341,16 +1354,16 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
 
 </script>
 <div id="end-scr" class="overlay hidden">
-  <h1 id="end-title">🏆 Fin de Partie</h1>
+  <h1 id="end-title" data-i18n="ui.fin_de_partie">🏆 Fin de Partie</h1>
   <p class="result" id="end-result"></p>
   <div class="vp-wrap" id="vp-wrap"></div>
   <div style="display:flex;gap:10px;justify-content:center;margin-top:8px;flex-wrap:wrap">
-    <button class="btn-restart" onclick="location.reload()">↺ Rejouer</button>
-    <button class="btn-restart" style="background:#1a2a1a;border-color:#44aa44;color:#88ff88" onclick="copyLogText()">📋 Copier le log</button>
-    <button class="btn-restart" style="background:#1a2418;border-color:#7abf3f;color:#bfe89a" onclick="emailLog()">📧 Envoyer par email</button>
-    <button class="btn-restart" style="background:#10142e;border-color:#4a9eff;color:#9cc2ff" onclick="downloadLog()">💾 Télécharger .txt</button>
+    <button class="btn-restart" onclick="location.reload()" data-i18n="ui.rejouer">↺ Rejouer</button>
+    <button class="btn-restart" style="background:#1a2a1a;border-color:#44aa44;color:#88ff88" onclick="copyLogText()" data-i18n="ui.copier_le_log">📋 Copier le log</button>
+    <button class="btn-restart" style="background:#1a2418;border-color:#7abf3f;color:#bfe89a" onclick="emailLog()" data-i18n="ui.envoyer_par_email">📧 Envoyer par email</button>
+    <button class="btn-restart" style="background:#10142e;border-color:#4a9eff;color:#9cc2ff" onclick="downloadLog()" data-i18n="ui.telecharger_txt">💾 Télécharger .txt</button>
   </div>
-  <div id="end-log-confirm" style="display:none;font-size:.8em;color:#88ff88;margin-top:6px">✅ Log copié dans le presse-papier !</div>
+  <div id="end-log-confirm" style="display:none;font-size:.8em;color:#88ff88;margin-top:6px" data-i18n="ui.log_copie_dans_le_presse_papier">✅ Log copié dans le presse-papier !</div>
 </div>
 <!-- ═══ BARRE DU HAUT « CONSOLE À VOYANTS » (v10.62, maquette B validée par Marc le 16/09) ═══
      Trois lignes FIXES : (1) médaillon + nation, tour, AC, gouvernement ; (2) les quatre ressources en
@@ -1360,7 +1373,7 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
 <div id="top-bar" style="display:none">
   <div class="tb-l1">
     <span id="civ-badge-top" class="cbt-wrap"></span>
-    <span id="turn-disp">Tour 1/10</span>
+    <span id="turn-disp" data-i18n="ui.tour_1_10">Tour 1/10</span>
     <div id="ac-disp">2 AC</div>
     <div id="gov-disp">🏛️ 1</div>
     <span id="phase-disp" hidden></span>
@@ -1370,14 +1383,14 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
     <div id="top-income" hidden></div>
   </div>
   <div class="tb-l3">
-    <span class="tb-puce vp" id="tb-vp" title="Score VP estimé">🏆 0</span>
-    <span class="tb-puce jet" id="tb-jet" title="Jetons Force engageables (net) — utilisables en guerre ou pour un raid. Exclut la garnison des colonies, les jetons posés sur les routes et ceux en récupération.">0 <i></i></span>
+    <span class="tb-puce vp" id="tb-vp" title="Score VP estimé" data-i18n-title="ui.title_score_vp_estime">🏆 0</span>
+    <span class="tb-puce jet" id="tb-jet" title="Jetons Force engageables (net) — utilisables en guerre ou pour un raid. Exclut la garnison des colonies, les jetons posés sur les routes et ceux en récupération." data-i18n-title="ui.title_jetons_force_engageables_net_utilisables">0 <i></i></span>
     <span class="tb-esp"></span>
-    <button class="tb-pouvoir" id="btn-ability" type="button" onclick="useAbility()"><span class="k">✦</span><span>Pouvoir</span></button>
+    <button class="tb-pouvoir" id="btn-ability" type="button" onclick="useAbility()"><span class="k">✦</span><span data-i18n="ui.pouvoir">Pouvoir</span></button>
     <!-- « À TOI » : DANS la barre du haut (demande de Marc). En ligne, `badgeTour` (online.js) l'allume
          en vert (à toi) ou en rouge (« LE MARTIEN JOUE ») ; en solo, renderTopBar. PASSER n'apparaît
          que pendant TON tour d'action en ligne (renonce à UNE action, pas à la manche). -->
-    <span id="tb-etat"><span id="a-toi-badge">À TOI</span><button id="passer-btn" type="button">Passer</button></span>
+    <span id="tb-etat"><span id="a-toi-badge" data-i18n="ui.a_toi">À TOI</span><button id="passer-btn" type="button" data-i18n="ui.passer">Passer</button></span>
   </div>
 </div>
 <div id="game-wrap" style="display:none">
@@ -1385,12 +1398,12 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
   <div class="m-panel" id="mp-diplo">
   <div id="left-panel">
     <div class="war-section">
-      <h4>⚔️ Guerre &amp; Pirates</h4>
+      <h4 data-i18n="ui.guerre_pirates">⚔️ Guerre &amp; Pirates</h4>
       <div id="war-risk-display"></div>
       <div id="pirate-status" style="margin-top:5px;font-size:.68em;color:#ff8888"></div>
     </div>
     <div class="ps">
-      <h4>Événements</h4>
+      <h4 data-i18n="ui.evenements">Événements</h4>
       <div class="evt-box">
         <div id="evt-now-box"></div>
         <div id="evt-next-box"></div>
@@ -1404,21 +1417,21 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
          défaite » (ex-Concéder, vote des autres) et, pour le créateur, « Renoncer à jouer » (une IA
          reprend son rôle, sans vote). online.js (`concederVisible`) choisit lesquels montrer. -->
     <div class="jr-card" id="jr-reglages">
-      <div class="jr-kicker">Réglages</div>
+      <div class="jr-kicker" data-i18n="ui.reglages">Réglages</div>
       <div class="jr-row">
         <div id="sc-taille" role="group" aria-label="Taille du texte">
-          <button type="button" onclick="scTaille(14)" data-fs="14" aria-pressed="false" title="Petit">A</button>
-          <button type="button" onclick="scTaille(16)" data-fs="16" aria-pressed="true" title="Normal">A</button>
-          <button type="button" onclick="scTaille(18)" data-fs="18" aria-pressed="false" title="Grand">A</button>
-          <button type="button" onclick="scTaille(20)" data-fs="20" aria-pressed="false" title="Très grand">A</button>
+          <button type="button" onclick="scTaille(14)" data-fs="14" aria-pressed="false" title="Petit" data-i18n-title="ui.title_petit">A</button>
+          <button type="button" onclick="scTaille(16)" data-fs="16" aria-pressed="true" title="Normal" data-i18n-title="ui.title_normal">A</button>
+          <button type="button" onclick="scTaille(18)" data-fs="18" aria-pressed="false" title="Grand" data-i18n-title="ui.title_grand">A</button>
+          <button type="button" onclick="scTaille(20)" data-fs="20" aria-pressed="false" title="Très grand" data-i18n-title="ui.title_tres_grand">A</button>
         </div>
-        <a class="jr-btn go" href="regles.html" target="_blank" rel="noopener">📖 Règles</a>
+        <a class="jr-btn go" href="regles.html" target="_blank" rel="noopener" data-i18n="ui.regles">📖 Règles</a>
       </div>
       <div class="jr-row jr-row2">
-        <button class="jr-btn" type="button" onclick="copyLogText()">📋 Copier le log</button>
-        <button class="jr-btn danger" id="recommencer-btn" type="button" onclick="scAbandonGame()">🔄 Recommencer la partie</button>
-        <button class="jr-btn danger" id="conceder-btn" type="button" style="display:none" onclick="scConcede()">🏳️ Admettre sa défaite</button>
-        <button class="jr-btn danger" id="renoncer-btn" type="button" style="display:none" title="Une IA reprend mon rôle" onclick="scRenoncer()">🤖 Renoncer à jouer</button>
+        <button class="jr-btn" type="button" onclick="copyLogText()" data-i18n="ui.copier_le_log">📋 Copier le log</button>
+        <button class="jr-btn danger" id="recommencer-btn" type="button" onclick="scAbandonGame()" data-i18n="ui.recommencer_la_partie">🔄 Recommencer la partie</button>
+        <button class="jr-btn danger" id="conceder-btn" type="button" style="display:none" onclick="scConcede()" data-i18n="ui.admettre_sa_defaite">🏳️ Admettre sa défaite</button>
+        <button class="jr-btn danger" id="renoncer-btn" type="button" style="display:none" title="Une IA reprend mon rôle" onclick="scRenoncer()" data-i18n="ui.renoncer_a_jouer" data-i18n-title="ui.title_une_ia_reprend_mon_role">🤖 Renoncer à jouer</button>
       </div>
     </div>
     <div id="log-legend" class="log-legend"></div><div id="log-content" class="open"></div>
@@ -1454,33 +1467,33 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
     </div>
     <!-- Retour à la carte peinte et noms des ceintures : ancrés au PANNEAU comme le zoom (s'ils
          étaient dans `#map-wrap`, qui défile, ils partiraient hors de vue dès qu'on fait glisser). -->
-    <div id="map-back" onclick="backToMap()">← Carte</div>
+    <div id="map-back" onclick="backToMap()" data-i18n="ui.carte">← Carte</div>
     <!-- ⚠️ LES BOUTONS DE ZOOM NE DOIVENT PAS ÊTRE DANS `#map-wrap`.
          Je les y avais mis pour les poser « sur la carte ». Mais `#map-wrap` est le cadre qui
          DÉFILE : un élément en `position:absolute` à l'intérieur défile avec le contenu, donc les
          boutons partaient hors de vue dès qu'on faisait glisser la carte. Ils sont maintenant
          ancrés au PANNEAU (qui, lui, ne défile pas) : toujours visibles, en haut à droite. -->
-    <div class="map-zoom"><button onclick="uiZoom(-1)" title="Dézoomer">−</button><span id="mz-lbl" class="mz-lbl">1×</span><button onclick="uiZoom(1)" title="Zoomer">＋</button><!--
+    <div class="map-zoom"><button onclick="uiZoom(-1)" title="Dézoomer" data-i18n-title="ui.title_dezoomer">−</button><span id="mz-lbl" class="mz-lbl">1×</span><button onclick="uiZoom(1)" title="Zoomer" data-i18n-title="ui.title_zoomer">＋</button><!--
       Bascule des distances entre capitales (les traits jaunes Terre–Mars–Jupiter–Éris). Elles
       n'portent aucune règle : ni route, ni adjacence, seulement des durées de trajet. Placée près
       du zoom, comme demandé, parce que c'est là qu'on règle la lisibilité de la carte. -->
-      <button id="mz-dist" onclick="toggleDistances()" title="Masquer les distances entre capitales et les astéroïdes">⤳</button></div>
+      <button id="mz-dist" onclick="toggleDistances()" title="Masquer les distances entre capitales et les astéroïdes" data-i18n-title="ui.title_masquer_les_distances_entre_capitales_et">⤳</button></div>
   </div>
   </div>
   <div class="m-panel" id="mp-tech">
     <div id="tech-area">
-      <div id="tech-handle" title="Glisser pour redimensionner"></div>
+      <div id="tech-handle" title="Glisser pour redimensionner" data-i18n-title="ui.title_glisser_pour_redimensionner"></div>
       <div id="tech-hdr">
-        <span><i class=ri-science></i> Arbre Tech</span>
+        <span data-i18n="ui.arbre_tech"><i class=ri-science></i> Arbre Tech</span>
         <span id="branch-progress-summary" style="margin-left:auto;font-size:.65em;color:#5a6a8a"></span>
       </div>
       <!-- TROIS RIVIÈRES = TROIS PAGES (demande de Marc). Avant, ces boutons ne faisaient que faire
            DÉFILER vers une ancre : on voyait toujours un bout des autres familles de cartes.
            `techRiviere()` change de page ; le bouton actif est souligné en blanc. -->
       <div id="tech-tabs" style="display:flex;gap:5px;padding:4px 6px;flex-shrink:0;border-bottom:1px solid #1a1a3a">
-        <button id="riv-btn-tech" onclick="techRiviere('tech')" style="flex:1;font-size:.62em;font-weight:700;padding:5px 2px;border:none;border-radius:5px;cursor:pointer;background:#185FA5;color:#fff">Techs</button>
-        <button id="riv-btn-civ" onclick="techRiviere('civ')" style="flex:1;font-size:.62em;font-weight:700;padding:5px 2px;border:none;border-radius:5px;cursor:pointer;background:#3B6D11;color:#dcedc0">Eco&Soc</button>
-        <button id="riv-btn-mil" onclick="techRiviere('mil')" style="flex:1;font-size:.62em;font-weight:700;padding:5px 2px;border:none;border-radius:5px;cursor:pointer;background:#A32D2D;color:#ffd7d7">A. Milit.</button>
+        <button id="riv-btn-tech" onclick="techRiviere('tech')" style="flex:1;font-size:.62em;font-weight:700;padding:5px 2px;border:none;border-radius:5px;cursor:pointer;background:#185FA5;color:#fff" data-i18n="ui.techs">Techs</button>
+        <button id="riv-btn-civ" onclick="techRiviere('civ')" style="flex:1;font-size:.62em;font-weight:700;padding:5px 2px;border:none;border-radius:5px;cursor:pointer;background:#3B6D11;color:#dcedc0" data-i18n="ui.eco_soc">Eco&Soc</button>
+        <button id="riv-btn-mil" onclick="techRiviere('mil')" style="flex:1;font-size:.62em;font-weight:700;padding:5px 2px;border:none;border-radius:5px;cursor:pointer;background:#A32D2D;color:#ffd7d7" data-i18n="ui.a_milit">A. Milit.</button>
       </div>
       <div id="tech-body"></div>
       <div id="tc-preview">
@@ -1494,46 +1507,46 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
   <div class="m-panel" id="mp-empire">
   <div id="right-panel">
     <div class="score-bar">
-      <div class="score-p"><div class="score-name">Toi</div><div class="score-vp" id="score-p">0</div></div>
+      <div class="score-p"><div class="score-name" data-i18n="ui.toi">Toi</div><div class="score-vp" id="score-p">0</div></div>
       <div class="score-vs">VS</div>
       <div class="score-a"><div class="score-name" id="score-a-label">IA</div><div class="score-vp" id="score-a">0</div></div>
     </div>
     <div class="rps">
-      <h4>Ta nation</h4>
+      <h4 data-i18n="ui.ta_nation">Ta nation</h4>
       <div class="civ-hdr" id="r-civ-hdr"></div>
       <div class="res-grid" id="r-res"></div>
       <div id="r-ability" style="margin-top:8px;font-size:.76em;line-height:1.4"></div>
     </div>
     <div class="rps">
-      <h4>🏛️ Gouvernement</h4>
+      <h4 data-i18n="ui.gouvernement">🏛️ Gouvernement</h4>
       <div id="r-gov"></div>
     </div>
     <div class="rps">
-      <h4>⚔️ Jetons Force</h4>
+      <h4 data-i18n="ui.jetons_force">⚔️ Jetons Force</h4>
       <div id="r-force"></div>
     </div>
     <div class="rps">
-      <h4>Colonies &amp; Routes</h4>
+      <h4 data-i18n="ui.colonies_routes">Colonies &amp; Routes</h4>
       <div class="col-list" id="r-cols"></div>
     </div>
     <div class="rps">
-      <h4>💼 Investissements Actifs</h4>
+      <h4 data-i18n="ui.investissements_actifs">💼 Investissements Actifs</h4>
       <div id="r-invest"></div>
     </div>
     <div class="rps">
-      <h4>Cartes Actives</h4>
+      <h4 data-i18n="ui.cartes_actives">Cartes Actives</h4>
       <div class="active-cards" id="r-cards"></div>
     </div>
     <div class="rps">
-      <h4>📋 Agendas Publics</h4>
+      <h4 data-i18n="ui.agendas_publics">📋 Agendas Publics</h4>
       <div id="r-agendas"></div>
     </div>
     <div class="rps">
-      <h4>🏆 Points de victoire</h4>
+      <h4 data-i18n="ui.points_de_victoire">🏆 Points de victoire</h4>
       <div id="r-classement" style="font-size:.8em;line-height:1.6"></div>
     </div>
     <div class="rps">
-      <h4>Adversaire IA</h4>
+      <h4 data-i18n="ui.adversaire_ia">Adversaire IA</h4>
       <div id="r-ai" style="font-size:.72em;color:#7080a0;line-height:1.7"></div>
     </div>
   </div>
@@ -1542,45 +1555,45 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
 </div>
 <!-- Anciens boutons d'action : conservés cachés (stubs) pour que renderActions ne plante pas. Les actions sont désormais contextuelles (clic sur la carte). -->
 <div id="action-bar" style="display:none">
-  <button class="abtn" id="btn-col" onclick="toggleMode('colonize')">🏗 Coloniser</button>
-  <button class="abtn" id="btn-route" onclick="toggleMode('route')">🛤 Route</button>
-  <button class="abtn" id="btn-raid" onclick="doRaid()">💰 Raid</button>
-  <button class="abtn" id="btn-attack" onclick="toggleMode('attack')" style="border-color:#ef5350;color:#ff7060">⚔️ Attaquer</button>
+  <button class="abtn" id="btn-col" onclick="toggleMode('colonize')" data-i18n="ui.coloniser">🏗 Coloniser</button>
+  <button class="abtn" id="btn-route" onclick="toggleMode('route')" data-i18n="ui.route">🛤 Route</button>
+  <button class="abtn" id="btn-raid" onclick="doRaid()" data-i18n="ui.raid">💰 Raid</button>
+  <button class="abtn" id="btn-attack" onclick="toggleMode('attack')" style="border-color:#ef5350;color:#ff7060" data-i18n="ui.attaquer">⚔️ Attaquer</button>
   <span id="hint"></span>
 </div>
 <div id="bottom-bar" style="display:none">
   <div id="m-tabs">
-    <button class="mtab active" data-tab="map" onclick="uiTab('map')"><span>🗺️</span><label>Carte</label></button>
-    <button class="mtab" data-tab="tech" onclick="uiTab('tech')"><span><i class=ri-science></i></span><label>Techs</label></button>
-    <button class="mtab" data-tab="empire" onclick="uiTab('empire')"><span>🏛️</span><label>Empire</label></button>
-    <button class="mtab" data-tab="diplo" onclick="uiTab('diplo')"><span>⚔️</span><label>Diplo</label></button>
-    <button class="mtab" data-tab="journal" onclick="uiTab('journal')"><span>📜</span><label>Journal</label></button>
+    <button class="mtab active" data-tab="map" onclick="uiTab('map')"><span>🗺️</span><label data-i18n="ui.carte_2">Carte</label></button>
+    <button class="mtab" data-tab="tech" onclick="uiTab('tech')"><span><i class=ri-science></i></span><label data-i18n="ui.techs">Techs</label></button>
+    <button class="mtab" data-tab="empire" onclick="uiTab('empire')"><span>🏛️</span><label data-i18n="ui.empire">Empire</label></button>
+    <button class="mtab" data-tab="diplo" onclick="uiTab('diplo')"><span>⚔️</span><label data-i18n="ui.diplo">Diplo</label></button>
+    <button class="mtab" data-tab="journal" onclick="uiTab('journal')"><span>📜</span><label data-i18n="ui.journal">Journal</label></button>
   </div>
 </div>
 <div id="sc-confirm">
   <div id="sc-confirm-label"></div>
-  <button class="scc-btn scc-undo" onclick="scConfirmCancel()" title="Annuler / revenir en arrière" aria-label="Annuler">ANN</button>
+  <button class="scc-btn scc-undo" onclick="scConfirmCancel()" title="Annuler / revenir en arrière" aria-label="Annuler" data-i18n-title="ui.title_annuler_revenir_en_arriere">ANN</button>
   <button class="scc-btn scc-ok" onclick="scConfirmValidate()" aria-label="Valider">OK</button>
 </div>
 <div id="action-toast"></div>
 <div id="eot-modal" class="hidden">
   <div class="fen-wrap fen-large"><div class="fen fen-info eot-card">
     <div class="fen-medal" aria-hidden="true">📊</div>
-    <div class="fen-kicker">Fin de tour</div>
-    <div class="fen-nation eot-title" id="eot-title">Bilan du tour</div>
+    <div class="fen-kicker" data-i18n="ui.fin_de_tour">Fin de tour</div>
+    <div class="fen-nation eot-title" id="eot-title" data-i18n="ui.bilan_du_tour">Bilan du tour</div>
     <div id="eot-body" style="text-align:left"></div>
-    <div class="fen-btns fen-one"><button type="button" class="fen-btn ok eot-btn" onclick="continueAfterEOT()"><span class="k">Tour suivant</span></button></div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn ok eot-btn" onclick="continueAfterEOT()"><span class="k" data-i18n="ui.tour_suivant">Tour suivant</span></button></div>
   </div></div>
 </div>
 <div id="accord-modal" class="hidden">
   <div class="fen-wrap"><div class="fen fen-event">
     <div class="fen-medal" id="accord-emoji" aria-hidden="true">🤝</div>
-    <div class="fen-kicker">Accord commercial</div>
+    <div class="fen-kicker" data-i18n="ui.accord_commercial">Accord commercial</div>
     <div class="fen-nation" id="accord-nation"></div>
     <div class="fen-body fen-left" id="accord-body"></div>
     <div class="fen-btns">
-      <button type="button" class="fen-btn ghost" onclick="document.getElementById('accord-modal').classList.add('hidden')"><span class="k">Annuler</span></button>
-      <button type="button" class="fen-btn ok" id="accord-confirm"><span class="k">Conclure</span><span class="s">l'accord</span></button>
+      <button type="button" class="fen-btn ghost" onclick="document.getElementById('accord-modal').classList.add('hidden')"><span class="k" data-i18n="ui.annuler">Annuler</span></button>
+      <button type="button" class="fen-btn ok" id="accord-confirm"><span class="k" data-i18n="ui.conclure">Conclure</span><span class="s" data-i18n="ui.l_accord">l'accord</span></button>
     </div>
   </div></div>
 </div>
@@ -1589,12 +1602,12 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
 <div id="war-modal" class="hidden">
   <div class="fen-wrap"><div class="fen fen-war" id="wm-fen">
     <div class="fen-medal" id="wm-emoji" aria-hidden="true">⚔️</div>
-    <div class="fen-kicker" id="wm-kicker">Guerre</div>
+    <div class="fen-kicker" id="wm-kicker" data-i18n="ui.guerre">Guerre</div>
     <div class="fen-nation" id="wm-nation"></div>
     <div class="fen-verb" id="wm-title"></div>
     <div class="fen-body fen-left" id="wm-body" style="background:#0b0d24;border:1px solid #232750;border-radius:10px;padding:10px 12px"></div>
     <div class="war-result hidden" id="wm-result"></div>
-    <div class="fen-btns fen-one"><button type="button" class="fen-btn go war-btn" style="background:#163a6b;border-color:#2f6fbf;color:#e8f1ff" onclick="dismissWarModal()"><span class="k">Continuer</span></button></div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn go war-btn" style="background:#163a6b;border-color:#2f6fbf;color:#e8f1ff" onclick="dismissWarModal()"><span class="k" data-i18n="ui.continuer">Continuer</span></button></div>
   </div></div>
 </div>
 <div id="event-modal" class="hidden">
@@ -1604,46 +1617,46 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
     <div class="fen-nation evm-name" id="evm-name"></div>
     <div class="fen-body fen-left evm-result" id="evm-result"></div>
     <div class="fen-note evm-consequence hidden" id="evm-consequence"></div>
-    <div class="fen-btns fen-one"><button type="button" class="fen-btn go evm-btn" onclick="dismissEventModal()"><span class="k">Continuer</span></button></div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn go evm-btn" onclick="dismissEventModal()"><span class="k" data-i18n="ui.continuer">Continuer</span></button></div>
   </div></div>
 </div>
 <div id="strategy-modal" class="hidden">
   <div class="fen-wrap fen-large"><div class="fen fen-info strat-card">
     <div class="fen-medal" aria-hidden="true">🎯</div>
-    <div class="fen-kicker">Début de tour</div>
-    <div class="fen-nation strat-title">Cartes Stratégie</div>
-    <div class="fen-verb strat-sub" id="strat-sub">Choisis une stratégie pour ce tour</div>
+    <div class="fen-kicker" data-i18n="ui.debut_de_tour">Début de tour</div>
+    <div class="fen-nation strat-title" data-i18n="ui.cartes_strategie">Cartes Stratégie</div>
+    <div class="fen-verb strat-sub" id="strat-sub" data-i18n="ui.choisis_une_strategie_pour_ce_tour">Choisis une stratégie pour ce tour</div>
     <div class="strat-options" id="strat-options"></div>
-    <div class="fen-btns fen-one"><button type="button" class="fen-btn go agsel-confirm" id="strat-confirm-btn" onclick="confirmStrategy()" disabled><span class="k">Valider mon choix</span></button></div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn go agsel-confirm" id="strat-confirm-btn" onclick="confirmStrategy()" disabled><span class="k" data-i18n="ui.valider_mon_choix">Valider mon choix</span></button></div>
   </div></div>
 </div>
 <div id="discovery-modal" class="hidden">
   <div class="fen-wrap"><div class="fen fen-peace disc-card">
     <div class="fen-medal" id="disc-emoji" aria-hidden="true">⭐</div>
-    <div class="fen-kicker">Découverte</div>
-    <div class="fen-nation" id="disc-name">Découverte !</div>
+    <div class="fen-kicker" data-i18n="ui.decouverte">Découverte</div>
+    <div class="fen-nation" id="disc-name" data-i18n="ui.decouverte_2">Découverte !</div>
     <div class="fen-body" id="disc-desc"></div>
-    <div class="fen-btns fen-one"><button type="button" class="fen-btn ok disc-btn" onclick="dismissDiscovery()"><span class="k">Continuer</span></button></div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn ok disc-btn" onclick="dismissDiscovery()"><span class="k" data-i18n="ui.continuer">Continuer</span></button></div>
   </div></div>
 </div>
 <div id="agenda-sel-modal" class="hidden">
   <div class="fen-wrap fen-large"><div class="fen fen-info agsel-card">
     <div class="fen-medal" aria-hidden="true">📋</div>
-    <div class="fen-kicker">Tour 1</div>
-    <div class="fen-nation agsel-title">Agenda secret</div>
-    <div class="fen-verb agsel-sub">Ton objectif secret de la partie.</div>
+    <div class="fen-kicker" data-i18n="ui.tour_1">Tour 1</div>
+    <div class="fen-nation agsel-title" data-i18n="ui.agenda_secret">Agenda secret</div>
+    <div class="fen-verb agsel-sub" data-i18n="ui.ton_objectif_secret_de_la_partie">Ton objectif secret de la partie.</div>
     <div class="agsel-context" id="agsel-context"></div>
     <div class="agsel-agendas" id="agsel-agendas"></div>
-    <div class="fen-btns fen-one"><button type="button" class="fen-btn go agsel-confirm" id="agsel-confirm-btn" onclick="confirmAgendaChoice()" disabled><span class="k">Confirmer mon choix</span></button></div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn go agsel-confirm" id="agsel-confirm-btn" onclick="confirmAgendaChoice()" disabled><span class="k" data-i18n="ui.confirmer_mon_choix">Confirmer mon choix</span></button></div>
   </div></div>
 </div>
 <div id="event-announce-modal" class="hidden">
   <div class="fen-wrap"><div class="fen fen-event ea-card">
     <div class="fen-medal" id="ea-emoji" aria-hidden="true">⭐</div>
-    <div class="fen-kicker">Événement du prochain tour</div>
+    <div class="fen-kicker" data-i18n="ui.evenement_du_prochain_tour">Événement du prochain tour</div>
     <div class="fen-nation" id="ea-name"></div>
     <div class="fen-body" id="ea-desc"></div>
-    <div class="fen-btns fen-one"><button type="button" class="fen-btn go ea-btn" onclick="dismissEventAnnounce()"><span class="k">Compris</span></button></div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn go ea-btn" onclick="dismissEventAnnounce()"><span class="k" data-i18n="ui.compris">Compris</span></button></div>
   </div></div>
 </div>
 <div id="tech-detail-modal" class="hidden">
@@ -1659,22 +1672,22 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
       <div class="td-effect" id="td-effect"></div>
       <div class="td-cost-row" id="td-cost"></div>
       <button class="td-buy" id="td-buy-btn" onclick="doBuyFromDetail()"></button>
-      <button class="td-close" onclick="closeTechDetail()">✕ Fermer</button>
+      <button class="td-close" onclick="closeTechDetail()" data-i18n="ui.fermer">✕ Fermer</button>
     </div>
   </div>
 </div>
 <div id="debug-modal" class="hidden">
   <div class="debug-card">
     <h3>? Question / Remarque — Tour <span id="debug-turn-label"></span></h3>
-    <textarea id="debug-note-input" placeholder="Ex : Pourquoi j'ai perdu tous mes AC ce tour ?"></textarea>
+    <textarea id="debug-note-input" placeholder="Ex : Pourquoi j'ai perdu tous mes AC ce tour ?" data-i18n-ph="ui.ph_ex_pourquoi_j_ai_perdu_tous_mes_ac_ce_to"></textarea>
     <div class="debug-btns">
-      <button class="debug-save" onclick="saveDebugNote()">💾 Enregistrer</button>
-      <button class="debug-export" onclick="exportDebugLog()">📋 Exporter tout</button>
-      <button class="debug-close" onclick="closeDebugModal()">Fermer</button>
+      <button class="debug-save" onclick="saveDebugNote()" data-i18n="ui.enregistrer">💾 Enregistrer</button>
+      <button class="debug-export" onclick="exportDebugLog()" data-i18n="ui.exporter_tout">📋 Exporter tout</button>
+      <button class="debug-close" onclick="closeDebugModal()" data-i18n="ui.fermer_2">Fermer</button>
     </div>
     <div id="debug-export-area">
       <div id="debug-export-preview"></div>
-      <p style="font-size:.72em;color:#7880a0;margin:10px 0 6px">Version texte (à copier / coller) :</p>
+      <p style="font-size:.72em;color:#7880a0;margin:10px 0 6px" data-i18n="ui.version_texte_a_copier_coller">Version texte (à copier / coller) :</p>
       <textarea id="debug-export-text" readonly onclick="this.select()"></textarea>
     </div>
   </div>
@@ -1682,9 +1695,9 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
 <div id="invest-modal" class="hidden">
   <div class="fen-wrap fen-large"><div class="fen fen-event inv-card">
     <div class="fen-medal" aria-hidden="true">💼</div>
-    <div class="fen-kicker">Investissement · niveau 1</div>
-    <div class="fen-nation inv-title">Cartes Investissement</div>
-    <div class="fen-verb inv-sub">Effet + contrepartie dès le tour 3.</div>
+    <div class="fen-kicker" data-i18n="ui.investissement_niveau_1">Investissement · niveau 1</div>
+    <div class="fen-nation inv-title" data-i18n="ui.cartes_investissement">Cartes Investissement</div>
+    <div class="fen-verb inv-sub" data-i18n="ui.effet_contrepartie_des_le_tour_3">Effet + contrepartie dès le tour 3.</div>
     <div class="inv-ai-pick hidden" id="inv-ai-pick"></div>
     <div class="inv-opts" id="inv-opts"></div>
   </div></div>
@@ -1692,9 +1705,9 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
 <div id="invest2-modal" class="hidden">
   <div class="fen-wrap fen-large"><div class="fen fen-event inv-card">
     <div class="fen-medal" aria-hidden="true">🧠</div>
-    <div class="fen-kicker">Investissement · niveau 2</div>
-    <div class="fen-nation inv-title">Investissements Niveau 2</div>
-    <div class="fen-verb inv-sub">Effet + contrepartie au tour 7, pendant 3 tours.</div>
+    <div class="fen-kicker" data-i18n="ui.investissement_niveau_2">Investissement · niveau 2</div>
+    <div class="fen-nation inv-title" data-i18n="ui.investissements_niveau_2">Investissements Niveau 2</div>
+    <div class="fen-verb inv-sub" data-i18n="ui.effet_contrepartie_au_tour_7_pendant_3_t">Effet + contrepartie au tour 7, pendant 3 tours.</div>
     <div class="inv-ai-pick hidden" id="inv2-ai-pick"></div>
     <div class="inv-opts" id="inv2-opts"></div>
   </div></div>
@@ -1702,28 +1715,28 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
 <div id="espionage-modal" class="hidden">
   <div class="fen-wrap fen-large"><div class="fen fen-info inv-card">
     <div class="fen-medal" aria-hidden="true">🕵️</div>
-    <div class="fen-kicker">Espionnage</div>
-    <div class="fen-nation inv-title">Quelle filière copier ?</div>
-    <div class="fen-verb inv-sub" id="espionage-modal-sub">Choisis la ligne technologique ennemie dont tu copieras les cartes acquises.</div>
+    <div class="fen-kicker" data-i18n="ui.espionnage">Espionnage</div>
+    <div class="fen-nation inv-title" data-i18n="ui.quelle_filiere_copier">Quelle filière copier ?</div>
+    <div class="fen-verb inv-sub" id="espionage-modal-sub" data-i18n="ui.choisis_la_ligne_technologique_ennemie_d">Choisis la ligne technologique ennemie dont tu copieras les cartes acquises.</div>
     <div class="inv-opts" id="espionage-branch-opts"></div>
   </div></div>
 </div>
 <div id="empath-copy-modal" class="hidden">
   <div class="fen-wrap fen-large"><div class="fen fen-info inv-card">
     <div class="fen-medal" aria-hidden="true">🧬</div>
-    <div class="fen-kicker">Télépathie</div>
-    <div class="fen-nation inv-title">Copier une technologie</div>
-    <div class="fen-verb inv-sub">Copie une technologie adverse.</div>
+    <div class="fen-kicker" data-i18n="ui.telepathie">Télépathie</div>
+    <div class="fen-nation inv-title" data-i18n="ui.copier_une_technologie">Copier une technologie</div>
+    <div class="fen-verb inv-sub" data-i18n="ui.copie_une_technologie_adverse">Copie une technologie adverse.</div>
     <div class="inv-opts" id="empath-copy-opts"></div>
-    <div class="fen-btns fen-one"><button type="button" class="fen-btn ghost" onclick="applyEmpathCopy(null)"><span class="k">Annuler</span></button></div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn ghost" onclick="applyEmpathCopy(null)"><span class="k" data-i18n="ui.annuler">Annuler</span></button></div>
   </div></div>
 </div>
 <div id="dyson-modal" class="hidden">
   <div class="fen-wrap fen-large"><div class="fen fen-event inv-card">
     <div class="fen-medal" aria-hidden="true">⚡</div>
-    <div class="fen-kicker">Sphère de Dyson</div>
-    <div class="fen-nation inv-title" id="dyson-title">Sphère de Dyson construite !</div>
-    <div class="inv-sub" id="dyson-sub" style="color:#ffe080;margin-bottom:14px">Votre empire monopolise l'énergie solaire (+5<i class=ri-energy></i>/tour).<br>Les autres nations doivent <strong>accepter</strong> ou c'est <strong>la guerre immédiate</strong>.</div>
+    <div class="fen-kicker" data-i18n="ui.sphere_de_dyson">Sphère de Dyson</div>
+    <div class="fen-nation inv-title" id="dyson-title" data-i18n="ui.sphere_de_dyson_construite">Sphère de Dyson construite !</div>
+    <div class="inv-sub" id="dyson-sub" style="color:#ffe080;margin-bottom:14px" data-i18n="ui.votre_empire_monopolise_l_energie_solair">Votre empire monopolise l'énergie solaire (+5<i class=ri-energy></i>/tour).<br>Les autres nations doivent <strong>accepter</strong> ou c'est <strong>la guerre immédiate</strong>.</div>
     <div id="dyson-nations" style="margin-bottom:8px;text-align:left"></div>
     <div id="dyson-actions"></div>
   </div></div>
@@ -1731,43 +1744,43 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
 <div id="invest-active-modal" class="hidden" style="position:fixed;inset:0;background:rgba(4,4,18,.88);backdrop-filter:blur(7px);z-index:390;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:10px">
   <div class="fen-wrap"><div class="fen fen-event">
     <div class="fen-medal" aria-hidden="true">💼</div>
-    <div class="fen-kicker">Tour 3</div>
-    <div class="fen-nation">Investissements activés</div>
-    <div class="fen-verb">Les effets ci-dessous sont <b>permanents jusqu'au tour 10</b>.</div>
-    <div class="fen-slider"><div class="row"><span>Ton investissement</span></div><div id="inv-active-your" style="color:#ffe080;line-height:1.5"></div></div>
-    <div class="fen-slider"><div class="row"><span>Investissements adverses</span></div><div id="inv-active-ai" style="color:#c8d0ea;line-height:1.5"></div></div>
-    <div class="fen-btns fen-one"><button type="button" class="fen-btn go" onclick="dismissInvestActive()"><span class="k">Compris</span><span class="s">je continue</span></button></div>
+    <div class="fen-kicker" data-i18n="ui.tour_3">Tour 3</div>
+    <div class="fen-nation" data-i18n="ui.investissements_actives">Investissements activés</div>
+    <div class="fen-verb" data-i18n="ui.les_effets_ci_dessous_sont_permanents_ju">Les effets ci-dessous sont <b>permanents jusqu'au tour 10</b>.</div>
+    <div class="fen-slider"><div class="row"><span data-i18n="ui.ton_investissement">Ton investissement</span></div><div id="inv-active-your" style="color:#ffe080;line-height:1.5"></div></div>
+    <div class="fen-slider"><div class="row"><span data-i18n="ui.investissements_adverses">Investissements adverses</span></div><div id="inv-active-ai" style="color:#c8d0ea;line-height:1.5"></div></div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn go" onclick="dismissInvestActive()"><span class="k" data-i18n="ui.compris">Compris</span><span class="s" data-i18n="ui.je_continue">je continue</span></button></div>
   </div></div>
 </div>
 <div id="route-token-modal" class="hidden">
   <div class="fen-wrap"><div class="fen fen-info">
     <div class="fen-medal" aria-hidden="true">🛤️</div>
-    <div class="fen-kicker">Nouvelle route</div>
-    <div class="fen-nation">Protéger la route ?</div>
+    <div class="fen-kicker" data-i18n="ui.nouvelle_route">Nouvelle route</div>
+    <div class="fen-nation" data-i18n="ui.proteger_la_route">Protéger la route ?</div>
     <div class="fen-body" id="rtm-info"></div>
     <div class="fen-btns rtm-btns">
-      <button type="button" class="fen-btn ghost" onclick="confirmRouteToken(false)"><span class="k">Laisser</span><span class="s">non protégée</span></button>
-      <button type="button" class="fen-btn go" onclick="confirmRouteToken(true)"><span class="k">Protéger</span><span class="s">1 jeton Force</span></button>
+      <button type="button" class="fen-btn ghost" onclick="confirmRouteToken(false)"><span class="k" data-i18n="ui.laisser">Laisser</span><span class="s" data-i18n="ui.non_protegee">non protégée</span></button>
+      <button type="button" class="fen-btn go" onclick="confirmRouteToken(true)"><span class="k" data-i18n="ui.proteger">Protéger</span><span class="s" data-i18n="ui.1_jeton_force">1 jeton Force</span></button>
     </div>
   </div></div>
 </div>
 <div id="route-manage-modal" class="hidden">
   <div class="fen-wrap"><div class="fen fen-info">
     <div class="fen-medal" aria-hidden="true">🛤️</div>
-    <div class="fen-kicker">Route</div>
-    <div class="fen-nation" id="rmm-title">Route</div>
+    <div class="fen-kicker" data-i18n="ui.route_2">Route</div>
+    <div class="fen-nation" id="rmm-title" data-i18n="ui.route_2">Route</div>
     <div class="fen-body" id="rmm-info"></div>
     <div class="fen-btns fen-col rmm-btns">
-      <button type="button" class="fen-btn go hidden" id="rmm-deploy-btn" onclick="routeManageDeploy()"><span class="k">Déployer 1 jeton</span><span class="s">1 AC</span></button>
-      <button type="button" class="fen-btn no hidden" id="rmm-recall-btn" onclick="routeManageRecall()"><span class="k">Rappeler le jeton</span><span class="s">1 AC</span></button>
-      <button type="button" class="fen-btn ghost" onclick="routeManageClose()"><span class="k">Fermer</span></button>
+      <button type="button" class="fen-btn go hidden" id="rmm-deploy-btn" onclick="routeManageDeploy()"><span class="k" data-i18n="ui.deployer_1_jeton">Déployer 1 jeton</span><span class="s">1 AC</span></button>
+      <button type="button" class="fen-btn no hidden" id="rmm-recall-btn" onclick="routeManageRecall()"><span class="k" data-i18n="ui.rappeler_le_jeton">Rappeler le jeton</span><span class="s">1 AC</span></button>
+      <button type="button" class="fen-btn ghost" onclick="routeManageClose()"><span class="k" data-i18n="ui.fermer_2">Fermer</span></button>
     </div>
   </div></div>
 </div>
 <div id="forced-war-modal" class="hidden">
   <div class="fen-wrap"><div class="fen fen-war" id="fw-fen">
     <div class="fen-medal" id="fw-emoji" aria-hidden="true">😡</div>
-    <div class="fen-kicker">Guerre populaire — le peuple exige</div>
+    <div class="fen-kicker" data-i18n="ui.guerre_populaire_le_peuple_exige">Guerre populaire — le peuple exige</div>
     <div class="fen-nation" id="fw-nation"></div>
     <div class="fen-verb" id="fw-title"></div>
     <div class="fen-body" id="fw-desc"></div>
@@ -1791,20 +1804,20 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
 <div id="peace-modal" class="hidden" style="position:fixed;inset:0;background:rgba(4,4,18,.86);backdrop-filter:blur(6px);z-index:900;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:10px">
   <div class="fen-wrap"><div class="fen fen-peace" id="pm-fen">
     <div class="fen-medal" id="pm-emoji" aria-hidden="true">🕊️</div>
-    <div class="fen-kicker fen-prep" id="pm-kicker">contre</div>
-    <div class="fen-nation" id="pm-nation">Adversaire</div>
-    <div class="fen-verb" id="pm-verb">Proposer la paix ?</div>
+    <div class="fen-kicker fen-prep" id="pm-kicker" data-i18n="ui.contre">contre</div>
+    <div class="fen-nation" id="pm-nation" data-i18n="ui.adversaire">Adversaire</div>
+    <div class="fen-verb" id="pm-verb" data-i18n="ui.proposer_la_paix">Proposer la paix ?</div>
     <div id="pm-combatants" hidden></div>
     <div class="fen-note" id="pm-declaredby"></div>
     <div class="fen-body" id="pm-context"></div>
     <div class="fen-slider">
-      <div class="row"><span>💰 Offre de ressources pour la paix</span></div>
+      <div class="row"><span data-i18n="ui.offre_de_ressources_pour_la_paix">💰 Offre de ressources pour la paix</span></div>
       <div class="pm-offre"><div class="pm-res"><span class="pm-lab"><i class="ri-materials"></i></span><button type="button" onclick="adjustPeaceOffer('materials',-1)" aria-label="Moins">−</button><span id="pm-mat" class="pm-val" style="color:#ffcc88">0</span><button type="button" onclick="adjustPeaceOffer('materials',1)" aria-label="Plus">+</button></div><div class="pm-res"><span class="pm-lab"><i class="ri-energy"></i></span><button type="button" onclick="adjustPeaceOffer('energy',-1)" aria-label="Moins">−</button><span id="pm-energy" class="pm-val" style="color:#88ccff">0</span><button type="button" onclick="adjustPeaceOffer('energy',1)" aria-label="Plus">+</button></div><div class="pm-res"><span class="pm-lab"><i class="ri-science"></i></span><button type="button" onclick="adjustPeaceOffer('science',-1)" aria-label="Moins">−</button><span id="pm-science" class="pm-val" style="color:#88ffcc">0</span><button type="button" onclick="adjustPeaceOffer('science',1)" aria-label="Plus">+</button></div></div>
       <div class="row"><span id="pm-total"></span></div>
     </div>
     <div class="fen-btns atk-btns">
-      <button type="button" class="fen-btn no" onclick="rejectPeace()"><span class="k">Se battre</span><span class="s">la guerre continue</span></button>
-      <button type="button" class="fen-btn ok" onclick="submitPeaceOffer()"><span class="k">Proposer</span><span class="s">la paix</span></button>
+      <button type="button" class="fen-btn no" onclick="rejectPeace()"><span class="k" data-i18n="ui.se_battre">Se battre</span><span class="s" data-i18n="ui.la_guerre_continue">la guerre continue</span></button>
+      <button type="button" class="fen-btn ok" onclick="submitPeaceOffer()"><span class="k" data-i18n="ui.proposer">Proposer</span><span class="s" data-i18n="ui.la_paix">la paix</span></button>
     </div>
   </div></div>
 </div>
@@ -1818,36 +1831,36 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
     <div class="fen-verb" id="wcm-sub"></div>
     <div class="fen-body fen-left" id="wcm-info"></div>
     <div class="fen-slider">
-      <div class="row"><span>Jetons engagés</span><b id="wcm-slider-val">0</b></div>
+      <div class="row"><span data-i18n="ui.jetons_engages">Jetons engagés</span><b id="wcm-slider-val">0</b></div>
       <input type="range" id="wcm-slider" min="0" max="10" value="0" aria-label="Jetons engagés" oninput="_warSliderMode==='defend'?updateWarDefenseSlider():updateWarCombatSlider()">
     </div>
     <div class="fen-body" id="wcm-power"></div>
     <div class="fen-btns atk-btns">
-      <button type="button" class="fen-btn ghost" onclick="cancelWarCombat()"><span class="k">Annuler</span><span class="s">revenir au choix</span></button>
-      <button type="button" class="fen-btn no" onclick="confirmWarCombat()"><span class="k">Engager</span><span class="s">ces jetons</span></button>
+      <button type="button" class="fen-btn ghost" onclick="cancelWarCombat()"><span class="k" data-i18n="ui.annuler">Annuler</span><span class="s" data-i18n="ui.revenir_au_choix">revenir au choix</span></button>
+      <button type="button" class="fen-btn no" onclick="confirmWarCombat()"><span class="k" data-i18n="ui.engager">Engager</span><span class="s" data-i18n="ui.ces_jetons">ces jetons</span></button>
     </div>
   </div></div>
 </div>
 <div id="route-capture-modal" class="hidden">
   <div class="fen-wrap"><div class="fen fen-war">
     <div class="fen-medal" aria-hidden="true">🛤️</div>
-    <div class="fen-kicker">Route conquise</div>
+    <div class="fen-kicker" data-i18n="ui.route_conquise">Route conquise</div>
     <div class="fen-nation" id="rcm-title"></div>
     <div class="fen-body" id="rcm-desc"></div>
     <div class="fen-btns atk-btns">
-      <button type="button" class="fen-btn no" onclick="routeCaptureChoice(false)"><span class="k">Détruire</span><span class="s">l'adversaire la perd</span></button>
-      <button type="button" class="fen-btn ok" id="rcm-keep" onclick="routeCaptureChoice(true)"><span class="k">Récupérer</span><span class="s">elle devient tienne</span></button>
+      <button type="button" class="fen-btn no" onclick="routeCaptureChoice(false)"><span class="k" data-i18n="ui.detruire">Détruire</span><span class="s" data-i18n="ui.l_adversaire_la_perd">l'adversaire la perd</span></button>
+      <button type="button" class="fen-btn ok" id="rcm-keep" onclick="routeCaptureChoice(true)"><span class="k" data-i18n="ui.recuperer">Récupérer</span><span class="s" data-i18n="ui.elle_devient_tienne">elle devient tienne</span></button>
     </div>
   </div></div>
 </div>
 <div id="forge-modal" class="hidden">
   <div class="fen-wrap"><div class="fen fen-event" style="border-color:#c77a1a">
     <div class="fen-medal" aria-hidden="true">💫</div>
-    <div class="fen-kicker">Pouvoir national</div>
-    <div class="fen-nation">Forge orbitale</div>
-    <div class="fen-body">Choisis la lune joviène à améliorer (Nv.1 → Nv.2 · 0 AC, −1<i class=ri-materials></i> −1<i class=ri-energy></i>).</div>
+    <div class="fen-kicker" data-i18n="ui.pouvoir_national">Pouvoir national</div>
+    <div class="fen-nation" data-i18n="ui.forge_orbitale">Forge orbitale</div>
+    <div class="fen-body" data-i18n="ui.choisis_la_lune_joviene_a_ameliorer_nv_1">Choisis la lune joviène à améliorer (Nv.1 → Nv.2 · 0 AC, −1<i class=ri-materials></i> −1<i class=ri-energy></i>).</div>
     <div id="forge-opts" style="text-align:left"></div>
-    <div class="fen-btns fen-one"><button type="button" class="fen-btn ghost" onclick="forgeCancel()"><span class="k">Annuler</span></button></div>
+    <div class="fen-btns fen-one"><button type="button" class="fen-btn ghost" onclick="forgeCancel()"><span class="k" data-i18n="ui.annuler">Annuler</span></button></div>
   </div></div>
 </div>
 <script src="moteur.js"></script>
@@ -1884,7 +1897,7 @@ function fenBlason(spec){
   return h+'</div></div>';
 }
 /* Le nom d'une nation pour un médaillon : emoji + nom, « (toi) » si c'est le joueur. */
-function fenNation(nat){ if(!nat||!nat.civ) return {emoji:'⚔️',nom:'?'}; var moi=(typeof G!=='undefined'&&G&&nat===G.player); return {emoji:nat.civ.emoji||'', nom:nat.civ.name+(moi?' (toi)':'')}; }
+function fenNation(nat){ if(!nat||!nat.civ) return {emoji:'⚔️',nom:'?'}; var moi=(typeof G!=='undefined'&&G&&nat===G.player); return {emoji:nat.civ.emoji||'', nom:nat.civ.name+(moi?' '+t('commun.toi_paren','(toi)'):'')}; }
 /* Remplit le médaillon (`<id>-emoji`) et le nom (`<id>-nation`) d'une fenêtre avec une nation : celle passée,
    sinon l'ennemi de guerre courant (`guerreAdverseId`). Appelée à l'ouverture des fenêtres de guerre solo. */
 /* ═══ DÉPÊCHES — Blason B (Marc, 15/09 : « je préfère le blason ») ═══
@@ -1911,10 +1924,10 @@ function fenDepeches(lignes, opts){
   var corps='<div class="fen-dep">'+rows.map(function(r){
     return '<div><span class="m" style="--c:'+(r.nat?r.nat.color:'#4a9eff')+'">'+(r.nat?r.nat.emoji:'📡')+'</span><span>'+(r.nat?'<b>'+esc(r.nat.name)+'</b> ':'')+esc(r.texte)+'</span></div>';
   }).join('')+'</div>';
-  var btn='<div class="fen-btns fen-one"><button type="button" class="fen-btn go fen-compris" onclick="fenDepechesFermer()">'+(o.duree?'<span class="fen-cd" id="sc-dep-cd"></span>':'')+'<span class="k">Compris</span></button></div>';
-  return fenBlason({ton:o.ton||'info', emoji:une?une.emoji:'📡', kicker:o.kicker||'Pendant ton attente', prep:!!o.prep,
-    nation:une?esc(une.name):(nats.length>1?nats.length+' nations':'Les autres nations'),
-    verbe:o.verbe||(une?'a joué':'ont joué'), milieu:corps+btn});
+  var btn='<div class="fen-btns fen-one"><button type="button" class="fen-btn go fen-compris" onclick="fenDepechesFermer()">'+(o.duree?'<span class="fen-cd" id="sc-dep-cd"></span>':'')+'<span class="k">'+t('fen.compris','Compris')+'</span></button></div>';
+  return fenBlason({ton:o.ton||'info', emoji:une?une.emoji:'📡', kicker:o.kicker||t('fen.pendant_attente','Pendant ton attente'), prep:!!o.prep,
+    nation:une?esc(une.name):(nats.length>1?t('fen.n_nations','{n} nations',{n:nats.length}):t('fen.autres_nations','Les autres nations')),
+    verbe:o.verbe||(une?t('fen.a_joue','a joué'):t('fen.ont_joue','ont joué')), milieu:corps+btn});
 }
 /* DURÉE D'AFFICHAGE SELON LE NOMBRE DE NATIONS (Marc, 15/09) : à 2 nations il y a moins à lire, à 4 davantage.
    Base = 3 nations ; 2 → −3 s ; 4 → +3 s. Jamais moins de 2 s. */
@@ -1951,11 +1964,11 @@ function fenAttaques(hits, opts){
   /* Cette fenêtre reçoit aussi des NOUVELLES qui ne sont pas des coups (accord signé, ordre du tour, pacte) :
      le rouge et « attaqué par » ne valent que si un titre parle d'attaque, de pillage, de prise ou d'espionnage. */
   var coup=(hits||[]).some(function(h){ return /pill|attaq|prend |détruit|espionn|assaill|tombe|capital/i.test(String(h.title||'')+' '+String(h.body||'')); });
-  if(!coup) return fenBlason({ton:'info', emoji:'📡', kicker:'Nouvelles', nation:'Pour toi', verbe:o.verbe||'Pendant ton attente',
-    milieu:corps, boutons:[{k:'Compris', cls:'go', onclick:o.onclick||''}]});
-  return fenBlason({ton:'war', emoji:une?une.emoji:'⚔️', kicker:une?'attaqué par':'Guerre', prep:!!une,
-    nation:une?esc(une.name):'On t\'attaque', verbe:o.verbe||((hits||[]).length>1?'Plusieurs coups portés contre toi':'Un coup porté contre toi'),
-    milieu:corps, boutons:[{k:'Compris', cls:'go', onclick:o.onclick||''}]});
+  if(!coup) return fenBlason({ton:'info', emoji:'📡', kicker:t('fen.nouvelles','Nouvelles'), nation:t('fen.pour_toi','Pour toi'), verbe:o.verbe||t('fen.pendant_attente','Pendant ton attente'),
+    milieu:corps, boutons:[{k:t('fen.compris','Compris'), cls:'go', onclick:o.onclick||''}]});
+  return fenBlason({ton:'war', emoji:une?une.emoji:'⚔️', kicker:une?t('fen.attaque_par','attaqué par'):t('fen.guerre','Guerre'), prep:!!une,
+    nation:une?esc(une.name):t('fen.on_t_attaque','On t\'attaque'), verbe:o.verbe||((hits||[]).length>1?t('fen.plusieurs_coups','Plusieurs coups portés contre toi'):t('fen.un_coup','Un coup porté contre toi')),
+    milieu:corps, boutons:[{k:t('fen.compris','Compris'), cls:'go', onclick:o.onclick||''}]});
 }
 function fenAdversaire(prefix, nat){
   try{
@@ -2250,7 +2263,7 @@ if ('serviceWorker' in navigator && !_natif) {
             try {
               var b = document.createElement('div');
               b.style.cssText = 'position:fixed;bottom:12px;left:12px;z-index:9999;background:linear-gradient(135deg,#2f6fd0,#1f4fa0);color:#fff;border-radius:10px;padding:9px 14px;font:700 .82em system-ui;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.4)';
-              b.textContent = '🔄 Nouvelle version — toucher pour mettre à jour';
+              b.textContent = t('accueil.nouvelle_version','🔄 Nouvelle version — toucher pour mettre à jour');
               b.onclick = function () { nw.postMessage && nw.postMessage('skipWaiting'); if (reg.waiting) reg.waiting.postMessage('skipWaiting'); location.reload(); };
               document.body.appendChild(b);
               setTimeout(function () { try { b.remove(); } catch (e) {} }, 15000);

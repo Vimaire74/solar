@@ -9,7 +9,7 @@
      interceptées, elles passent directement. Rien n'est mis en cache du serveur de jeu.
    - HORS-LIGNE : le solo reste jouable ; en navigation hors-ligne on sert index.html depuis le cache.
    Le numéro de version ci-dessous purge les anciens caches à chaque mise à jour du SW. */
-const VERSION = 'v196-2026-09-18';
+const VERSION = 'v199-2026-09-19';
 const HTML_CACHE = 'sc-html-' + VERSION;     // documents + scripts (network-first)
 const ASSET_CACHE = 'sc-assets-' + VERSION;  // images, icônes, PDF (cache-first)
 
@@ -20,6 +20,11 @@ const SHELL = [
      collé dans index.html, donc mis en cache « gratuitement » — l'extraction en fichier séparé rend
      cette ligne INDISPENSABLE. */
   './', './index.html', './moteur.js', './online.js', './regles.html', './confidentialite.html',
+  /* Langues (18/09) : i18n.js choisit la langue AVANT moteur.js ; lang/<code>.js est le dictionnaire.
+     Hors ligne sans ces deux-là, le jeu retomberait en français — pas cassé, mais pas dans la langue choisie. */
+  './i18n.js', './lang/en.js',
+  /* Pages traduites à part (19/09) : une page par langue, à côté de la française. */
+  './regles.en.html', './confidentialite.en.html',
   './assets/pwa/manifest.webmanifest',
   './assets/pwa/icon-192.png', './assets/pwa/icon-512.png', './assets/pwa/icon-maskable-512.png',
   /* Polices embarquées (§112) : sans elles hors ligne, le jeu retomberait sur la police système. */

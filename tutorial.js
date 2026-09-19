@@ -68,12 +68,12 @@ function coach(stepLabel, html, opts){
   opts=opts||{};
   if(!_coachEl){ _coachEl=el('<div id="tuto-coach"></div>'); document.body.appendChild(_coachEl); makeDraggable(); }
   _coachEl.classList.remove('tuto-hidden'); // réapparaît (ex. après une cinématique d'achat)
-  const nextTxt=opts.nextText||'Suivant ▶';
-  const backBtn = opts.noBack ? '' : '<button id="tuto-back" class="skip">◀ Retour</button>';
+  const nextTxt=opts.nextText||t('tuto.suivant','Suivant ▶');
+  const backBtn = opts.noBack ? '' : '<button id="tuto-back" class="skip">'+t('tuto.retour','◀ Retour')+'</button>';
   const nextBtn = opts.noNext ? '' : '<button id="tuto-next">'+nextTxt+'</button>';
   _coachEl.innerHTML=
     '<div id="tuto-head"><span id="tuto-title">'+(stepLabel||'Tutoriel')+'</span>'+
-      '<button id="tuto-min" title="Réduire / agrandir">'+(_collapsed?'+':'–')+'</button></div>'+
+      '<button id="tuto-min" title="'+t('tuto.reduire_agrandir','Réduire / agrandir')+'">'+(_collapsed?'+':'–')+'</button></div>'+
     '<div id="tuto-body"'+(_collapsed?' style="display:none"':'')+'>'+
       '<div class="tx">'+html+'</div>'+
       '<div class="go">'+backBtn+'<span class="hint">'+(opts.hint||'')+'</span>'+nextBtn+'</div>'+
@@ -210,27 +210,25 @@ function demoInvest(){
 // Guerre populaire forcée (tension 10) : on peuple la vraie fenêtre avec un contenu d'illustration (boutons inertes).
 function demoForcedWar(){
   const d=$('fw-desc'), c=$('fw-choices'), m=$('forced-war-modal');
-  if(d)d.innerHTML="Ta <b>tension</b> a atteint <b>10</b> envers une nation : ta population <b>exige</b> la guerre. Tu dois frapper une de ses <b>routes</b> ou <b>colonies</b> maintenant — tu ne peux pas l'éviter, sauf à <b>payer</b> pour l'apaiser.";
-  if(c)c.innerHTML='<button class="fw-btn" style="padding:8px;background:#2a0a0a;border:1px solid #a44;color:#f99;border-radius:6px">🛤️ Attaquer une route</button>'+
-                   '<button class="fw-btn" style="padding:8px;background:#2a0a0a;border:1px solid #a44;color:#f99;border-radius:6px">🏙️ Attaquer une colonie</button>'+
-                   '<button class="fw-btn" style="padding:8px;background:#0a2a1a;border:1px solid #4b8;color:#9fa;border-radius:6px">🕊️ Exiger la paix (payer)</button>';
+  if(d)d.innerHTML=t('tuto.tension_atteint_10_envers_nation_populat','Ta <b>tension</b> a atteint <b>10</b> envers une nation : ta population <b>exige</b> la guerre. Tu dois frapper une de ses <b>routes</b> ou <b>colonies</b> maintenant — tu ne peux pas l\'éviter, sauf à <b>payer</b> pour l\'apaiser.');
+  if(c)c.innerHTML=t('tuto.attaquer_route_attaquer_colonie_exiger_p','<button class="fw-btn" style="padding:8px;background:#2a0a0a;border:1px solid #a44;color:#f99;border-radius:6px">🛤️ Attaquer une route</button><button class="fw-btn" style="padding:8px;background:#2a0a0a;border:1px solid #a44;color:#f99;border-radius:6px">🏙️ Attaquer une colonie</button><button class="fw-btn" style="padding:8px;background:#0a2a1a;border:1px solid #4b8;color:#9fa;border-radius:6px">🕊️ Exiger la paix (payer)</button>');
   if(m){ m.style.display='flex'; m.classList.remove('hidden'); }
 }
 // Guerre déclarée par une IA (riposte) — fenêtre de résultat, contenu texte (sûr).
 function demoWarDeclared(){
-  try{ if(window.showWarModal)window.showWarModal('⚔️ Guerre Déclarée !',
-    "Une nation rivale <b>t'a déclaré la guerre</b> (souvent après une provocation ou un refus d'accord).<br><br><em>C'est elle l'agresseur : elle frappe <b>maintenant</b> — prépare ta <b>défense</b>. Tu pourras <b>riposter à ton tour</b>.</em>", null); }catch(e){ console.error('[TUTO warDecl]',e); }
+  try{ if(window.showWarModal)window.showWarModal(t('combat.guerre_declaree','⚔️ Guerre Déclarée !'),
+    t('tuto.nation_rivale_declare_guerre_souvent_apr','Une nation rivale <b>t\'a déclaré la guerre</b> (souvent après une provocation ou un refus d\'accord).<br><br><em>C\'est elle l\'agresseur : elle frappe <b>maintenant</b> — prépare ta <b>défense</b>. Tu pourras <b>riposter à ton tour</b>.</em>'), null); }catch(e){ console.error('[TUTO warDecl]',e); }
 }
 // Assaut de colonie — combat résolu IMMÉDIATEMENT (fenêtre de résultat, sûr).
 function demoAssault(){
-  try{ if(window.showWarModal)window.showWarModal('⚔️ Assaut sur une colonie',
-    "Quand <b>tu</b> attaques une colonie ennemie, le combat est résolu <b>immédiatement</b> (une seule manche) : si tu gagnes, tu <b>captures</b> la colonie.<br><br>Puissance — Toi : <strong>6</strong> | Ennemi : <strong>4</strong>",
-    {txt:'🏆 Victoire ! Colonie capturée.', cls:'win'}); }catch(e){ console.error('[TUTO assault]',e); }
+  try{ if(window.showWarModal)window.showWarModal(t('tuto.assaut_colonie','⚔️ Assaut sur une colonie'),
+    t('tuto.quand_attaques_colonie_ennemie_combat_re','Quand <b>tu</b> attaques une colonie ennemie, le combat est résolu <b>immédiatement</b> (une seule manche) : si tu gagnes, tu <b>captures</b> la colonie.<br><br>Puissance — Toi : <strong>6</strong> | Ennemi : <strong>4</strong>'),
+    {txt:t('tuto.victoire_colonie_capturee','🏆 Victoire ! Colonie capturée.'), cls:'win'}); }catch(e){ console.error('[TUTO assault]',e); }
 }
 // Négociation de paix — la VRAIE fenêtre (retombe sur la 1re IA si pas de guerre active).
 function demoPeace(){
   const g=G(); if(!g)return;
-  g._warDeclaredBy='other'; g._warDeclareReason='La tension a atteint son comble.';
+  g._warDeclaredBy='other'; g._warDeclareReason=t('tuto.tension_atteint_comble','La tension a atteint son comble.');
   try{ if(window.showPeaceOfferModal)window.showPeaceOfferModal(true, function(){}); }catch(e){ console.error('[TUTO peace]',e); }
 }
 // Fenêtre de combat — la VRAIE (retombe sur la 1re IA). On donne quelques jetons pour une belle illustration.
@@ -356,188 +354,188 @@ function inhibit(sels){ if(!sels)return; sels.forEach(function(sel){ try{ docume
    Chaque étape : {lab, tx, glow?, trig? (emoji d'action qui fait avancer)}
    ============================================================ */
 const STEPS=[
- {lab:'Le but',
-  tx:"En <b>10 tours</b>, marque le plus de <b>🏆 points de victoire (VP)</b>. Je te guide sur les premiers tours."},
+ {lab:t('tuto.but','Le but'),
+  tx:t('tuto.10_tours_marque_points_victoire_vp_te_gu','En <b>10 tours</b>, marque le plus de <b>🏆 points de victoire (VP)</b>. Je te guide sur les premiers tours.')},
 
  {lab:'Agenda secret', glow:'agenda-sel-modal', pos:'top', confirm:confirmAgenda, sync:'agenda',
-  tx:"Ton <b>agenda secret</b> : un objectif caché qui rapporte des VP en fin de partie. <b>Clique un agenda</b>, puis <b>Valider et continuer</b>.",
-  hint:"Choisis, puis Valider"},
+  tx:t('tuto.agenda_secret_objectif_cache_rapporte_vp','Ton <b>agenda secret</b> : un objectif caché qui rapporte des VP en fin de partie. <b>Clique un agenda</b>, puis <b>Valider et continuer</b>.'),
+  hint:t('tuto.choisis_puis_valider','Choisis, puis Valider')},
 
  /* ⚠️ ORDRE : l'ANNONCE D'ÉVÉNEMENT vient AVANT le tirage de la carte Stratégie depuis la v4.8 —
     c'est volontaire (connaître l'événement à venir donne son intérêt au choix de la carte).
     Les deux étapes ont donc été interverties. Contrôlé par `node server/tutorial-sync.js`. */
- {lab:'Événements', glow:'event-announce-modal', confirm:confirmEventAnnounce, sync:'event',
-  tx:"Un <b>événement</b> tombe à la fin des tours <b>2, 4, 6 et 8</b>. Il t'est <b>annoncé un tour à l'avance</b> — c'est la fenêtre derrière moi. Lis-la, puis <b>Valider et continuer</b>.",
-  hint:"Lis, puis Valider"},
+ {lab:t('web.evenements','Événements'), glow:'event-announce-modal', confirm:confirmEventAnnounce, sync:'event',
+  tx:t('tuto.evenement_tombe_fin_tours_2_4_6_8_annonc','Un <b>événement</b> tombe à la fin des tours <b>2, 4, 6 et 8</b>. Il t\'est <b>annoncé un tour à l\'avance</b> — c\'est la fenêtre derrière moi. Lis-la, puis <b>Valider et continuer</b>.'),
+  hint:t('tuto.lis_puis_valider','Lis, puis Valider')},
 
- {lab:'Carte Stratégie', glow:'strategy-modal', pos:'top', confirm:confirmStrategy, sync:'strategy',
-  tx:"Une <b>carte Stratégie</b> par tour : un bonus immédiat (ressources, AC, jetons…). Tu connais l'événement qui vient : choisis en conséquence. <b>Clique une carte</b> — le tour démarre.",
-  hint:"Choisis une carte"},
+ {lab:t('web.carte_strategie','Carte Stratégie'), glow:'strategy-modal', pos:'top', confirm:confirmStrategy, sync:'strategy',
+  tx:t('tuto.carte_strategie_tour_bonus_immediat_ress','Une <b>carte Stratégie</b> par tour : un bonus immédiat (ressources, AC, jetons…). Tu connais l\'événement qui vient : choisis en conséquence. <b>Clique une carte</b> — le tour démarre.'),
+  hint:t('tuto.choisis_carte','Choisis une carte')},
 
- {lab:'Tes ressources', glow:'top-bar', onShow:boostForTutorial,
-  tx:"En haut : ⚡ énergie, 🪨 matériaux, 🔬 savoir, ❤️ moral, tes <b>AC</b> (actions du tour) et tes <b>🏆 VP</b>. Chaque action coûte des AC et des ressources.<br><i>Pour t'entraîner, je te donne <b>5 AC</b> et des ressources en abondance.</i>"},
+ {lab:t('tuto.ressources','Tes ressources'), glow:'top-bar', onShow:boostForTutorial,
+  tx:t('tuto.haut_energie_materiaux_savoir_moral_ac_a','En haut : ⚡ énergie, 🪨 matériaux, 🔬 savoir, ❤️ moral, tes <b>AC</b> (actions du tour) et tes <b>🏆 VP</b>. Chaque action coûte des AC et des ressources.<br><i>Pour t\'entraîner, je te donne <b>5 AC</b> et des ressources en abondance.</i>')},
 
- {lab:'La carte du système solaire', glow:'game-wrap',
-  tx:"Voici le système solaire. <b>Touche une planète</b> pour ouvrir le plateau détaillé sur sa région : le Soleil en bas à gauche, chaque corps à sa distance, les lunes autour de leur planète. C'est là que tu poses colonies et routes ; <b>← Carte</b> revient ici.",
-  hint:"Regarde, puis Suivant"},
+ {lab:t('tuto.carte_systeme_solaire','La carte du système solaire'), glow:'game-wrap',
+  tx:t('tuto.voici_systeme_solaire_touche_planete_ouv','Voici le système solaire. <b>Touche une planète</b> pour ouvrir le plateau détaillé sur sa région : le Soleil en bas à gauche, chaque corps à sa distance, les lunes autour de leur planète. C\'est là que tu poses colonies et routes ; <b>← Carte</b> revient ici.'),
+  hint:t('tuto.regarde_puis_suivant','Regarde, puis Suivant')},
 
  {lab:'Coloniser', glow:'btn-col', pos:'top', trig:'🏗️',
-  tx:"<b>Clique une lune ou un astéroïde voisin</b> de ta capitale, puis <b>🏗️ Coloniser</b> dans sa fiche.",
-  hint:"Colonise (ou Suivant)"},
+  tx:t('tuto.clique_lune_ou_asteroide_voisin_capitale','<b>Clique une lune ou un astéroïde voisin</b> de ta capitale, puis <b>🏗️ Coloniser</b> dans sa fiche.'),
+  hint:t('tuto.colonise_ou_suivant','Colonise (ou Suivant)')},
 
- {lab:'Tuile Découverte', glow:'discovery-modal', confirm:confirmDiscovery, sync:'discovery',
-  tx:"Chaque nouvelle colonie tire une <b>tuile Découverte</b> : ressources, jetons Force, bonus permanent, VP… ou rien. Regarde, puis <b>Valider et continuer</b>.",
-  hint:"Regarde, puis Valider"},
+ {lab:t('tuto.tuile_decouverte','Tuile Découverte'), glow:'discovery-modal', confirm:confirmDiscovery, sync:'discovery',
+  tx:t('tuto.chaque_nouvelle_colonie_tire_tuile_decou','Chaque nouvelle colonie tire une <b>tuile Découverte</b> : ressources, jetons Force, bonus permanent, VP… ou rien. Regarde, puis <b>Valider et continuer</b>.'),
+  hint:t('tuto.regarde_puis_valider','Regarde, puis Valider')},
 
- {lab:'Relier par une route', glow:'btn-route', pos:'top', sync:'route',
-  tx:"Une colonie <b>isolée ne rapporte rien</b> : il faut une chaîne de routes jusqu'à ta capitale. Clique <b>🛤️ Route</b> (ou le <b>+</b> entre deux colonies sur la carte).",
-  hint:"Trace une route"},
+ {lab:t('tuto.relier_route','Relier par une route'), glow:'btn-route', pos:'top', sync:'route',
+  tx:t('tuto.colonie_isolee_rapporte_rien_faut_chaine','Une colonie <b>isolée ne rapporte rien</b> : il faut une chaîne de routes jusqu\'à ta capitale. Clique <b>🛤️ Route</b> (ou le <b>+</b> entre deux colonies sur la carte).'),
+  hint:t('tuto.trace_route','Trace une route')},
 
- {lab:'Protéger la route', glow:'route-token-modal', requireChoice:'route-token-modal', sync:'routetoken',
-  tx:"<b>⚔️ Déployer 1 jeton</b> : la route est protégée des pirates. <b>Laisser non protégée</b> : gratuit, mais elle peut être détruite. <b>Choisis dans la fenêtre.</b>",
-  hint:"Choisis une option"},
+ {lab:t('tuto.proteger_route','Protéger la route'), glow:'route-token-modal', requireChoice:'route-token-modal', sync:'routetoken',
+  tx:t('tuto.deployer_1_jeton_route_protegee_pirates','<b>⚔️ Déployer 1 jeton</b> : la route est protégée des pirates. <b>Laisser non protégée</b> : gratuit, mais elle peut être détruite. <b>Choisis dans la fenêtre.</b>'),
+  hint:t('tuto.choisis_option','Choisis une option')},
 
- {lab:'Les pirates',
-  tx:"Les <b>pirates</b> ne visent que les <b>routes non protégées</b> : 20 % de risque par route au tour 1, <b>+10 % par tour</b>. Une route pillée est détruite (à reconstruire). Protège les routes qui comptent.",
+ {lab:t('tuto.pirates','Les pirates'),
+  tx:t('tuto.pirates_visent_routes_non_protegees_20_r','Les <b>pirates</b> ne visent que les <b>routes non protégées</b> : 20 % de risque par route au tour 1, <b>+10 % par tour</b>. Une route pillée est détruite (à reconstruire). Protège les routes qui comptent.'),
   hint:"Suivant"},
 
- {lab:'Améliorer', glow:'game-wrap', pos:'top', trig:'⬆️',
-  tx:"Une colonie <b>reliée</b> peut monter de niveau : <b>clique-la</b>, puis <b>« Niv.2 »</b> dans sa fiche. Niveau 2 = revenus ×1,5.",
-  hint:"Clique « Niv.2 » (ou Suivant)"},
+ {lab:t('tuto.ameliorer','Améliorer'), glow:'game-wrap', pos:'top', trig:'⬆️',
+  tx:t('tuto.colonie_reliee_peut_monter_niveau_clique','Une colonie <b>reliée</b> peut monter de niveau : <b>clique-la</b>, puis <b>« Niv.2 »</b> dans sa fiche. Niveau 2 = revenus ×1,5.'),
+  hint:t('tuto.clique_niv_2_ou_suivant','Clique « Niv.2 » (ou Suivant)')},
 
  // ═══════ CINÉMATIQUE : arbre technologique (le tuto joue, tu regardes) ═══════
- {lab:'Les technologies', glow:'tech-tabs', awaitClick:'tech-tabs', onShow:boostMaxCine,
-  tx:"Passons aux <b>technologies</b>. <b>Clique l'onglet Techs</b> en bas : je prends la main ensuite. (AC et ressources au maximum pour la démo.)",
-  hint:"Clique l'onglet Techs"},
+ {lab:t('tuto.technologies','Les technologies'), glow:'tech-tabs', awaitClick:'tech-tabs', onShow:boostMaxCine,
+  tx:t('tuto.passons_technologies_clique_onglet_techs','Passons aux <b>technologies</b>. <b>Clique l\'onglet Techs</b> en bas : je prends la main ensuite. (AC et ressources au maximum pour la démo.)'),
+  hint:t('tuto.clique_onglet_techs','Clique l\'onglet Techs')},
 
- {lab:'Les 3 onglets', glow:'tech-tabs', riverdemo:true,
-  tx:"Trois rivières de cartes :<br>• <b style='color:#5aa0e8'>Techs</b> — bonus permanents et VP ;<br>• <b style='color:#8bc34a'>Actions civiles</b> — moral, savoir, tension ;<br>• <b style='color:#e87a7a'>Actions militaires</b> — jetons Force.<br>Regarde-moi acheter : <b>Suivant</b> à chaque étape."},
+ {lab:t('tuto.3_onglets','Les 3 onglets'), glow:'tech-tabs', riverdemo:true,
+  tx:t('tuto.trois_rivieres_cartes_techs_bonus_perman','Trois rivières de cartes :<br>• <b style=\'color:#5aa0e8\'>Techs</b> — bonus permanents et VP ;<br>• <b style=\'color:#8bc34a\'>Actions civiles</b> — moral, savoir, tension ;<br>• <b style=\'color:#e87a7a\'>Actions militaires</b> — jetons Force.<br>Regarde-moi acheter : <b>Suivant</b> à chaque étape.')},
 
- {lab:'Acheter une tech (niveau 1)', glow:'tech-tabs', demo:{kind:'tech',id:'prop1'},
-  tx:"J'ai ouvert <b>Propulsion Ionique</b> (niveau 1, branche Navigation) et cliqué <b>Acheter</b> : <b>1 AC</b> + ressources, décomptés en haut. Une tech est <b>à toi pour toujours</b>."},
+ {lab:t('tuto.acheter_tech_niveau_1','Acheter une tech (niveau 1)'), glow:'tech-tabs', demo:{kind:'tech',id:'prop1'},
+  tx:t('tuto.j_ai_ouvert_propulsion_ionique_niveau_1','J\'ai ouvert <b>Propulsion Ionique</b> (niveau 1, branche Navigation) et cliqué <b>Acheter</b> : <b>1 AC</b> + ressources, décomptés en haut. Une tech est <b>à toi pour toujours</b>.')},
 
  {lab:'Tech niveau 2', glow:'tech-tabs', demo:{kind:'tech',id:'nav2'},
-  tx:"Le <b>niveau 2</b> (IA de Navigation) exige le <b>niveau 1</b> de la même branche. 1 AC + ressources."},
+  tx:t('tuto.niveau_2_ia_navigation_exige_niveau_1_me','Le <b>niveau 2</b> (IA de Navigation) exige le <b>niveau 1</b> de la même branche. 1 AC + ressources.')},
 
  {lab:'Tech niveau 3', glow:'tech-tabs', demo:{kind:'tech',id:'hyper3'},
-  tx:"Le <b>niveau 3</b> (Hyperpropulsion) exige le niveau 2 et coûte <b>2 AC</b>. Chaque palier ouvre le suivant."},
+  tx:t('tuto.niveau_3_hyperpropulsion_exige_niveau_2','Le <b>niveau 3</b> (Hyperpropulsion) exige le niveau 2 et coûte <b>2 AC</b>. Chaque palier ouvre le suivant.')},
 
- {lab:'Le pillage scientifique', glow:'tech-tabs', onShow:function(){simUnlock('expansion');},
-  tx:"Si une <b>autre nation</b> possède le niveau 1 d'une branche, son <b>niveau 2</b> t'est ouvert <b>sans acheter le 1</b>. Je viens de le simuler sur la branche <b>Expansion</b>."},
+ {lab:t('tuto.pillage_scientifique','Le pillage scientifique'), glow:'tech-tabs', onShow:function(){simUnlock('expansion');},
+  tx:t('tuto.si_autre_nation_possede_niveau_1_branche','Si une <b>autre nation</b> possède le niveau 1 d\'une branche, son <b>niveau 2</b> t\'est ouvert <b>sans acheter le 1</b>. Je viens de le simuler sur la branche <b>Expansion</b>.')},
 
  {lab:'T2 accessible directement', glow:'tech-tabs', demo:{kind:'tech',id:'bio2'},
-  tx:"J'achète donc <b>directement</b> Biosphère Avancée (niveau 2) sans son niveau 1."},
+  tx:t('tuto.j_achete_donc_directement_biosphere_avan','J\'achète donc <b>directement</b> Biosphère Avancée (niveau 2) sans son niveau 1.')},
 
- {lab:'Mais la T3 exige TA T2', glow:'tech-tabs',
-  tx:"Limite : le <b>niveau 3</b> exige toujours <b>ton</b> niveau 2. Le pillage n'ouvre jamais un niveau 3."},
+ {lab:t('tuto.mais_t3_exige_t2','Mais la T3 exige TA T2'), glow:'tech-tabs',
+  tx:t('tuto.limite_niveau_3_exige_toujours_niveau_2','Limite : le <b>niveau 3</b> exige toujours <b>ton</b> niveau 2. Le pillage n\'ouvre jamais un niveau 3.')},
 
- {lab:'Récap technos', glow:'tech-tabs',
-  tx:"À retenir : <b>1 → 2 → 3</b> dans l'ordre ; le niveau 2 d'une branche est ouvert dès qu'une nation a le 1 ; le 3 exige ton 2 ; une tech ne se perd jamais."},
+ {lab:t('tuto.recap_technos','Récap technos'), glow:'tech-tabs',
+  tx:t('tuto.retenir_1_2_3_dans_ordre_niveau_2_branch','À retenir : <b>1 → 2 → 3</b> dans l\'ordre ; le niveau 2 d\'une branche est ouvert dès qu\'une nation a le 1 ; le 3 exige ton 2 ; une tech ne se perd jamais.')},
 
  // ─── Actions civiles + gouvernement ───
  {lab:'Actions civiles', glow:'tech-tabs', demo:{kind:'market',id:'cm_culture'},
-  tx:"<b>Actions civiles</b> (vert) : j'achète <b>Campagne Culturelle</b> (+3 ❤️). Elles donnent du moral, du savoir, ou apaisent la tension. La plupart : <b>une fois par partie</b>."},
+  tx:t('tuto.actions_civiles_vert_j_achete_campagne_c','<b>Actions civiles</b> (vert) : j\'achète <b>Campagne Culturelle</b> (+3 ❤️). Elles donnent du moral, du savoir, ou apaisent la tension. La plupart : <b>une fois par partie</b>.')},
 
  {lab:'Action gouvernementale', glow:'tech-tabs', demo:{kind:'market',id:'gov_senat'},
-  tx:"J'achète le <b>Sénat Solaire</b> : des <b>points de Gouvernement</b>."},
+  tx:t('tuto.j_achete_senat_solaire_points_gouverneme','J\'achète le <b>Sénat Solaire</b> : des <b>points de Gouvernement</b>.')},
 
- {lab:'Le facteur Gouvernement', glow:'top-bar',
-  tx:"<b>Gouvernement</b> : 5 points → niveau 2, 10 → 3, 15 → 4. Chaque niveau = <b>+1 AC par tour</b>. Plus d'actions, c'est tout le jeu."},
+ {lab:t('tuto.facteur_gouvernement','Le facteur Gouvernement'), glow:'top-bar',
+  tx:t('tuto.gouvernement_5_points_niveau_2_10_3_15_4','<b>Gouvernement</b> : 5 points → niveau 2, 10 → 3, 15 → 4. Chaque niveau = <b>+1 AC par tour</b>. Plus d\'actions, c\'est tout le jeu.')},
 
  // ─── Actions militaires ───
  {lab:'Actions militaires', glow:'tech-tabs', demo:{kind:'gen',id:'mil_invest'},
-  tx:"<b>Actions militaires</b> (rouge) : j'achète <b>Investissements militaires</b> (+2 jetons Force). Attention : 3 cartes sur 4 sont <b>temporaires</b> — leurs jetons partent au tour suivant. Seul le <b>Supercroiseur</b> reste."},
+  tx:t('tuto.actions_militaires_rouge_j_achete_invest','<b>Actions militaires</b> (rouge) : j\'achète <b>Investissements militaires</b> (+2 jetons Force). Attention : 3 cartes sur 4 sont <b>temporaires</b> — leurs jetons partent au tour suivant. Seul le <b>Supercroiseur</b> reste.')},
 
- {lab:'Coûts : à l\'achat vs chaque tour', glow:'top-bar',
-  tx:"Les cartes ne se perdent pas, mais certaines (ex. Démocratie Instantanée) coûtent <b>chaque tour</b>. Lis le coût avant d'acheter."},
+ {lab:t('tuto.couts_achat_vs_chaque_tour','Coûts : à l\'achat vs chaque tour'), glow:'top-bar',
+  tx:t('tuto.cartes_perdent_mais_certaines_ex_democra','Les cartes ne se perdent pas, mais certaines (ex. Démocratie Instantanée) coûtent <b>chaque tour</b>. Lis le coût avant d\'acheter.')},
 
- {lab:'À toi de jouer les technos !', glow:'tech-tabs', onShow:boostMaxCine,
-  tx:"À toi : ouvre une carte et <b>achète</b> ce que tu veux. Puis <b>Suivant</b>.",
-  hint:"Essaie, puis Suivant"},
+ {lab:t('tuto.toi_jouer_technos','À toi de jouer les technos !'), glow:'tech-tabs', onShow:boostMaxCine,
+  tx:t('tuto.toi_ouvre_carte_achete_veux_puis_suivant','À toi : ouvre une carte et <b>achète</b> ce que tu veux. Puis <b>Suivant</b>.'),
+  hint:t('tuto.essaie_puis_suivant','Essaie, puis Suivant')},
 
  // ─── Fin de l'entraînement : retour à la normale + règles AC / gouvernement / moral ───
- {lab:'Coût des actions', glow:'top-bar', onShow:resetToNormal,
-  tx:"Fin de l'entraînement : je remets tes <b>AC à 2</b>, ton gouvernement et tes ressources <b>au départ</b>. Règle : chaque action coûte <b>1 AC ou plus</b> et des ressources, sauf le <b>pouvoir gratuit</b> de ta nation."},
+ {lab:t('tuto.cout_actions','Coût des actions'), glow:'top-bar', onShow:resetToNormal,
+  tx:t('tuto.fin_entrainement_remets_ac_2_gouvernemen','Fin de l\'entraînement : je remets tes <b>AC à 2</b>, ton gouvernement et tes ressources <b>au départ</b>. Règle : chaque action coûte <b>1 AC ou plus</b> et des ressources, sauf le <b>pouvoir gratuit</b> de ta nation.')},
 
- {lab:'Gouvernement → plus d\'actions', glow:'top-bar',
-  tx:"Le Terrien monte vite en gouvernement grâce à <b>Diplomatie Verte</b> : +3 points, 0 AC, 3 🪨. À 15 points, <b>5 AC par tour</b>."},
+ {lab:t('tuto.gouvernement_actions','Gouvernement → plus d\'actions'), glow:'top-bar',
+  tx:t('tuto.terrien_monte_vite_gouvernement_grace_di','Le Terrien monte vite en gouvernement grâce à <b>Diplomatie Verte</b> : +3 points, 0 AC, 3 🪨. À 15 points, <b>5 AC par tour</b>.')},
 
- {lab:'Le moral', glow:'top-bar',
-  tx:"<b>Moral ❤️</b> à 1 : revenus <b>÷ 2</b>. À 0 : plus de revenus. Il remonte avec les techs Spiritualité, les actions civiles, les colonies améliorées."},
+ {lab:t('tuto.moral','Le moral'), glow:'top-bar',
+  tx:t('tuto.moral_1_revenus_2_0_revenus_remonte_avec','<b>Moral ❤️</b> à 1 : revenus <b>÷ 2</b>. À 0 : plus de revenus. Il remonte avec les techs Spiritualité, les actions civiles, les colonies améliorées.')},
 
  {lab:'Pouvoir gratuit', glow:'btn-ability', pos:'top', trig:'💫',
-  tx:"Chaque nation a un <b>pouvoir gratuit</b> (0 AC, 1×/tour) : 🌍 Diplomatie Verte, 🔴 Surtension (+1 AC), ☠️ Commerce avec les pirates, 🟠 Forge Orbitale. <b>Touche le bouton ✦ Pouvoir</b> (barre du haut) pour lancer Diplomatie Verte.",
+  tx:t('tuto.chaque_nation_pouvoir_gratuit_0_ac_1_tou','Chaque nation a un <b>pouvoir gratuit</b> (0 AC, 1×/tour) : 🌍 Diplomatie Verte, 🔴 Surtension (+1 AC), ☠️ Commerce avec les pirates, 🟠 Forge Orbitale. <b>Touche le bouton ✦ Pouvoir</b> (barre du haut) pour lancer Diplomatie Verte.'),
   hint:"Touche ✦ Pouvoir"},
 
  {lab:'Valider / annuler chaque action', pos:'top', onShow:function(){ _confirmOn=true; },
-  tx:"Après chaque action, une fenêtre en bas à droite résume le gain : <b>✓ Valider</b> ou <b>↩ Annuler</b>. Tant que tu n'as pas validé, tu peux revenir en arrière. Seuls <b>raids et combats</b> sont définitifs."},
+  tx:t('tuto.apres_chaque_action_fenetre_bas_droite_r','Après chaque action, une fenêtre en bas à droite résume le gain : <b>✓ Valider</b> ou <b>↩ Annuler</b>. Tant que tu n\'as pas validé, tu peux revenir en arrière. Seuls <b>raids et combats</b> sont définitifs.')},
 
- {lab:'Essaie : valider ou annuler', pos:'top', sync:'confirmvalidate',
+ {lab:t('tuto.essaie_valider_ou_annuler','Essaie : valider ou annuler'), pos:'top', sync:'confirmvalidate',
   onShow:function(){ const g=G(); if(g&&g.player){ g.player.acLeft=Math.max(2,g.player.acLeft||0); g.player.res.materials=Math.max(g.player.res.materials||0,8); g.player.res.energy=Math.max(g.player.res.energy||0,6); g.player.res.science=Math.max(g.player.res.science||0,6); try{ if(window.render)window.render(); }catch(e){} } },
-  tx:"<b>Fais une action</b> (colonie, tech, amélioration…). Essaie <b>↩ Annuler</b>, refais-la, puis <b>✓ Valider</b> : on continue dès la validation.",
-  hint:"Une action, puis ✓ Valider"},
+  tx:t('tuto.fais_action_colonie_tech_amelioration_es','<b>Fais une action</b> (colonie, tech, amélioration…). Essaie <b>↩ Annuler</b>, refais-la, puis <b>✓ Valider</b> : on continue dès la validation.'),
+  hint:t('tuto.action_puis_valider','Une action, puis ✓ Valider')},
 
- {lab:'Fin du tour', confirm:confirmEndTurn, sync:'endturn',
-  tx:"Pas de bouton « fin de tour » : quand chacun a joué ses AC, le <b>bilan</b> arrive tout seul. Clique <b>Valider et continuer</b>.",
-  hint:"Valider et continuer"},
+ {lab:t('tuto.fin_tour','Fin du tour'), confirm:confirmEndTurn, sync:'endturn',
+  tx:t('tuto.bouton_fin_tour_quand_chacun_joue_ac_bil','Pas de bouton « fin de tour » : quand chacun a joué ses AC, le <b>bilan</b> arrive tout seul. Clique <b>Valider et continuer</b>.'),
+  hint:t('tuto.valider_continuer','Valider et continuer')},
 
- {lab:'Le bilan de tour', pos:'top', confirm:confirmEOT, sync:'eot',
-  tx:"Le <b>bilan</b> : revenus des colonies reliées, entretien, actions des autres nations. <b>Valider et continuer</b> → tour suivant."},
+ {lab:t('tuto.bilan_tour','Le bilan de tour'), pos:'top', confirm:confirmEOT, sync:'eot',
+  tx:t('tuto.bilan_revenus_colonies_reliees_entretien','Le <b>bilan</b> : revenus des colonies reliées, entretien, actions des autres nations. <b>Valider et continuer</b> → tour suivant.')},
 
- {lab:'À toi de jouer !', free:true,
-  tx:"Joue ce tour librement : <b>coloniser → relier → améliorer → techs</b>. Valide chaque action. Quand tu n'as plus d'AC, le bilan arrive ; je m'occupe du reste et je reviens pour les <b>fenêtres spéciales</b>.",
+ {lab:t('tuto.toi_jouer','À toi de jouer !'), free:true,
+  tx:t('tuto.joue_tour_librement_coloniser_relier_ame','Joue ce tour librement : <b>coloniser → relier → améliorer → techs</b>. Valide chaque action. Quand tu n\'as plus d\'AC, le bilan arrive ; je m\'occupe du reste et je reviens pour les <b>fenêtres spéciales</b>.'),
   hint:"Joue ; valide chaque action"},
 ];
 // Après le tour libre : on présente les fenêtres spéciales une à une. Certaines sont AFFICHÉES pour de vrai
 // (avec un contenu d'illustration), sans avoir à les déclencher par le jeu — les IA étant passives ici.
 const SPECIAL=[
- {lab:'Les investissements 💼', glow:'invest-modal', pos:'top', onShow:demoInvest, inhibit:['#invest-modal .inv-opt','#invest-modal button'],
-  tx:"<b>💼 Investissements</b> : à la <b>fin du tour 2</b>, tu choisis une carte — un gros bonus et une contrepartie, actifs <b>tours 3 à 5</b> (second choix à la fin du tour 6). Je viens de choisir pour toi ; en vraie partie, c'est toi. Regarde, puis <b>Suivant</b>."},
+ {lab:t('tuto.investissements','Les investissements 💼'), glow:'invest-modal', pos:'top', onShow:demoInvest, inhibit:['#invest-modal .inv-opt','#invest-modal button'],
+  tx:t('tuto.investissements_fin_tour_2_choisis_carte','<b>💼 Investissements</b> : à la <b>fin du tour 2</b>, tu choisis une carte — un gros bonus et une contrepartie, actifs <b>tours 3 à 5</b> (second choix à la fin du tour 6). Je viens de choisir pour toi ; en vraie partie, c\'est toi. Regarde, puis <b>Suivant</b>.')},
 
  // ── Les 3 onglets du bas — Empire est ouvert PAR LE JOUEUR (fiable, pas de calibrage) ──
- {lab:'Clique l\'onglet Empire 🏛️', glow:'m-tabs', awaitClick:'.mtab[data-tab="empire"]',
-  tx:"<b>Clique l'onglet 🏛️ Empire</b> en bas."},
+ {lab:t('tuto.clique_onglet_empire','Clique l\'onglet Empire 🏛️'), glow:'m-tabs', awaitClick:'.mtab[data-tab="empire"]',
+  tx:t('tuto.clique_onglet_empire_bas','<b>Clique l\'onglet 🏛️ Empire</b> en bas.')},
 
- {lab:'Le panneau Empire', glow:'m-tabs', onShow:function(){demoPanel('empire');},
-  tx:"Ton tableau de bord : jetons ⚔️, investissements, agenda 🎯, et en bas les <b>nations adverses</b> (VP, force, supercroiseur)."},
+ {lab:t('tuto.panneau_empire','Le panneau Empire'), glow:'m-tabs', onShow:function(){demoPanel('empire');},
+  tx:t('tuto.tableau_bord_jetons_investissements_agen','Ton tableau de bord : jetons ⚔️, investissements, agenda 🎯, et en bas les <b>nations adverses</b> (VP, force, supercroiseur).')},
 
- {lab:'Onglet Diplo ⚔️ — la tension', glow:'m-tabs', onShow:function(){demoPanel('diplo');},
-  tx:"<b>⚔️ Diplo</b> : la <b>tension</b> monte quand on te raide, qu'un rival te domine ou te bloque. À <b>10</b>, guerre. Elle baisse avec un <b>accord commercial</b> (−3 chacun, depuis une colonie adverse sur la carte) ou <b>Calmer la population</b> (−3)."},
+ {lab:t('tuto.onglet_diplo_tension','Onglet Diplo ⚔️ — la tension'), glow:'m-tabs', onShow:function(){demoPanel('diplo');},
+  tx:t('tuto.diplo_tension_monte_quand_te_raide_qu_ri','<b>⚔️ Diplo</b> : la <b>tension</b> monte quand on te raide, qu\'un rival te domine ou te bloque. À <b>10</b>, guerre. Elle baisse avec un <b>accord commercial</b> (−3 chacun, depuis une colonie adverse sur la carte) ou <b>Calmer la population</b> (−3).')},
 
  {lab:'Onglet Journal 📜', glow:'m-tabs', onShow:function(){demoPanel('journal');},
-  tx:"<b>📜 Journal</b> : tout ce qui s'est passé, tour par tour — pourquoi une route est tombée, pourquoi une guerre a éclaté. Le lien <b>Règles</b> et <b>Recommencer</b> sont ici."},
+  tx:t('tuto.journal_tout_passe_tour_tour_pourquoi_ro','<b>📜 Journal</b> : tout ce qui s\'est passé, tour par tour — pourquoi une route est tombée, pourquoi une guerre a éclaté. Le lien <b>Règles</b> et <b>Recommencer</b> sont ici.')},
 
- {lab:'Les événements 🎯', glow:'top-bar', onShow:function(){demoPanel('map');},
-  tx:"<b>🎯 Événements</b> (tours 2, 4, 6, 8, tirés au hasard) :<span style=\"font-size:.86em\"><br>• <b>Ruée Minière</b> — le plus de colonies : +6 VP<br>• <b>Conférence Scientifique</b> — le plus de 🔬 : +6 VP<br>• <b>Développement Techno</b> — le plus de techs 2-3 : +6 VP<br>• <b>Suprématie Militaire</b> — le plus de jetons : +6 VP<br>• <b>Civ. attractive</b> — le plus de moral : +2🪨 +2🔬 +3 VP<br>• <b>Accords Commerciaux / Diplomatiques</b> — négociations<br>• <b>Tempêtes Solaires</b>, <b>Prolifération des Pirates</b> — menaces</span><br>Tour 10 : <b>Jugement Final</b>."},
+ {lab:t('tuto.evenements','Les événements 🎯'), glow:'top-bar', onShow:function(){demoPanel('map');},
+  tx:t('tuto.evenements_tours_2_4_6_8_tires_hasard_ru','<b>🎯 Événements</b> (tours 2, 4, 6, 8, tirés au hasard) :<span style="font-size:.86em"><br>• <b>Ruée Minière</b> — le plus de colonies : +6 VP<br>• <b>Conférence Scientifique</b> — le plus de 🔬 : +6 VP<br>• <b>Développement Techno</b> — le plus de techs 2-3 : +6 VP<br>• <b>Suprématie Militaire</b> — le plus de jetons : +6 VP<br>• <b>Civ. attractive</b> — le plus de moral : +2🪨 +2🔬 +3 VP<br>• <b>Accords Commerciaux / Diplomatiques</b> — négociations<br>• <b>Tempêtes Solaires</b>, <b>Prolifération des Pirates</b> — menaces</span><br>Tour 10 : <b>Jugement Final</b>.')},
 
  // ── Les 3 situations de guerre (vraies fenêtres, contenu d'illustration) ──
- {lab:'Guerre populaire forcée', glow:'forced-war-modal', pos:'top', onShow:demoForcedWar, inhibit:['#forced-war-modal button'],
-  tx:"1ʳᵉ guerre : <b>populaire</b>. Tension à <b>10</b> → ton peuple t'oblige à frapper une route ou une colonie, sauf à payer pour l'apaiser."},
+ {lab:t('tuto.guerre_populaire_forcee','Guerre populaire forcée'), glow:'forced-war-modal', pos:'top', onShow:demoForcedWar, inhibit:['#forced-war-modal button'],
+  tx:t('tuto.1_guerre_populaire_tension_10_peuple_obl','1ʳᵉ guerre : <b>populaire</b>. Tension à <b>10</b> → ton peuple t\'oblige à frapper une route ou une colonie, sauf à payer pour l\'apaiser.')},
 
- {lab:'Guerre en riposte', glow:'war-modal', pos:'top', onShow:demoWarDeclared, inhibit:['#war-modal button'],
-  tx:"2ᵉ : une nation <b>te déclare la guerre</b>. Au premier tour elle seule frappe, tu défends. Ensuite, <b>deux combats</b> par fin de tour : chacun attaque et subit."},
+ {lab:t('tuto.guerre_riposte','Guerre en riposte'), glow:'war-modal', pos:'top', onShow:demoWarDeclared, inhibit:['#war-modal button'],
+  tx:t('tuto.2_nation_te_declare_guerre_premier_tour','2ᵉ : une nation <b>te déclare la guerre</b>. Au premier tour elle seule frappe, tu défends. Ensuite, <b>deux combats</b> par fin de tour : chacun attaque et subit.')},
 
  // ── L'initiative : ajoutée le 2026-08-23 avec la règle des deux combats (§14.3 des règles) ──
- {lab:'Qui frappe en premier ? 🎖️',
-  tx:"Avec deux combats, une nation choisit l'ordre : c'est l'<b>initiative</b>. Elle va à qui a l'<b>Hyperpropulsion</b>, sinon à qui a le <b>moins attaqué</b> dans le tour, sinon au plus avancé, puis au mieux armé. Le journal dit qui et pourquoi.",
+ {lab:t('tuto.frappe_premier','Qui frappe en premier ? 🎖️'),
+  tx:t('tuto.avec_deux_combats_nation_choisit_ordre_i','Avec deux combats, une nation choisit l\'ordre : c\'est l\'<b>initiative</b>. Elle va à qui a l\'<b>Hyperpropulsion</b>, sinon à qui a le <b>moins attaqué</b> dans le tour, sinon au plus avancé, puis au mieux armé. Le journal dit qui et pourquoi.'),
   hint:"Suivant"},
 
- {lab:'Attaque de colonie (immédiate)', glow:'war-modal', pos:'top', onShow:demoAssault, inhibit:['#war-modal button'],
-  tx:"3ᵉ : <b>toi</b> tu assailles une colonie. Combat résolu <b>immédiatement</b> ; si tu gagnes, tu la <b>captures</b>. Une colonie se défend à <b>1</b> (sa garnison permanente) <b>+ les jetons</b> que le défenseur ajoute ; une capitale à <b>10 + les jetons</b>, et sa prise vaut <b>+10 VP</b>."},
+ {lab:t('tuto.attaque_colonie_immediate','Attaque de colonie (immédiate)'), glow:'war-modal', pos:'top', onShow:demoAssault, inhibit:['#war-modal button'],
+  tx:t('tuto.3_toi_assailles_colonie_combat_resolu_im','3ᵉ : <b>toi</b> tu assailles une colonie. Combat résolu <b>immédiatement</b> ; si tu gagnes, tu la <b>captures</b>. Une colonie se défend à <b>1</b> (sa garnison permanente) <b>+ les jetons</b> que le défenseur ajoute ; une capitale à <b>10 + les jetons</b>, et sa prise vaut <b>+10 VP</b>.')},
 
  // ── Négociation de paix (vraie fenêtre) ──
- {lab:'Négociation de paix 🕊️', glow:'peace-modal', pos:'top', onShow:demoPeace, inhibit:['#peace-modal button'],
-  tx:"<b>Paix</b> : à chaque fin de tour de guerre, tu peux la proposer, avec ou sans ressources. L'adversaire accepte selon sa situation. Personne n'est obligé de la faire ni de l'accepter."},
+ {lab:t('tuto.negociation_paix','Négociation de paix 🕊️'), glow:'peace-modal', pos:'top', onShow:demoPeace, inhibit:['#peace-modal button'],
+  tx:t('tuto.paix_chaque_fin_tour_guerre_peux_propose','<b>Paix</b> : à chaque fin de tour de guerre, tu peux la proposer, avec ou sans ressources. L\'adversaire accepte selon sa situation. Personne n\'est obligé de la faire ni de l\'accepter.')},
 
  // ── La fenêtre de combat (2 étapes : le choix, puis le coût) ──
- {lab:'La fenêtre de combat ⚔️', glow:'war-combat-modal', pos:'top', onShow:demoCombat, inhibit:['#war-combat-modal button'],
-  tx:"<b>Combat</b> : choisis une <b>cible</b>, puis le nombre de <b>jetons</b> à engager. Le <b>⚓ Supercroiseur</b> ajoute +5⚔️ (il se paie). <b>Renoncer</b> garde tes jetons : la guerre continue sans assaut. La force ennemie n'est qu'une <b>estimation (±3)</b> sans renseignement."},
+ {lab:t('tuto.fenetre_combat','La fenêtre de combat ⚔️'), glow:'war-combat-modal', pos:'top', onShow:demoCombat, inhibit:['#war-combat-modal button'],
+  tx:t('tuto.combat_choisis_cible_puis_nombre_jetons','<b>Combat</b> : choisis une <b>cible</b>, puis le nombre de <b>jetons</b> à engager. Le <b>⚓ Supercroiseur</b> ajoute +5⚔️ (il se paie). <b>Renoncer</b> garde tes jetons : la guerre continue sans assaut. La force ennemie n\'est qu\'une <b>estimation (±3)</b> sans renseignement.')},
 
- {lab:'Attaquer une route 🛤️', glow:'war-combat-modal', pos:'top', onShow:demoCombat, inhibit:['#war-combat-modal button'],
-  tx:"Une <b>route est facile à attaquer</b> : elle ne se défend pas, il te suffit d'engager <b>1 jeton</b> si elle est non protégée, <b>2</b> si un jeton la protège. Tu la <b>captures</b> (elle devient tienne) ou la <b>détruis</b> ; l'adversaire perd son revenu."},
+ {lab:t('tuto.attaquer_route','Attaquer une route 🛤️'), glow:'war-combat-modal', pos:'top', onShow:demoCombat, inhibit:['#war-combat-modal button'],
+  tx:t('tuto.route_facile_attaquer_defend_te_suffit_e','Une <b>route est facile à attaquer</b> : elle ne se défend pas, il te suffit d\'engager <b>1 jeton</b> si elle est non protégée, <b>2</b> si un jeton la protège. Tu la <b>captures</b> (elle devient tienne) ou la <b>détruis</b> ; l\'adversaire perd son revenu.')},
 
- {lab:'Le coût de la guerre', glow:'war-combat-modal', pos:'top', onShow:demoCombat, inhibit:['#war-combat-modal button'],
-  tx:"⚠️ Chaque jeton engagé coûte <b>1🪨 + 1⚡</b> et part en <b>récupération pendant 2 tours</b> ; si tu perds, la <b>moitié est détruite</b>. Une colonie se défend toujours avec sa <b>garnison</b> (1 jeton, 10 pour une capitale). <b>IA de Navigation</b> divise le coût par 2."},
+ {lab:t('tuto.cout_guerre','Le coût de la guerre'), glow:'war-combat-modal', pos:'top', onShow:demoCombat, inhibit:['#war-combat-modal button'],
+  tx:t('tuto.chaque_jeton_engage_coute_1_1_part_recup','⚠️ Chaque jeton engagé coûte <b>1🪨 + 1⚡</b> et part en <b>récupération pendant 2 tours</b> ; si tu perds, la <b>moitié est détruite</b>. Une colonie se défend toujours avec sa <b>garnison</b> (1 jeton, 10 pour une capitale). <b>IA de Navigation</b> divise le coût par 2.')},
 ];
 
 let _cur=0, _free=false, _special=false;
@@ -578,12 +576,12 @@ function showStep(){
 }
 function renderCoachForStep(s){
   const hasConfirm=typeof s.confirm==='function';
-  let onNext=null, nextText='Suivant ▶';
+  let onNext=null, nextText=t('tuto.suivant','Suivant ▶');
   if(s.requireChoice){
     nextText='Continuer ▶';
-    onNext=function(){ const m=$(s.requireChoice); if(m && !m.classList.contains('hidden')){ note('👉 Choisis d\'abord une option dans la fenêtre ci-dessous.'); } else if(_advTimer){ /* le choix vient d'être fait : l'avancée est déjà programmée, un second clic sauterait une étape */ } else { advance(); } };
+    onNext=function(){ const m=$(s.requireChoice); if(m && !m.classList.contains('hidden')){ note(t('tuto.choisis_abord_option_dans_fenetre_ci_des','👉 Choisis d\'abord une option dans la fenêtre ci-dessous.')); } else if(_advTimer){ /* le choix vient d'être fait : l'avancée est déjà programmée, un second clic sauterait une étape */ } else { advance(); } };
   } else if(hasConfirm){
-    nextText='Valider et continuer ▶';
+    nextText=t('tuto.valider_continuer_2','Valider et continuer ▶');
     /* ═══════ « VALIDER ET CONTINUER » POUVAIT NE RIEN FAIRE DU TOUT ═══════
        ⚠️ Une étape SYNCHRONISÉE (`sync`) ne s'avançait pas elle-même : elle comptait sur la fonction
        du jeu (`dismissEventAnnounce`, `confirmAgendaChoice`…) pour déclencher `syncAdvance`. Or ces
@@ -604,7 +602,7 @@ function renderCoachForStep(s){
       if(!s.sync || !etaitOuverte){ scheduleAdvance(350); }
     };
   }
-  coach((_special?'Fenêtre spéciale ':'Étape ')+(_cur+1)+'/'+curArr().length+' · '+s.lab, s.tx, { hint:s.hint, nextText:nextText, onNext:onNext });
+  coach(t('tuto.ligne','{v}{v2}/{v3} · {v4}',{v:(_special?t('tuto.fenetre_speciale','Fenêtre spéciale '):t('tuto.etape','Étape ')),v2:_cur+1,v3:curArr().length,v4:s.lab}), s.tx, { hint:s.hint, nextText:nextText, onNext:onNext });
   positionCoach(s.glow, s.pos);
   if(s.inhibit)inhibit(s.inhibit); // désactive les boutons de validation du jeu de cette étape
   if(s.free){ _free=true; }
@@ -644,23 +642,23 @@ function onAction(emoji){
 const _seen={};
 function enterFreePlay(){
   _free=true; _collapsed=false; clearGlow(); unInhibit(); hideCursor(); // en jeu libre, les boutons du jeu redeviennent normaux
-  coach('Jeu libre · ton tour',
-    "Joue ton tour : <b>✓ Valider</b> après chaque action. Quand tu n'as plus d'AC, le <b>bilan</b> arrive tout seul ; je m'occupe de l'investissement et de l'événement, et je reprends la main pour les <b>fenêtres spéciales</b>.",
+  coach(t('tuto.jeu_libre_tour','Jeu libre · ton tour'),
+    t('tuto.joue_tour_valider_apres_chaque_action_qu','Joue ton tour : <b>✓ Valider</b> après chaque action. Quand tu n\'as plus d\'AC, le <b>bilan</b> arrive tout seul ; je m\'occupe de l\'investissement et de l\'événement, et je reprends la main pour les <b>fenêtres spéciales</b>.'),
     {noNext:true});
 }
 function onLog(msg){
   msg=String(msg||'');
   if(!_free&&!_special)return;   // pendant la partie guidée, le coach explique déjà ; une note par-dessus le cachait (étape 1, 07/09)
   if(!_seen.event && /[ÉE]V[ÉE]NEMENT/i.test(msg)){ _seen.event=1;
-    note("🎯 <b>Événement</b> : aux tours pairs, un événement survient — bonus, malus ou compétition entre nations. Lis-le : il peut rapporter des VP."); }
+    note(t('tuto.evenement_tours_pairs_evenement_survient','🎯 <b>Événement</b> : aux tours pairs, un événement survient — bonus, malus ou compétition entre nations. Lis-le : il peut rapporter des VP.')); }
   if(!_seen.tension && /tension/i.test(msg)){ _seen.tension=1;
-    note("😤 <b>Tension</b> : elle monte avec un rival (raids, proximité, refus). À <b>10</b>, la guerre éclate. Un accord commercial ou « Calmer la population » la fait baisser."); }
+    note(t('tuto.tension_monte_avec_rival_raids_proximite','😤 <b>Tension</b> : elle monte avec un rival (raids, proximité, refus). À <b>10</b>, la guerre éclate. Un accord commercial ou « Calmer la population » la fait baisser.')); }
   if(!_seen.raid && /(Raid|pille)/i.test(msg)){ _seen.raid=1;
-    note("⚔️ <b>Raid</b> : on te vole des ressources et la tension monte. Protège tes routes avec des jetons Force, ou réponds."); }
+    note(t('tuto.raid_te_vole_ressources_tension_monte_pr','⚔️ <b>Raid</b> : on te vole des ressources et la tension monte. Protège tes routes avec des jetons Force, ou réponds.')); }
   if(!_seen.war && /GUERRE/i.test(msg)){ _seen.war=1;
-    note("🚨 <b>Guerre</b> : le combat se résout avec tes <b>jetons Force</b>. Tu choisis combien engager en attaque ou en défense. Tu peux proposer la paix ensuite."); }
+    note(t('tuto.guerre_combat_resout_avec_jetons_force_c','🚨 <b>Guerre</b> : le combat se résout avec tes <b>jetons Force</b>. Tu choisis combien engager en attaque ou en défense. Tu peux proposer la paix ensuite.')); }
   if(!_seen.power && /💫/.test(msg)){ _seen.power=1;
-    note("💫 <b>Pouvoir gratuit utilisé !</b> "+msg.replace(/^💫\s*/,'')+". C'est <b>gratuit (0 AC)</b> et disponible <b>1×/tour</b> — regarde le changement en haut de l'écran."); }
+    note(t('tuto.pouvoir_gratuit_utilise_gratuit_0_ac_dis','💫 <b>Pouvoir gratuit utilisé !</b> {v}. C\'est <b>gratuit (0 AC)</b> et disponible <b>1×/tour</b> — regarde le changement en haut de l\'écran.',{v:msg.replace(/^💫\s*/,'')})); }
 }
 
 /* ---------- fin ---------- */
@@ -668,13 +666,7 @@ let _finished=false;
 function finish(){
   if(_finished)return; _finished=true;
   clearGlow(); hideCoach(); unInhibit(); hideCursor(); hideAllSpecialModals();
-  const ov=el('<div id="tuto-final">'+
-    '<div class="big">🏆</div><h2>Bravo, tu as les bases !</h2>'+
-    '<p>Colonise, relie, améliore, cherche des technos, gère ton moral, et vise le plus de <b>VP</b> en 10 tours. Les événements, la tension et la guerre, tu les maîtriseras en jouant.</p>'+
-    '<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">'+
-    '<button onclick="location.reload()">↻ Refaire le tuto</button>'+
-    '<button class="ghost" onclick="location.href=\'index.html\'">🎮 Vers le jeu</button>'+
-    '</div></div>');
+  const ov=el(t('tuto.bravo_as_bases_colonise_relie_ameliore_c','<div id="tuto-final"><div class="big">🏆</div><h2>Bravo, tu as les bases !</h2><p>Colonise, relie, améliore, cherche des technos, gère ton moral, et vise le plus de <b>VP</b> en 10 tours. Les événements, la tension et la guerre, tu les maîtriseras en jouant.</p><div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"><button onclick="location.reload()">↻ Refaire le tuto</button><button class="ghost" onclick="location.href=\'index.html\'">🎮 Vers le jeu</button></div></div>'));
   document.body.appendChild(ov);
 }
 
@@ -700,15 +692,15 @@ function startWatch(){
       if(vis('invest-modal')||vis('invest2-modal')){
         const m=vis('invest-modal')?$('invest-modal'):$('invest2-modal');
         const o=m.querySelector('.inv-opt:not(.inv-nope)');
-        if(o){ const nom=(o.querySelector('.inv-opt-name')||{}).textContent||'un investissement'; o.click(); note('💼 <b>Investissement</b> : j\'ai pris « '+nom.trim()+' » pour toi — je t\'explique cette fenêtre juste après.'); }
+        if(o){ const nom=(o.querySelector('.inv-opt-name')||{}).textContent||t('tuto.investissement','un investissement'); o.click(); note(t('tuto.investissement_j_ai_pris_toi_explique_fe','💼 <b>Investissement</b> : j\'ai pris « {v} » pour toi — je t\'explique cette fenêtre juste après.',{v:nom.trim()})); }
         else { try{ const b=m.querySelector('button'); if(b)b.click(); }catch(e){} }
         return;
       }
-      if(vis('event-modal')){ const n=$('ev-name'); note('🎯 <b>Événement du tour 2</b>'+(n&&n.textContent?' : '+n.textContent:'')+' — je continue.'); try{ if(window.dismissEventModal)window.dismissEventModal(); }catch(e){} return; }
+      if(vis('event-modal')){ const n=$('ev-name'); note(t('tuto.evenement_tour_2_continue','🎯 <b>Événement du tour 2</b>{v} — je continue.',{v:(n&&n.textContent?' : '+n.textContent:'')})); try{ if(window.dismissEventModal)window.dismissEventModal(); }catch(e){} return; }
       { const ec=$('event-choice-modal'); if(ec&&ec.style.display!=='none'){ const b=Array.prototype.slice.call(ec.querySelectorAll('button.ea-btn')).pop(); if(b)b.click(); return; } }
       if(vis('event-announce-modal')&&g.turn>=3){ try{ if(window.dismissEventAnnounce)window.dismissEventAnnounce(); }catch(e){} return; }
       if(vis('invest-active-modal')){ const m=$('invest-active-modal'); const b=m.querySelector('button'); if(b)b.click(); else m.classList.add('hidden'); return; }
-      if(vis('eot-modal')){ if(!_eotBouton){ _eotBouton=true; coach('Jeu libre · fin du tour', "Voici le <b>bilan</b> du tour. Lis-le, puis clique <b>Tour suivant</b> — ici ou dans la fenêtre.", {nextText:'Tour suivant ▶', onNext:function(){ confirmEOT(); }}); } return; }
+      if(vis('eot-modal')){ if(!_eotBouton){ _eotBouton=true; coach(t('tuto.jeu_libre_fin_tour','Jeu libre · fin du tour'), t('tuto.voici_bilan_tour_lis_puis_clique_tour_su','Voici le <b>bilan</b> du tour. Lis-le, puis clique <b>Tour suivant</b> — ici ou dans la fenêtre.'), {nextText:t('tuto.tour_suivant','Tour suivant ▶'), onNext:function(){ confirmEOT(); }}); } return; }
       if(g.turn>=3 && g.phase==='actions' && !vis('strategy-modal')){ startSpecial(); }
       else if(g.phase==='over'){ startSpecial(); }
     }
@@ -774,7 +766,7 @@ function hookGame(){
       if(_free && !_special && g && g.turn>=3){
         /* Tour 3 : la carte est choisie par le jeu (la première), pour que le tour démarre et que
            l'écran soit libre ; `startWatch` gèle ensuite. */
-        try{ if(Array.isArray(g._stratPool)&&g._stratPool.length){ const f=g._stratPool.filter(c=>c&&!c.calmTension&&!c.calmTheirs&&!c.initiative); const c=(f[0]||g._stratPool[0]); if(window.applyStrategy)window.applyStrategy(c.id); note('🃏 <b>Carte Stratégie</b> du tour 3 : « '+c.name+' », choisie pour toi.'); return; } }catch(e){ console.error('[TUTO strat T3]',e); }
+        try{ if(Array.isArray(g._stratPool)&&g._stratPool.length){ const f=g._stratPool.filter(c=>c&&!c.calmTension&&!c.calmTheirs&&!c.initiative); const c=(f[0]||g._stratPool[0]); if(window.applyStrategy)window.applyStrategy(c.id); note(t('tuto.carte_strategie_tour_3_choisie_toi','🃏 <b>Carte Stratégie</b> du tour 3 : « {nom} », choisie pour toi.',{nom:c.name})); return; } }catch(e){ console.error('[TUTO strat T3]',e); }
         startSpecial(); return;
       }
       /* Les cartes qui ouvrent une SECONDE fenêtre (Calmer les tensions, Diplomatie : choisir une
@@ -804,11 +796,7 @@ function startTuto(){
 }
 function showWelcome(){
   injectCSS();
-  const ov=el('<div id="tuto-welcome">'+
-    '<div class="big">🌌</div><h1>Apprendre à jouer</h1>'+
-    '<p><b>Solar</b> — jeu de stratégie spatiale. Ce tutoriel te fait jouer une vraie partie, guidée pas à pas sur les <b>4 premiers tours</b>.</p>'+
-    '<p>À chaque étape, fais l\'action indiquée sur l\'élément <b style="color:#ffd34d">en surbrillance</b>, ou clique « Suivant » pour avancer.</p>'+
-    '<button id="tuto-go">Commencer ▶</button></div>');
+  const ov=el(t('tuto.apprendre_jouer_solar_jeu_strategie_spat','<div id="tuto-welcome"><div class="big">🌌</div><h1>Apprendre à jouer</h1><p><b>Solar</b> — jeu de stratégie spatiale. Ce tutoriel te fait jouer une vraie partie, guidée pas à pas sur les <b>4 premiers tours</b>.</p><p>À chaque étape, fais l\'action indiquée sur l\'élément <b style="color:#ffd34d">en surbrillance</b>, ou clique « Suivant » pour avancer.</p><button id="tuto-go">Commencer ▶</button></div>'));
   document.body.appendChild(ov);
   $('tuto-go').onclick=startTuto;
 }
