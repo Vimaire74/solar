@@ -49,6 +49,7 @@ function tL(lang, k, fr, p) {
   if (p) for (const x in p) {
     let v = p[x];
     if (typeof v === 'string' && v.charCodeAt(0) === 64 && v.length > 1) { const r = v.slice(1); v = (d && d[r] !== undefined) ? d[r] : r.split('.').slice(-2, -1)[0] || r; }
+    else if (typeof v === 'string' && v.indexOf('@') > 0) v = v.replace(/@([a-z][a-z0-9_]*\.[a-z0-9_]+\.[a-z0-9_]+)/g, (m, r) => (d && d[r] !== undefined) ? d[r] : r.split('.').slice(-2, -1)[0] || r);   // plusieurs @refs dans une liste jointe
     else if (v && typeof v === 'object' && typeof v.k === 'string') v = tL(lang, v.k, v.fr, v.p);
     s = String(s).split('{' + x + '}').join(v);
   }
@@ -519,6 +520,27 @@ function broadcast(g, obj) { for (const s of g.seats) sendTo(s.ws, obj); }
    fenêtres de résultats apparaissent aux deux joueurs »). Un combat a DEUX camps : n'en informer
    que l'assaillant, c'est laisser le défenseur découvrir ses pertes en regardant sa carte.
    Une guerre est de toute façon publique — tout le monde la voit dans le journal. */
+/* ═══ LE BILAN DE FIN DE TOUR, DANS LA LANGUE DE CHAQUE JOUEUR ═══
+   C'est la seule fenêtre que le moteur envoie en HTML DÉJÀ ÉCRIT : il n'y a aucune clé à hydrater
+   chez le client, et elle arrivait donc en français chez un joueur anglais (Marc, 20/09 — « ACTIONS
+   CE TOUR », « ENTRETIEN », « TERRIENS »). Même doctrine que le courriel de fin de partie : c'est
+   le serveur qui rédige, une fois par langue présente à la table. `eotRenduLangue` pose le
+   dictionnaire ET traduit les tables de données, puis remet tout en français — les tables sont
+   partagées par la partie entière.
+   Un moteur antérieur n'a pas la fonction : on renvoie la charge utile telle quelle (français). */
+function eotPourLangue(g, lang, payload) {
+  if (!lang || lang === 'fr' || !DICTS[lang] || !payload) return payload;
+  try {
+    const sb = g && g.driver && g.driver.sb;
+    if (!sb || typeof sb.eotRenduLangue !== 'function') return payload;
+    g._eotCache = g._eotCache || {};
+    const cle = lang + '#' + (payload.turn || 0);
+    if (!g._eotCache[cle]) g._eotCache[cle] = sb.eotRenduLangue(DICTS[lang]);
+    const r = g._eotCache[cle];
+    if (!r) return payload;
+    return Object.assign({}, payload, { html: r.html, bodies: r.bodies });
+  } catch (e) { console.error('eotPourLangue:', e.message); return payload; }
+}
 const FENETRES_COLLECTIVES = ['eot', 'event_announce', 'event_result', 'war_result'];
 function sendWindowToAll(g, kind, payload, ownerCiv) {
   if (!payload) return;
@@ -527,7 +549,9 @@ function sendWindowToAll(g, kind, payload, ownerCiv) {
     if (s.ai || !s.ws) continue;
     if (ownerCiv && s.civId === ownerCiv) continue;
     if (kind === 'eot') {
-      const html = (bodies && bodies[s.civId]) || payload.html || '';
+      const pl = eotPourLangue(g, langDe(s.user), payload);
+      const bd = (pl && pl.bodies) || bodies;
+      const html = (bd && bd[s.civId]) || (pl && pl.html) || payload.html || '';
       if (!html) continue;
       sendTo(s.ws, { t: 'notice', kind: 'eot', payload: { turn: payload.turn, html } });
     } else if (kind === 'war_result' && Array.isArray(payload.civs) && payload.civs.length) {
@@ -1075,8 +1099,14 @@ function route(g, r) {
       g.lastRoute.questions = [];
       for (const s of g.seats) {
         if (s.ai || !s.user) continue;
-        const corps = (p.payload && p.payload.bodies && p.payload.bodies[s.civId]) || (p.payload && p.payload.html) || '';
-        const sien = { id: p.id, kind: 'eot', nation: s.civId, payload: Object.assign({}, p.payload, { html: corps }) };
+        const _pl = eotPourLangue(g, langDe(s.user), p.payload) || p.payload;
+        const corps = (_pl && _pl.bodies && _pl.bodies[s.civId]) || (_pl && _pl.html) || '';
+        /* `bodies` NE PART PAS : c'est le bilan de TOUTES les nations, écrit en français par le
+           moteur. Le joueur n'a besoin que du sien (`html`), déjà rendu dans SA langue ci-dessus ;
+           l'expédier entier envoyait du français sur le fil pour rien — et l'y laissait à portée
+           d'un affichage de repli. */
+        const _sansBodies = Object.assign({}, p.payload); delete _sansBodies.bodies;
+        const sien = { id: p.id, kind: 'eot', nation: s.civId, payload: Object.assign(_sansBodies, { html: corps }) };
         g.lastRoute.questions.push({ civId: s.civId, pending: sien });
         /* Seuls ceux qu'on attend encore reçoivent la fenêtre. Celui qui a déjà cliqué ne la revoit
            pas — c'est ce renvoi qui produisait une seconde réponse, refusée ensuite comme
@@ -1106,6 +1136,22 @@ function route(g, r) {
       if (FENETRES_COLLECTIVES.includes(q.pending.kind)) sendWindowToAll(g, q.pending.kind, q.pending.payload, q.civId);
       if (g.envoyees.has(q.pending.id)) continue;
       g.envoyees.add(q.pending.id);
+      /* ⚠️ UN BILAN DE FIN DE TOUR PEUT AUSSI PASSER PAR ICI (quand il est posé en même temps
+         qu'une autre question). Ce chemin envoyait la charge utile brute — HTML français écrit
+         par le serveur, plus le `bodies` de toute la table : le bilan arrivait en français un
+         tour sur dix chez le joueur anglais, sans raison apparente (Marc, 20/09). Même traitement
+         que la branche « bilan seul » : on rend dans la langue du destinataire. */
+      if (q.pending.kind === 'eot') {
+        const _s = g.seats.find(x => x.civId === q.civId && !x.ai && x.user);
+        if (_s) {
+          const _pl = eotPourLangue(g, langDe(_s.user), q.pending.payload) || q.pending.payload;
+          const _corps = (_pl.bodies && _pl.bodies[q.civId]) || _pl.html || '';
+          const _net = Object.assign({}, q.pending.payload); delete _net.bodies;
+          q.pending = Object.assign({}, q.pending, { payload: Object.assign(_net, { html: _corps }) });
+          const _i = g.lastRoute.questions.findIndex(x => x.pending.id === q.pending.id);
+          if (_i >= 0) g.lastRoute.questions[_i] = { civId: q.civId, pending: q.pending };   // la reprise renverra la même
+        }
+      }
       sendToCiv(g, q.civId, { t: 'decision', pending: q.pending });
     }
     for (const s of g.seats) {
@@ -1133,7 +1179,10 @@ function route(g, r) {
       // affiche EXACTEMENT le même tableau qu'en solo, ligne par ligne, y compris les postes à 0.
       scores = [G.player, ...G.ais].map(p => {
         const d = sb.calcVP(p) || {};
-        return { civId: p.civ.id, name: p.civ.name, emoji: p.civ.emoji || '', vp: d.total || 0, detail: {
+        /* Le nom de nation part AUSSI comme référence : l'archive et le courriel gardent le
+           français (`name`), l'écran de fin le re-rend dans la langue du joueur (`name_i18n`).
+           Sans ça, le tableau des scores restait français en anglais (Marc, 20/09). */
+        return { civId: p.civ.id, name: p.civ.name, name_i18n: { k: 'commun.ref', fr: '{v}', p: { v: '@nation.' + p.civ.id + '.nom' } }, emoji: p.civ.emoji || '', vp: d.total || 0, detail: {
           colVP: d.colVP || 0, routeVP: d.routeVP || 0, cardsVP: d.cardsVP || 0, techBonusVP: d.techBonusVP || 0,
           rptVP: d.rptVP || 0, agendasVP: d.agendasVP || 0, evtVP: d.evtVP || 0, extraVP: d.extraVP || 0,
           total: d.total || 0 } };
@@ -1820,13 +1869,13 @@ wss.on('connection', (ws) => {
             }
             g.attenteBilan = null;
             try { route(g, g.driver.answer(m.id, {})); }
-            catch (e) { err(e.message.split('\n')[0]); recover(g, 'answer', e); }
+            catch (e) { if (process.env.SC_TRACE) console.error('[trace answer]', e && e.stack); err(e.message.split('\n')[0]); recover(g, 'answer', e); }
             break;
           }
           const civ = (typeof p.nation === 'object' && p.nation) ? (p.nation.civ && p.nation.civ.id) : p.nation;
           if (civ !== s.civId) return err(K('srv.decision_toi','cette décision n\'est pas pour toi'));
           try { route(g, g.driver.answer(m.id, assainirReponse(g, p, m.ans || {}))); }
-          catch (e) { err(e.message.split('\n')[0]); recover(g, 'answer', e); }
+          catch (e) { if (process.env.SC_TRACE) console.error('[trace answer2]', e && e.stack); err(e.message.split('\n')[0]); recover(g, 'answer', e); }
           break;
         }
 

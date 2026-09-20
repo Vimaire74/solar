@@ -1,10 +1,63 @@
-LOT 17 — MISE À JOUR  ·  v10.79 / sw v200  ·  19/09/2026
+LOT 17 — MISE À JOUR  ·  v10.81 / sw v202  ·  20/09/2026
+
+⚠️ LE SITE EN LIGNE EST ENCORE EN v10.79 (vérifié le 20/09 au soir)
+   Marc a refait une partie EN FRANÇAIS qui se fige en fin de tour après un espionnage et le vol
+   de TROIS technologies. Ce n'est pas un nouveau défaut : solar-game.com sert toujours
+   moteur.js v10.79, donc le correctif de la v10.80 n'est pas en ligne. Voler trois technologies
+   porte la tension à 10 à tous les coups (barème 1→6, 2→8, 3 et plus→10), ce qui ouvre la branche
+   fautive — en français comme en anglais, le défaut est dans le code et pas dans la langue.
+   Nouveau banc server/test_espionnage_trois_techs.js : vert sur ce lot, rouge (« t is not a
+   function ») sur une copie où l'on remet l'ombrage de la v10.79.
+   → Tant que ce lot n'est pas en ligne, éviter la fenêtre d'espionnage.
 
 À UPLOADER (site) : index.html, moteur.js, online.js, sw.js, i18n.js, tutorial.js, tutorial.html,
    regles.html, regles.en.html, confidentialite.en.html, lang/ (dossier entier), scripts/
-À REDÉPLOYER (serveur) : server/server.js et server/driver.js ont changé — le serveur DOIT être
-   redéployé avec le site, sinon les fenêtres en ligne et les courriels restent en français et
-   la ligne « passe une action » du journal s'affiche en français chez un joueur anglais.
+À REDÉPLOYER (serveur) : server/server.js, server/driver.js et server/package.json ont changé
+   (npm install au déploiement : acorn en devDependencies pour le nouveau banc) — le serveur DOIT
+   être redéployé avec le site : il porte le correctif du blocage « t is not a function » et les
+   fenêtres/courriels dans la langue de chaque joueur.
+
+v10.81 / sw v202 — LE FRANÇAIS QUI RESTAIT EN LIGNE, ET SA CAUSE COMMUNE
+   Tes captures du 20/09 : « systématiquement dans le rapport de fin de tour, le choix des
+   ressources en début de tour, l'espionnage, les investissements et les agendas secrets ».
+   Elles disaient toutes la même chose, et c'est la même cause :
+
+   LA CAUSE. En solo, le texte est écrit par TON navigateur : il sort forcément dans ta langue.
+   En ligne, c'est le SERVEUR qui écrit, et il n'a pas de dictionnaire. Tout ce qui partait
+   DÉJÀ RENDU arrivait donc en français, quelle que soit la langue du lecteur. Trois formes :
+     · une phrase assemblée avec des « + » (la colle rend le texte tout de suite) ;
+     · un t() glissé dans les PARAMÈTRES d'un autre message (l'argument est évalué aussitôt) ;
+     · un nom de donnée pris à même la table (node.name, civ.name) au lieu d'une référence.
+   Corrigé partout : 114 paramètres dégelés, 54 noms de données transformés en références,
+   les libellés d'action rangés dans l'état gardent désormais leur clé à côté du français.
+
+   CE QUI EST RÉPARÉ, NOMMÉMENT
+     · rapport de fin de tour : rédigé par le serveur une fois par langue présente à la table
+       (Entretien/Upkeep, Revenus/Income, Routes, Pillage subi, et les actions des AUTRES
+       nations — « Achète Réseau Orbital », « Améliore Éris » — enfin en anglais) ;
+     · espionnage : en-têtes « X — n technologies à prendre », option « Attendre un tour » ;
+     · investissements, agendas secrets, cartes Stratégie : noms et descriptions ;
+     · draft de début de tour (« Draft : à toi — 2/4 ») et rappel d'initiative ;
+     · journal : « achète », « adopte », « production de X pillée », « ✗ non connectée »,
+       « colonie prise », « route → Phobos (via Cérès) », « jetons Force engagés » ;
+     · avis : « Tu perds +1 énergie +2 matériaux », moral critique, guerre entre deux tiers,
+       « X te pille », noms de nations dans les demandes d'accord et le tableau des scores.
+
+   COMMENT JE LE SAIS MAINTENANT (et pourquoi je ne le savais pas avant)
+   Toutes mes vérifications s'étaient faites EN SOLO — le seul mode où ce défaut ne peut pas
+   apparaître. Nouveau banc : server/test_langue_en.js joue une partie EN LIGNE entière avec
+   deux clients déclarés en anglais, puis rejoue le rendu du client sur chaque message reçu et
+   liste ce qui reste français. Trois parties complètes (471 messages) : 0 texte français.
+   Deux bancs de garde s'ajoutent, qui lisent le code : test_i18n_param_fige.js (un t() figé
+   dans des paramètres) et test_i18n_nom_donnee.js (un nom de table passé tel quel).
+
+   Petit changement visible : en anglais, les ressources d'un avis se disent « Energy »,
+   « Materials », « Science », « Morale » (avant : énergie, matériaux…).
+
+   Bancs : suite passée (i18n, moteur sans écran, simulation, suppression de partie, tutoriel,
+   actions, ws). test_ws garde son « décision périmée » intermittent, connu et antérieur.
+
+   À FAIRE : uploader le site ET redéployer le serveur (server/server.js a changé).
 
 CE QUI CHANGE — partie 20C9
 
@@ -128,6 +181,24 @@ v10.79 / sw v200 — APRÈS TA MISE EN LIGNE DU 19/09 (captures du dossier scree
      le nom de la base vient des données (« Moon » en anglais, plus « Lune » en dur).
    · Barre du haut sur écran étroit (« MARTIE… ») : nom, Tour, AC et 🏛️ légèrement resserrés
      sous 380 px ; vérifié « JUPITÉRIENS » entier à 360 px au plus grand Aa.
+   · Grande carte des actions sociales (He3, Recherche, Calmer…) : l'image, carrée, s'affichait
+     réduite avec du vide de chaque côté — elle prend maintenant toute la largeur.
+   · Cinq boutons d'achat encore en français en anglais (« Acheter (1 AC) »…) : traduits.
+   · LE RESTE DU FRANÇAIS EST TRADUIT (20/09) : ~300 textes — pactes et accords proposés,
+     initiative de guerre, Supercroiseur vaincu, Dyson, espionnage, jeton de route, cible d'un
+     raid, fenêtres d'assaut et de défense, exigence de paix, refus d'accord, résultats des
+     événements (ruée, tempêtes, pirates…), bilan de fin de tour, boutons du log. 2132 clés.
+     Reste en français, volontairement : le rapport complet à copier (pour moi), la carte peinte,
+     le PDF. Une partie solo anglaise de 9 tours pilotée en Chromium : 0 erreur, journal anglais.
+   · ⚠️ C'EST CE LOT QUI DÉBLOQUE TA PARTIE C4E5. Ce que tu as mis en ligne ce matin était la
+     PREMIÈRE v10.79 (celle d'hier soir) : j'avais livré le travail d'aujourd'hui sous la même
+     estampille, tu ne pouvais pas les distinguer. D'où v10.81 / sw v202.
+   · BUG DE LA v10.78 ATTRAPÉ (en production) : quand un espionnage portait la tension à 10, le
+     moteur appelait t() sous une variable locale nommée t (« t is not a function ») et la partie
+     EN LIGNE se bloquait. Corrigé, et un nouveau banc (test_i18n_ombrage.js) l'interdit pour
+     toujours. Redéployer le serveur avec le site.
+   · Grande carte d'une technologie : plus de badge « IA » / « IA aussi » en gros sur
+     l'illustration (Marc, 19/09) — le texte en bas suffit. Seul « ✓ Toi » reste.
    · La fenêtre d'agenda dont les cartes passent « sous » la barre : sur ta capture, la fenêtre
      est simplement défilée (son bord haut est juste sous la barre, comme prévu) ; je n'ai pas
      pu reproduire un vrai chevauchement en v10.78/79. Dis-moi si tu le revois.

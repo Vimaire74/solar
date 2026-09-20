@@ -47,8 +47,15 @@ addLog(J('journal.colonise', '{civ} colonise {noeud}', {civ:_i18nRef(civ,'name')
   (`lang:`) et est gardée dans `users[u].lang` : le courriel de fin de partie est rédigé dans la
   langue de chaque destinataire (`corpsRapport(entry, lang)`) ; la copie de l'éditeur reste en français.
 - server/driver.js : les lignes qu'il écrit passent par `sb.J`.
-- Vérification : `node server/test_i18n.js`, `node server/test_simulation_sans_fenetre.js`, et
-  l'extracteur (il relève aussi `J(`, `K(`, `T(` et `tL(lang,`).
+- Vérification : `node server/test_i18n.js`, `node server/test_simulation_sans_fenetre.js`,
+  `node server/test_i18n_ombrage.js` (aucun `t(...)` sous une variable locale nommée `t` — sinon
+  « t is not a function », vu en v10.78 dans `espPiller`), et l'extracteur (il relève aussi `J(`,
+  `K(`, `T(` et `tL(lang,`).
+- Trois règles : un message qui entre dans l'ÉTAT sauvegardé reste `t()` (un J relu d'un JSON perd
+  son `toString`) ou est lu par `_i18nTexte()` ; jamais de `join`/`+=` sur des J (la concaténation
+  rend le français tout de suite) — des paramètres imbriqués à la place ; les noms de données dans
+  un paramètre sont des références `_i18nRef(obj,'name')`, plusieurs `@refs` peuvent cohabiter dans
+  une chaîne (`'@carte.a.nom, @carte.b.nom'`).
 
 ## Les pages traduites à part (règles, confidentialité)
 `regles.html` → `regles.en.html`, `confidentialite.html` → `confidentialite.en.html` : une page par
@@ -79,7 +86,7 @@ tout seul : ajouter une carte, c'est ajouter ses clés dans `_source.fr.json` au
 nom de donnée** (`card.name==='…'`) — toujours sur l'ID.
 
 ## Ce qui est traduit, et ce qui reste à faire
-Voir `docs/REPRISE.md` §148. Fait (v10.78, **1933 clés**) : accueil, connexion, lobby, création de
+Voir `docs/REPRISE.md` §148. Fait (v10.79, **2132 clés**) : accueil, connexion, lobby, création de
 partie, salle d'attente, suppression de compte (tranche 0) ; toute l'interface du plateau (tranche 1) ;
 les données affichées — cartes, civiques, nations, nœuds, planètes, événements, agendas,
 investissements, découvertes, stratégies, tempéraments (tranche 2) ; le journal, les toasts, les

@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-19 · v10.79';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-20 · v10.81';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -789,7 +789,10 @@ function showStrategyReal(pending){
   if(!el || !modal) return false;
   el.innerHTML=opts.map(c=>t('web.ligne_7','<div class="strat-opt" id="strat-opt-{v}" onclick="selectStrategy(\'{v2}\')"><div class="so-emoji">{v3}</div><div class="so-name">{v4}</div><div class="so-desc">{v5}{tension}</div></div>',{v:c.id,v2:c.id,v3:c.emoji||'',v4:c.name||c.id,v5:c.desc||'',tension:(c.calmTension?t('web.calme_tension_2',' 🕊️ (calme une tension)'):'')})).join('');
   const b=document.getElementById('strat-confirm-btn'); if(b) b.disabled=true;
-  const sub=document.getElementById('strat-sub'); if(sub) sub.textContent=t('web.draft_toi','Draft : à toi en {v}{v2}/{v3}.',{v:o.rank||1,v2:((o.rank||1)===1?'er':'e'),v3:o.total||'?'});
+  /* ⚠️ Le suffixe ordinal ('er'/'e') était passé en PARAMÈTRE : il restait français en anglais
+     (« Draft: your pick, 1er/4 »). Un ordinal ne se fabrique pas par morceaux d'une langue à
+     l'autre — on écrit le rang tel quel, et la phrase complète vient du serveur (`o.phrase`). */
+  const sub=document.getElementById('strat-sub'); if(sub) sub.textContent=t('web.draft_toi_2','Draft : à toi — {v}/{v2}.',{v:o.rank||1,v2:o.total||'?'});
   modal.classList.remove('hidden');
   return true;
 }
@@ -809,8 +812,11 @@ function showInvestReal(pending, lvl){
     return t('web.ligne_8','<div class="inv-opt{v}"{v2}><div class="inv-opt-emoji">{v3}</div><div class="inv-opt-name">{v4}</div><div class="inv-opt-benefit">✅ {v5}</div><div class="inv-opt-cost">⚠️ {v6}</div>{cout}</div>',{v:(ok?'':' inv-nope'),v2:(ok?' onclick="'+selFn+'(\''+c.id+'\')"':''),v3:c.emoji||'',v4:c.name||c.id,v5:c.benefit||'',v6:c.contrepartie||'',cout:(ok?'':t('web.te_manque','<div class="inv-opt-cost" style="color:#ff8a8a;font-weight:700">🚫 Il te manque {v}</div>',{v:c.manque||''}))});}).join('');
   const aiEl=document.getElementById(two?'inv2-ai-pick':'inv-ai-pick');
   if(aiEl && Array.isArray(o.ai) && o.ai.length){
+    /* ⚠️ `a.civ` est un IDENTIFIANT ('terriens'), pas un nom : il s'affichait tel quel (capture du
+       20/09). Le nom vient de NOS tables, traduites au chargement — donc dans la langue du lecteur. */
     const nm=(id)=>{ const x=opts.find(y=>y.id===id); return x?((x.emoji||'')+' '+x.name):id; };
-    aiEl.innerHTML=o.ai.map(a=>'🤖 '+a.civ+' : '+nm(a.pick)).join('<br>');
+    const civNom=(id)=>{ const c=(typeof CIVS!=='undefined')&&CIVS[id]; return c?((c.emoji||'')+' '+c.name):id; };
+    aiEl.innerHTML=o.ai.map(a=>'🤖 '+civNom(a.civ)+' : '+nm(a.pick)).join('<br>');
     aiEl.classList.remove('hidden');
   }
   modal.classList.remove('hidden');
@@ -982,7 +988,7 @@ function showNotice(m){
     const ti=document.getElementById('eot-title'); if(ti)ti.textContent=t('web.bilan_tour','📊 Bilan du Tour {tour}',{tour:o.turn||''});
     const body=document.getElementById('eot-body'); if(body)body.innerHTML=o.html||'';
     const go=()=>em.classList.add('hidden');
-    const btn=em.querySelector('.eot-btn'); if(btn){ btn.textContent='Fermer'; btn.onclick=go; }
+    const btn=em.querySelector('.eot-btn'); if(btn){ btn.textContent=t('web.fermer','Fermer'); btn.onclick=go; }
     else { const b2=em.querySelector('button'); if(b2)b2.onclick=go; }
     em.classList.remove('hidden');
     return;
