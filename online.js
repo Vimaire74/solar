@@ -919,7 +919,9 @@ try{ window.showGainToast=showGainToast; }catch(e){}
 // Affiche la VRAIE modale d'événement du jeu (#event-modal / #event-announce-modal) au lieu d'un bandeau.
 // Retourne true si la modale existe (sinon repli sur le bandeau). Restaure le visuel d'origine des événements.
 function showEventReal(o, isAnnounce){
-  const ev=o.event||{};
+  /* Le serveur envoie l'événement EN FRANÇAIS (son moteur n'a pas de dictionnaire) ; le client retrouve
+     par l'id sa propre table EVENTS, retraduite en place au chargement (nom, aperçu dans SA langue). */
+  const _evS=o.event||{}; const ev=(typeof EVENTS!=='undefined'&&_evS.id&&EVENTS.find(e=>e.id===_evS.id))||_evS;
   if(isAnnounce){
     const m=document.getElementById('event-announce-modal'); if(!m) return false;
     const em=document.getElementById('ea-emoji'), nm=document.getElementById('ea-name'), ds=document.getElementById('ea-desc');
@@ -930,7 +932,7 @@ function showEventReal(o, isAnnounce){
   const m=document.getElementById('event-modal'); if(!m) return false;
   const card=document.getElementById('evm-card'); if(card){card.className='fen fen-event evt-card'+(ev.type?(' '+ev.type):''); card.style.borderColor='';}
   const em=document.getElementById('evm-emoji'), bd=document.getElementById('evm-badge'), nm=document.getElementById('evm-name'), rs=document.getElementById('evm-result'), cq=document.getElementById('evm-consequence');
-  const T={competition:t('web.competition','COMPÉTITION'),menace:'MENACE',opportunite:t('web.opportunite','OPPORTUNITÉ')};
+  const T={competition:t('web.competition','COMPÉTITION'),menace:t('web.menace','MENACE'),opportunite:t('web.opportunite','OPPORTUNITÉ')};
   if(em)em.textContent=ev.emoji||'🎯';
   if(bd){bd.textContent=(T[ev.type]||t('web.evenement_2','ÉVÉNEMENT'));bd.style.color=ev.type==='menace'?'#ffb347':ev.type==='competition'?'#ff6b62':ev.type==='opportunite'?'#5fd08a':'#ffd34d';}
   if(nm)nm.textContent=(ev.name||t('web.evenement','Événement'));
