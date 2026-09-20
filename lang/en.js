@@ -2177,5 +2177,6 @@ window.SOLAR_LANG_DICT = {
   "res.science": "Science",
   "avis.raison_em": "<br><em>{r}</em>",
   "avis.tiret_detail": " \u2014 {d}",
-  "journal.via": " (via {n})"
+  "journal.via": " (via {n})",
+  "journal.conquete_apaise": "\ud83d\udd4a\ufe0f {emoji} {nation} got satisfaction: tension toward {emoji2} {nation2} falls back to {v}/10."
 };

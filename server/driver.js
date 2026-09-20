@@ -61,7 +61,7 @@ class GameDriver {
     this.activate(this.primaryId);
     try { this.sb.startTurn(); }
     catch(e){ for(const p of this.roster) p.acLeft = p.acMax; }
-    for(const p of this.roster){ p._passedRound = false; p._aiSetupDone = false; }
+    for(const p of this.roster){ p._passedRound = false; p._aiSetupDone = false; p._passesDues = 0; }
     /* Une nation sans colonie ne joue plus (Marc, 05/09) : le moteur la marque « passée » et le dit
        une fois. Même règle que `startInterleaved` en solo — une seule fonction. */
     try { if (typeof this.sb.appliquerEliminations === 'function') this.sb.appliquerEliminations(); } catch(e) {}
@@ -321,7 +321,13 @@ class GameDriver {
     if(!order.length) return null;
     for(let k=0;k<order.length;k++){
       const nat=order[(this._aptr+k)%order.length];
-      if(!nat._passedRound) return nat;
+      if(nat._passedRound) continue;
+      /* DETTE DE PASSAGES — un coup à 2 ou 3 AC coûte 2 ou 3 places dans le tour de table
+         (Marc, 20/09 : « logiquement, elles devraient faire elles aussi leurs 2 ou 3 actions
+         avant que je puisse jouer mon action suivante »). On saute la nation autant de fois
+         qu'il lui reste d'actions à payer, au lieu d'avancer l'index — qui sauterait les AUTRES. */
+      if(nat._passesDues>0){ nat._passesDues--; this._aptr=(this._aptr+k+1)%order.length; k=-1; continue; }
+      return nat;
     }
     return null; // tous ont passé
   }
@@ -342,10 +348,15 @@ class GameDriver {
   }
   _stepActor(nat){
     const before=this.sb.__G.log?this.sb.__G.log.length:0;
+    const acAvant=nat.acLeft||0;
     let acted=false;
     try{ acted=this._aiTurn(nat); }catch(e){ nat._passedRound=true; this._advanceActor(); return; }
     this._emitLog(before);
     if(!acted || nat.acLeft<=0) nat._passedRound=true;
+    /* Même règle que pour l'humain : ce passage lui coûte autant de places qu'il a dépensé d'AC.
+       Son pouvoir gratuit ne compte pas — il l'enchaîne déjà avec une action payante. */
+    const _dep=Math.max(0,acAvant-(nat.acLeft||0));
+    nat._passesDues=Math.max(0,_dep-1);
     this._advanceActor();
   }
 
@@ -494,6 +505,8 @@ class GameDriver {
     }
     const confirmable = !nat._isAI && this._isConfirmable(action);
     const snap = confirmable ? this._snap() : null;    // photo AVANT l'action (pour annuler)
+    const _acAvant = nat.acLeft||0;                    // ce que ce coup aura VRAIMENT coûté (voir `_avancerApresCoup`)
+    if(confirmable) this._acAvantTenu = _acAvant;      // l'action tenue se soldera dans `commit`
     const before=G.log?G.log.length:0;
     if(action && action.type && action.type!=='pass'){ this.engine.apply(action); }
     this._emitLog(before);
@@ -510,17 +523,22 @@ class GameDriver {
       const rejected = this._lastActionLog.some(x=>/pas assez|impossible|déjà|non adjacent|invalide|refuse|besoin/i.test(String(x)));
       if(!rejected){ this._hold={civId, snap, actionType:(action&&action.type)}; return {kind:'confirm', civId}; }
     }
-    /* RÈGLE (Marc, 2026-08-01) : l'AC SUPPLÉMENTAIRE donné par un pouvoir (ex. Surtension martienne)
-       ne s'enchaîne PAS. Un joueur pouvait faire 3 coups d'affilée — action normale, pouvoir gratuit,
-       puis l'action offerte par ce pouvoir — pendant que les autres attendaient. La main tourne donc
-       après un pouvoir comme après n'importe quelle action ; l'AC gagné servira au prochain passage.
-       (Ceci REMPLACE volontairement l'ancien comportement « le pouvoir garde la main ».) */
+    /* ⚠️ RÈGLE CHANGÉE LE 20/09, ET ELLE EN REMPLACE UNE DE MARC LUI-MÊME.
+       Le 2026-08-01 il avait demandé l'inverse : « l'AC SUPPLÉMENTAIRE donné par un pouvoir
+       (Surtension) ne s'enchaîne pas », parce qu'un joueur pouvait faire trois coups d'affilée
+       pendant que les autres attendaient. Le 20/09, ayant constaté que l'ORDINATEUR enchaîne son
+       pouvoir gratuit et son action payante dans un seul passage (`doAITurn`) alors que lui rendait
+       la main, il demande l'alignement dans l'autre sens : « je trouve que ce serait mieux si on
+       peut enchaîner deux actions de suite ainsi ».
+       On applique donc : un coup qui ne CONSOMME aucun AC ne fait pas tourner la main. La
+       conséquence assumée est le retour du cas Surtension — pouvoir gratuit puis action offerte —
+       qui est exactement ce que l'ordinateur fait déjà. */
     // Sinon : commit direct. Passer la nation sauf si pouvoir gratuit encore dispo.
     // Le rappel du pouvoir gratuit est désormais proposé à 1 AC RESTANT (côté client), donc on ne RETIENT
     // PLUS la main du joueur à 0 AC : sinon le tour n'avançait plus tant qu'il n'avait pas utilisé ce pouvoir
     // (bug vécu par Marc : obligé de l'activer pour débloquer la partie).
     if(!action || action.type==='pass' || nat.acLeft<=0) nat._passedRound=true;
-    this._advanceActor();
+    this._avancerApresCoup(nat, _acAvant, action);
     return this.pump();
   }
   // Valider une action tenue : on la fige et on continue (passe la main si plus d'AC ni pouvoir).
@@ -531,8 +549,22 @@ class GameDriver {
     // Idem après validation d'un pouvoir : la main tourne (voir la règle expliquée dans act()).
     void heldType;
     if(nat && nat.acLeft<=0) nat._passedRound=true; // idem : plus de blocage pour le pouvoir gratuit
-    this._advanceActor();
+    this._avancerApresCoup(nat, (this._acAvantTenu!==undefined?this._acAvantTenu:((nat&&nat.acLeft)||0)+1), null);
+    this._acAvantTenu=undefined;
     return this.pump();
+  }
+  /* COMBIEN DE PLACES CE COUP COÛTE-T-IL ? On compare les AC AVANT et APRÈS, jamais le libellé du
+     coup : c'est la seule mesure qui ne se trompe pas quand un pouvoir DONNE de l'AC (Surtension).
+       · 0 AC consommé  → la main NE TOURNE PAS (pouvoir national) ;
+       · 1 AC           → une place, comme avant ;
+       · N AC           → une place, plus N−1 passages sautés (`_passesDues`).
+     Une nation qui a fini sa manche (`_passedRound`) rend toujours la main. */
+  _avancerApresCoup(nat, acAvant, action){
+    const passe=(!action || action.type==='pass' || !nat || nat._passedRound);
+    const dep=Math.max(0,(acAvant||0)-((nat&&nat.acLeft)||0));
+    if(!passe && dep===0) return;                 // coup gratuit : il garde la main
+    if(nat) nat._passesDues=Math.max(0,dep-1);
+    this._advanceActor();
   }
   // Annuler une action tenue : restaurer la photo, MAIS garder les découvertes figées (pas de re-tirage).
   undo(civId){

@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-20 · v10.81';
+const SOLAR_BUILD_MOTEUR = '2026-09-20 · v10.83';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -2057,6 +2057,26 @@ function capturerNoeud(vainqueur, nodeId){
       vainqueur._vpCapitales[nodeId]=perdant.civ.name;
       addLog(J('journal.empare_capitale_10_vp_tant_qu_tient','👑 {emoji} {nation} s\'empare de {nom}, CAPITALE de {emoji2} {nation2} — +10 VP (tant qu\'il la tient) !',{emoji:vainqueur.civ.emoji,nation:_i18nRef(vainqueur.civ,'name'),nom:nom,emoji2:perdant.civ.emoji,nation2:_i18nRef(perdant.civ,'name')}),'gold');
     }
+    /* ═══ PRENDRE UNE COLONIE APAISE CELUI QUI LA PREND (Marc, 20/09, partie 2959) ═══
+       « Si je prends leur capitale, je devrais descendre ma tension comme si j'avais gagné la
+       guerre. » Au tour 9 il s'empare de Phobos, capitale martienne — et le MÊME tour sa propre
+       tension envers les Martiens monte de 4 et atteint 10 : son peuple exige la guerre contre une
+       nation qu'il vient d'écraser. La tension du vainqueur n'était jamais retombée : ses griefs
+       (routes en travers, expansion bloquée) continuaient de s'empiler comme si rien n'avait eu
+       lieu. Une conquête réussie est une satisfaction : la capitale efface le grief, une colonie
+       ordinaire l'allège. La tension du PERDANT, elle, monte comme avant — c'est lui la victime. */
+    try{
+      if(typeof addTens==='function'&&vainqueur&&vainqueur.civ&&perdant&&perdant.civ){
+        const _idV=(vainqueur===G.player)?'player':vainqueur.civ.id;
+        const _capitale=(perdant.civ.home===nodeId);
+        const _avant=(typeof getTens==='function')?getTens(_idV,perdant.civ.id):0;
+        if(_avant>0){
+          const _baisse=_capitale?_avant:Math.min(_avant,TENSION_APAISEMENT_CONQUETE);
+          addTens(_idV,perdant.civ.id,-_baisse);
+          addLog(J('journal.conquete_apaise','🕊️ {emoji} {nation} a obtenu satisfaction : sa tension envers {emoji2} {nation2} retombe à {v}/10.',{emoji:vainqueur.civ.emoji,nation:_i18nRef(vainqueur.civ,'name'),emoji2:perdant.civ.emoji,nation2:_i18nRef(perdant.civ,'name'),v:getTens(_idV,perdant.civ.id)}),'dim');
+        }
+      }
+    }catch(e){}
     if(perdant._vpCapitales&&perdant._vpCapitales[nodeId]){
       const _de=perdant._vpCapitales[nodeId]; delete perdant._vpCapitales[nodeId];
       if(typeof gagnerVP==='function')gagnerVP(perdant,-10,t('vp.capitale_perdue_bonus_repris','Capitale de {de} ({nom}) perdue — bonus repris',{de:_de,nom:nom}));
@@ -2782,6 +2802,10 @@ const PROJET_SEUIL_CHANGEMENT=1.3;   // un autre projet doit valoir 30 % de plus
 const PROJET_POIDS=1.0;              // prime = poids × gain / étapes restantes
 const PROJET_GAIN_MIN=0.5;           // en dessous, ce n'est pas un projet, c'est du bruit
 const PROJET_MAX_CIBLES=8;
+/* Le BUT DE JEU du Conquérant (branche IA & Renseignement) : sa prime ne se déduit pas d'une
+   évaluation, elle est posée. Réglée par la mesure (`mesure_ia_defensive.js`), pas au jugé. */
+const PROJET_BUT_PRIME=14;      // prime ajoutée au coup qui fait avancer le but
+const PROJET_BUT_GAIN_MIN=6;    // gain plancher, pour que le but survive aux tours où il paraît hors de portée
 
 function _cartesBranche(branche){ return CARDS_POOL.filter(c=>c&&c.branch===branche&&c.tier<=3).sort((a,b)=>a.tier-b.tier); }
 /* Les achats manquants pour atteindre le rang 3 de `branche` ; null si la branche est fermée à `nat`. */
@@ -2953,13 +2977,31 @@ function reviserProjet(nat){
      chaîne des mines vaut 26 contre 10). Une préférence ne suffit donc pas : pour lui, c'est une
      DÉCISION. Elle ne dure que tant que le plan est faisable dans les tours restants, et elle
      s'efface dès qu'il l'a terminé — après quoi il compare comme tout le monde. */
-  if(!courant&&nat._profil==='guerrier'){
-    const def=cands.find(p=>p&&p.cible&&p.cible.type==='tech'&&p.cible.branche==='ia_renseignement');
-    if(def&&def.etapes&&def.etapes.length){
-      const ev=evaluerProjet(nat,def);
-      if(ev){ def.gain=ev.gain; def.tours=ev.tours; nat._projet=def; _tracerProjet(nat,'choisi',def,ev.gain); return; }
-    }
-  }
+  /* ═══ LE BUT DE JEU DU CONQUÉRANT : LA BRANCHE IA & RENSEIGNEMENT (Marc, 20/09) ═══
+     « Donne comme but à Conquérant de prendre en priorité la tech IA avancée et IA défensive.
+       Comme un but de jeu. Et après tu la laisses faire. […] Comme ça elle est souple quand même
+       pour se bâtir des ressources. »
+     Ce n'est donc NI un projet parmi d'autres, NI une obligation. La version précédente — une
+     « règle ferme » — n'en était pas une : deux gardes l'annulaient presque toujours, et la mesure
+     l'a montré (`mesure_ia_defensive.js` : chaîne entamée 3 fois sur 4, IA Défensive obtenue ZÉRO
+     fois sur 4, pendant que des nations SANS règle la terminaient).
+       · `!courant` — au tour 1 la chaîne coûte une dizaine de science quand le revenu en vaut une
+         ou deux : `evaluerProjet` la déclarait infaisable, la règle passait EN SILENCE, un autre
+         projet était adopté, et `!courant` l'interdisait pour tout le reste de la partie ;
+       · le gain — `valeurProjet` ne prime qu'à hauteur de `gain/étapes`, soit environ 2 points
+         contre un écart mesuré de 26 à 10 en faveur des mines. Le projet était adopté et le
+         tacticien l'ignorait quand même.
+     Le but vit maintenant DANS SON PROPRE CHAMP (`nat._but`), à côté du projet : le Conquérant
+     continue de planifier ses conquêtes et son économie comme avant — c'est la souplesse demandée —
+     et il porte EN PLUS une préférence permanente pour les trois achats de la branche, réarmée à
+     chaque tour tant qu'elle n'est pas atteinte. Elle s'efface dès que la branche est prise, ou
+     fermée : le rang 3 est EXCLUSIF (premier acheteur seulement), donc c'est une course, et la
+     perdre est un résultat de partie, pas un défaut. */
+  if(nat._profil==='guerrier'){
+    const et=_chaineBranche(nat,'ia_renseignement');
+    nat._but=(et&&et.length)?{etapes:et}:null;
+  }else nat._but=null;
+
   let meilleur=null, mv=-Infinity, valCourant=null, gainCourant=null;
   for(const p of cands){
     const nouveau=!courant||p.id!==courant.id;
@@ -3000,6 +3042,25 @@ function valeurTemperament(coup,nat){
   }catch(e){ return 0; }
 }
 /* La prime d'un coup qui fait avancer le projet courant — sur le COUP, jamais sur l'état. */
+/* La prime du BUT DE JEU, indépendante du projet : elle ne se divise pas par le nombre d'étapes
+   restantes — chacune des trois marches vaut la peine d'être montée, la dernière comme la
+   première. `G._butPrime` permet de la régler (ou de l'annuler) depuis un banc de mesure. */
+function valeurBut(coup,nat){
+  try{
+    const b=nat&&nat._but; if(!b||!b.etapes||!b.etapes.length||!coup)return 0;
+    const e=b.etapes.find(x=>_memeCoup(x,coup)); if(!e)return 0;
+    const base=(G&&G._butPrime!==undefined)?G._butPrime:PROJET_BUT_PRIME;
+    /* ⚠️ LA PRIME N'EST PAS LA MÊME SUR LES TROIS MARCHES, ET C'EST LA MESURE QUI L'A DIT.
+       Marc nomme deux cartes : « la tech IA avancée et IA défensive » — le rang 2 et le rang 3.
+       Une prime PLATE sur les trois faisait acheter le rang 1 (🔍 Drones, seul et faible) très tôt,
+       à la place d'une colonie, sans jamais atteindre le rang 3 : 6 parties, IA Défensive 1 fois,
+       et le score du Conquérant tombé de 63 à 50 de moyenne. La poussée va donc là où est le but ;
+       le rang 1 n'est qu'un passage obligé, il garde une prime symbolique. */
+    const c=CARDS_POOL.find(x=>x&&x.id===e.card);
+    const poids=(!c||c.tier>=3)?1:(c.tier===2?0.6:0.15);
+    return base*poids;
+  }catch(err){ return 0; }
+}
 function valeurProjet(coup,nat){
   try{
     const p=nat&&nat._projet; if(!p||!p.etapes||!p.etapes.length||!coup)return 0;
@@ -5673,10 +5734,17 @@ function _guerreLancerOrdre(jePremier){
 }
 function guerreMonAssaut(){ showWarCombatModal('guerreCombatLiveChoisi'); }
 
+/* ⚠️ « 0 JETON » NE VEUT PLUS DIRE « JE TIENS » QUAND LE SUPERCROISEUR EST DÉPLOYÉ.
+   Marc, partie 2959, tour 9 : « j'ai attaqué Titan, j'ai déterminé que j'utilisais le supercroiseur
+   seul, j'ai cliqué attaquer, et après c'est passé à l'as ». C'est exactement ce que faisait cette
+   ligne : elle date d'avant le Supercroiseur, quand zéro jeton voulait dire zéro puissance et donc
+   un combat perdu d'avance. Le Supercroiseur vaut +5 à lui seul : engager 0 jeton AVEC lui est un
+   assaut parfaitement sensé, et il était annulé en silence — sans message, sans remboursement
+   visible, la fin de tour enchaînait. On ne « tient » donc que si l'on n'engage RIEN du tout. */
 function guerreCombatLiveChoisi(committed){
   const warEnName=guerreEnnemiNom();
   // ROUTE_ATTACK / STANDOFF / DEFEND : déjà résolus par leur propre flux → on enchaîne sur l'ennemi.
-  if(committed===undefined||committed===null||typeof committed==='string'||(committed|0)<=0){
+  if(committed===undefined||committed===null||typeof committed==='string'||((committed|0)<=0&&!G._cruiserDeployed)){
     addLog(J('journal.tiens_position_aucun_assaut_tour','🛡️ Tu tiens ta position — aucun assaut ce tour.'),'dim'); guerreAssautIAPuisSuivante(); return; // 0 jeton = TENIR (pas un combat perdu d'avance)
   }
   /* ⚠️ LE DÉFENSEUR HUMAIN CHOISIT SA DÉFENSE À CHAQUE COMBAT, PAS SEULEMENT AU PREMIER ASSAUT.
@@ -5815,7 +5883,7 @@ function guerreEtapeFraiche(){
 function guerreFraicheOuvrirCombat(){ showWarCombatModal('guerreFraicheCombatChoisi'); }
 function guerreFraicheCombatChoisi(committed){
   const warEnName=guerreEnnemiNom();
-  if(committed===undefined||committed===null||typeof committed==='string'||(committed|0)<=0){
+  if(committed===undefined||committed===null||typeof committed==='string'||((committed|0)<=0&&!G._cruiserDeployed)){
     addLog(J('journal.tiens_position_aucun_assaut_tour','🛡️ Tu tiens ta position — aucun assaut ce tour.'),'dim'); guerreSuivante(); return; // 0 jeton = TENIR
   }
   const res=resolveWarCombat(committed);
@@ -5942,7 +6010,7 @@ function startInterleaved(){
   G._il=true;
   const _odt=ordreDuTour();
   G._order=_odt.ordre; G._ordreEtiquettes=_odt.etiquettes;
-  for(const p of allPlayers()){ p._passedRound=false; p._aiSetupDone=false; p._turnActions=[]; p._raidsThisTurn=[]; p._recoltesTour=0; }
+  for(const p of allPlayers()){ p._passedRound=false; p._aiSetupDone=false; p._turnActions=[]; p._raidsThisTurn=[]; p._recoltesTour=0; p._passesDues=0; }
   if(typeof appliquerEliminations==='function')appliquerEliminations();
   G._ilIdx=0; G._humanActive=false; G._ilLines=[]; G._ilMarkEntry=(G.log&&G.log[0])||null; G._turnMarkEntry=(G.log&&G.log[0])||null;
   /* ⚠️ LA LIGNE D'INITIATIVE ÉTAIT ÉCRITE APRÈS LE `return` DU MODE SERVEUR — donc JAMAIS en
@@ -6076,6 +6144,9 @@ function interleaveStep(){
     if(allPlayers().every(p=>p._passedRound)){ _ilHide(); runEndOfRound(); return; }
     const actor=G._order[G._ilIdx % G._order.length];
     if(actor._passedRound){ G._ilIdx++; continue; }
+    /* Dette d'un coup à plusieurs AC : la nation saute son tour autant de fois qu'il lui reste
+       d'actions à « payer ». C'est ce qui donne aux autres leurs 2 ou 3 coups en face du sien. */
+    if(actor._passesDues>0){ actor._passesDues--; G._ilIdx++; continue; }
     if(actor===G.player){
       G._humanActive=true;
       // Action par action : quand tes actions sont finies (0 AC) et aucune confirmation en attente →
@@ -6096,6 +6167,9 @@ function interleaveStep(){
     const before=(G.log||[]).length;
     const acted=doAITurn(actor,true);
     if(acted&&G.aiActions&&G.aiActions.length){ actor._turnActions=(actor._turnActions||[]).concat(G.aiActions); } // cumule les actions de la manche pour le bilan par nation
+    /* Même règle que pour le joueur : ce passage lui coûte autant de places qu'il a dépensé d'AC.
+       Son pouvoir gratuit (0 AC) n'en coûte aucune — il l'enchaîne déjà avec une action payante. */
+    try{ const _ac=(G.aiActions||[]).reduce((n,x)=>n+((x&&x.acPaid)||0),0); actor._passesDues=Math.max(0,_ac-1); }catch(err){}
     if(!acted||actor.acLeft<=0) actor._passedRound=true;
     G._ilIdx++;
     const _newE=[]; for(const e of (G.log||[])){ if(e===G._ilMarkEntry) break; _newE.push(e); if(_newE.length>60) break; }
@@ -6109,7 +6183,11 @@ function interleaveStep(){
     return;
   }
 }
-function playerActed(){ if(!G._il||!G._humanActive) return; _scHideConfirm(); G._ilLines=[]; G._ilMarkEntry=(G.log&&G.log[0])||null; _ilHide(); G._humanActive=false; G._ilIdx++; interleaveStep(); }
+function playerActed(){ if(!G._il||!G._humanActive) return; _scHideConfirm(); G._ilLines=[]; G._ilMarkEntry=(G.log&&G.log[0])||null; _ilHide(); G._humanActive=false;
+  /* Un coup à 0 AC — le pouvoir national — ne consomme pas de place dans le tour de table :
+     on repasse par la boucle sans avancer l'index, et le joueur enchaîne comme l'ordinateur. */
+  if((G._dernierCoutAC||0)>0) G._ilIdx++;
+  interleaveStep(); }
 function passTurnIL(){ if(!G._il) return; _scHideConfirm(); G._ilLines=[]; G._ilMarkEntry=(G.log&&G.log[0])||null; _ilHide(); G._humanActive=false; G.player._passedRound=true; G._ilIdx++; interleaveStep(); }
 function runEndOfRound(){ return logAuteur('systeme', _runEndOfRound); }
 function _runEndOfRound(){
@@ -8655,6 +8733,9 @@ function principalBloqueur(x){
    après l'évaluation de l'événement ». Une nation qui suit le rythme n'est plus punie ; l'écart seul
    compte ; et la pression est divisée par deux. Banc : server/test_tension_technologique.js */
 const GRIEF_TECH_PAR_RANG3 = 2;
+/* Ce qu'une conquête RÉUSSIE retire à la tension de celui qui la mène : une capitale la remet
+   à zéro (guerre gagnée), une colonie ordinaire l'allège de ce montant. */
+const TENSION_APAISEMENT_CONQUETE = 4;
 function griefTechnologique(){
   const out=[];
   if((G.turn%2)!==0) return out;
@@ -9157,7 +9238,7 @@ function forcedWarChoiceColony(nodeId){
    jetons, l'assaut se résout par `stAssautJoueurChoisi`. Autre chose (« tenir ») : pas d'assaut, pas
    de dépense, la file reprend. Nommée pour survivre à une sauvegarde. */
 function stAssautForceReponse(committed){
-  if(committed===undefined||committed===null||typeof committed==='string'||(committed|0)<=0){
+  if(committed===undefined||committed===null||typeof committed==='string'||((committed|0)<=0&&!G._cruiserDeployed)){
     addLog(J('journal.tiens_position_aucun_assaut_tour','🛡️ Tu tiens ta position — aucun assaut ce tour.'),'dim');
     G._assaultThenSuite=null; fluxDonnees().assautCible=null; fluxDonnees().assautEnnemi=null;
     if(!_guerrePopSuiteJouer())render(); return;
@@ -11428,6 +11509,9 @@ enregistrerCerveau('tacticien', function(ctx){
       +((c.type==='tech'&&typeof valeurDeni==='function')?valeurDeni(c.card,ctx.nation):0)
       /* · `valeurProjet` — ce que ce coup fait AVANCER dans le projet en chaîne (voir `reviserProjet`). */
       +((typeof valeurProjet==='function')?valeurProjet(c,ctx.nation):0)
+      /* · `valeurBut` — le BUT DE JEU d'un tempérament, qui vit à côté du projet et ne l'empêche
+           pas : pour le Conquérant, la branche IA & Renseignement jusqu'à l'IA Défensive. */
+      +((typeof valeurBut==='function')?valeurBut(c,ctx.nation):0)
       /* · `valeurAssaut` — la seule chose que la simulation ne PEUT pas voir sur un assaut : son
            issue. Un assaut lancé en phase d'actions ne livre pas le combat (il se joue en fin de
            tour) ; sans ce terme, toutes les cibles reçoivent la même note — mesuré. */
@@ -14292,7 +14376,14 @@ function addAction(emoji,name,acPaid,resPaid,gainDesc){plafonnerMoral();if(!G.tu
 const _nomFr=_i18nTexte(name),_gainFr=_i18nTexte(gainDesc);
 const _entry={emoji,name:_nomFr,acPaid:acPaid||0,resPaid:resPaid||{},gainDesc:_gainFr||''};
 _memoJChamp(_entry,'name',name);_memoJChamp(_entry,'gainDesc',gainDesc);
-G.turnActions.push(_entry);if(G.player){if(!G.player._turnActions)G.player._turnActions=[];G.player._turnActions.push(_entry);}/* journal par nation : indispensable au bilan en multijoueur */if(G){G._scStuckTries=0;try{G._journal=G._journal||[];G._journal.push({turn:G.turn||0,nat:(G.player&&G.player.civ&&G.player.civ.name)||'Toi',name:_nomFr,ac:acPaid||0,cost:_normCost(resPaid),gain:_riToText(_gainFr),war:_isWarAct(_nomFr),auto:false});}catch(e){}}showToast(emoji,_nomFr,acPaid,resPaid,_gainFr);if(G&&G._il){G._ilPassTries=0;setTimeout(_ilMaybePass,60);}}
+G.turnActions.push(_entry);if(G.player){if(!G.player._turnActions)G.player._turnActions=[];G.player._turnActions.push(_entry);}/* journal par nation : indispensable au bilan en multijoueur */if(G){G._scStuckTries=0;try{G._journal=G._journal||[];G._journal.push({turn:G.turn||0,nat:(G.player&&G.player.civ&&G.player.civ.name)||'Toi',name:_nomFr,ac:acPaid||0,cost:_normCost(resPaid),gain:_riToText(_gainFr),war:_isWarAct(_nomFr),auto:false});}catch(e){}}showToast(emoji,_nomFr,acPaid,resPaid,_gainFr);/* ⚠️ LA ROTATION SE COMPTE EN ACTIONS DÉPENSÉES, PAS EN COUPS (Marc, 20/09). Deux règles ici :
+   · un coup À 0 AC — le POUVOIR NATIONAL — ne rend pas la main. Il ne coûte pas d'action, il ne
+     doit pas en coûter une dans le tour de table. L'ordinateur enchaînait déjà pouvoir + action
+     dans le même passage (`doAITurn`), le joueur non : sa partie 2A5F, tour 6, montre son
+     « Commerce avec les pirates » suivi de DEUX nations avant qu'il ne rejoue.
+   · un coup à 2 ou 3 AC coûte 2 ou 3 places : les autres jouent autant de fois avant son coup
+     suivant. On le note comme une DETTE sur la nation (`_passesDues`), parce qu'avancer
+     l'index sauterait les AUTRES, ce qui est exactement l'inverse. */if(G){G._dernierCoutAC=(acPaid||0);const _n=_acteurCourant()||G.player;if(_n)_n._passesDues=Math.max(0,(acPaid||0)-1);}if(G&&G._il){G._ilPassTries=0;setTimeout(_ilMaybePass,60);}}
 function showToast(emoji,name,acPaid,resPaid,gainDesc){
   const el=document.getElementById('action-toast');if(!el)return;
   const paid=[];if(acPaid)paid.push(acPaid+' AC');for(const[r,a]of Object.entries(resPaid||{}))if(a>0)paid.push(a+rEmoji(r));

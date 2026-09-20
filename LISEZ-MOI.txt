@@ -1,14 +1,75 @@
-LOT 17 — MISE À JOUR  ·  v10.81 / sw v202  ·  20/09/2026
+LOT 17 — MISE À JOUR  ·  v10.83 / sw v204  ·  20/09/2026
 
-⚠️ LE SITE EN LIGNE EST ENCORE EN v10.79 (vérifié le 20/09 au soir)
-   Marc a refait une partie EN FRANÇAIS qui se fige en fin de tour après un espionnage et le vol
-   de TROIS technologies. Ce n'est pas un nouveau défaut : solar-game.com sert toujours
-   moteur.js v10.79, donc le correctif de la v10.80 n'est pas en ligne. Voler trois technologies
-   porte la tension à 10 à tous les coups (barème 1→6, 2→8, 3 et plus→10), ce qui ouvre la branche
-   fautive — en français comme en anglais, le défaut est dans le code et pas dans la langue.
-   Nouveau banc server/test_espionnage_trois_techs.js : vert sur ce lot, rouge (« t is not a
-   function ») sur une copie où l'on remet l'ombrage de la v10.79.
-   → Tant que ce lot n'est pas en ligne, éviter la fenêtre d'espionnage.
+v10.83 / sw v204 — DEUX CORRECTIONS DE LA PARTIE 2959
+
+1. TON ASSAUT AU SUPERCROISEUR SEUL ÉTAIT ANNULÉ EN SILENCE
+   « J'ai attaqué Titan, j'ai déterminé que j'utilisais le supercroiseur seul, j'ai cliqué
+   attaquer, et après c'est passé à l'as. » Exactement ça : le moteur lisait « 0 jeton engagé »
+   et concluait « il tient sa position ». Cette règle date d'avant le Supercroiseur, quand zéro
+   jeton voulait dire zéro puissance donc un combat perdu d'avance. Le Supercroiseur vaut +5 à
+   lui seul : engager 0 jeton AVEC lui est un assaut sensé. Trois endroits corrigés (guerre en
+   cours, guerre fraîche, assaut forcé) : on ne « tient » plus que si l'on n'engage vraiment rien.
+
+2. PRENDRE UNE COLONIE FAIT RETOMBER TA PROPRE TENSION
+   Au tour 9 tu prends Phobos, capitale martienne — et le même tour ta tension envers eux monte
+   de 4 et atteint 10 : ton peuple exige la guerre contre une nation que tu viens d'écraser. Tes
+   griefs (routes en travers, expansion bloquée) continuaient de s'empiler comme si rien n'avait
+   eu lieu. Désormais une conquête est une satisfaction : une CAPITALE remet ta tension envers le
+   vaincu à zéro (comme une guerre gagnée), une colonie ordinaire l'allège de 4. La tension du
+   perdant, elle, monte comme avant — c'est lui la victime.
+
+RAPPEL : le SERVEUR n'a pas été redéployé avec la v10.81. C'est pour ça que le rapport de fin de
+   tour reste en français alors que tout le reste est traduit : c'est la seule fenêtre que le
+   serveur rédige. Redéploie les DEUX ressources Coolify.
+
+ENCORE À FAIRE : les routes inutiles du Martien (il pouvait rejoindre Titan par l'autre côté en
+   deux routes) — pas encore regardé.
+
+v10.82 / sw v203 — LE TOUR DE TABLE, ET UN BUT DE JEU POUR LE CONQUÉRANT
+
+1. TON POUVOIR NATIONAL NE TE COÛTE PLUS UNE PLACE DANS LE TOUR DE TABLE
+   Tu l'avais vu juste : l'ordinateur enchaînait son pouvoir gratuit et une action payante dans le
+   même passage, toi non. Ton tour 6 : « Commerce avec les pirates » puis DEUX nations avant que tu
+   rejoues, pendant que « Surtension » + « Robotisation » des Martiens se suivaient.
+   ⚠️ Cette correction ANNULE une règle que tu avais demandée le 01/08 (« l'AC supplémentaire d'une
+   Surtension ne s'enchaîne pas »). Le cas revient donc : pouvoir gratuit puis action offerte, à la
+   suite. C'est exactement ce que l'ordinateur faisait déjà. Dis-le si tu préfères l'inverse —
+   aligner l'ordinateur sur l'ancienne règle plutôt que toi sur la sienne.
+
+2. UN COUP À 2 OU 3 AC COÛTE 2 OU 3 PLACES
+   Les autres jouent maintenant autant de fois avant ton coup suivant. Ton Supercroiseur à 3 AC ne
+   vaut plus une colonisation à 1 AC. Vrai en solo ET en ligne : la rotation existe en double dans
+   le code, ne corriger qu'un côté n'aurait rien changé pour toi.
+
+3. LE CONQUÉRANT A UN BUT DE JEU : LA BRANCHE IA & RENSEIGNEMENT
+   (Drones Surveillance → Réseau Orbital → IA Défensive. Il n'existe pas de carte « IA avancée » :
+   c'est cette branche-là.)
+   La règle qui existait ne servait à rien — mesuré : IA Défensive prise 1 fois sur 6 parties. Deux
+   verrous l'annulaient : elle ne se déclenchait que si aucun projet n'était en cours, et elle
+   passait par un test de faisabilité qui la refusait toujours au tour 1 (la chaîne coûte 10 de
+   science quand le revenu en vaut 1).
+   Maintenant c'est un BUT, à côté de ses projets : il continue de planifier ses conquêtes et son
+   économie — la souplesse que tu voulais — et il a en plus une préférence permanente pour ces
+   achats, réarmée chaque tour tant qu'il ne les a pas.
+   Mesuré, 6 parties : IA Défensive 3 fois sur 6 (contre 1), pour 7 % de score en moins. La prime
+   est plus forte sur les rangs 2 et 3 que sur le rang 1 : en la mettant plate, il achetait le petit
+   drone très tôt à la place d'une colonie et n'arrivait jamais au bout — 44 de score au lieu de 63.
+   ⚠️ LE RANG 3 EST EXCLUSIF : une seule nation par partie peut l'avoir. C'est une course, et la
+   perdre est un résultat de partie, pas un défaut.
+
+CE QUI N'ÉTAIT PAS UN DÉFAUT DANS TA PARTIE 2A5F
+   · Si les ordinateurs ne t'ont pas attaqué : la tension de Jupitériens envers toi a atteint 10/10
+     en fin de tour 6 puis de tour 8, et tu l'as ramenée à 7 avec la diplomatie au tour suivant,
+     pour 1 AC. C'est possible parce que la jalousie technologique est appliquée APRÈS le contrôle
+     du seuil de guerre — décalage voulu (17/09). Une guerre technologique coûte donc 1 AC à
+     annuler, indéfiniment. Dis-moi si tu veux revoir ça.
+   · Et dès le tour 7 tes deux adversaires étaient en guerre l'un contre l'autre. À trois nations,
+     quand deux se battent, la troisième est libre.
+   · Aucun tempérament ne court après l'événement annoncé sauf l'Opportuniste. Le Conquérant aime
+     les jetons permanents en général, pas « parce que Suprématie Militaire arrive ».
+
+BANCS NOUVEAUX : server/test_rotation_actions.js (les deux règles de rotation) et
+   server/mesure_ia_defensive.js (le but du Conquérant, avec BUT=0 pour la mesure de référence).
 
 À UPLOADER (site) : index.html, moteur.js, online.js, sw.js, i18n.js, tutorial.js, tutorial.html,
    regles.html, regles.en.html, confidentialite.en.html, lang/ (dossier entier), scripts/
