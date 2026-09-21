@@ -249,7 +249,8 @@ function corpsRapport(entry, lang) {
   for (let i = 0; i < entry.scores.length; i++) {
     const s = entry.scores[i], d = s.detail || {};
     L.push('');
-    L.push((i + 1) + '. ' + s.name + (s.user ? ' (' + s.user + ')' : ' ' + T('rapport.ia_paren', '(IA)')) + ' — ' + T('rapport.total_vp', 'TOTAL {vp} VP', { vp: s.vp }));
+    const _rl0 = (d.rendu && (d.rendu[lang] || d.rendu.fr)) || null;
+    L.push((i + 1) + '. ' + ((_rl0 && _rl0.name) || s.name) + (s.user ? ' (' + s.user + ')' : ' ' + T('rapport.ia_paren', '(IA)')) + ' — ' + T('rapport.total_vp', 'TOTAL {vp} VP', { vp: s.vp }));
     /* ⚠️ UN DÉCOMPTE SANS SA RÈGLE N'EXPLIQUE RIEN. Marc, partie 140A : « c'est pas clair pourquoi.
        Il faut ajouter les mêmes textes que dans le fichier de règle. » Les libellés viennent donc du
        §17 des règles, mot pour mot — et « Bonus divers » énumère enfin sa provenance. */
@@ -257,13 +258,16 @@ function corpsRapport(entry, lang) {
        calcul de points les règles qui expliquent ça et le calcul complet des points pour chaque
        élément calculé, notamment bonus spéciaux qui n'est pas clair ». On imprime donc, sous chaque
        poste, l'arithmétique ligne par ligne telle que `calcVP` vient de la faire. */
-    const det = d.det || {};
+    /* Rendu dans la langue du lecteur quand il existe ; sinon (archives d'avant le 21/09) l'ancien détail. */
+    const _rl = (d.rendu && (d.rendu[lang] || d.rendu.fr)) || null;
+    const det = (_rl && _rl.det) || d.det || {};
+    const _nomNation = (_rl && _rl.name) || s.name, _nomAgenda = (_rl && _rl.agenda) || s.agenda;
     /* ⚠️ UN POSTE À ZÉRO DOIT DIRE POURQUOI IL EST À ZÉRO. C'est là que le lecteur soupçonne une
        erreur de comptabilité : sans explication, « Revenus par tour … 0 » ressemble à un oubli. */
     const bloc = (titre, valeur, regle, lignes, siVide) => {
       L.push('     ' + titre + ' ' + '.'.repeat(Math.max(1, 24 - titre.length)) + ' ' + (valeur || 0) + '   [' + regle + ']');
       const L2 = (lignes && lignes.length) ? lignes : (siVide ? [siVide] : []);
-      for (const x of L2) L.push('          · ' + String(x).replace(/<[^>]+>/g, ''));
+      for (const x of L2) L.push('          · ' + String((x && typeof x === 'object' && typeof x.k === 'string') ? tL(lang, x.k, x.fr, x.p) : x).replace(/<[^>]+>/g, ''));
     };
     bloc(T('rapport.colonies', 'Colonies'), d.colVP, T('rapport.colonies_regle', 'VP du nœud × niveau, ×1 si connectée, ×0,5 si isolée, +1 par colonie reliée'),
       det.colonies, T('rapport.aucune_colonie', 'aucune colonie'));
@@ -278,14 +282,14 @@ function corpsRapport(entry, lang) {
       det.tech, T('rapport.aucune_carte_arbre', 'aucune carte de l\'arbre technologique'));
     bloc(T('rapport.revenus_tour', 'Revenus par tour'), d.rptVP, T('rapport.revenus_regle', 'par ressource : +2 au-delà de 5/tour, +5 au-delà de 10/tour'),
       det.rpt, T('rapport.aucune_ressource_5', 'aucune ressource ne dépasse 5 de revenu par tour'));
-    bloc(T('rapport.agenda', 'Agenda') + (s.agenda ? ' (' + s.agenda + ')' : ''), d.agendasVP,
+    bloc(T('rapport.agenda', 'Agenda') + (_nomAgenda ? ' (' + _nomAgenda + ')' : ''), d.agendasVP,
       (d.agendasVP || 0) > 0 ? T('rapport.condition_remplie', 'condition remplie') : T('rapport.condition_non_remplie', 'condition NON remplie'),
       det.agenda, T('rapport.aucun_agenda', 'aucun agenda secret enregistré pour cette nation'));
     bloc(T('rapport.evenements', 'Événements'), d.evtVP, T('rapport.evenements_regle', 'événements, victoires de combat (+2 chacune), découvertes, accords, surproduction (+1 par ressource au plafond, par tour)'),
       det.evt, T('rapport.aucun_evenement', 'aucun événement, combat gagné, découverte ni accord n\'a rapporté de point'));
     /* « Bonus divers » restait opaque même à zéro : on dit maintenant CE QU'IL CONTIENDRAIT. */
     bloc(T('rapport.bonus_divers', 'Bonus divers'), d.extraVP, T('rapport.bonus_divers_regle', 'bonus de technologies particulières (Extra-Solaire, Éveil Collectif) et découvertes'),
-      (d.extraDetail || []).length ? d.extraDetail
+      ((_rl && _rl.extraDetail) || d.extraDetail || []).length ? ((_rl && _rl.extraDetail) || d.extraDetail)
         : [T('rapport.aucun_bonus_divers', 'aucun — aucune de ces technologies n\'a été acquise, ou leur condition n\'est pas remplie')]);
     L.push('     ' + '─'.repeat(56));
     L.push('     TOTAL .................... ' + s.vp + '   ' + T('rapport.somme_postes', '[somme des huit postes ci-dessus]'));
@@ -335,7 +339,15 @@ function archiveGame(g) {
         detail: { colVP: d.colVP || 0, routeVP: d.routeVP || 0, cardsVP: d.cardsVP || 0,
                   techBonusVP: d.techBonusVP || 0, rptVP: d.rptVP || 0, agendasVP: d.agendasVP || 0,
                   evtVP: d.evtVP || 0, extraVP: d.extraVP || 0,
-                  extraDetail: d.extraDetail || [], det: d.det || null }
+                  extraDetail: d.extraDetail || [], det: d.det || null,
+                  /* Le détail rendu UNE FOIS PAR LANGUE (BCE3, 21/09) : `det` contient des messages à clé,
+                     que le rapport texte ne sait pas rendre seul — les noms de données y sont des
+                     références (@carte.x.nom) que seul le moteur résout en français. */
+                  rendu: (function () { const r = {};
+                    for (const lg of ['fr'].concat(Object.keys(DICTS))) {
+                      try { r[lg] = sb.calcVPDetRendu(p, lg === 'fr' ? null : DICTS[lg]); } catch (e) {}
+                    }
+                    return r; })() }
       };
     }).sort((a, b) => b.vp - a.vp);
     /* MÊME FORMAT ATTRIBUÉ que /debug : l'email de fin de partie et l'archive doivent permettre le

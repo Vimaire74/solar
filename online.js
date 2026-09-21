@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-21 · v10.86';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-21 · v10.87';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -653,11 +653,13 @@ function showOptsReal(pending, modalId, contId, key, allowNone){
      (Marc, 2026-08-15). Les autres listes d'options gardent leur affichage d'origine. */
   if(pending.kind==='espionage' && opts.some(o=>o.categorieCle)){
     let g=null, h='';
-    const blocs=new Map();
-    for(const o of opts){ if(o.kind!=='une'||!o.categorieCle)continue;
-      if(!blocs.has(o.categorieCle))blocs.set(o.categorieCle,{groupe:o.groupe,nom:o.categorieNom,techs:[]});
-      blocs.get(o.categorieCle).techs.push(o); }
-    for(const [cle,b] of blocs){
+    const blocs=new Map(), ordre=[], _deja=Array.isArray(o.deja)?o.deja:[];
+    /* `o.deja` : ce que la nation a et que tu as déjà — montré grisé, jamais cochable (Marc, BCE3, 21/09). */
+    for(const o of opts.concat(_deja)){ if((o.kind!=='une'&&o.kind!=='deja')||!o.categorieCle)continue;
+      if(!ordre.includes(o.nation))ordre.push(o.nation);
+      if(!blocs.has(o.categorieCle))blocs.set(o.categorieCle,{groupe:o.groupe,nom:o.categorieNom,nation:o.nation,techs:[],deja:[]});
+      blocs.get(o.categorieCle)[o.kind==='deja'?'deja':'techs'].push(o); }
+    for(const [cle,b] of [...blocs].sort((x,y)=>ordre.indexOf(x[1].nation)-ordre.indexOf(y[1].nation))){
       if(b.groupe&&b.groupe!==g){ g=b.groupe; h+='<div class="esp-groupe">'+esc(b.groupe)+'</div>'; }
       h+='<div class="esp-cat" data-cle="'+esc(cle)+'"><div class="esp-cat-nom">'+esc(b.nom||'')+'</div>';
       for(const t of b.techs)
@@ -666,6 +668,7 @@ function showOptsReal(pending, modalId, contId, key, allowNone){
            renvoie son `cardId`. La nation et la catégorie s'en déduisent côté moteur — plus besoin
            de les fabriquer ici, donc plus personne pour les perdre en route. */
         h+='<label class="esp-tech"><input type="checkbox" data-cle="'+esc(cle)+'" value="'+esc(t.id)+'"> <span>'+(t.name||'')+'</span></label>';
+      for(const t of b.deja) h+='<div class="esp-tech esp-deja" style="opacity:.5">✓ <span>'+(t.name||'')+'</span></div>';
       h+='<div class="esp-cat-pied"></div></div>';
     }
     const att=opts.find(o=>o.kind==='attendre');
@@ -2061,7 +2064,7 @@ function askLocalDecision(pending){
         const maj=()=>{ const v=parseInt(sl.value)||0; dv.textContent=v; if(dt)dt.textContent=v+_base+(cru()?(o.cruiserPower||5):0); if(dbs)dbs.textContent=v>0?t('assaut.avec_n_jetons','avec {n} jeton(s)',{n:v}):t('assaut.garnison_seule','la garnison seule'); };
         if(sl)sl.oninput=maj; { const c=document.getElementById('sc-cru'); if(c)c.onchange=maj; }
         document.getElementById('sc-ok').onclick=()=>done({defTokens:parseInt(sl.value)||0, cruiser:cru()});
-        document.getElementById('sc-none').onclick=()=>done({defTokens:0, cruiser:false});
+        document.getElementById('sc-none').onclick=()=>done({defTokens:0, cruiser:cru()}); // la case cochée compte aussi ici (Marc, 21/09)
         return;
       }
       body=t('web.assaille_force_assaut_jetons_engageables','<h2>{v}</h2>{jetons}<div style="margin-bottom:8px"><b>{who}</b> assaille <b>{cible}</b>.<br><span class="muted">Force de l\'assaut : ~{v2}⚔️{v3} · tes jetons engageables : {max}{v4}</span></div>{v5}{v6}<input type="range" id="sc-d" min="0" max="{max2}" value="{cout}" style="width:100%"><div style="margin:4px 0 8px">Défense : <b id="sc-dv">{cout2}</b> jeton(s){cout3}</div>{cout4}<button class="opt" id="sc-ok">{jetons2}</button><button class="opt" id="sc-none" style="background:#2a2f45">{jetons3}</button>',{v:(o.renfort?'🤝 Renfort !':t('web.defense','🛡️ Défense !')),jetons:(o.renfort?t('web.partages_avec_deja_choisi_defense_jetons','<div style="background:#0e2a18;border:1px solid #3a8a5a;border-radius:8px;padding:6px 9px;margin-bottom:8px;color:#9fe8b8;font-size:.85em">Tu partages <b>{v}</b> avec <b>{v2}</b>, qui a déjà choisi sa défense. Tes jetons <b>s\'ajoutent</b> aux siens. Si la place tombe, vous êtes chassés tous les deux.</div>',{v:(o.target?o.target.name:t('web.ud_2','ce nœud')),v2:(o.principal||t('web.proprietaire','son propriétaire'))}):''),who:who,cible:cible,v2:o.threat||0,v3:(o.threatDetail?' ('+o.threatDetail+')':''),max:max,v4:(o.navDemi?t('web.chacun_ia_navigation',' (½🪨 +½⚡ chacun — IA de Navigation)'):' (1🪨 +1⚡ chacun)'),v5:(o.attackerCruiser?t('web.deploie_supercroiseur_deja_compte_ci_des','<div style="background:#2a1200;border:1px solid #cc6622;border-radius:8px;padding:6px 9px;margin-bottom:8px;color:#ffcfa0;font-size:.85em">⚓ Il déploie son <b>Supercroiseur</b> — déjà compté ci-dessus.</div>'):''),v6:(o.garrison!==undefined?t('web.garnison_place_comptes_dans_defense','<div style="background:#0e2a18;border:1px solid #3a8a5a;border-radius:8px;padding:6px 9px;margin-bottom:8px;color:#9fe8b8;font-size:.85em">🏛️ Garnison sur place : <b>{v}</b>{v2}{v3} — comptés dans ta défense.</div>',{v:o.garrison,v2:(o.garrisonLabel?' ('+o.garrisonLabel+')':''),v3:(o.empath?' · 🔮 +'+o.empath+' Empathes':'')}):''),max2:max,cout:Math.min(2,max),cout2:Math.min(2,max),cout3:(o.garrison!==undefined?' → total <b id="sc-dt">'+(Math.min(2,max)+(o.garrison||0)+(o.empath||0))+'</b>🛡️ contre ~'+(o.threat||0)+'⚔️':''),cout4:(o.cruiser?t('web.deployer_supercroiseur_2','<label class="opt" style="display:block;text-align:left;cursor:pointer"><input type="checkbox" id="sc-cru" style="margin-right:8px">⚓ Déployer le <b>Supercroiseur</b> (+{v}⚔️, −{cout}🪨 −{cout2}⚡)</label>',{v:o.cruiserPower||5,cout:cc.materials,cout2:cc.energy}):''),jetons2:(o.renfort?'🤝 Renforcer':t('web.defendre','🛡️ Défendre')),jetons3:(o.renfort?t('web.engage_rien_proprietaire_defend_seul','Je n\'engage rien — le propriétaire défend seul'):t('web.colonie_defend_toute_seule_avec_jetons_1','La colonie se défend toute seule avec ses jetons (1 pour une colonie, 10 pour la base de ta nation)'))});
@@ -2072,7 +2075,7 @@ function askLocalDecision(pending){
       if(sl)sl.oninput=()=>{ dv.textContent=sl.value; total(); };
       { const c=document.getElementById('sc-cru'); if(c)c.onchange=total; }
       document.getElementById('sc-ok').onclick=()=>done({defTokens:parseInt(sl.value)||0, cruiser:cru()});
-      document.getElementById('sc-none').onclick=()=>done({defTokens:0, cruiser:false});
+      document.getElementById('sc-none').onclick=()=>done({defTokens:0, cruiser:cru()}); // la case cochée compte aussi ici (Marc, 21/09)
       return;
     }
     if(k==='war_combat'){

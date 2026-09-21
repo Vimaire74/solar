@@ -1,18 +1,31 @@
-LOT 17 — À UPLOADER  ·  21/09/2026  ·  v10.86 / sw v207
+LOT 17 — À UPLOADER  ·  21/09/2026  ·  v10.87 / sw v208
 
 CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas encore en ligne).
 
-   index.html          → estampille v10.86
-   online.js           → estampille v10.86
-   moteur.js           → v10.84 + tensions
-   sw.js               → cache v207
+   index.html          → estampille v10.87
+   tutorial.html       → régénéré (v10.87)
+   online.js           → v10.87 (défense : la case Supercroiseur compte toujours ; espionnage)
+   moteur.js           → v10.84 + tensions + v10.87
+   sw.js               → cache v208
    regles.html         → règles FR
    regles.en.html      → règles EN
    lang/en.js          → traductions
    server/Dockerfile   → « COPY lang ./lang » (bilan de fin de tour en anglais)
-   server/server.js    → dit au démarrage quelles langues il a chargées
+   server/server.js    → langues chargées au démarrage + rapport de fin traduit (v10.87)
 
 Redéploie les DEUX ressources dans Coolify (site + serveur).
+
+v10.87 — PARTIE BCE3 (voir REPRISE.md §152)
+   · Supercroiseur en défense : compte avec ou sans jeton, quel que soit le bouton ; la règle
+     solo « dès 1 jeton » est supprimée ; une réponse sans la case le déploie.
+   · Assaut : +8 (colonie prise) / +6 (repoussé) S'AJOUTENT à la tension, plafond 10.
+   · Défense des ordinateurs : IA de Navigation comptée, croiseur réservé, jamais 0 jeton
+     quand 1 est payable.
+   · Routes des ordinateurs : plus de tronçon qui tombe au tour suivant, plus de route vers
+     une colonie étrangère.
+   · Marché : carte non répétable possédée grisée (Supercroiseur).
+   · Espionnage : les technologies déjà à toi apparaissent, grisées.
+   · Rapport de fin : détail du décompte et ligne de combat traduits.
 
 v10.85 — TENSIONS
    · Nation dominante (+3) et suprême (+6) : une fois par partie et par couple, dès le tour 6.
@@ -29,4 +42,4 @@ v10.84 — voir REPRISE.md §150 (pacte +4 VP, Opulence 6 VP, routes, fenêtre d
 
 APRÈS LE REDÉPLOIEMENT
    Journaux Coolify du serveur :  Langues chargées : en (2163 clés)
-   Écran d'accueil : Version 2026-09-21 · v10.86
+   Écran d'accueil : Version 2026-09-21 · v10.87
