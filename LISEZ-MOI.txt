@@ -1,19 +1,32 @@
-LOT 17 — À UPLOADER  ·  21/09/2026
+LOT 17 — À UPLOADER  ·  21/09/2026  ·  v10.86 / sw v207
 
-CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (depuis la v10.83 que tu as mise en ligne).
+CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas encore en ligne).
 
-   server/Dockerfile   → ajoute « COPY lang ./lang »
+   index.html          → estampille v10.86
+   online.js           → estampille v10.86
+   moteur.js           → v10.84 + tensions
+   sw.js               → cache v207
+   regles.html         → règles FR
+   regles.en.html      → règles EN
+   lang/en.js          → traductions
+   server/Dockerfile   → « COPY lang ./lang » (bilan de fin de tour en anglais)
    server/server.js    → dit au démarrage quelles langues il a chargées
 
-Redéploie ensuite la ressource SERVEUR dans Coolify (le site n'a pas changé).
+Redéploie les DEUX ressources dans Coolify (site + serveur).
 
-POURQUOI LE BILAN DE FIN DE TOUR RESTAIT EN FRANÇAIS
-   Le Dockerfile du serveur ne copiait pas le dossier lang/ dans l'image. Le serveur démarrait,
-   jouait, mais sans aucun dictionnaire — et l'erreur de chargement était avalée en silence.
-   Tout ce qu'il rédige lui-même (le bilan de fin de tour d'abord) restait donc en français.
-   Mes bancs passaient parce qu'en local le dossier lang/ existe à côté du serveur.
+v10.85 — TENSIONS
+   · Nation dominante (+3) et suprême (+6) : une fois par partie et par couple, dès le tour 6.
+   · Avance technologique : +2 par rang 3 d'écart, une fois par partie et par couple, dès le tour 7.
+   · Blocage de chemin : dès le tour 4.
+   · Étouffement : dès le tour 6, quand toutes les autres ont 5 colonies ou plus ; tension
+     seulement vers la nation qui coince le chemin.
+   · Accords diplomatiques : plus de −5 automatique ; seul le pacte signé remet la tension à 0.
+   · Règles : apaisement par conquête ajouté ; lignes « Sommet » en double retirées.
+   · Accords commerciaux : −2 entre TOUTES les nations, IA comprises (v10.86).
 
-POUR VÉRIFIER APRÈS LE REDÉPLOIEMENT
-   Dans les journaux Coolify du serveur, au démarrage :
-      Langues chargées : en (2148 clés)
-   Si tu lis « AUCUNE — tout sera en français », le dossier lang/ manque encore.
+v10.84 — voir REPRISE.md §150 (pacte +4 VP, Opulence 6 VP, routes, fenêtre de colonisation,
+   traductions, carte, règles).
+
+APRÈS LE REDÉPLOIEMENT
+   Journaux Coolify du serveur :  Langues chargées : en (2163 clés)
+   Écran d'accueil : Version 2026-09-21 · v10.86

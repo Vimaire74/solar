@@ -157,10 +157,10 @@
 <h3>6.2 Route</h3>
 <p>Entretien 1⚡/tour, compensé par 1🪨 de revenu commercial. Une route reste connectée tant qu'elle existe ; le jeton posé dessus sert <strong>uniquement</strong> à la protéger des pirates.</p>
 <p><strong>Une route ne compte que si elle est à toi</strong> : ses deux bouts sont tes colonies (capitale et cohabitation comprises), ou l'un est à toi et l'autre <strong>libre</strong>. Une route vers la colonie d'une autre nation ne rapporte ni 🪨 ni point de victoire (ni pour l'agenda Maître des Routes) — elle coûte quand même son entretien.</p>
-<p><strong>Une route sans extrémité à toi tombe.</strong> Au début de chaque tour, toute route dont aucun des deux bouts n'est une de tes colonies (ta capitale compte, même occupée) est abandonnée et son jeton te revient — par exemple quand tu perds la colonie qui la tenait. Une route dont un seul bout est à toi tient.</p>
+<p><strong>Une route sans extrémité à toi tombe.</strong> Au début de chaque tour, toute route dont aucun des deux bouts n'est une de tes colonies est abandonnée et son jeton te revient — par exemple quand tu perds la colonie qui la tenait. Une route dont un seul bout est à toi tient.</p>
 
 <h3>6.3 Raid</h3>
-<p>Tu prends la <strong>production d'une colonie</strong> — son revenu du tour en ⚡, 🪨 et 🔬, jamais son ❤️ — dans la limite de ce que la nation possède. Sans cible désignée, c'est la plus productive. Une colonie ne se pille qu'<strong>une fois par tour</strong>, par qui que ce soit : le bouton Raid l'indique (« déjà pillée ce tour »). Tes jetons partent 2 tours en récupération (1 avec Stratégie Guerrière). Tension : <strong>+3</strong> victime, <strong>+1</strong> pillard. Le raid ne touche pas au moral de la victime — c'est la tension (manifestations, guerre populaire) qui fait le reste.</p>
+<p>Tu prends la <strong>production d'une colonie</strong> — son revenu du tour en ⚡, 🪨 et 🔬, jamais son ❤️ — dans la limite de ce que la nation possède. Un raid vise toujours <strong>une colonie précise</strong>, que tu choisis. Une colonie ne se pille qu'<strong>une fois par tour</strong>, par qui que ce soit : le bouton Raid l'indique (« déjà pillée ce tour »). Tes jetons partent 2 tours en récupération (1 avec Stratégie Guerrière). Tension : <strong>+3</strong> victime, <strong>+1</strong> pillard. Le raid ne touche pas au moral de la victime — c'est la tension (manifestations, guerre populaire) qui fait le reste.</p>
 <p>🔍 IA Défensive annule le vol, 🛰️ Drones de Surveillance retire <strong>1 unité à chaque ressource volée</strong>. Un raid bloqué coûte quand même AC et jetons, donne +1 de tension, et le pillard en est averti.</p>
 
 <h3>6.4 Accord commercial</h3>
@@ -305,16 +305,16 @@
 <p>Une jauge de 0 à 10 par <strong>couple de nations</strong>, y compris entre deux nations que tu ne joues pas : deux rivales peuvent entrer en guerre sans que tu y sois pour rien. Une guerre en cours ne gèle que le couple concerné.</p>
 
 <h3>12.1 Ce qui la fait monter</h3>
-<p>Les griefs de <strong>voisinage</strong> se repaient chaque tour tant que la situation dure ; les griefs d'<strong>acte</strong> se paient au moment où ils surviennent.</p>
+<p>Les griefs de <strong>voisinage</strong> (routes) se repaient chaque tour tant que la situation dure ; les griefs de <strong>situation</strong> (dominance, avance technologique, blocage) ne se paient <strong>qu'une fois par partie</strong> et par couple de nations ; les griefs d'<strong>acte</strong> se paient au moment où ils surviennent.</p>
 <table>
 <tr><th>Cause</th><th>Points</th><th>Quand</th></tr>
 <tr><td>Route adverse touchant une de tes colonies, sans accord entre vous</td><td>+1 par route</td><td>chaque tour</td></tr>
 <tr><td>Route partagée avec un jeton de défense adverse</td><td>+1 par route</td><td>chaque tour</td></tr>
-<tr><td>Nation dominante — 4 colonies connectées d'avance</td><td>+3</td><td>chaque tour</td></tr>
-<tr><td>Nation suprême — 6 colonies d'avance</td><td>+6</td><td>chaque tour</td></tr>
-<tr><td><strong>Avance technologique</strong> — l'autre nation a plus de technologies de rang 3 que toi</td><td>+2 par rang 3 d'écart</td><td>tous les deux tours (les tours d'événement), après l'événement — la guerre qui en résulterait n'est jugée qu'à la fin du tour suivant</td></tr>
-<tr><td><strong>Blocage de chemin</strong> — tu as <em>au plus 2 colonies</em>, il ne te reste au plus une sortie libre, et elle en tient une. Vise uniquement celle qui occupe le plus de tes sorties (les nœuds que tu possèdes toi-même ne comptent pas comme des sorties bouchées).</td><td>+4</td><td>une seule fois</td></tr>
-<tr><td><strong>Étouffement</strong> — 2 colonies quand <em>toutes</em> les autres en ont 3 ou plus (dès le tour 2). Vise uniquement celle qui occupe le plus de tes sorties.</td><td>+6 puis +1</td><td>+6 à l'installation, +1 par tour ensuite</td></tr>
+<tr><td>Nation dominante — 4 colonies connectées d'avance</td><td>+3</td><td>une seule fois par partie, dès le tour 6</td></tr>
+<tr><td>Nation suprême — 6 colonies connectées d'avance</td><td>+6</td><td>une seule fois par partie, dès le tour 6 (s'ajoute au +3 de la nation dominante)</td></tr>
+<tr><td><strong>Avance technologique</strong> — l'autre nation a plus de technologies de rang 3 que toi</td><td>+2 par rang 3 d'écart</td><td>une seule fois par partie, dès le tour 7, après l'événement — la guerre qui en résulterait n'est jugée qu'à la fin du tour suivant</td></tr>
+<tr><td><strong>Blocage de chemin</strong> — tu as <em>au plus 2 colonies</em>, il ne te reste au plus une sortie libre, et elle en tient une. Vise uniquement celle qui occupe le plus de tes sorties (les nœuds que tu possèdes toi-même ne comptent pas comme des sorties bouchées).</td><td>+4</td><td>une seule fois, dès le tour 4</td></tr>
+<tr><td><strong>Étouffement</strong> — 2 colonies quand <em>toutes</em> les autres en ont 5 ou plus (dès le tour 6). Vise uniquement celle qui te coince le chemin (qui occupe le plus de tes sorties).</td><td>+6 puis +1</td><td>+6 à l'installation, +1 par tour ensuite</td></tr>
 <tr><td>Raid subi</td><td>+3 victime, +1 pillard</td><td>à chaque raid</td></tr>
 <tr><td>Raid bloqué par 🔍 IA Défensive</td><td>+1 victime</td><td>à chaque tentative</td></tr>
 <tr><td>Espionnage détecté</td><td>+6, +8 ou +10 chez la victime</td><td>à la détection</td></tr>
@@ -330,13 +330,12 @@
 <tr><td>Accord commercial signé</td><td>−3 des deux côtés</td></tr>
 <tr><td>🕊️ Calmer la population (action sociale)</td><td>−3 à ta tension envers une nation de ton choix — une fois par nation et par tour</td></tr>
 <tr><td>🕊️ Mission diplomatique (action sociale)</td><td>−3 à la tension d'une nation envers toi — une fois par nation et par tour</td></tr>
-<tr><td>Sommet des accords — proposition acceptée</td><td>−5 entre le proposant et chaque nation qui accepte</td></tr>
 <tr><td>Pacte de non-agression</td><td>les deux jauges à 0</td></tr>
-<tr><td>Événement Sommet commercial</td><td>−2 avec chaque nation</td></tr>
-<tr><td>Événement Sommet diplomatique</td><td>−5 partout</td></tr>
+<tr><td>Événement Accords commerciaux</td><td>−2 entre toutes les nations (IA comprises)</td></tr>
 <tr><td>Carte Diplomatie</td><td>−3 à la tension d'une nation choisie ENVERS TOI, <strong>et sa rancune est effacée</strong> (voir 12.4)</td></tr>
 <tr><td>Accepter le monopole de la Sphère de Dyson</td><td>les deux jauges à 2, la guerre à peine déclarée s'arrête</td></tr>
 <tr><td>Fin de guerre</td><td>vainqueur 0, perdant 5 · paix blanche : 4 partout</td></tr>
+<tr><td>Conquête</td><td>prendre la <strong>capitale</strong> d'une nation remet ta tension envers elle à <strong>0</strong> ; prendre une autre de ses colonies la baisse de <strong>4</strong></td></tr>
 </table>
 
 <h3>12.3 Effets</h3>
@@ -348,7 +347,7 @@
 <p>Un accord commercial ou un pacte est refusé au-dessus de <strong>7</strong> de tension, ou en cas de guerre.</p>
 
 <h3>12.4 La rancune — ce qu'une nation n'oublie pas</h3>
-<p>La tension s'efface : elle redescend d'elle-même, une paix la divise par deux, un sommet la baisse partout. La <strong>rancune</strong>, elle, ne s'efface pas avec le temps. Chaque raid et chaque assaut que tu fais subir à une nation — <strong>réussi ou non</strong> — s'ajoute à son compteur, et ce compteur <strong>durcit toutes ses réponses à tes demandes</strong> : accord commercial, pacte de non-agression, offre de paix.</p>
+<p>La tension s'efface : elle redescend d'elle-même, une paix la divise par deux, un pacte la remet à zéro. La <strong>rancune</strong>, elle, ne s'efface pas avec le temps. Chaque raid et chaque assaut que tu fais subir à une nation — <strong>réussi ou non</strong> — s'ajoute à son compteur, et ce compteur <strong>durcit toutes ses réponses à tes demandes</strong> : accord commercial, pacte de non-agression, offre de paix.</p>
 <p>Concrètement, au moment où elle décide, elle ressent ta tension <strong>+1</strong> dès la première agression et <strong>+2</strong> à partir de la troisième. Un accord qui serait passé à 6 de tension est refusé si tu l'as déjà attaquée, et le refus te dit pourquoi. À tension basse, en revanche, une rancune seule ne bloque rien : une nation tranquille reste ouverte.</p>
 <p><strong>Et on se réconcilie toujours.</strong> Une mission 🕊️ <strong>Diplomatie</strong> dirigée vers cette nation efface son ardoise d'un coup — elle ne dépend pas de son accord, donc une diplomatie bloquée peut toujours se débloquer. Un pacte de non-agression signé l'efface aussi, des deux côtés.</p>
 
@@ -365,7 +364,7 @@
 <p>Même déroulé, que l'assaut vienne d'un joueur ou de l'ordinateur. Un assaut <strong>rompt l'accord commercial</strong> qui liait les deux nations — on ne commerce pas avec qui l'on attaque — mais il ne rompt ni les routes ni les colonies de cohabitation : cela n'arrive qu'à la déclaration d'une vraie guerre.</p>
 
 <h3>14.2 Le combat</h3>
-<p>Tout se joue en <strong>jetons Force</strong>. Chaque jeton engagé coûte <strong>1🪨 + 1⚡</strong> : tu ne peux engager que ce que tu peux payer (l'IA de Navigation divise ce coût par deux). S'ajoutent gratuitement le bonus Empathes (+2 ou +4) et le Supercroiseur (+5) si tu le déploies.</p>
+<p>Tout se joue en <strong>jetons Force</strong>. Chaque jeton engagé coûte <strong>1🪨 + 1⚡</strong> : tu ne peux engager que ce que tu peux payer (l'IA de Navigation divise ce coût par deux). Le bonus Empathes (+2 ou +4) s'ajoute gratuitement. Le Supercroiseur (+5), lui, se paie à chaque déploiement : <strong>5🪨 + 5⚡</strong> (2🪨 + 3⚡ avec l'IA de Navigation), voir §14.7.</p>
 <ul>
 <li>Le défenseur <strong>choisit</strong> sa défense. Sans défense, l'attaquant prend la cible sans rien dépenser : engager des jetons est le seul moyen de lui faire perdre des forces.</li>
 <li>Tes assauts ne sont pas plafonnés — seuls tes AC, tes jetons et tes ressources les bornent. Une nation tenue par l'ordinateur ne t'assaille qu'une fois par tour.</li>
@@ -373,7 +372,7 @@
 </ul>
 
 <h3>14.3 L'ordre des combats en fin de tour</h3>
-<p>Une fois la guerre ouverte, le <strong>premier tour</strong> appartient à celui qui l'a ouverte : lui seul frappe. Dès le <strong>tour suivant</strong>, chaque camp mène un assaut et subit celui de l'autre — <strong>deux combats</strong> par soirée. Chaque jeton se payant, il faut répartir jetons et ressources entre attaque et défense : c'est là que se joue la guerre.</p>
+<p>Une fois la guerre ouverte, le <strong>premier tour</strong> appartient à celui qui l'a ouverte : lui seul frappe. Dès le <strong>tour suivant</strong>, chaque camp mène un assaut et subit celui de l'autre — <strong>deux combats</strong> en fin de tour. Chaque jeton se payant, il faut répartir jetons et ressources entre attaque et défense : c'est là que se joue la guerre.</p>
 <p>L'<strong>initiative</strong> ne dit pas qui frappe en premier, mais <em>qui choisit</em> lequel des deux frappe en premier. Elle se détermine par la première règle qui départage :</p>
 <table>
 <tr><th>#</th><th>Critère</th><th>Qui l'emporte</th></tr>
@@ -390,7 +389,7 @@
 <p>Chaque colonie connectée hors ta base immobilise <strong>1 jeton en réserve</strong> : tes jetons attaquables sont tes jetons totaux moins tes colonies connectées. Plus tu t'étends, moins tu peux attaquer.</p>
 <p>Toute colonie ajoute <strong>1 jeton de garnison</strong> à la défense engagée : aucune n'est sans défense. Si elle tombe, ce jeton est détruit.</p>
 <p><strong>La capitale.</strong> Tenue par sa nation d'origine, elle est attaquable mais défendue par <strong>10 jetons de garnison</strong>. La prendre à sa nation d'origine rapporte <strong>+10 VP</strong> — <strong>tant qu'on la tient</strong> : si elle échappe à son conquérant (reprise par son propriétaire, ou prise par un tiers), ces 10 VP sautent aussitôt ; le tiers, lui, ne touche rien. Une fois conquise, elle se défend comme une colonie ordinaire (<strong>1 jeton</strong>) : sa nation d'origine peut la reprendre — sans bonus de VP. Reprise, sa garnison repart de <strong>1</strong> et gagne <strong>+1 par tour</strong> jusqu'à 10 ; tous les joueurs en sont avertis au moment de la reprise.</p>
-<p><strong>Routes en guerre.</strong> À la déclaration de guerre, toute route dont aucune extrémité n'est à toi et dont une extrémité est à l'ennemi est rompue et son jeton te revient. Exception : une route qui touche <strong>ta capitale</strong>, même occupée par l'ennemi, tient — c'est le chemin du retour.</p>
+<p><strong>Routes en guerre.</strong> À la déclaration de guerre, toute route dont aucune extrémité n'est à toi et dont une extrémité est à l'ennemi est rompue et son jeton te revient.</p>
 <p>La fenêtre de défense annonce la garnison du lieu attaqué (10 capitale, 1 colonie, capitale reprise : sa valeur du moment) et le total de ta défense.</p>
 <p><strong>Une nation sans aucune colonie ne joue plus</strong> : c'est fini pour elle jusqu'à la fin de la partie (elle garde ses cartes, ses jetons et ses points, mais n'agit plus et ne peut plus être attaquée). Une nation qui a perdu sa capitale mais garde d'autres colonies continue de jouer.</p>
 
@@ -426,7 +425,7 @@
 <tr><td>🌩️ Tempêtes solaires</td><td>Sans IA Défensive : −1 jeton, −1 route, −2🪨 pour chaque nation</td></tr>
 <tr><td>☠️ Prolifération des pirates</td><td>Routes de la nation la plus riche en 🪨 (stock à la fin des actions, avant le revenu du tour) : non protégées détruites, protégées 1 chance sur 2.</td></tr>
 <tr><td>🤝 Accords commerciaux</td><td>Accord <strong>gratuit</strong> avec la nation de ton choix : +3 VP chacune, fin immédiate d'une guerre. Elle peut refuser si tu es très en avance.</td></tr>
-<tr><td>🕊️ Accords diplomatiques</td><td>Pacte de non-agression de 4 tours : 6🪨 (+2⚡ si vous êtes en guerre). Met fin à la guerre, tension à 0, +1❤️. L'événement baisse la tension de 5 partout.</td></tr>
+<tr><td>🕊️ Accords diplomatiques</td><td>Pacte de non-agression de 4 tours : 6🪨 (+2⚡ si vous êtes en guerre). Met fin à la guerre, tension à 0, +1❤️ et <strong>+4 VP pour chacune des deux nations</strong> à la signature.</td></tr>
 <tr><td>🏆 Jugement final (tour 10)</td><td>Calcul des scores</td></tr>
 </table>
 <p class="cle"><strong>Le pacte de non-agression lie vraiment.</strong> Pendant ses 4 tours, aucun des deux signataires ne peut assaillir l'autre, le piller ni lui déclarer la guerre — pas même par guerre populaire. Il ne lie que ces deux-là : chacun reste libre d'attaquer les autres. Un refus est notifié au proposant, qui ne paie alors rien.</p>
@@ -442,7 +441,7 @@
 <tr><td>🛤️ Maître des routes</td><td>5 routes ou plus</td><td>+6 VP</td></tr>
 <tr><td>🟠 Hub jovien</td><td>3 colonies joviennes ou plus</td><td>+6 VP</td></tr>
 <tr><td>⚡ Empire énergétique</td><td>Toutes les technologies produisant de l'⚡</td><td>+12 VP</td></tr>
-<tr><td>🪨 Opulence matérielle</td><td>Toutes les technologies produisant des 🪨</td><td>+12 VP</td></tr>
+<tr><td>🪨 Opulence matérielle</td><td>Toutes les technologies produisant des 🪨</td><td>+6 VP</td></tr>
 </table>
 
 <h2 id="s17">17. Points de victoire</h2>

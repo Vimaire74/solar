@@ -40,7 +40,15 @@ try {
     const bac = { window: {} };
     try { require('vm').runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'lang', f), 'utf8'), bac); DICTS[m[1]] = bac.window.SOLAR_LANG_DICT || {}; } catch (e) { console.error('lang/' + f + ' : ' + e.message); }
   }
-} catch (e) {}
+} catch (e) {
+  /* ⚠️ CE `catch` ÉTAIT MUET, ET C'EST LUI QUI A GARDÉ LE BILAN EN FRANÇAIS (21/09).
+     Le Dockerfile ne copiait pas `lang/` dans l'image : le dossier n'existait pas sur le serveur,
+     `readdirSync` levait, et l'erreur disparaissait ici. Résultat : aucun dictionnaire, donc tout
+     ce que le serveur rédige lui-même — le bilan de fin de tour d'abord — restait en français,
+     alors que les bancs passaient (en local, `../lang` existe). On le dit maintenant au démarrage. */
+  console.error('⚠️ LANGUES : dossier lang/ introuvable (' + path.join(__dirname, '..', 'lang') + ') — le serveur rédigera tout en français. Vérifie `COPY lang ./lang` dans server/Dockerfile.');
+}
+console.log('Langues chargées : ' + (Object.keys(DICTS).length ? Object.keys(DICTS).map(k => k + ' (' + Object.keys(DICTS[k]).length + ' clés)').join(', ') : 'AUCUNE — tout sera en français'));
 function K(k, fr, p) { return { k, fr, p: p || null }; }
 function tL(lang, k, fr, p) {
   const d = DICTS[lang] || null;

@@ -157,10 +157,10 @@
 <h3>6.2 Routes</h3>
 <p>Upkeep 1⚡/turn, offset by 1🪨 of trade income. A route stays connected as long as it exists; the token placed on it serves <strong>only</strong> to protect it from pirates.</p>
 <p><strong>A route only counts if it is yours</strong>: both its ends are your colonies (capital and cohabitation included), or one is yours and the other is <strong>free</strong>. A route to another nation's colony yields neither 🪨 nor victory points (nor for the Master of Routes agenda) — it still costs its upkeep.</p>
-<p><strong>A route with no end of yours falls.</strong> At the start of each turn, any route neither end of which is one of your colonies (your capital counts, even when occupied) is abandoned and its token comes back to you — for instance when you lose the colony that held it. A route with only one end of yours holds.</p>
+<p><strong>A route with no end of yours falls.</strong> At the start of each turn, any route neither end of which is one of your colonies is abandoned and its token comes back to you — for instance when you lose the colony that held it. A route with only one end of yours holds.</p>
 
 <h3>6.3 Raid</h3>
-<p>You take the <strong>production of a colony</strong> — its income for the turn in ⚡, 🪨 and 🔬, never its ❤️ — within the limit of what the nation owns. Without a designated target, it is the most productive one. A colony can only be raided <strong>once per turn</strong>, by anyone: the Raid button says so (“already raided this turn”). Your tokens go into recovery for 2 turns (1 with War Strategy). Tension: <strong>+3</strong> victim, <strong>+1</strong> raider. The raid does not touch the victim's morale — tension (demonstrations, popular war) does the rest.</p>
+<p>You take the <strong>production of a colony</strong> — its income for the turn in ⚡, 🪨 and 🔬, never its ❤️ — within the limit of what the nation owns. A raid always targets <strong>one specific colony</strong>, which you choose. A colony can only be raided <strong>once per turn</strong>, by anyone: the Raid button says so (“already raided this turn”). Your tokens go into recovery for 2 turns (1 with War Strategy). Tension: <strong>+3</strong> victim, <strong>+1</strong> raider. The raid does not touch the victim's morale — tension (demonstrations, popular war) does the rest.</p>
 <p>🔍 Defensive AI cancels the theft, 🛰️ Surveillance Drones remove <strong>1 unit from each resource stolen</strong>. A blocked raid still costs AP and tokens, gives +1 tension, and the raider is told about it.</p>
 
 <h3>6.4 Trade agreement</h3>
@@ -305,16 +305,16 @@
 <p>A gauge from 0 to 10 per <strong>pair of nations</strong>, including between two nations you do not play: two rivals can go to war without you having anything to do with it. An ongoing war only freezes the pair concerned.</p>
 
 <h3>12.1 What raises it</h3>
-<p><strong>Neighbourhood</strong> grievances are paid again every turn as long as the situation lasts; grievances of <strong>deed</strong> are paid the moment they occur.</p>
+<p><strong>Neighbourhood</strong> grievances (routes) are paid again every turn as long as the situation lasts; <strong>situation</strong> grievances (dominance, technological lead, blocking) are paid <strong>only once per game</strong> for each pair of nations; grievances of <strong>deed</strong> are paid the moment they occur.</p>
 <table>
 <tr><th>Cause</th><th>Points</th><th>When</th></tr>
 <tr><td>Enemy route touching one of your colonies, without an agreement between you</td><td>+1 per route</td><td>every turn</td></tr>
 <tr><td>Shared route with an enemy defence token</td><td>+1 per route</td><td>every turn</td></tr>
-<tr><td>Dominant nation — 4 connected colonies ahead</td><td>+3</td><td>every turn</td></tr>
-<tr><td>Supreme nation — 6 colonies ahead</td><td>+6</td><td>every turn</td></tr>
-<tr><td><strong>Technological lead</strong> — the other nation has more rank 3 technologies than you</td><td>+2 per rank 3 of difference</td><td>every two turns (the event turns), after the event — the war that would result is only judged at the end of the following turn</td></tr>
-<tr><td><strong>Path blocking</strong> — you have <em>at most 2 colonies</em>, at most one free exit remains, and it holds one. Only the nation occupying the most of your exits is targeted (nodes you own yourself do not count as blocked exits).</td><td>+4</td><td>once only</td></tr>
-<tr><td><strong>Suffocation</strong> — 2 colonies when <em>all</em> the others have 3 or more (from turn 2). Only the nation occupying the most of your exits is targeted.</td><td>+6 then +1</td><td>+6 when it sets in, +1 per turn afterwards</td></tr>
+<tr><td>Dominant nation — 4 connected colonies ahead</td><td>+3</td><td>only once per game, from turn 6</td></tr>
+<tr><td>Supreme nation — 6 connected colonies ahead</td><td>+6</td><td>only once per game, from turn 6 (added to the +3 of the dominant nation)</td></tr>
+<tr><td><strong>Technological lead</strong> — the other nation has more rank 3 technologies than you</td><td>+2 per rank 3 of difference</td><td>only once per game, from turn 7, after the event — the war that would result is only judged at the end of the following turn</td></tr>
+<tr><td><strong>Path blocking</strong> — you have <em>at most 2 colonies</em>, at most one free exit remains, and it holds one. Only the nation occupying the most of your exits is targeted (nodes you own yourself do not count as blocked exits).</td><td>+4</td><td>once only, from turn 4</td></tr>
+<tr><td><strong>Suffocation</strong> — 2 colonies when <em>all</em> the others have 5 or more (from turn 6). Only the nation hemming you in (occupying the most of your exits) is targeted.</td><td>+6 then +1</td><td>+6 when it sets in, +1 per turn afterwards</td></tr>
 <tr><td>Raid suffered</td><td>+3 victim, +1 raider</td><td>at each raid</td></tr>
 <tr><td>Raid blocked by 🔍 Defensive AI</td><td>+1 victim</td><td>at each attempt</td></tr>
 <tr><td>Espionage detected</td><td>+6, +8 or +10 for the victim</td><td>on detection</td></tr>
@@ -330,13 +330,12 @@
 <tr><td>Trade agreement signed</td><td>−3 on both sides</td></tr>
 <tr><td>🕊️ Calm the People (society action)</td><td>−3 to your tension towards a nation of your choice — once per nation per turn</td></tr>
 <tr><td>🕊️ Diplomatic Mission (society action)</td><td>−3 to a nation's tension towards you — once per nation per turn</td></tr>
-<tr><td>Agreements summit — proposal accepted</td><td>−5 between the proposer and each nation that accepts</td></tr>
 <tr><td>Non-aggression pact</td><td>both gauges to 0</td></tr>
-<tr><td>Trade Summit event</td><td>−2 with every nation</td></tr>
-<tr><td>Diplomatic Summit event</td><td>−5 everywhere</td></tr>
+<tr><td>Trade Agreements event</td><td>−2 between all nations (computer ones included)</td></tr>
 <tr><td>Diplomacy card</td><td>−3 to a chosen nation's tension TOWARDS YOU, <strong>and its grudge is wiped</strong> (see 12.4)</td></tr>
 <tr><td>Accepting the Dyson Sphere monopoly</td><td>both gauges to 2, the war just declared stops</td></tr>
 <tr><td>End of war</td><td>winner 0, loser 5 · white peace: 4 everywhere</td></tr>
+<tr><td>Conquest</td><td>taking a nation's <strong>capital</strong> resets your tension toward it to <strong>0</strong>; taking another of its colonies lowers it by <strong>4</strong></td></tr>
 </table>
 
 <h3>12.3 Effects</h3>
@@ -348,7 +347,7 @@
 <p>A trade agreement or a pact is refused above <strong>7</strong> tension, or in case of war.</p>
 
 <h3>12.4 The grudge — what a nation does not forget</h3>
-<p>Tension fades: it comes down on its own, a peace halves it, a summit lowers it everywhere. The <strong>grudge</strong>, however, does not fade with time. Every raid and every assault you inflict on a nation — <strong>successful or not</strong> — is added to its counter, and that counter <strong>hardens all its answers to your requests</strong>: trade agreement, non-aggression pact, peace offer.</p>
+<p>Tension fades: it comes down on its own, a peace halves it, a pact resets it to zero. The <strong>grudge</strong>, however, does not fade with time. Every raid and every assault you inflict on a nation — <strong>successful or not</strong> — is added to its counter, and that counter <strong>hardens all its answers to your requests</strong>: trade agreement, non-aggression pact, peace offer.</p>
 <p>Concretely, when it decides, it feels your tension <strong>+1</strong> from the first aggression and <strong>+2</strong> from the third onwards. An agreement that would have passed at 6 tension is refused if you have already attacked it, and the refusal tells you why. At low tension, on the other hand, a grudge alone blocks nothing: a nation at peace stays open.</p>
 <p><strong>And reconciliation is always possible.</strong> A 🕊️ <strong>Diplomacy</strong> mission aimed at that nation wipes its slate clean in one go — it does not depend on its consent, so blocked diplomacy can always be unblocked. A signed non-aggression pact wipes it too, on both sides.</p>
 
@@ -365,7 +364,7 @@
 <p>Same sequence whether the assault comes from a player or from the computer. An assault <strong>breaks the trade agreement</strong> that bound the two nations — you do not trade with those you attack — but it breaks neither routes nor cohabitation colonies: that only happens on the declaration of a real war.</p>
 
 <h3>14.2 Battle</h3>
-<p>Everything is played in <strong>Force tokens</strong>. Each token committed costs <strong>1🪨 + 1⚡</strong>: you can only commit what you can pay for (Navigation AI halves that cost). Added for free are the Empaths bonus (+2 or +4) and the Supercruiser (+5) if you deploy it.</p>
+<p>Everything is played in <strong>Force tokens</strong>. Each token committed costs <strong>1🪨 + 1⚡</strong>: you can only commit what you can pay for (Navigation AI halves that cost). The Empaths bonus (+2 or +4) is added for free. The Supercruiser (+5), however, is paid for each time it is deployed: <strong>5🪨 + 5⚡</strong> (2🪨 + 3⚡ with Navigation AI), see §14.7.</p>
 <ul>
 <li>The defender <strong>chooses</strong> its defence. Without defence, the attacker takes the target without spending anything: committing tokens is the only way to make it lose forces.</li>
 <li>Your assaults are not capped — only your AP, your tokens and your resources limit them. A computer-controlled nation only assaults you once per turn.</li>
@@ -373,7 +372,7 @@
 </ul>
 
 <h3>14.3 The order of battles at the end of the turn</h3>
-<p>Once war is open, the <strong>first turn</strong> belongs to whoever opened it: only they strike. From the <strong>following turn</strong>, each side leads an assault and suffers the other's — <strong>two battles</strong> per evening. Since each token has to be paid for, tokens and resources must be split between attack and defence: that is where the war is decided.</p>
+<p>Once war is open, the <strong>first turn</strong> belongs to whoever opened it: only they strike. From the <strong>following turn</strong>, each side leads an assault and suffers the other's — <strong>two battles</strong> at the end of the turn. Since each token has to be paid for, tokens and resources must be split between attack and defence: that is where the war is decided.</p>
 <p>The <strong>initiative</strong> does not say who strikes first, but <em>who chooses</em> which of the two strikes first. It is decided by the first rule that separates them:</p>
 <table>
 <tr><th>#</th><th>Criterion</th><th>Who wins it</th></tr>
@@ -390,7 +389,7 @@
 <p>Each connected colony other than your base ties up <strong>1 token in reserve</strong>: your attack-capable tokens are your total tokens minus your connected colonies. The more you expand, the less you can attack.</p>
 <p>Every colony adds <strong>1 garrison token</strong> to the defence committed: none is defenceless. If it falls, that token is destroyed.</p>
 <p><strong>The capital.</strong> Held by its original nation, it can be attacked but is defended by <strong>10 garrison tokens</strong>. Taking it from its original nation yields <strong>+10 VP</strong> — <strong>as long as you hold it</strong>: if it escapes its conqueror (retaken by its owner, or taken by a third party), those 10 VP vanish at once; the third party gets nothing. Once conquered, it defends itself like an ordinary colony (<strong>1 token</strong>): its original nation can take it back — without any VP bonus. Once retaken, its garrison starts again at <strong>1</strong> and gains <strong>+1 per turn</strong> up to 10; all players are told at the moment it is retaken.</p>
-<p><strong>Routes in war.</strong> On the declaration of war, any route neither end of which is yours and one end of which belongs to the enemy is broken and its token comes back to you. Exception: a route that touches <strong>your capital</strong>, even one occupied by the enemy, holds — it is the way home.</p>
+<p><strong>Routes in war.</strong> On the declaration of war, any route neither end of which is yours and one end of which belongs to the enemy is broken and its token comes back to you.</p>
 <p>The defence window announces the garrison of the place attacked (10 capital, 1 colony, retaken capital: its current value) and the total of your defence.</p>
 <p><strong>A nation with no colony at all no longer plays</strong>: it is over for it until the end of the game (it keeps its cards, its tokens and its points, but no longer acts and can no longer be attacked). A nation that has lost its capital but keeps other colonies goes on playing.</p>
 
@@ -426,7 +425,7 @@
 <tr><td>🌩️ Solar Storms</td><td>Without Defensive AI: −1 token, −1 route, −2🪨 for every nation</td></tr>
 <tr><td>☠️ Pirate Proliferation</td><td>Routes of the nation richest in 🪨 (stock at the end of the actions, before the turn's income): unprotected ones destroyed, protected ones a 1 in 2 chance.</td></tr>
 <tr><td>🤝 Trade Agreements</td><td><strong>Free</strong> agreement with the nation of your choice: +3 VP each, immediate end of a war. It may refuse if you are far ahead.</td></tr>
-<tr><td>🕊️ Diplomatic Agreements</td><td>Non-aggression pact for 4 turns: 6🪨 (+2⚡ if you are at war). Ends the war, tension to 0, +1❤️. The event lowers tension by 5 everywhere.</td></tr>
+<tr><td>🕊️ Diplomatic Agreements</td><td>Non-aggression pact for 4 turns: 6🪨 (+2⚡ if you are at war). Ends the war, tension to 0, +1❤️ and <strong>+4 VP for each of the two nations</strong> on signing.</td></tr>
 <tr><td>🏆 Final Judgement (turn 10)</td><td>Scores are calculated</td></tr>
 </table>
 <p class="cle"><strong>The non-aggression pact really binds.</strong> During its 4 turns, neither signatory can assault the other, raid it or declare war on it — not even by popular war. It binds only those two: each remains free to attack the others. A refusal is notified to the proposer, who then pays nothing.</p>
@@ -442,7 +441,7 @@
 <tr><td>🛤️ Master of Routes</td><td>5 routes or more</td><td>+6 VP</td></tr>
 <tr><td>🟠 Jovian Hub</td><td>3 Jovian colonies or more</td><td>+6 VP</td></tr>
 <tr><td>⚡ Energy Empire</td><td>All the technologies producing ⚡</td><td>+12 VP</td></tr>
-<tr><td>🪨 Material Opulence</td><td>All the technologies producing 🪨</td><td>+12 VP</td></tr>
+<tr><td>🪨 Material Opulence</td><td>All the technologies producing 🪨</td><td>+6 VP</td></tr>
 </table>
 
 <h2 id="s17">17. Victory points</h2>
