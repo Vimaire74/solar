@@ -14,6 +14,12 @@ RUN cd server && npm install --omit=dev --no-fund --no-audit
 # l'extraction et ne copiait qu'index.html.
 COPY index.html moteur.js ./
 
+# ⚠️ ET LES LANGUES (21/09). Sans ce dossier, le serveur démarre, joue, et rédige TOUT en français :
+# le bilan de fin de tour (qu'il écrit lui-même, une fois par langue), ses messages, le courriel de
+# fin de partie. Il n'y avait aucun message d'erreur — le chargement échouait en silence. Depuis la
+# v10.84 il le dit au démarrage (« Langues chargées : … »).
+COPY lang ./lang
+
 COPY server/server.js server/driver.js server/game-core.js server/bot.js server/
 ENV GAME_HTML=/app/index.html \
     DATA_DIR=/data \
