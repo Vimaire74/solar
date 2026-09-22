@@ -160,7 +160,7 @@
 <p><strong>Une route sans extrémité à toi tombe.</strong> Au début de chaque tour, toute route dont aucun des deux bouts n'est une de tes colonies est abandonnée et son jeton te revient — par exemple quand tu perds la colonie qui la tenait. Une route dont un seul bout est à toi tient.</p>
 
 <h3>6.3 Raid</h3>
-<p>Tu prends la <strong>production d'une colonie</strong> — son revenu du tour en ⚡, 🪨 et 🔬, jamais son ❤️ — dans la limite de ce que la nation possède. Un raid vise toujours <strong>une colonie précise</strong>, que tu choisis. Une colonie ne se pille qu'<strong>une fois par tour</strong>, par qui que ce soit : le bouton Raid l'indique (« déjà pillée ce tour »). Tes jetons partent 2 tours en récupération (1 avec Stratégie Guerrière). Tension : <strong>+3</strong> victime, <strong>+1</strong> pillard. Le raid ne touche pas au moral de la victime — c'est la tension (manifestations, guerre populaire) qui fait le reste.</p>
+<p>Tu prends la <strong>production d'une colonie</strong> — son revenu du tour en ⚡, 🪨 et 🔬, jamais son ❤️. Tu la reçois tout de suite ; la nation pillée ne la touche pas en fin de tour (son stock n'est pas entamé : c'est le revenu de cette colonie qui manque). Un raid vise toujours <strong>une colonie précise</strong>, que tu choisis. Une colonie ne se pille qu'<strong>une fois par tour</strong>, par qui que ce soit : le bouton Raid l'indique (« déjà pillée ce tour »). Tes jetons partent 2 tours en récupération (1 avec Stratégie Guerrière). Tension : <strong>+3</strong> victime, <strong>+1</strong> pillard. Le raid ne touche pas au moral de la victime — c'est la tension (manifestations, guerre populaire) qui fait le reste.</p>
 <p>🔍 IA Défensive annule le vol, 🛰️ Drones de Surveillance retire <strong>1 unité à chaque ressource volée</strong>. Un raid bloqué coûte quand même AC et jetons, donne +1 de tension, et le pillard en est averti.</p>
 
 <h3>6.4 Accord commercial</h3>
@@ -319,7 +319,7 @@
 <tr><td>Raid bloqué par 🔍 IA Défensive</td><td>+1 victime</td><td>à chaque tentative</td></tr>
 <tr><td>Espionnage détecté</td><td>+6, +8 ou +10 chez la victime</td><td>à la détection</td></tr>
 <tr><td>Assaut d'une colonie</td><td><strong>+8</strong> chez l'assailli si la colonie tombe, <strong>+6</strong> si elle tient — l'assaillant n'ajoute rien</td><td>à chaque assaut, cumulable (plafond 10)</td></tr>
-<tr><td>Attaque de pirates sur tes routes</td><td>+1 envers les Ceinturiens</td><td>à chaque attaque</td></tr>
+<tr><td>Pillage de pirates sur tes routes</td><td>+1 envers les Ceinturiens</td><td>une fois par tour où tu es pillé</td></tr>
 <tr><td>Déclaration de guerre</td><td>les deux jauges à 10</td><td>immédiatement</td></tr>
 </table>
 
@@ -352,7 +352,10 @@
 <p><strong>Et on se réconcilie toujours.</strong> Une mission 🕊️ <strong>Diplomatie</strong> dirigée vers cette nation efface son ardoise d'un coup — elle ne dépend pas de son accord, donc une diplomatie bloquée peut toujours se débloquer. Un pacte de non-agression signé l'efface aussi, des deux côtés.</p>
 
 <h2 id="s13">13. Pirates</h2>
-<p>Ils occupent Triton et épargnent les Ceinturiens, qui font de la contrebande avec eux. Chaque route <strong>non protégée</strong> risque d'être détruite : <strong>20 % au tour 1, +10 points par tour</strong>, certain dès le tour 9. Reconstruction : 1 AC + 1🪨. Les colonies ne sont jamais touchées, et la tension envers les Ceinturiens monte de 1 à chaque attaque.</p>
+<p>Les pirates vivent dans la <strong>ceinture d'astéroïdes principale</strong> (Cérès, Vesta) et dans la <strong>ceinture de Kuiper</strong> (Pluton, Éris). Ils pillent les routes de toutes les nations — sauf celles des <strong>Ceinturiens</strong>, à qui ils vendent leur contrebande.</p>
+<p><strong>Quelles routes ?</strong> Celles dont une extrémité est à <strong>60 jours de voyage ou moins</strong> d'un repaire (Phobos, Déimos, Lune, Io, Europe, Ganymède, Callisto, Triton et les repaires eux-mêmes). Une route dont les deux extrémités sont plus loin (Titan–Encelade, par exemple) n'est jamais visitée.</p>
+<p><strong>Quand et combien ?</strong> Au <strong>début de chaque tour</strong>, après le choix des cartes Stratégie, chaque route à portée est pillée avec une chance de <strong>70 %</strong> si elle n'est pas protégée, <strong>30 %</strong> si elle porte un jeton Force (le jeton d'une autre nation sur la même liaison suffit). Plusieurs routes peuvent être pillées le même tour. Chaque pillage vole <strong>1 ressource</strong> tirée au hasard parmi ⚡, 🪨 et 🔬 — si tu n'as pas celle-là, une autre que tu possèdes. La ressource est perdue (elle ne va pas aux Ceinturiens). <strong>La route ne tombe pas.</strong> La nation pillée est avertie, route par route.</p>
+<p><strong>Tension.</strong> Une nation pillée voit sa tension envers les Ceinturiens monter de <strong>1 par tour</strong>, quel que soit le nombre de routes touchées. Les nations épargnées ne bougent pas.</p>
 <p>🔍 Réseau Orbital, 🔍 IA Défensive et 🔮 Liens Empathes rendent immunisé — à l'achat, les jetons posés sur tes routes reviennent gratuitement.</p>
 
 <h2 id="s14">14. Guerre</h2>
@@ -462,11 +465,11 @@
 <ol>
 <li>Annonce de l'événement, s'il y en a un.</li>
 <li>Cartes Stratégie, de la nation la plus faible à la plus forte.</li>
+<li>Pillage des pirates sur les routes proches des ceintures (voir 13).</li>
 <li>Phase d'actions : chacun dépense ses AC. L'ordre est tiré au sort chaque tour — sauf pour qui a joué Initiative ou Initiative planifiée (voir 9).</li>
 <li>Mise à jour des tensions.</li>
 <li>Combats, si une guerre est en cours.</li>
 <li>Revenus, puis entretien.</li>
-<li>Attaque des pirates.</li>
 <li>Résolution de l'événement.</li>
 <li>Aux tours 2 et 6 : choix d'un investissement.</li>
 </ol>

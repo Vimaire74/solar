@@ -160,7 +160,7 @@
 <p><strong>A route with no end of yours falls.</strong> At the start of each turn, any route neither end of which is one of your colonies is abandoned and its token comes back to you — for instance when you lose the colony that held it. A route with only one end of yours holds.</p>
 
 <h3>6.3 Raid</h3>
-<p>You take the <strong>production of a colony</strong> — its income for the turn in ⚡, 🪨 and 🔬, never its ❤️ — within the limit of what the nation owns. A raid always targets <strong>one specific colony</strong>, which you choose. A colony can only be raided <strong>once per turn</strong>, by anyone: the Raid button says so (“already raided this turn”). Your tokens go into recovery for 2 turns (1 with War Strategy). Tension: <strong>+3</strong> victim, <strong>+1</strong> raider. The raid does not touch the victim's morale — tension (demonstrations, popular war) does the rest.</p>
+<p>You take the <strong>production of a colony</strong> — its income for the turn in ⚡, 🪨 and 🔬, never its ❤️. You receive it at once; the raided nation does not collect it at the end of the turn (its stock is untouched: it is that colony's income that goes missing). A raid always targets <strong>one specific colony</strong>, which you choose. A colony can only be raided <strong>once per turn</strong>, by anyone: the Raid button says so (“already raided this turn”). Your tokens go into recovery for 2 turns (1 with War Strategy). Tension: <strong>+3</strong> victim, <strong>+1</strong> raider. The raid does not touch the victim's morale — tension (demonstrations, popular war) does the rest.</p>
 <p>🔍 Defensive AI cancels the theft, 🛰️ Surveillance Drones remove <strong>1 unit from each resource stolen</strong>. A blocked raid still costs AP and tokens, gives +1 tension, and the raider is told about it.</p>
 
 <h3>6.4 Trade agreement</h3>
@@ -319,7 +319,7 @@
 <tr><td>Raid blocked by 🔍 Defensive AI</td><td>+1 victim</td><td>at each attempt</td></tr>
 <tr><td>Espionage detected</td><td>+6, +8 or +10 for the victim</td><td>on detection</td></tr>
 <tr><td>Assault on a colony</td><td><strong>+8</strong> for the assaulted nation if the colony falls, <strong>+6</strong> if it holds — the attacker adds nothing</td><td>at each assault, cumulative (capped at 10)</td></tr>
-<tr><td>Pirate attack on your routes</td><td>+1 towards the Belters</td><td>at each attack</td></tr>
+<tr><td>Pirate plunder on your routes</td><td>+1 towards the Belters</td><td>once per turn in which you are plundered</td></tr>
 <tr><td>Declaration of war</td><td>both gauges to 10</td><td>immediately</td></tr>
 </table>
 
@@ -352,7 +352,10 @@
 <p><strong>And reconciliation is always possible.</strong> A 🕊️ <strong>Diplomacy</strong> mission aimed at that nation wipes its slate clean in one go — it does not depend on its consent, so blocked diplomacy can always be unblocked. A signed non-aggression pact wipes it too, on both sides.</p>
 
 <h2 id="s13">13. Pirates</h2>
-<p>They occupy Triton and spare the Belters, who smuggle with them. Each <strong>unprotected</strong> route risks being destroyed: <strong>20% on turn 1, +10 points per turn</strong>, certain from turn 9. Rebuilding: 1 AP + 1🪨. Colonies are never touched, and tension towards the Belters rises by 1 at each attack.</p>
+<p>The pirates live in the <strong>main asteroid belt</strong> (Ceres, Vesta) and in the <strong>Kuiper belt</strong> (Pluto, Eris). They plunder the routes of every nation — except those of the <strong>Belters</strong>, to whom they sell their contraband.</p>
+<p><strong>Which routes?</strong> Those with one end <strong>60 days of travel or less</strong> from a den (Phobos, Deimos, Moon, Io, Europa, Ganymede, Callisto, Triton and the dens themselves). A route with both ends further out (Titan–Enceladus, for example) is never visited.</p>
+<p><strong>When and how much?</strong> At the <strong>start of each turn</strong>, after the Strategy cards are chosen, each route in range is plundered with a <strong>70%</strong> chance if it is unprotected, <strong>30%</strong> if it carries a Force token (another nation's token on the same link is enough). Several routes can be plundered in the same turn. Each plunder steals <strong>1 resource</strong> drawn at random among ⚡, 🪨 and 🔬 — if you have none of that one, another you own. The resource is lost (it does not go to the Belters). <strong>The route does not fall.</strong> The plundered nation is warned, route by route.</p>
+<p><strong>Tension.</strong> A plundered nation sees its tension towards the Belters rise by <strong>1 per turn</strong>, whatever the number of routes hit. Spared nations do not change.</p>
 <p>🔍 Orbital Network, 🔍 Defensive AI and 🔮 Empath Links make you immune — on purchase, the tokens placed on your routes come back for free.</p>
 
 <h2 id="s14">14. War</h2>
@@ -462,11 +465,11 @@
 <ol>
 <li>Announcement of the event, if there is one.</li>
 <li>Strategy cards, from the weakest nation to the strongest.</li>
+<li>Pirate plunder of the routes near the belts (see 13).</li>
 <li>Action phase: each spends its AP. The order is drawn at random each turn — except for whoever played Initiative or Planned Initiative (see 9).</li>
 <li>Tension update.</li>
 <li>Battles, if a war is in progress.</li>
 <li>Income, then upkeep.</li>
-<li>Pirate attack.</li>
 <li>Event resolution.</li>
 <li>On turns 2 and 6: choice of an investment.</li>
 </ol>

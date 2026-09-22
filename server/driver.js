@@ -156,7 +156,7 @@ class GameDriver {
   endRound(){
     const G = this.sb.__G;
     this.activate(this.primaryId);
-    try { this.sb.advancePirates(); this.sb.doMaintenance(); this.sb.doRevenues(); } catch(e){}
+    try { this.sb.doMaintenance(); this.sb.doRevenues(); } catch(e){}   // pirates : au début du tour suivant (startInterleaved, 21/09)
     const ev = this.EVENTS.find(x=>x.turn===G.turn);
     if(ev){ try{ ev.resolve(G); }catch(e){} }
     G.turn++;

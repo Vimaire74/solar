@@ -56,8 +56,9 @@ function tL(lang, k, fr, p) {
   if (s === undefined || s === null) s = k;
   if (p) for (const x in p) {
     let v = p[x];
-    if (typeof v === 'string' && v.charCodeAt(0) === 64 && v.length > 1) { const r = v.slice(1); v = (d && d[r] !== undefined) ? d[r] : r.split('.').slice(-2, -1)[0] || r; }
-    else if (typeof v === 'string' && v.indexOf('@') > 0) v = v.replace(/@([a-z][a-z0-9_]*\.[a-z0-9_]+\.[a-z0-9_]+)/g, (m, r) => (d && d[r] !== undefined) ? d[r] : r.split('.').slice(-2, -1)[0] || r);   // plusieurs @refs dans une liste jointe
+    /* Une référence SEULE ; une liste qui commence par « @ » va à la branche suivante (BCE3 : « (reseau2) »). */
+    if (typeof v === 'string' && /^@[a-z][a-z0-9_]*\.[a-z0-9_]+\.[a-z0-9_]+$/.test(v)) { const r = v.slice(1); v = (d && d[r] !== undefined) ? d[r] : r.split('.').slice(-2, -1)[0] || r; }
+    else if (typeof v === 'string' && v.indexOf('@') >= 0) v = v.replace(/@([a-z][a-z0-9_]*\.[a-z0-9_]+\.[a-z0-9_]+)/g, (m, r) => (d && d[r] !== undefined) ? d[r] : r.split('.').slice(-2, -1)[0] || r);   // plusieurs @refs dans une liste jointe
     else if (v && typeof v === 'object' && typeof v.k === 'string') v = tL(lang, v.k, v.fr, v.p);
     s = String(s).split('{' + x + '}').join(v);
   }

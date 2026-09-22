@@ -392,11 +392,11 @@ const STEPS=[
   hint:t('tuto.trace_route','Trace une route')},
 
  {lab:t('tuto.proteger_route','Protéger la route'), glow:'route-token-modal', requireChoice:'route-token-modal', sync:'routetoken',
-  tx:t('tuto.deployer_1_jeton_route_protegee_pirates','<b>⚔️ Déployer 1 jeton</b> : la route est protégée des pirates. <b>Laisser non protégée</b> : gratuit, mais elle peut être détruite. <b>Choisis dans la fenêtre.</b>'),
+  tx:t('tuto.jeton_route_pirates_v2','<b>⚔️ Déployer 1 jeton</b> : près des ceintures, le risque de pillage pirate passe de 70 % à 30 % par tour. <b>Laisser non protégée</b> : gratuit ; la route ne tombe jamais, mais les pirates peuvent y voler une ressource. <b>Choisis dans la fenêtre.</b>'),
   hint:t('tuto.choisis_option','Choisis une option')},
 
  {lab:t('tuto.pirates','Les pirates'),
-  tx:t('tuto.pirates_visent_routes_non_protegees_20_r','Les <b>pirates</b> ne visent que les <b>routes non protégées</b> : 20 % de risque par route au tour 1, <b>+10 % par tour</b>. Une route pillée est détruite (à reconstruire). Protège les routes qui comptent.'),
+  tx:t('tuto.pirates_v2','Les <b>pirates</b> vivent dans la ceinture principale et la ceinture de Kuiper. Au début de chaque tour, chaque route à <b>60 jours ou moins</b> d\'une ceinture risque d\'être pillée : <b>70 %</b> sans jeton, <b>30 %</b> avec. Ils volent 1 ressource (⚡, 🪨 ou 🔬) ; la route ne tombe pas. Les Ceinturiens sont épargnés.'),
   hint:"Suivant"},
 
  {lab:t('tuto.ameliorer','Améliorer'), glow:'game-wrap', pos:'top', trig:'⬆️',

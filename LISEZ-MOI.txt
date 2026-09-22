@@ -1,9 +1,9 @@
-LOT 17 — À UPLOADER  ·  21/09/2026  ·  v10.87 / sw v208
+LOT 17 — À UPLOADER  ·  21/09/2026  ·  v10.89 / sw v210
 
 CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas encore en ligne).
 
-   index.html          → estampille v10.87
-   tutorial.html       → régénéré (v10.87)
+   index.html          → estampille v10.89
+   tutorial.html       → régénéré (v10.89)
    online.js           → v10.87 (défense : la case Supercroiseur compte toujours ; espionnage)
    moteur.js           → v10.84 + tensions + v10.87
    sw.js               → cache v208
@@ -11,9 +11,29 @@ CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas enc
    regles.en.html      → règles EN
    lang/en.js          → traductions
    server/Dockerfile   → « COPY lang ./lang » (bilan de fin de tour en anglais)
+   tutorial.js         → textes des pirates (v10.89)
+   server/driver.js    → plus d'attaque pirate en fin de manche (v10.89)
    server/server.js    → langues chargées au démarrage + rapport de fin traduit (v10.87)
 
 Redéploie les DEUX ressources dans Coolify (site + serveur).
+
+v10.89 — PIRATES : LE PILLAGE, ET LE RAID B (voir REPRISE.md §154)
+   · Pirates : au début de chaque tour (après les cartes Stratégie), chaque route à 60 jours ou
+     moins d'un repaire est pillée à 70 % sans jeton, 30 % avec : 1 ressource ⚡🪨🔬 volée (une
+     autre si elle manque). Les routes ne tombent plus. Ceinturiens et technologies : immunisés.
+     Fenêtre d'avertissement au pillé. Tension envers les Ceinturiens : +1 par tour pillé, pour
+     la seule nation pillée.
+   · Ordinateurs : jeton seulement sur une route à portée, s'il leur reste 3 jetons engageables.
+   · Raid : le pillard reçoit la production du tour de la colonie ; la victime ne la touche pas
+     en fin de tour ; son stock n'est plus entamé.
+
+v10.88 — PIRATES (voir REPRISE.md §153)
+   · Règles FR/EN §13 : les pirates vivent dans la ceinture principale (Cérès, Vesta) et la
+     ceinture de Kuiper (Pluton, Éris) ; ils attaquent les routes non protégées de toutes les
+     nations sauf les Ceinturiens, à qui ils vendent leur contrebande.
+   · Carte : « ☠️ Repaire de pirates » fixe sur ces quatre nœuds (fin du marqueur « Pirates ici »
+     qui se promenait sans effet).
+   · Journal : « (reseau2) » / « carte.iadef3.nom » — listes de références rendues entières.
 
 v10.87 — PARTIE BCE3 (voir REPRISE.md §152)
    · Supercroiseur en défense : compte avec ou sans jeton, quel que soit le bouton ; la règle
@@ -42,4 +62,4 @@ v10.84 — voir REPRISE.md §150 (pacte +4 VP, Opulence 6 VP, routes, fenêtre d
 
 APRÈS LE REDÉPLOIEMENT
    Journaux Coolify du serveur :  Langues chargées : en (2163 clés)
-   Écran d'accueil : Version 2026-09-21 · v10.87
+   Écran d'accueil : Version 2026-09-22 · v10.89

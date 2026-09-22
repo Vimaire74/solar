@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-21 · v10.87';
+const SOLAR_BUILD_MOTEUR = '2026-09-22 · v10.89';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -27,10 +27,12 @@ function t(k,fr,p){
    (en français) d'être rendue en anglais chez un joueur anglais : la clé et ses paramètres voyagent,
    les noms aussi. Voir `_i18nRef` et `J`. */
 function _i18nParam(v){
-  if(typeof v==='string'&&v.charCodeAt(0)===64&&v.length>1)return _i18nRefTexte(v.slice(1));
+  /* UNE référence seule, et rien d'autre. ⚠️ Une LISTE qui commence par « @ » passait ici entière :
+     « carte.iadef3.nom, @carte.reseau2.nom » à l'écran (test pirates, 21/09). */
+  if(typeof v==='string'&&/^@[a-z][a-z0-9_]*\.[a-z0-9_]+\.[a-z0-9_]+$/.test(v))return _i18nRefTexte(v.slice(1));
   /* Plusieurs références dans une même chaîne (« @carte.iadef3.nom, @carte.liens1.nom » : une liste jointe) —
      trois segments au moins, pour ne jamais toucher une adresse email (« marc@domaine.ch »). */
-  if(typeof v==='string'&&v.indexOf('@')>0)return v.replace(/@([a-z][a-z0-9_]*\.[a-z0-9_]+\.[a-z0-9_]+)/g,function(m,k){ return _i18nRefTexte(k); });
+  if(typeof v==='string'&&v.indexOf('@')>=0)return v.replace(/@([a-z][a-z0-9_]*\.[a-z0-9_]+\.[a-z0-9_]+)/g,function(m,k){ return _i18nRefTexte(k); });
   if(v&&typeof v==='object'&&typeof v.k==='string'&&v.fr!==undefined)return t(v.k,v.fr,v.p||null);   // message J imbriqué
   return v;
 }
@@ -164,7 +166,14 @@ const TECH_BRANCHES={
   mines_energie:{label:'Mines & Énergie',emoji:'⛏️',civBonus:'jupiteriens',color:'#FFA726'},
   empathes:{label:'Empathes',emoji:'🔮',civBonus:null,color:'#CE93D8'},
 };
-const PIRATE_PATH=['eris','pluto','triton','titan','ganymede','callisto','vesta','ceres'];
+/* ═══ OÙ VIVENT LES PIRATES (Marc, 21/09) ═══ « Les pirates vivent dans la ceinture principale ou la
+   ceinture de Kuiper. » Avant : un marqueur « ⚠️ Pirates ici ! » se promenait d'un nœud à l'autre
+   (`PIRATE_PATH`, Éris → Pluton → Triton → Titan → Ganymède…) sans AUCUN effet de jeu — il pouvait
+   donc afficher des pirates sur Ganymède alors qu'ils n'y faisaient rien. Les repaires sont fixes :
+   Cérès et Vesta (ceinture principale), Pluton et Éris (ceinture de Kuiper). Purement descriptif :
+   les pirates attaquent les routes non protégées de toutes les nations, où qu'elles soient
+   (`advancePirates`), sauf celles des Ceinturiens. */
+const REPAIRES_PIRATES=['ceres','vesta','pluto','eris'];
 const CIVS={
   terriens:{id:'terriens',name:'Terriens',emoji:'🌍',color:'#4CAF50',
     start:{energy:2,materials:6,science:3,morale:5},startForce:5,home:'lune',
@@ -2513,7 +2522,7 @@ function getNodeDistance(fromId,toId){
 }
 function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;}
 function setHint(t){const h=document.getElementById('hint');if(h)h.textContent=t;}
-function getPiratePos(turn){return PIRATE_PATH[Math.min(Math.floor((turn-1)/2),PIRATE_PATH.length-1)];}
+
 function getIntelLevel(p){if(hasSpec(p,'intel_2'))return 2;if(hasSpec(p,'intel_1'))return 1;return 0;}
 // BROUILLARD : force perçue par 'viewer' sur 'target' (stable sur le tour). Exact si intel_2, sinon ±3.
 function perceivedForce(viewer,target){
@@ -6088,6 +6097,9 @@ function startInterleaved(){
   const _ordreJ=G._order.map(n=>J('journal.initiative_item','{emoji} {nom} ({etq})',{emoji:n.civ.emoji,nom:_i18nRef(n.civ,'name'),etq:_etqJ(n.civ.id)}))
                         .reduce((a,b)=>a===null?b:J('commun.joint','{a}{sep}{b}',{a:a,sep:' › ',b:b}),null);
   logAuteur('systeme',()=>addLog(J('journal.initiative_tour_commence','━ Initiative du tour {tour} : {v} — {nation} commence ━',{tour:G.turn,v:_ordreJ,nation:_i18nRef(G._order[0].civ,'name')}),'dim'));
+  /* PIRATES — au début du tour, après le draft des cartes Stratégie (Marc, 21/09). Ici, et nulle part
+     ailleurs : c'est le seul point par où passent le solo ET le serveur à chaque tour. */
+  try{ advancePirates(); }catch(e){}
   if(typeof _journalAuto==='function')_journalAuto(G._order[0].civ.name,'Premier joueur du tour ('+(_et(G._order[0].civ.id)==='tirage'?'tirage au sort':_et(G._order[0].civ.id))+')',G._order.map(n=>n.civ.name).join(' › '));
   if(_decisionActive()){ G._il=false; G._serverActionPhase=true; return; } // SERVEUR : le driver pilote la phase d'actions (pas l'interleave solo)
   interleaveStep();
@@ -6262,7 +6274,7 @@ function _runEndOfRound(){
   plafonnerMoral();
   /* Le moral qui décide de la guerre civile est jugé dans `doRevenues`, APRÈS le revenu de moral
      (règle de Marc, 04/09) — plus de figeage ici. */
-  advancePirates(); updateWarRisk(); updateTension();
+  updateWarRisk(); updateTension();   // les pirates frappent au DÉBUT du tour suivant (`startInterleaved`), plus en fin de tour (21/09)
   stDysonPuisGuerres();   // → guerres → stFinDeTour : chaque étape est NOMMÉE, aucune n'est capturée
 }
 /* ===== fin machinerie entrelacée ===== */
@@ -6277,7 +6289,6 @@ function endTurn(){
   G.phase='ai';render();
   setTimeout(()=>{
     for(const aiPlayer of G.ais){doAITurn(aiPlayer);aiPlayer._turnActions=[...(G.aiActions||[])];}
-    advancePirates();
     updateWarRisk();
     updateTension();
     // Même suite que le chemin serveur (`runEndOfRound`) : ce sont les MÊMES fonctions nommées,
@@ -6501,73 +6512,91 @@ function refillGeneralRiver(){
 /* ============================================================ PIRATES ============================================================ */
 // Les pirates NPC n'existent pas si l'une des factions joue Pirates
 function npcPiratesActive(){return true;} // les Pirates de Kuiper (NPC) existent TOUJOURS — ils n'attaquent simplement pas les Ceinturiens (voir advancePirates)
+/* ═══════════════ PIRATES — RÈGLE DU 21/09 (Marc) ═══════════════
+   « Les routes proches des deux ceintures, à moins de 60 jours de voyage, ont 30 % de chance d'être
+   pillées si elles sont protégées, 70 % si elles ne le sont pas. Les routes ne tombent pas mais les
+   pirates capturent une ressource au hasard parmi énergie, matériaux et savoir. Leur attaque est
+   évaluée à chaque début de tour après le choix des cartes stratégie. Si une route a été attaquée
+   avec succès, le joueur pillé est averti. Plusieurs routes peuvent être pillées dans un même tour. »
+   Décisions du même jour : seuil 60 j (et non 50 — les Martiens, à 24 j de Cérès, portaient seuls la
+   règle) ; si la nation n'a pas la ressource tirée, les pirates en prennent une autre qu'elle a ; la
+   ressource disparaît (elle ne va PAS aux Ceinturiens) ; les technologies de protection (Réseau
+   Orbital, IA Défensive, Liens Empathes) gardent l'immunité TOTALE ; tension envers les Ceinturiens :
+   +1 par nation pillée et par tour, pas par route (sinon la guerre populaire tombait vers le tour 5).
+   AVANT : en fin de tour, 20 % + 10 pts/tour, route non protégée DÉTRUITE. L'événement « Prolifération
+   des pirates » reste inchangé (il détruit encore, décision de Marc).
+   Appelée UNE fois par tour, depuis `startInterleaved` (solo ET serveur), après le draft. */
+const PIRATES_PORTEE_JOURS=60, PIRATES_CHANCE_NUE=0.7, PIRATES_CHANCE_PROTEGEE=0.3;
+function distanceAuxRepaires(id){
+  let d=Infinity;
+  for(const z of REPAIRES_PIRATES){ const x=(id===z)?0:joursTrajet(id,z); if(x<d)d=x; }
+  return d;
+}
+/* Une route est « à portée » si l'un de ses bouts est à 60 jours ou moins d'un repaire. */
+function routeAPorteeDesPirates(r){
+  return !!r && (distanceAuxRepaires(r.from)<=PIRATES_PORTEE_JOURS || distanceAuxRepaires(r.to)<=PIRATES_PORTEE_JOURS);
+}
+/* Protégée par un jeton — le sien, ou celui d'une autre nation sur la même liaison. */
+function _routeGardeeParJeton(p,r){
+  if((r.tokens||0)>0) return true;
+  return allPlayers().some(o=>o!==p&&(o.routes||[]).some(or=>(or.tokens||0)>0&&((or.from===r.from&&or.to===r.to)||(or.from===r.to&&or.to===r.from))));
+}
+/* La chance de pillage d'une route pour cette nation : 0 hors portée, Ceinturiens ou technologie. */
+function chancePillagePirates(p,r){
+  if(!p||!p.civ||p.civ.id==='ceinturiens') return 0;
+  if(routesProtegeesParTech(p)) return 0;
+  if(!routeAPorteeDesPirates(r)) return 0;
+  return _routeGardeeParJeton(p,r)?PIRATES_CHANCE_PROTEGEE:PIRATES_CHANCE_NUE;
+}
+/* La ressource prise : tirée parmi ⚡🪨🔬 ; si la nation n'en a pas, une autre qu'elle possède. */
+function _ressourcePillee(p){
+  const R=['energy','materials','science'];
+  const tiree=R[Math.floor(Math.random()*R.length)];
+  if((p.res[tiree]||0)>0) return tiree;
+  const dispo=R.filter(k=>(p.res[k]||0)>0);
+  return dispo.length?dispo[Math.floor(Math.random()*dispo.length)]:null;
+}
 function advancePirates(){
   if(!npcPiratesActive())return;
-  // Chaque route NON protégée a sa PROPRE chance d'attaque, croissante chaque tour jusqu'à 100%.
-  const chance=Math.min(1,0.10+G.turn*0.10); // T1=20% … T9=100%
-  let attacked=false;
-  /* Ces trois phases (pirates, entretien, revenus) tournent nation par nation, mais TOUTES sous la
-     perspective de l'humain principal : sans marquage, leurs lignes lui auraient été attribuées.
-     On nomme donc l'auteur à chaque tour de boucle — c'est la nation traitée, pas celle activée. */
+  if(G._piratesTour===G.turn)return;      // une seule attaque par tour, quel que soit le chemin
+  G._piratesTour=G.turn;
+  const _pilles=[];
   for(const p of allPlayers()) logAuteur(p, ()=>{
-    if(p.civ.id==='ceinturiens')return; // les pirates ne pillent pas les Ceinturiens (ils font du commerce avec eux)
-    /* ⚠️ ICI était le défaut signalé par Marc le 2026-08-09. Cette ligne testait
-       `ia_immune || intel_2` — sa PROPRE liste, sans Lien Empathe — alors que la règle partagée
-       existait déjà juste à côté depuis la veille. Le message ne part plus au seul `G.player`,
-       pour la même raison qu'au message de destruction plus bas : à plusieurs humains, l'autre
-       ne voyait rien. */
+    if(!p||!p.civ||p.civ.id==='ceinturiens')return; // ils vendent leur contrebande aux Ceinturiens
+    if(!(p.routes||[]).length)return;
     if(routesProtegeesParTech(p)){
-      if(p.routes.length) addLog(J('journal.routes_immunisees_contre_pirates','🛡️ Routes de {emoji} {nation} immunisées contre les pirates ({v}).',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),v:techsProtegeantRoutes(p).join(', ')}),'gold');
-      return;   // ⚠️ `return` et non `continue` : le corps de boucle est passé en fonction (voir logAuteur)
+      if(p.routes.some(routeAPorteeDesPirates)) addLog(J('journal.routes_immunisees_contre_pirates','🛡️ Routes de {emoji} {nation} immunisées contre les pirates ({v}).',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),v:techsProtegeantRoutes(p).join(', ')}),'gold');
+      return;
     }
-    // Routes non protégées (sans jeton Force) : chacune risque d'être pillée ET DÉTRUITE (à reconstruire).
-    // Une route est protégée si elle a un jeton OU si un allié a déjà un jeton sur le même segment (surveillance partagée).
-    const _guarded=function(r){return allPlayers().some(function(o){return o!==p&&o.routes.some(function(or){return (or.tokens||0)>0&&((or.from===r.from&&or.to===r.to)||(or.from===r.to&&or.to===r.from));});});};
-    // `routeProtegee` = jeton posé OU technologie de protection. Plus de test « r.tokens===0 » en
-    // dur ici : c'est ce raccourci qui ignorait les technologies (voir le bandeau ci-dessus).
-    const unprotected=p.routes.filter(r=>!routeProtegee(p,r)&&!_guarded(r));
-    const hitRoutes=unprotected.filter(()=>Math.random()<chance);
-    if(hitRoutes.length){
-      p.routes=p.routes.filter(r=>!hitRoutes.includes(r));updateConnections(p);
-      attacked=true;
-      /* ⚠️ CORRIGÉ LE 2026-08-07 (partie DB55) : le message n'était écrit que `if(p===G.player)`.
-         Or `runEndOfRound` active l'humain PRIMAIRE (l'hôte) : les routes du SECOND humain étaient
-         donc détruites EN SILENCE. L'ami de Marc a perdu deux routes — et avec elles la connectivité
-         de trois colonies et ses points d'agenda — sans jamais recevoir un mot. Il a cru que « le
-         jeu avait oublié de compter une route ».
-         Le journal appartient à la PARTIE, pas au point de vue : on nomme donc la nation touchée,
-         et la ligne part à tout le monde. Chacun doit pouvoir constater ce qui lui est arrivé. */
-      hitRoutes.forEach(r=>{
-        const _seg=(NODES[r.from]?.name||r.from)+'→'+(NODES[r.to]?.name||r.to);
-        addLog(J('journal.pirates_route_pillee_detruite_reconstrui','☠️ Pirates ! Route {seg} de {emoji} {nation} pillée et DÉTRUITE — à reconstruire (protège tes routes avec un jeton).',{seg:_seg,emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name')}),'red');
-        if(typeof _journalAuto==='function')_journalAuto(p.civ.name,'Route détruite par les pirates',_seg);
-      });
+    const prises=[];
+    for(const r of p.routes){
+      const ch=chancePillagePirates(p,r); if(ch<=0)continue;
+      if(Math.random()>=ch)continue;
+      const k=_ressourcePillee(p);
+      const seg=(NODES[r.from]?_i18nRef(NODES[r.from],'name'):r.from)+'→'+(NODES[r.to]?_i18nRef(NODES[r.to],'name'):r.to);
+      if(k){ p.res[k]=Math.max(0,(p.res[k]||0)-1); }
+      prises.push({seg:seg,k:k});
+      addLog(k?J('journal.pirates_pillent_route','☠️ Pirates ! Route {seg} de {emoji} {nation} pillée : −1{res}.',{seg:seg,emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),res:rEmoji(k)})
+              :J('journal.pirates_pillent_route_rien','☠️ Pirates ! Route {seg} de {emoji} {nation} attaquée — rien à prendre.',{seg:seg,emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name')}),'red');
     }
-    // (Règle voulue par Marc : les pirates de FIN DE TOUR n'attaquent QUE les routes non protégées,
-    //  JAMAIS les colonies. La branche « raid sur colonie » a été retirée. L'événement « Prolifération
-    //  des pirates » reste distinct.)
+    if(!prises.length)return;
+    _pilles.push(p);
+    const _lignes=prises.map(x=>x.k?J('avis.pirates_ligne','• {seg} : −1{res}',{seg:x.seg,res:rEmoji(x.k)}):J('avis.pirates_ligne_rien','• {seg} : rien à prendre',{seg:x.seg}))
+      .reduce((a,b)=>a===null?b:J('commun.joint','{a}{sep}{b}',{a:a,sep:'<br>',b:b}),null);
+    notifyNationHit(p,J('avis.pirates_titre','☠️ Les pirates ont pillé tes routes'),
+      J('avis.pirates_corps','{n} route(s) pillée(s) ce tour :<br>{lignes}<br><br>Les routes à 60 jours ou moins de la ceinture principale ou de Kuiper sont exposées : 70 % sans jeton, 30 % avec. 🔍 Réseau Orbital, 🔍 IA Défensive et 🔮 Liens Empathes en protègent totalement.',{n:prises.length,lignes:_lignes}));
+    if(typeof gainToast==='function'&&!p._isAI){ try{ gainToast(J('toast.pirates','☠️ Pirates : {n} route(s) pillée(s)',{n:prises.length})); }catch(e){} }
   });
-  if(attacked){
-    // Risque guerre +1 avec Ceinturiens (lore : ils soutiennent les pirates en secret)
-    /* ⚠️ UN JOUEUR CEINTURIEN ÉTAIT INVISIBLE. `G.ais` ne contient jamais la nation active : quand
-       un humain jouait les Ceinturiens, cette recherche ne trouvait personne et le code partait
-       dans la branche « pas de Ceinturiens dans la partie » — risque de guerre global au lieu de la
-       tension due à leur soutien secret aux pirates. Mesuré le 2026-08-15. */
-    const ceinturAI=allPlayers().find(a=>a.civ.id==='ceinturiens');
-    if(ceinturAI){
-      // ⚠️ `'player'` en dur ciblait « celui qui est actif à cet instant », pas la nation réellement
-      // pillée. On monte la tension de CHAQUE nation attaquée envers les Ceinturiens.
-      for(const v of allPlayers()){ if(v!==ceinturAI) addTens(v.civ.id,ceinturAI.civ.id,1); }
-      addLog(J('journal.tension_vs_ceinturiens_1_soutien_secret','☠️ Tension vs Ceinturiens +1 (soutien secret aux pirates)'),'dim');
-    }else{
-      /* Pas de Ceinturiens dans cette partie : les pirates ne sont le bras de personne. Il n'y a
-         donc aucune nation vers qui diriger la rancœur, et le climat général monte d'un cran.
-         `G.warRisk` est GLOBAL, et c'est ici la bonne échelle — c'est une jauge d'ambiance, pas une
-         relation entre deux nations. C'est la seule lecture de drapeau global que ce lot laisse en
-         place, et elle est délibérée. */
-      G.warRisk=Math.min(10,(G.warRisk||0)+1);
-      addLog(J('journal.raid_pirate_risque_guerre_1','☠️ Raid pirate — risque de guerre +1'),'red');
-    }
+  if(!_pilles.length)return;
+  const ceinturAI=allPlayers().find(a=>a.civ.id==='ceinturiens');
+  if(ceinturAI){
+    /* +1 PAR NATION PILLÉE ET PAR TOUR, quel que soit le nombre de routes (Marc, 21/09) — et
+       SEULEMENT la nation pillée (banc test_pirates_tension_pillee.js). */
+    for(const v of _pilles){ if(v!==ceinturAI) addTens(v.civ.id,ceinturAI.civ.id,1); }
+    addLog(J('journal.tension_vs_ceinturiens_1_soutien_secret','☠️ Tension vs Ceinturiens +1 (soutien secret aux pirates)'),'dim');
+  }else{
+    G.warRisk=Math.min(10,(G.warRisk||0)+1);
+    addLog(J('journal.raid_pirate_risque_guerre_1','☠️ Raid pirate — risque de guerre +1'),'red');
   }
 }
 /* ============================================================ MAINTENANCE ============================================================ */
@@ -6884,13 +6913,26 @@ function butinDeRaid(cible,nodeId){
      et rien n'est « rendu » sur une ressource que la colonie ne produit pas. La carte le promettait
      (« Raids subis : −1 ressource volée ») et ne l'appliquait que dans l'ancien chemin de raid. */
   const _drones=(typeof hasSpec==='function')&&hasSpec(cible,'intel_1');
+  /* RÈGLE B (Marc, 21/09) : le raid prend la PRODUCTION DU TOUR de la colonie, pas le stock. Le
+     pillard la reçoit tout de suite ; la colonie ne la verse plus à sa nation en fin de tour
+     (`revenusBruts` lit `col._raidButin`). Plus de plafond par le stock : c'est la production qui part. */
   for(const k of ['energy','materials','science']){
-    let dispo=Math.min(brut[k]||0, cible.res[k]||0);   // on ne vole que ce qu'elle a vraiment
+    let dispo=brut[k]||0;
     if(_drones&&dispo>0)dispo-=1;
     if(dispo>0) butin[k]=dispo;
   }
   return {col:col,butin:butin};
 }
+/* Marque la colonie pillée ce tour et retient ce qui est parti : ce montant manquera à son revenu
+   de fin de tour. Une seule porte pour les deux chemins de raid (joueur/tacticien et ancien cerveau). */
+function marquerColoniePillee(col,pris){
+  if(!col)return;
+  col._raidTour=G.turn;
+  col._raidButin={};
+  for(const k in (pris||{})) if(pris[k]>0) col._raidButin[k]=pris[k];
+}
+/* Ce qu'un raid a pris à cette colonie CE tour — 0 sinon (un butin d'un tour passé ne compte plus). */
+function butinPrisCeTour(col){ return (col&&col._raidTour===(G&&G.turn)&&col._raidButin)?col._raidButin:null; }
 function revenuDuneColonie(p,col){
   const node=NODES[col.nodeId]; const o={};
   if(!node||node.decorative) return o;
@@ -6940,6 +6982,9 @@ function revenusBruts(p, opts){
     const node=NODES[col.nodeId];
     if(node.decorative)continue;
     const _o=revenuDuneColonie(p,col);
+    /* Colonie pillée CE tour : sa production volée ne rentre pas (règle B du raid, Marc 21/09). */
+    const _pris=butinPrisCeTour(col);
+    if(_pris) for(const _k of Object.keys(_pris)) _o[_k]=Math.max(0,(_o[_k]||0)-_pris[_k]);
     for(const _k of Object.keys(_o)) gains[_k]=(gains[_k]||0)+_o[_k];
     _det('🏙️ '+((NODES[col.nodeId]&&NODES[col.nodeId].name)||col.nodeId)+' (Nv.'+(col.level||1)+')',_o);
   }
@@ -7587,17 +7632,23 @@ function deployerJetonSurRoute(nat, route, opts){
    Donc : Ceinturiens → jamais (les pirates ne les touchent pas) ; immunisé par une technologie →
    inutile ; Bâtisseur → toujours ; les autres → dès que la chance pirate du tour atteint 40 %
    (= tour 3, voir `advancePirates` : 10 % + 10 % par tour). Banc : `test_ia_routes.js`. */
-function chancePiratesDuTour(){ return Math.min(1,0.10+(G.turn||1)*0.10); }
-function ordinateurProtegeSesRoutes(nat){
+/* ═══ L'ORDINATEUR ET LES PIRATES DEPUIS LE 21/09 ═══
+   Avant, une route nue était DÉTRUITE (jusqu'à 100 %) : l'ordinateur posait un jeton sur chaque
+   route, et les pirates ne touchaient jamais personne. Désormais un jeton ne fait que passer le
+   risque de 70 % à 30 %, et seulement à portée des repaires (≤ 60 j) ; la perte est 1 ressource.
+   Il protège donc une route À PORTÉE, et seulement s'il lui reste de quoi se défendre (3 jetons
+   engageables au moins, garnison exclue). Le reste est chiffré par l'évaluation (`risquePirates`). */
+const PIRATES_RESERVE_IA=3;
+function ordinateurProtegeSesRoutes(nat, route){
   if(!nat||!nat.civ) return false;
   if(nat.civ.id==='ceinturiens') return false;
   if(typeof routesProtegeesParTech==='function'&&routesProtegeesParTech(nat)) return false;
-  /* « Le Bâtisseur protège toutes ses routes » : c'était son caractère, le Stratège ne l'a plus
-     (§139.2). Le risque est déjà chiffré dans l'évaluation (`risquePirates`). */
-  return chancePiratesDuTour()>=0.40;
+  if(engageableTokens(nat)<PIRATES_RESERVE_IA && !hasSpec(nat,'route_force_free')) return false;
+  if(route) return routeAPorteeDesPirates(route);
+  return (nat.routes||[]).some(r=>!((r.tokens||0)>0)&&routeAPorteeDesPirates(r));
 }
 function protegerRouteIA(nat, route){
-  if(!ordinateurProtegeSesRoutes(nat)) return false;
+  if(!ordinateurProtegeSesRoutes(nat, route)) return false;
   if(!deployerJetonSurRoute(nat, route)) return false;
   addLog(J('journal.pose_jeton_route_protegee_pirates','⚔️ {emoji} {nation} pose un jeton sur la route {v}→{v2} (protégée des pirates).',{emoji:nat.civ.emoji,nation:_i18nRef(nat.civ,'name'),v:_i18nRef(NODES[route.from]||{},'name')||route.from,v2:_i18nRef(NODES[route.to]||{},'name')||route.to}),'dim');
   return true;
@@ -7631,7 +7682,9 @@ function doEstablishRoute(from,to, nation){
   if(_n.forceTokens>0&&!hasSpec(_n,'route_force_free')){
     _pendingRouteObj=newRoute;
     document.getElementById('rtm-info').innerHTML=
-      t('ui.route_jetons_disponibles_jeton_protege_r','Route <strong>{nom} → {nom2}</strong><br>Jetons disponibles : <strong>{jetons}</strong><br><span style="color:#7880a0;font-size:.92em">Un jeton protège la route des pirates. Sans jeton, la route connecte quand même et rapporte 1<i class=ri-materials></i>/tour, mais les pirates peuvent la détruire ({tour} % ce tour, +10 % par tour).</span>',{nom:_i18nRef(fn,'name'),nom2:_i18nRef(tn,'name'),jetons:_n.forceTokens,tour:Math.round(chancePiratesDuTour()*100)});
+      (routeAPorteeDesPirates(newRoute)
+        ?t('ui.route_jeton_pirates_portee','Route <strong>{nom} → {nom2}</strong><br>Jetons disponibles : <strong>{jetons}</strong><br><span style="color:#7880a0;font-size:.92em">Route à portée des pirates (60 jours ou moins de la ceinture principale ou de Kuiper). À chaque début de tour : 70 % de risque de pillage sans jeton, 30 % avec — 1 ressource volée. La route ne tombe jamais et connecte avec ou sans jeton.</span>',{nom:_i18nRef(fn,'name'),nom2:_i18nRef(tn,'name'),jetons:_n.forceTokens})
+        :t('ui.route_jeton_pirates_hors','Route <strong>{nom} → {nom2}</strong><br>Jetons disponibles : <strong>{jetons}</strong><br><span style="color:#7880a0;font-size:.92em">Route hors de portée des pirates (plus de 60 jours des ceintures) : un jeton n\'y sert à rien contre eux. La route connecte avec ou sans jeton.</span>',{nom:_i18nRef(fn,'name'),nom2:_i18nRef(tn,'name'),jetons:_n.forceTokens}));
     document.getElementById('route-token-modal').classList.remove('hidden');
   }else{
     /* IA DE NAVIGATION (`route_force_free`) — « déploiement GRATUIT en jetons ».
@@ -7686,7 +7739,7 @@ function showRouteManageModal(idx){
     t('routegere.jeton','Jeton :')+' <strong style="color:'+(hasToken?'#66cc66':'#ff8844')+'">'+(hasToken?t('routegere.deploye','⚔️ Déployé'):t('routegere.aucun','Aucun (route non protégée)'))+'</strong>'+warnConn+
     '<br>'+t('routegere.dispo','Jetons disponibles : <strong>{j}</strong> | AC restants : <strong>{ac}</strong>',{j:p.forceTokens,ac:p.acLeft})+
     (isFree?'<br><span style="color:#66cc99;font-size:.88em">'+t('routegere.nav_gratuit','IA Navigation : déploiement gratuit en jetons.')+'</span>':'')+
-    '<br><span style="color:#7880a0;font-size:.82em">'+t('routegere.protege','Le jeton protège des pirates ({p} % ce tour) ; la route connecte avec ou sans jeton.',{p:Math.round(chancePiratesDuTour()*100)})+'</span>';
+    '<br><span style="color:#7880a0;font-size:.82em">'+(chancePillagePirates(p,{from:r.from,to:r.to,tokens:0})>0?t('routegere.pirates_portee','À portée des pirates : 70 % de risque de pillage par tour sans jeton, 30 % avec (1 ressource volée) ; la route connecte avec ou sans jeton.'):t('routegere.pirates_hors','Hors de portée des pirates (ou routes immunisées) ; la route connecte avec ou sans jeton.'))+'</span>';
   const deployBtn=document.getElementById('rmm-deploy-btn');
   const recallBtn=document.getElementById('rmm-recall-btn');
   if(hasToken){
@@ -7909,14 +7962,15 @@ function doRaidTarget(aiId,nodeId,pillard){
     p.spentThisTurn=(p.spentThisTurn||0)+1+tc+enCost;
     /* ⚠️ LE BUTIN NE VIENT PLUS DU STOCK AU HASARD, MAIS D'UNE COLONIE (voir `butinDeRaid`). */
     var _b=butinDeRaid(target,nodeId), _col=_b.col, stolen=[];
+    /* RÈGLE B (21/09) : rien n'est retiré du STOCK de la victime ; c'est le revenu de fin de tour de
+       cette colonie qui manquera (`marquerColoniePillee` → `revenusBruts`). */
     for(var _k in _b.butin){
       var _q=_b.butin[_k];
-      target.res[_k]=Math.max(0,(target.res[_k]||0)-_q);
       p.res[_k]=(p.res[_k]||0)+_q;
       stolen.push('+'+_q+rEmoji(_k));
     }
     var _nomCol=_col?(NODES[_col.nodeId]?_i18nRef(NODES[_col.nodeId],'name'):_col.nodeId):null;
-    if(_col)_col._raidTour=G.turn;   // pillée ce tour : plus personne ne la repille avant le suivant
+    if(_col)marquerColoniePillee(_col,_b.butin);   // pillée ce tour : plus personne ne la repille avant le suivant
     /* ⚠️ PLUS DE MORAL PERDU AU RAID (Marc, 04/09). Le −1 du 27/08 s'ajoutait à la tension +5, aux
        manifestations (−1/tour dès 6) et à la guerre populaire forcée à 10 (−2 chaque camp, puis
        l'usure) : « quand les IA jouent mieux, c'est la cata des règles ». Un Conquérant qui raidait
@@ -10603,7 +10657,8 @@ const POIDS_EVAL={
   auDela:0.25,
   action:0.45,            // VP par action et par tour restant (une action ≈ un coup moyen)
   plafondMoral:0.08,      // VP perdus par point de plafond sous 10, par tour restant (×2 en guerre)
-  route:1.0,              // ce que vaut une route (≈ 1 VP + son revenu) — perdue avec la chance pirate du tour
+  route:1.0,              // ce que vaut une route (≈ 1 VP + son revenu)
+  pillage:0.2,            // VP que coûte une ressource prise par les pirates (≈ trésorerie d'une unité, 21/09)
   immunite:0.5,           // VP par tour restant que vaut l'immunité aux raids et aux pirates (IA Défensive)
   force:0.45,             // VP par jeton (plafonné à 12 jetons) — multiplié par la menace, plus par l'horizon (§139.5)
   forceMin:1.0,           /* personne ne me menace : un jeton vaut le poids de base — soit ce qu'il
@@ -10858,10 +10913,12 @@ function evaluerPosition(nat,observateur){
      exposée au tour 7 (80 % de destruction) comme une route sûre — les Terriens de la 4942 en ont
      reconstruit onze. Ce terme lui fait préférer : protéger, ou ne pas construire ce qu'il ne peut
      pas protéger. Il ne s'applique pas aux Ceinturiens : pour eux, aucune route n'est un pari. */
+  /* 21/09 : les pirates ne détruisent plus, ils prennent 1 ressource par route pillée, chaque tour
+     restant, avec la chance de la route (`chancePillagePirates` : 0, 30 % ou 70 %). */
   let risquePirates=0;
   if(nat.civ.id!=='ceinturiens'&&!(typeof routesProtegeesParTech==='function'&&routesProtegeesParTech(nat))){
-    const exposees=(nat.routes||[]).filter(r=>!((r.tokens||0)>0)).length;
-    if(exposees) risquePirates=-exposees*chancePiratesDuTour()*POIDS_EVAL.route;
+    let attendu=0; for(const r of (nat.routes||[])) attendu+=chancePillagePirates(nat,r);
+    if(attendu) risquePirates=-attendu*restants*POIDS_EVAL.pillage;
   }
   /* ═══════ ÊTRE IMPILLABLE VAUT QUELQUE CHOSE (Marc, 13/09 : « les IA ne cherchent jamais à prendre
      IA Défensive, alors que moi je le fais tout le temps ») ═══════
@@ -11245,6 +11302,7 @@ function coupsPossibles(nat){
      &&(engageableTokens(nat)>=1||hasSpec(nat,'route_force_free'))){ // garnison exclue (13/09)
     for(const r of (nat.routes||[])){
       if((r.tokens||0)>0)continue;
+      if(!routeAPorteeDesPirates(r))continue;   // hors de portée des repaires : un jeton n'y sert à rien (21/09)
       coups.push({type:'proteger',from:r.from,to:r.to,libelle:'protéger la route '+((NODES[r.from]||{}).name||r.from)+'→'+((NODES[r.to]||{}).name||r.to)});
     }
   }
@@ -12370,13 +12428,14 @@ function _doAITurnInterne(aiPlayer,oneShot){
        règle, un même calcul, pour les deux camps. Le renseignement adverse (`intel_1`) protège
        toujours : il divise le butin par deux, l'IA Défensive l'annule (traité plus haut). */
     {
-      const _b=butinDeRaid(_e,null);
+      const _b=butinDeRaid(_e,null), _pris={};
       for(const _k in _b.butin){
         const _q=(maxSteal===1)?Math.ceil(_b.butin[_k]/2):_b.butin[_k];   // Drones Surveillance : moitié
         if(_q<=0)continue;
-        _e.res[_k]=Math.max(0,(_e.res[_k]||0)-_q); ai.res[_k]=(ai.res[_k]||0)+_q;
+        ai.res[_k]=(ai.res[_k]||0)+_q; _pris[_k]=_q;      // RÈGLE B : pris sur la production, pas le stock
         stolen.push('+'+_q+rEmoji(_k));
       }
+      if(_b.col)marquerColoniePillee(_b.col,_pris);
       if(_b.col)addLog(J('journal.pille_production_chez','💰 {emoji} {nation} pille la production de {v} chez {emoji2} {nation2}.',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),v:(NODES[_b.col.nodeId]&&_i18nRef(NODES[_b.col.nodeId],'name'))||_b.col.nodeId,emoji2:_e.civ.emoji,nation2:_i18nRef(_e.civ,'name')}),'red');
     }
     G.warRisk=Math.min(10,(G.warRisk||0)+2);
@@ -14393,7 +14452,7 @@ function showNodePopup(nodeId){
   const revStr=revenusParNiveau(nodeId,G.player);
   /* LE défaut signalé par Marc : c'est MON accord qui compte, pas celui du voisin d'en face. */
   const accord=accordAvecMoi(nodeId,G.player);
-  document.getElementById('npop-info').innerHTML=`VP: ${node.baseVP} | ${resStr}<br>${revStr}<br>${t('noeud.type','Type :')} ${({moon:t('noeud.t_lune','Lune'),dwarf_planet:t('noeud.t_naine','Planète naine'),asteroid:t('noeud.t_asteroide','Astéroïde'),orbital_station:t('noeud.t_station','Station orbitale'),planet:t('noeud.t_planete','Planète'),gas_giant:t('noeud.t_geante','Géante gazeuse')})[node.type]||node.type}${pCol?`<br>✅ <b style="color:${G.player.civ.color}">${G.player.civ.emoji} ${G.player.civ.name} (${t('commun.toi','toi')})</b> — Nv.${pCol.level}${pCol.connected?' ✓':' ✗ '+t('noeud.deconnectee','déconnectée')}`:''}${_occupants.map(o=>`<br>🏴 ${t('noeud.colonie_de','Colonie de')} <b style="color:${o.nat.civ.color}">${o.nat.civ.emoji} ${o.nat.civ.name}</b> — Nv.${o.col.level}${(o.nat===aColAI&&accord)?' 🤝 '+t('noeud.accord','accord'):''}${(_occupants.length>1&&o.nat===aColAI)?' <span style="color:#ffcc88">'+t('noeud.cible','← cible de tes actions')+'</span>':''}`).join('')}${(_occupants.length>1||(pCol&&_occupants.length))?'<br><span style="color:#ffcc88;font-size:.9em">'+t('noeud.partage','⚠️ Nœud PARTAGÉ — les occupants se défendent ensemble contre un tiers ; entre eux, l\'un peut chasser l\'autre.')+'</span>':''}${!pCol&&!aCol?'<br><span style="color:#7a8aa0">'+t('noeud.inoccupe','Inoccupé')+'</span>':''}${getPiratePos(G.turn)===nodeId?'<br><span style="color:#ff8888">'+t('noeud.pirates_ici','⚠️ Pirates ici !')+'</span>':''}`;
+  document.getElementById('npop-info').innerHTML=`VP: ${node.baseVP} | ${resStr}<br>${revStr}<br>${t('noeud.type','Type :')} ${({moon:t('noeud.t_lune','Lune'),dwarf_planet:t('noeud.t_naine','Planète naine'),asteroid:t('noeud.t_asteroide','Astéroïde'),orbital_station:t('noeud.t_station','Station orbitale'),planet:t('noeud.t_planete','Planète'),gas_giant:t('noeud.t_geante','Géante gazeuse')})[node.type]||node.type}${pCol?`<br>✅ <b style="color:${G.player.civ.color}">${G.player.civ.emoji} ${G.player.civ.name} (${t('commun.toi','toi')})</b> — Nv.${pCol.level}${pCol.connected?' ✓':' ✗ '+t('noeud.deconnectee','déconnectée')}`:''}${_occupants.map(o=>`<br>🏴 ${t('noeud.colonie_de','Colonie de')} <b style="color:${o.nat.civ.color}">${o.nat.civ.emoji} ${o.nat.civ.name}</b> — Nv.${o.col.level}${(o.nat===aColAI&&accord)?' 🤝 '+t('noeud.accord','accord'):''}${(_occupants.length>1&&o.nat===aColAI)?' <span style="color:#ffcc88">'+t('noeud.cible','← cible de tes actions')+'</span>':''}`).join('')}${(_occupants.length>1||(pCol&&_occupants.length))?'<br><span style="color:#ffcc88;font-size:.9em">'+t('noeud.partage','⚠️ Nœud PARTAGÉ — les occupants se défendent ensemble contre un tiers ; entre eux, l\'un peut chasser l\'autre.')+'</span>':''}${!pCol&&!aCol?'<br><span style="color:#7a8aa0">'+t('noeud.inoccupe','Inoccupé')+'</span>':''}${REPAIRES_PIRATES.includes(nodeId)?'<br><span style="color:#ff8888">'+t('noeud.repaire_pirates','☠️ Repaire de pirates — ils pillent les routes non protégées, sauf celles des Ceinturiens, à qui ils vendent leur contrebande.')+'</span>':''}`;
   const acts=document.getElementById('npop-acts');acts.innerHTML='';
   if(!pCol){
     const{ac,mat,en}=colonizeCost(G.player);
@@ -16031,7 +16090,9 @@ function _notePlayerHit(title,body){
   }catch(e){}
 }
 function _showPlayerHitModal(){
-  if(typeof document==='undefined'||!document.body)return;
+  /* Sans vrai DOM (bac à sable des bancs, serveur) il n'y a rien à afficher — les pirates frappent
+     désormais au début du tour, dans `startInterleaved`, un chemin que les bancs sans écran empruntent. */
+  if(typeof document==='undefined'||!document.body||typeof document.body.insertAdjacentHTML!=='function')return;
   const hits=(G&&G._ilPlayerHits)||[];
   if(!hits.length){return;}
   const old=document.getElementById('sc-attack-notice');if(old)old.remove();
