@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-09-22 · v10.89';</script>
+<script>window.SOLAR_BUILD_HTML='2026-09-22 · v10.92';</script>
 <!-- i18n.js EN TÊTE, avant tout script du corps : il choisit la langue et charge lang/<code>.js (synchrone).
      Les écrans d'accueil (scripts inline plus bas) et moteur.js (qui porte t()) le trouvent déjà là. -->
 <script src="i18n.js"></script>
@@ -1182,6 +1182,51 @@ body{font-size:var(--sc-fs,16px);}
 }
 /* Écran étroit (≤ 380 px) : lettres plus serrées pour que « MARTIENS » tienne à côté de Tour / AC / 🏛️ (capture du 18/09 : « MARTIE… »). */
 @media (max-width:380px){.cbt-nom{font-size:.56em;letter-spacing:.02em} #top-bar #turn-disp{font-size:.74em} #top-bar #ac-disp,#top-bar #gov-disp{font-size:.72em;padding:3px 5px} .tb-l1{gap:5px}}
+/* ═══ ROULEAU « BLOQUÉ » ET MODE COMPACT DES TECHNOLOGIES (Marc, 22/09 — maquette validée) ═══
+   1) Le rouleau porte le mot en lettres blanches empilées (variante B). Le mot vient de l'attribut
+      `data-bloque` (traduit, une lettre par ligne). La carte s'atténue, pas son rouleau : l'opacité
+      passe de la carte à ses enfants, sinon le mot serait grisé avec elle.
+   2) Mode compact (bouton en bas, `#tech-body.tech-compact`) : téléphone = deux filières côte à côte,
+      rangs empilés ; ordinateur (≥ 600 px) = une filière par ligne, rangs de gauche à droite.
+      Dans une ligne compacte, le mot ne tient pas : un petit cadenas dessiné le remplace. */
+.tcard.tc-corne.tlocked,.tcard.tc-corne.ttaken,.tcard.tc-corne.tcantbuy,.gcard.gc-corne.no-buy{opacity:1}
+.tcard.tc-corne>*,.gcard.gc-corne>*{opacity:.72}
+.tcard.tc-corne::after,.gcard.gc-corne::after{content:attr(data-bloque);white-space:pre;display:flex;align-items:center;justify-content:center;text-align:center;
+  color:#fff;font-family:var(--font-titre);font-weight:400;font-size:11px;line-height:1.12;text-shadow:0 0 6px rgba(0,0,0,.95),0 1px 0 #000}
+.tcard.tc-corne.tc-compact::after,.gcard.gc-corne.gc-compact::after{content:'';background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 14'%3E%3Cpath d='M3.4 6.2V4.3a2.6 2.6 0 0 1 5.2 0v1.9' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round'/%3E%3Crect x='1.4' y='6.1' width='9.2' height='7.2' rx='1.7' fill='white'/%3E%3Cpath d='M6 8.6v2' stroke='%231b2440' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") center/7px 8px no-repeat,linear-gradient(90deg,#0d1326 0%,#1b2440 20%,#2e3c62 48%,#1b2440 76%,#0a0f1e 100%)}
+.tech-bascule-zone{display:flex;justify-content:center;padding:12px 0 4px}
+.tech-bascule{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-corps);font-weight:600;font-size:.8em;color:#dce8ff;background:#10183a;border:1px solid #2f4a8a;border-radius:20px;padding:9px 18px;cursor:pointer}
+.tech-bascule .tb-ico{width:14px;height:14px;display:inline-block;background:currentColor;
+  -webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat}
+.tb-ico-comp{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='2.5' width='5' height='5' rx='1'/%3E%3Crect x='9' y='2.5' width='5' height='5' rx='1'/%3E%3Crect x='2' y='9' width='5' height='5' rx='1'/%3E%3Crect x='9' y='9' width='5' height='5' rx='1'/%3E%3C/svg%3E")}
+.tb-ico-det{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='2.5' width='12' height='4.5' rx='1'/%3E%3Crect x='2' y='9' width='12' height='4.5' rx='1'/%3E%3C/svg%3E")}
+/* — compact, téléphone — */
+#tech-body.tech-compact #riv-tech{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+#tech-body.tech-compact .tb-row{padding:0;gap:0;overflow:hidden;border-radius:8px}
+#tech-body.tech-compact .tb-label{font-size:.6em!important;padding:4px 6px;border-radius:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#tech-body.tech-compact .tb-cards{flex-direction:column;gap:0}
+#tech-body.tech-compact .tcard-arr{display:none}
+#tech-body.tech-compact .tcard{min-height:0!important;height:26px;border-radius:0;border-width:0;border-top:1px solid #1a1a3e!important}
+#tech-body.tech-compact .tcard .tc-header{font-size:.62em;padding:0 5px;min-height:0}
+#tech-body.tech-compact .tcard .tc-name{font-size:1em;font-weight:600}
+#tech-body.tech-compact .tcard .tc-tier,#tech-body.tech-compact .tcard .res-tag{display:none}
+#tech-body.tech-compact .tcard .tc-header>span:last-child{font-size:.82em!important;white-space:nowrap}
+#tech-body.tech-compact .tcard.tc-corne .tc-header{padding-right:21px}
+#tech-body.tech-compact .gen-row{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+#tech-body.tech-compact .gen-row .gen-label{grid-column:1 / -1;width:auto}
+#tech-body.tech-compact .gcard .gc-name{font-size:1em}
+/* — compact, ordinateur : les rangs de gauche à droite — */
+@media (min-width:600px){
+  #tech-body.tech-compact #riv-tech{display:block}
+  #tech-body.tech-compact .tb-row{flex-direction:row;align-items:center;gap:4px;padding:3px 6px;margin-bottom:3px}
+  #tech-body.tech-compact .tb-label{width:180px!important;flex-shrink:0}
+  #tech-body.tech-compact .tb-cards{flex-direction:row;gap:3px;flex:1}
+  #tech-body.tech-compact .tb-cards .tcard{flex:1;width:auto;border-width:1px;border-radius:5px}
+  #tech-body.tech-compact .tcard-arr{display:block;transform:none}
+  #tech-body.tech-compact .tcard .tc-tier{display:inline}
+  #tech-body.tech-compact .gen-row{display:flex}
+  #tech-body.tech-compact .gen-row .gen-label{width:100px}
+}
 </style>
 </head>
 <body>
@@ -1225,7 +1270,31 @@ body{font-size:var(--sc-fs,16px);}
 /* Mode solo (caché) : les cartes de nation gardent leur look, sur un fond lisible. */
 #lv-solo-pick{position:relative;z-index:1;background:rgba(7,7,24,.92);padding:14px 12px;border-radius:14px;margin:0 16px 16px}
 #sc-online-btn{display:none!important}
+/* ═══ APPLICATION, PREMIÈRE VERSION (Marc, 22/09) : solo contre l'ordinateur, SANS compte ═══
+   Dans l'application (Capacitor, `html.app-natif`) : pas d'écran de connexion. On arrive sur
+   Nouvelle partie / Reprendre, Tutoriel et Règles en boutons, FR · EN, et en bas
+   « Confidentialité · Version ». Le site, lui, garde la connexion. `?app=1` force ce mode pour
+   l'essayer dans un navigateur. */
+#lv-app{display:none;width:100%;max-width:340px;margin-top:auto;background:rgba(11,13,36,.72);border:1px solid rgba(74,158,255,.35);border-radius:16px;padding:14px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 18px 50px rgba(0,0,0,.6);box-sizing:border-box}
+.app-natif #lv-app{display:block}
+.app-natif #lv-auth,.app-natif .lv-links,.app-natif .lv-pdf{display:none!important}
+.lv-pied .lv-confid{display:none;color:#9fb0d0;text-decoration:none;margin-right:6px}
+.app-natif .lv-pied .lv-confid{display:inline}
+.lv-aides{display:flex;gap:8px;margin-top:8px}
+.lv-aides a{flex:1;display:block;text-align:center;text-decoration:none;padding:12px 8px;border:1px solid #2a3a6a;border-radius:10px;background:#0b0d24;color:#c8d4ff;font-family:var(--font-titre);font-size:.66em;letter-spacing:.08em;text-transform:uppercase}
+.lv-reprendre{width:100%;margin-top:0;padding:13px;border:1px solid #3f8f5a;border-radius:10px;background:linear-gradient(135deg,#1f7a45,#155a33);color:#fff;cursor:pointer;font-family:var(--font-titre);font-size:.72em;letter-spacing:.1em;text-transform:uppercase}
+@media (min-width:900px){ #lv-app{margin-top:8px;max-width:360px} }
 </style>
+<script>
+/* L'application native se reconnaît AVANT tout affichage : Capacitor injecte son pont en tête de
+   page. Sur le site (ou en PWA), rien ne change. */
+(function(){ try{
+  var natif=!!(window.Capacitor&&typeof window.Capacitor.isNativePlatform==='function'&&window.Capacitor.isNativePlatform());
+  if(!natif&&/[?&]app=1\b/.test(location.search)) natif=true;
+  window.SOLAR_APP=natif;
+  if(natif) document.documentElement.classList.add('app-natif');
+}catch(e){ window.SOLAR_APP=false; } })();
+</script>
 <div id="civ-sel" class="overlay">
   <!-- ⚠️ CECI est le VRAI écran d'accueil / de connexion, celui que voit le joueur au démarrage.
        `screenAuth()` dans online.js est un SECOND écran, visible seulement si on annule une partie.
@@ -1255,7 +1324,7 @@ body{font-size:var(--sc-fs,16px);}
            ligne suivante (les champs font width:100%) et se retrouve n'importe où. -->
       <div class="lv-pass-wrap">
         <input id="lv-pass" type="password" placeholder="Mot de passe" data-i18n-ph="auth.ph_mdp" autocomplete="current-password" enterkeyhint="go" onkeydown="lvKey(event)">
-        <button type="button" id="lv-eye" onclick="lvEye()" title="Afficher / masquer le mot de passe" aria-label="Afficher ou masquer le mot de passe" data-i18n-title="auth.oeil">👁</button>
+        <button type="button" id="lv-eye" onclick="lvEye()" title="Afficher / masquer le mot de passe" aria-label="Afficher ou masquer le mot de passe" data-i18n-title="auth.oeil">👁️</button>
       </div>
       <label class="lv-souvenir">
         <input type="checkbox" id="lv-remember" checked style="width:auto;margin:0;accent-color:#4a9eff"> <span data-i18n="auth.souvenir">Se souvenir de moi</span>
@@ -1264,7 +1333,15 @@ body{font-size:var(--sc-fs,16px);}
       <button type="button" class="lv-go" id="lv-go" onclick="lvSubmit()" data-i18n="auth.go_connexion">Se connecter →</button>
       <button type="button" class="lv-solo" onclick="lvSolo()" style="display:none" data-i18n="auth.solo">Jouer en solo (hors-ligne)</button>
     </div>
-    <div class="lv-pied"><span id="lv-build"></span> <a class="lv-pdf" href="Solar_Conquest_Livret.pdf" target="_blank" rel="noopener" data-i18n="lien.livret">📖 Livret PDF</a></div>
+    <div id="lv-app">
+      <button type="button" class="lv-reprendre" id="lv-app-reprendre" style="display:none" onclick="lvAppReprendre()" data-i18n="accueil.reprendre">▶ Reprendre la partie</button>
+      <button type="button" class="lv-go" id="lv-app-nouvelle" onclick="lvAppNouvelle()" data-i18n="accueil.nouvelle">Nouvelle partie</button>
+      <div class="lv-aides">
+        <a href="tutorial.html" data-i18n="lien.tutoriel">🎓 Tutoriel</a>
+        <a href="regles.html" data-i18n="lien.regles">📖 Règles</a>
+      </div>
+    </div>
+    <div class="lv-pied"><a class="lv-confid" href="confidentialite.html" data-i18n="lien.confidentialite">🔒 Confidentialité</a><span class="lv-confid"> · </span><span id="lv-build"></span> <a class="lv-pdf" href="Solar_Conquest_Livret.pdf" target="_blank" rel="noopener" data-i18n="lien.livret">📖 Livret PDF</a></div>
   </div>
   <div id="lv-solo-pick" class="hidden">
     <div id="difficulty-sel" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:8px 0">
@@ -1312,7 +1389,7 @@ function lvEye(){
   if(!p||!b) return;
   const cache = p.type==='password';
   p.type = cache ? 'text' : 'password';
-  b.textContent = cache ? '🙈' : '👁';
+  b.textContent = cache ? '🙈' : '👁️';
   try{ p.focus(); }catch(_){}
 }
 /* Numéro de build affiché sur l'écran d'accueil. C'est le SEUL moyen fiable de savoir quelle
@@ -1351,8 +1428,18 @@ async function lvTryAutoLogin(){
 }
 /* ⚠️ lvShowBuild est appelé ICI et non dans lvTryAutoLogin : online.js REMPLACE window.lvTryAutoLogin,
    donc tout appel placé dedans serait du code mort dès que la couche en ligne est chargée. */
-document.addEventListener('DOMContentLoaded',()=>{ lvShowBuild(); setTimeout(()=>{ lvShowBuild(); if(typeof lvTryAutoLogin==='function')lvTryAutoLogin(); },300); });
-function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidden');document.getElementById('lv-auth').style.display='none';document.getElementById('lv-solo-pick').scrollIntoView({behavior:'smooth'});}
+document.addEventListener('DOMContentLoaded',()=>{ lvShowBuild(); lvAppPrep(); setTimeout(()=>{ lvShowBuild(); if(!window.SOLAR_APP&&typeof lvTryAutoLogin==='function')lvTryAutoLogin(); },300); });   // application : jamais de connexion automatique (22/09)
+function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidden');document.getElementById('lv-auth').style.display='none';var _a=document.getElementById('lv-app');if(_a)_a.style.display='none';document.getElementById('lv-solo-pick').scrollIntoView({behavior:'smooth'});}
+/* ═══ APPLICATION : L'ACCUEIL SANS COMPTE (22/09) ═══ « Reprendre » n'apparaît que si une partie
+   est sauvegardée sur le téléphone (`sc_save`, la sauvegarde automatique du jeu). « Nouvelle partie »
+   par-dessus une partie en cours demande confirmation : elle serait remplacée. */
+function _lvAppSave(){ try{ var s=localStorage.getItem('sc_save'); if(!s) return false; var g=JSON.parse(s); return !!(g&&g.player&&g.phase&&g.phase!=='over'); }catch(e){ return false; } }
+function lvAppPrep(){ if(!window.SOLAR_APP) return; var b=document.getElementById('lv-app-reprendre'); if(b) b.style.display=_lvAppSave()?'block':'none'; }
+function lvAppReprendre(){ if(typeof scResumeGame==='function'&&scResumeGame()) return; lvAppPrep(); }
+function lvAppNouvelle(){
+  if(_lvAppSave()&&!confirm(t('accueil.confirm_nouvelle','Une partie est en cours sur ce téléphone. La remplacer par une nouvelle partie ?'))) return;
+  lvSolo();
+}
 
 </script>
 <div id="end-scr" class="overlay hidden">
@@ -1557,8 +1644,8 @@ function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidd
 </div>
 <!-- Anciens boutons d'action : conservés cachés (stubs) pour que renderActions ne plante pas. Les actions sont désormais contextuelles (clic sur la carte). -->
 <div id="action-bar" style="display:none">
-  <button class="abtn" id="btn-col" onclick="toggleMode('colonize')" data-i18n="ui.coloniser">🏗 Coloniser</button>
-  <button class="abtn" id="btn-route" onclick="toggleMode('route')" data-i18n="ui.route">🛤 Route</button>
+  <button class="abtn" id="btn-col" onclick="toggleMode('colonize')" data-i18n="ui.coloniser">🏗️ Coloniser</button>
+  <button class="abtn" id="btn-route" onclick="toggleMode('route')" data-i18n="ui.route">🛤️ Route</button>
   <button class="abtn" id="btn-raid" onclick="doRaid()" data-i18n="ui.raid">💰 Raid</button>
   <button class="abtn" id="btn-attack" onclick="toggleMode('attack')" style="border-color:#ef5350;color:#ff7060" data-i18n="ui.attaquer">⚔️ Attaquer</button>
   <span id="hint"></span>

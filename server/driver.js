@@ -383,16 +383,25 @@ class GameDriver {
         /* Question adressée à une nation tenue par l'ordinateur : on y répond ici, au même endroit
            et de la même façon que les notices ci-dessus. La question a bien été posée dans
            `G._flux` avant d'être résolue — c'est ce qui garde l'état sérialisable à tout instant. */
-        const pourIA = liste.find(p=>{ const n=this._natDe(p); return n && n._isAI; });
+        /* ═══ UN JOUEUR ÉLIMINÉ NE REÇOIT PLUS DE QUESTION (partie 29BD, 22/09) ═══
+           Marc, sans colonie depuis le tour 9 : « le jeu me laisse continuer, je dois cliquer sur
+           toutes les fenêtres alors que ça n'a plus de sens ». Sa nation est traitée ici comme une
+           nation de l'ordinateur : le pilote répond pour elle, la partie file jusqu'au décompte, et
+           le rapport final part par courriel comme d'habitude. */
+        const _horsJeu = n => !!(n && typeof this.sb.estEliminee==='function' && this.sb.estEliminee(n));
+        const pourIA = liste.find(p=>{ const n=this._natDe(p); return n && (n._isAI || _horsJeu(n)); });
         if(pourIA){ this.sb.resolveDecision(pourIA.id, this._reponseIA(pourIA)); continue; }
         // Notice BLOQUANTE sans destinataire (ex. résultat d'événement, nation=null) → l'adresser à un HUMAIN
-        // (sinon personne ne peut cliquer « Continuer » et la partie se figerait).
+        // ENCORE EN JEU (sinon personne ne peut cliquer « Continuer » et la partie se figerait).
+        // S'il n'en reste aucun, le pilote l'acquitte lui-même.
+        let _acquitte=null;
         for(const p of liste){
           if(this._isBlockingNotice(p) && !p.nation){
-            const h=this.roster.find(n=>n && !n._isAI);
-            p.nation = h ? h.civ.id : this.primaryId;
+            const h=this.roster.find(n=>n && !n._isAI && !_horsJeu(n));
+            if(h) p.nation = h.civ.id; else { _acquitte=p; break; }
           }
         }
+        if(_acquitte){ this.sb.resolveDecision(_acquitte.id, {}); continue; }
         // `pending` = la tête, pour tout le code qui n'attend qu'une question ; `pendings` = la liste.
         return {kind:'decision', pending:liste[0], pendings:liste.slice()};
       }

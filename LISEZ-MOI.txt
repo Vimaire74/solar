@@ -1,9 +1,9 @@
-LOT 17 — À UPLOADER  ·  21/09/2026  ·  v10.89 / sw v210
+LOT 17 — À UPLOADER  ·  22/09/2026  ·  v10.92 / sw v213
 
 CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas encore en ligne).
 
-   index.html          → estampille v10.89
-   tutorial.html       → régénéré (v10.89)
+   index.html          → estampille v10.92
+   tutorial.html       → régénéré (v10.92)
    online.js           → v10.87 (défense : la case Supercroiseur compte toujours ; espionnage)
    moteur.js           → v10.84 + tensions + v10.87
    sw.js               → cache v208
@@ -16,6 +16,32 @@ CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas enc
    server/server.js    → langues chargées au démarrage + rapport de fin traduit (v10.87)
 
 Redéploie les DEUX ressources dans Coolify (site + serveur).
+
+v10.92 — PARTIE 29BD : ÉLIMINATION, JOURNAL, DÉCOUVERTES, TRADUCTIONS (voir REPRISE.md §157)
+   · Une nation sans colonie sort du jeu : plus de Stratégie, de tension, de guerre, de revenu.
+     En ligne le serveur répond pour elle et la partie file jusqu'au décompte ; en solo, un bandeau
+     « Tu n'as plus aucune colonie » pendant que les ordinateurs finissent, sans aucune fenêtre.
+   · Les Découvertes des colonies de l'ordinateur ne sont plus versées au joueur.
+   · Journal : l'action, puis « ↳ paie », puis les gains, puis la connexion ; chaque ligne commence
+     par sa nation ; plus de « you / toi » ; pirates et tempêtes : une ligne par nation.
+   · Fenêtre « Colonisation réussie » au ton vert (🚩), plus le médaillon de guerre.
+   · Traductions (nations, AP, guerre populaire, cartes du rapport, tempéraments) ; emojis 🏗️ 🛤️.
+   · Côté serveur : le journal n'est plus redessiné à chaque ligne (gros gain de temps de calcul).
+
+v10.91 — TECHNOLOGIES : ROULEAU « BLOQUÉ » ET MODE COMPACT (voir REPRISE.md §156)
+   · Rouleau des cartes bloquées : « BLOQUÉ » / « LOCKED » en lettres blanches empilées ; la carte
+     s'atténue, pas le rouleau. Techs, Éco & Soc et Militaires.
+   · Bouton « Mode compact / Mode détaillé » en bas de l'écran des technologies (gardé sur l'appareil) :
+     téléphone = deux filières côte à côte, rangs empilés ; ordinateur = rangs de gauche à droite.
+     Petit cadenas dessiné dans les lignes compactes.
+
+v10.90 — ÉCRAN D'ACCUEIL (voir REPRISE.md §155)
+   · Site, une fois connecté : plus de « Rafraîchir » ni de « Solo » (la liste des parties se met
+     à jour seule) ; Tutoriel et Règles en boutons ; en bas « ⚙️ Mon compte · Version » →
+     déconnexion, confidentialité, et tout en bas la suppression du compte.
+   · Application : pas de connexion ; Nouvelle partie / Reprendre la partie, Tutoriel, Règles,
+     FR · EN, en bas « Confidentialité · Version ». (Pour la voir sur ordinateur : ?app=1)
+   · Pour l'application : refaire npm run android dans solar-app après l'envoi.
 
 v10.89 — PIRATES : LE PILLAGE, ET LE RAID B (voir REPRISE.md §154)
    · Pirates : au début de chaque tour (après les cartes Stratégie), chaque route à 60 jours ou
@@ -62,4 +88,4 @@ v10.84 — voir REPRISE.md §150 (pacte +4 VP, Opulence 6 VP, routes, fenêtre d
 
 APRÈS LE REDÉPLOIEMENT
    Journaux Coolify du serveur :  Langues chargées : en (2163 clés)
-   Écran d'accueil : Version 2026-09-22 · v10.89
+   Écran d'accueil : Version 2026-09-22 · v10.91

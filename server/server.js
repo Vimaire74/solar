@@ -312,7 +312,7 @@ function corpsRapport(entry, lang) {
      deux choses différentes — c'est la règle qu'on a le plus souvent payée pour l'avoir oubliée. */
   if (Array.isArray(entry.analyse) && entry.analyse.length) { for (const l of entry.analyse) L.push(l); L.push(''); }
   L.push(T('rapport.titre_journal', '═══════════ JOURNAL COMPLET DE LA PARTIE ═══════════'));
-  const lignes = (lang !== 'fr' && Array.isArray(entry.journalEntries)) ? entry.journalEntries.map(e => (e.pref || '') + (e.k ? plainText(tL(lang, e.k, e.msg, e.p)) : e.msg)) : (entry.journal || []);
+  const lignes = (lang !== 'fr' && Array.isArray(entry.journalEntries)) ? entry.journalEntries.map(e => (e.pref || '') + ((e.parLangue && e.parLangue[lang]) || (e.k ? plainText(tL(lang, e.k, e.msg, e.p)) : e.msg))) : (entry.journal || []);
   L.push(T('rapport.n_lignes', '({n} lignes, du début à la fin)', { n: lignes.length }));
   L.push('');
   for (const l of lignes) L.push(l);
@@ -354,8 +354,12 @@ function archiveGame(g) {
     /* MÊME FORMAT ATTRIBUÉ que /debug : l'email de fin de partie et l'archive doivent permettre le
        même travail de relecture. Un journal anonyme dans l'archive, c'est une partie qu'on ne peut
        plus analyser une fois la partie effacée du serveur. */
+    /* Chaque ligne d'une nation commence par son nom (`journalEtiqueter`, le même rendu qu'à
+       l'écran — Marc, 22/09). */
+    const _etq = (l, txt, lang) => (typeof sb.journalEtiqueter === 'function')
+      ? sb.journalEtiqueter(l, txt, c => tL(lang, 'nation.' + c.id + '.nom', c.name)) : txt;
     journal = (G.log || []).map(l => {
-      const txt = plainText((l && l.msg) || l);
+      const txt = plainText(_etq(l, (l && l.msg) || l, 'fr'));
       if (!l || typeof l !== 'object') return txt;
       return ('T' + (l.turn !== undefined ? l.turn : '?')).padEnd(4) + String(l.civ || 'système').padEnd(12) + ' │ ' + txt;
     }).reverse();   // archive et email : journal ENTIER
@@ -364,7 +368,11 @@ function archiveGame(g) {
     journalEntries = (G.log || []).map(l => {
       if (!l || typeof l !== 'object') return { msg: plainText(l), k: null, p: null, pref: '' };
       const pref = ('T' + (l.turn !== undefined ? l.turn : '?')).padEnd(4) + String(l.civ || 'système').padEnd(12) + ' │ ';
-      return { msg: plainText(l.msg || ''), k: l.k || null, p: l.p || null, pref };
+      /* `parLangue` : la ligne déjà rendue ET étiquetée dans chaque langue connue — l'étiquette de nation
+         a besoin du moteur, qui n'est plus là quand le courriel est écrit. */
+      const parLangue = {};
+      for (const lg of Object.keys(DICTS)) { try { parLangue[lg] = plainText(_etq(l, l.k ? tL(lg, l.k, l.msg, l.p) : (l.msg || ''), lg)); } catch (e) {} }
+      return { msg: plainText(l.msg || ''), k: l.k || null, p: l.p || null, pref, parLangue };
     }).reverse();
     /* La trajectoire des nations et les décisions des IA, produites par le MOTEUR — une seule
        source pour le solo et pour le serveur. */
@@ -563,11 +571,18 @@ function eotPourLangue(g, lang, payload) {
   } catch (e) { console.error('eotPourLangue:', e.message); return payload; }
 }
 const FENETRES_COLLECTIVES = ['eot', 'event_announce', 'event_result', 'war_result'];
+/* Un siège dont la nation n'a plus aucune colonie est HORS JEU (partie 29BD, 22/09) : il ne reçoit
+   plus aucune fenêtre — le pilote répond pour lui (driver.js) et la partie file jusqu'au décompte. */
+function siegeHorsJeu(g, s) {
+  try { const sb = g.driver && g.driver.sb; const n = sb && sb.__G && [sb.__G.player].concat(sb.__G.ais || []).find(x => x && x.civ && x.civ.id === s.civId);
+        return !!(n && typeof sb.estEliminee === 'function' && sb.estEliminee(n)); } catch (e) { return false; }
+}
 function sendWindowToAll(g, kind, payload, ownerCiv) {
   if (!payload) return;
   const bodies = payload.bodies || null;
   for (const s of g.seats) {
     if (s.ai || !s.ws) continue;
+    if (typeof siegeHorsJeu === 'function' && siegeHorsJeu(g, s)) continue;
     if (ownerCiv && s.civId === ownerCiv) continue;
     if (kind === 'eot') {
       const pl = eotPourLangue(g, langDe(s.user), payload);
@@ -755,6 +770,7 @@ function puitsNotices(g) {
       if (FENETRES_COLLECTIVES.includes(p.kind)) return;
       const civ = (p.nation && p.nation.civ) ? p.nation.civ.id : p.nation;
       const seat = civ ? g.seats.find(s2 => s2.civId === civ && !s2.ai) : null;
+      if (seat && siegeHorsJeu(g, seat)) return;
       if (seat) sendTo(seat.ws, { t: 'notice', kind: p.kind, payload: p.payload });
       else if (!civ) broadcast(g, { t: 'notice', kind: p.kind, payload: p.payload }); // notice sans destinataire = information générale
     } catch (e) {}
@@ -1056,6 +1072,13 @@ function route(g, r) {
   snapshot(g);
   g.lastRoute = r;
   if (!r) return;
+  /* Le joueur éliminé l'apprend UNE fois, tout de suite. Quand il était le seul humain, le pilote a
+     déjà tout joué et la suite immédiate est le décompte (`over`) ; sinon il attend la fin ici. */
+  if (r.kind !== 'over') for (const s of g.seats) {
+    if (s.ai || !s.ws || s._elimineDit || !siegeHorsJeu(g, s)) continue;
+    s._elimineDit = true;
+    sendTo(s.ws, { t: 'notice', kind: 'info', payload: { msg: K('srv.elimine', '🏳️ Ta nation n\'a plus aucune colonie : elle ne joue plus. Les autres nations terminent la partie ; le résultat final s\'affichera ici et te sera envoyé par courriel.') } });
+  }
   if (r.kind === 'decision') {
     const p = r.pending;
     const civ = (typeof p.nation === 'object' && p.nation) ? (p.nation.civ && p.nation.civ.id) : p.nation;
@@ -1660,7 +1683,8 @@ const server = http.createServer((req, res) => {
            dépendent d'aucun point de vue. Sans elles, les lignes de la nation active étaient
            anonymes et la partie n'était pas rejouable — c'est ce qui a bloqué l'analyse de CC36. */
         const _ligne = l => {
-          const txt = plainText((l && l.msg) || l);
+          const _sbd = g.driver && g.driver.sb;
+          const txt = plainText((_sbd && typeof _sbd.journalEtiqueter === 'function') ? _sbd.journalEtiqueter(l, (l && l.msg) || l) : ((l && l.msg) || l));
           if (!l || typeof l !== 'object') return txt;
           const t = (l.turn !== undefined) ? ('T' + l.turn) : '  ';
           return t.padEnd(3) + ' ' + String(l.civ || 'système').padEnd(12) + ' │ ' + txt;

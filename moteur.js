@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-22 · v10.89';
+const SOLAR_BUILD_MOTEUR = '2026-09-22 · v10.92';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -525,8 +525,7 @@ const INVESTMENT_CARDS_2=[
      p.investBonus2.unionSacree=true;
      /* 5B38 : « accessible pour IA (Ceinturiens) » — c'était l'ami de Marc. On ne lit plus G.player
         mais la nature de la nation. */
-     const label=p.civ.emoji+' '+p.civ.name+(p._isAI?' (ordinateur)':'');
-     addLog(J('journal.union_sacree_branche_empathes_accessible','🧠 Union Sacrée : branche Empathes accessible pour {label} — exclusive jusqu\'au tour {v}',{label:label,v:G.empathesFounder.openAtTurn}),'gold');
+     logAuteur(p,()=>addLog(J('journal.union_sacree_nation','{emoji} {nation} — 🧠 Union Sacrée : branche Empathes accessible, exclusive jusqu\'au tour {v}',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),v:G.empathesFounder.openAtTurn}),'gold'));
    },
    applyCost(G,p){
      p.res.materials=Math.max(0,(p.res.materials||0)-3);p.res.science=Math.max(0,(p.res.science||0)-4);
@@ -615,7 +614,7 @@ const CIVIC_MARKET=[
    govForm:{formPts:10,moralePerTurn:1,upkeep:{materials:2,energy:2}}, cost:{materials:3,energy:2,science:1}},
 ];
 /* Gagnant d'un événement : meilleur sur la CONDITION ; égalité départagée par VP le plus bas, puis le plus de jetons Force. */
-function _evWinner(statFn){const allP=allPlayers();let w=allP[0];for(const p of allP){const s=statFn(p),bs=statFn(w);if(s>bs)w=p;else if(s===bs&&p!==w){const dv=calcVP(p).total-calcVP(w).total;if(dv<0||(dv===0&&p.forceTokens>w.forceTokens))w=p;}}return w;}
+function _evWinner(statFn){const allP=nationsEnJeu();let w=allP[0];for(const p of allP){const s=statFn(p),bs=statFn(w);if(s>bs)w=p;else if(s===bs&&p!==w){const dv=calcVP(p).total-calcVP(w).total;if(dv<0||(dv===0&&p.forceTokens>w.forceTokens))w=p;}}return w;}
 const EVENTS=[
   {id:'ruee',type:'competition',name:'Ruée Minière',emoji:'⛏️',preview:'La nation avec le plus de colonies gagne +6 VP. Si égalité en première place : les deux, si plus d\'égalités personne.',
    resolve(G){const h=_evTop(function(p){return p.colonies.length;});return J('evt.res_ruee','Ruée Minière — {v}',{v:_evAwardVP(h,6)});}},
@@ -627,7 +626,12 @@ const EVENTS=[
    resolve(G){
      const touches=[], proteges=[];
      for(const p of allPlayers()){
-       if(hasSpec(p,'storm_immune')){ proteges.push(J('commun.emoji_nation','{emoji} {nation}',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name')})); continue; }
+       /* Épargnée : la même ligne que les autres, nation en tête (Marc, 22/09 : « pourquoi ma nation
+          n'est pas formulée de la même manière ? »). */
+       if(hasSpec(p,'storm_immune')){
+         touches.push(J('evt.tempete_ligne','{emoji} {nation} : {v}',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),v:J('evt.tempete_epargnee','🛡️ épargnée (IA Défensive)')}));
+         logAuteur(p,()=>addLog(J('journal.tempete','🌩️ {emoji} {nation} — tempête : {v}.',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),v:J('evt.tempete_epargnee','🛡️ épargnée (IA Défensive)')}),'gold'));
+         continue; }
        const _j=Math.min(1,p.forceTokens||0);
        p.forceTokens=Math.max(0,(p.forceTokens||0)-1);
        let _rte=null;
@@ -645,11 +649,12 @@ const EVENTS=[
        /* Chaque perte est un paramètre (pas un `join`) : la ligne se rend chez chaque lecteur dans sa langue. */
        const _pertes=J('evt.tempete_pertes','{j}{rte}{mat}−1<i class=ri-morale></i>',{j:(_j?J('evt.tempete_jeton','−{n} jeton, ',{n:_j}):''),rte:(_rte?J('evt.tempete_route','route {r} détruite, ',{r:_rte}):''),mat:(_mat?J('evt.tempete_mat','−{n}<i class=ri-materials></i>, ',{n:_mat}):'')});
        touches.push(J('evt.tempete_ligne','{emoji} {nation} : {v}',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),v:_pertes}));
-       addLog(J('journal.tempete','🌩️ {emoji} {nation} — tempête : {v}.',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),v:_pertes}),'red');
+       logAuteur(p,()=>addLog(J('journal.tempete','🌩️ {emoji} {nation} — tempête : {v}.',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),v:_pertes}),'red'));
      }
+     const _nbProt=allPlayers().filter(p=>hasSpec(p,'storm_immune')).length;
      /* Quatre nations au plus : quatre emplacements, pas de `join` (voir `_evNames`). */
      const _sl=i=>(touches[i]?J('evt.tempete_puce','<br>• {v}',{v:touches[i]}):'');
-     return J('evt.res_tempetes','Tempêtes Solaires — {n} nation(s) touchée(s).{a}{b}{c}{d}{prot}',{n:touches.length,a:_sl(0),b:_sl(1),c:_sl(2),d:_sl(3),prot:(proteges.length?J('evt.tempete_epargnees','<br><span style="color:#9ad89a">🛡️ Épargnées (IA Défensive) : {v}</span>',{v:(proteges.length>=2?J('evt.deux_noms','{a} & {b}',{a:proteges[0],b:proteges[1]}):proteges[0])}):'')});
+     return J('evt.res_tempetes','Tempêtes Solaires — {n} nation(s) touchée(s).{a}{b}{c}{d}{prot}',{n:touches.length-_nbProt,a:_sl(0),b:_sl(1),c:_sl(2),d:_sl(3),prot:(proteges.length?J('evt.tempete_epargnees','<br><span style="color:#9ad89a">🛡️ Épargnées (IA Défensive) : {v}</span>',{v:(proteges.length>=2?J('evt.deux_noms','{a} & {b}',{a:proteges[0],b:proteges[1]}):proteges[0])}):'')});
    }},
   {id:'pirates',type:'menace',name:'Prolifération des pirates',emoji:'☠️',preview:'Les pirates frappent les routes de la nation la plus riche en <i class=ri-materials></i> (stock à la fin des actions, AVANT le revenu du tour) : les routes sans jeton NI technologie de protection sont détruites ; celles avec un jeton ont 50% de chance d\'être perdues, mais 2 au maximum.',
    /* La cible se juge sur le stock d'AVANT le revenu du tour (photo prise dans `stFinDeTour`) : voir la note là-bas. */
@@ -675,7 +680,7 @@ const EVENTS=[
 ];
 /* --- Refonte v18 : événements tirés au hasard, 1 par tour pair (T2/T4/T6/T8), révélés au tour précédent. T10 = Jugement Final. --- */
 // Toujours NOMMER la nation : « Toi » seul était ambigu (on ne savait pas si on gagnait ou perdait).
-function _evName(p){return J('evt.nom_nation','{emoji} {nation}{toi}',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),toi:((typeof G!=='undefined'&&G&&p===G.player)?J('commun.toi_paren_esp',' (toi)'):'')});}
+function _evName(p){return J('evt.nom_nation','{emoji} {nation}{toi}',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),toi:''});}   // plus de « (toi) » : le journal est lu par tous (22/09)
 /* Un ou deux gagnants nommés (à trois ou plus, « personne ») — deux paramètres, pas un `join` : le
    `join` rendrait le français tout de suite côté serveur. */
 function _evNames(h){return h.length>=2?J('evt.deux_noms','{a} & {b}',{a:_evName(h[0]),b:_evName(h[1])}):(h.length?_evName(h[0]):'');}
@@ -755,7 +760,7 @@ function techsProtegeantRoutes(p){
   if(hasSpec(p,'intel_2')) liste.push(_c('reseau2'));
   return liste;
 }
-function _evTop(statFn){const all=allPlayers();let mx=-Infinity;for(const p of all){const s=statFn(p);if(s>mx)mx=s;}if(mx<=0)return[];return all.filter(function(p){return statFn(p)===mx;});}
+function _evTop(statFn){const all=nationsEnJeu();let mx=-Infinity;for(const p of all){const s=statFn(p);if(s>mx)mx=s;}if(mx<=0)return[];return all.filter(function(p){return statFn(p)===mx;});}
 /* ═══ CHAQUE POINT GAGNÉ DOIT POUVOIR DIRE D'OÙ IL VIENT ═══
    Marc, 2026-08-25 : « j'aimerais un rapport de fin de partie plus détaillé… le calcul complet des
    points pour chaque élément calculé, notamment les bonus spéciaux qui n'est pas clair. »
@@ -774,7 +779,7 @@ function gagnerVP(p,n,raison){
   if(raison&&typeof raison==='object'&&typeof raison.k==='string') _e.raison_i18n={k:raison.k, fr:raison.fr, p:raison.p||null};
   p._vpDetail.push(_e);
 }
-function _evAwardVP(holders,vp,nom){if(holders.length===0)return J('evt.personne_aucune_production','personne (aucune production).');if(holders.length>=3)return J('evt.personne_egalites','personne — trop d\'égalités ({n} nations).',{n:holders.length});holders.forEach(function(p){gagnerVP(p,vp,J('vp.evenement','Événement : {v}',{v:(nom||J('vp.recompense',"récompense"))}));});return J('evt.gagnants_vp','{v} → +{vp} VP',{v:_evNames(holders),vp:vp});}
+function _evAwardVP(holders,vp,nom){if(holders.length===0)return J('evt.personne_aucune_production','personne (aucune production).');if(holders.length>=3)return J('evt.personne_egalites','personne — trop d\'égalités ({n} nations).',{n:holders.length});/* Le nom de l'événement en cours à défaut d'un nom donné (« Event: reward: +6 » dans le décompte final, 29BD). */if(!nom&&typeof G!=='undefined'&&G&&G.curEvent&&G.curEvent.name)nom=_i18nRef(G.curEvent,'name');holders.forEach(function(p){gagnerVP(p,vp,J('vp.evenement','Événement : {v}',{v:(nom||J('vp.recompense',"récompense"))}));});return J('evt.gagnants_vp','{v} → +{vp} VP',{v:_evNames(holders),vp:vp});}
 /* −2 entre TOUS les couples de nations, IA comprises (Marc, 21/09 : « entre deux IA aussi, égalité »).
    Avant : seulement entre `'player'` et chaque IA. */
 function _evCommResolve(G){const _ns=allPlayers().filter(n=>n&&n.civ);for(const x of _ns)for(const y of _ns){if(x!==y)setTens(x.civ.id,y.civ.id,Math.max(0,getTens(x.civ.id,y.civ.id)-2));}for(const p of allPlayers()){const c=getResCapFor(p);p.res.materials=Math.min(c.materials,(p.res.materials||0)+2);}return J('evt.sommet_commercial_resultat','Sommet commercial — tension −2 avec chaque nation, +2<i class=ri-materials></i> pour toutes.');}
@@ -904,7 +909,7 @@ function _evCommCandidats(nat){
 }
 /* `onDone` est un NOM de suite (bloc @flux) : il se sauvegarde, une fonction non. */
 function showEventChoiceModal(ev,onDone){
-  if(!ev){ if(onDone)fluxAppeler(onDone); return; }
+  if(!ev||_spectateurSolo()){ if(onDone)fluxAppeler(onDone); return; }
   if(ev.id==='comm')showCommEventModal(onDone);
   else if(ev.id==='diplo')showDiploEventModal(onDone);
   else if(onDone)fluxAppeler(onDone);
@@ -2056,7 +2061,7 @@ function capturerNoeud(vainqueur, nodeId){
     for(const _v of (typeof occupantsDuNoeud==='function'?occupantsDuNoeud(nodeId):[]))
       if(_v!==vainqueur) marquerAgressee(_v);
   if(!vainqueur||!nodeId) return 0;
-  const nom=(NODES[nodeId]&&NODES[nodeId].name)||nodeId;
+  const nom=NODES[nodeId]?_i18nRef(NODES[nodeId],'name'):nodeId;   // référence (journal relu dans la langue du lecteur)
   let meilleur=0, expulses=0;
   for(const perdant of occupantsDuNoeud(nodeId)){
     if(perdant===vainqueur) continue;
@@ -2081,7 +2086,7 @@ function capturerNoeud(vainqueur, nodeId){
          il est repris plus bas dès que la capitale lui échappe — reprise par son propriétaire ou
          prise par un tiers, qui lui ne touche rien. */
       if(!vainqueur._vpCapitales)vainqueur._vpCapitales={};
-      vainqueur._vpCapitales[nodeId]=perdant.civ.name;
+      vainqueur._vpCapitales[nodeId]=_i18nRef(perdant.civ,'name');   // une RÉFÉRENCE : relue dans la langue du lecteur (« capital of Martiens », 29BD)
       addLog(J('journal.empare_capitale_10_vp_tant_qu_tient','👑 {emoji} {nation} s\'empare de {nom}, CAPITALE de {emoji2} {nation2} — +10 VP (tant qu\'il la tient) !',{emoji:vainqueur.civ.emoji,nation:_i18nRef(vainqueur.civ,'name'),nom:nom,emoji2:perdant.civ.emoji,nation2:_i18nRef(perdant.civ,'name')}),'gold');
     }
     /* ═══ PRENDRE UNE COLONIE APAISE CELUI QUI LA PREND (Marc, 20/09, partie 2959) ═══
@@ -2159,7 +2164,7 @@ function capturerNoeud(vainqueur, nodeId){
      désormais LEQUEL et POURQUOI, au lieu d'invoquer une règle qui n'a rien à voir. */
   if(!estNoeudPartage(nodeId) && G.commercialAccords.includes(nodeId)){
     const _sg=(typeof _accordSignataires==='function')?_accordSignataires(nodeId):null;
-    const _noms=(_sg||[]).map(function(cid){ const n=allPlayers().find(function(x){return x.civ.id===cid;}); return n?(n.civ.emoji+' '+n.civ.name):cid; });
+    const _noms=(_sg||[]).map(function(cid){ const n=allPlayers().find(function(x){return x.civ.id===cid;}); return n?_nomNation(n):cid; });   // référence (« Terriens » dans un journal anglais, sinon)
     const _force=(typeof estNoeudPartage==='function')&&sienne&&sienne.noUpgrade;
     G.commercialAccords=G.commercialAccords.filter(n=>n!==nodeId);
     if(G.accordsParties)delete G.accordsParties[nodeId];
@@ -2375,6 +2380,7 @@ function surproductionVP(){
   if(!G||typeof allPlayers!=='function')return;
   for(const p of allPlayers()){
     if(!p||!p.res||!p.civ)continue;
+    if(estEliminee(p))continue;                          // hors jeu : son score est figé
     if(p._surprodTour===G.turn)continue;                 // déjà compté ce tour
     const cap=realResCap(p); const quoi=[];
     for(const [r,ico] of SURPROD_RES){
@@ -2385,8 +2391,8 @@ function surproductionVP(){
     p._surprodTour=G.turn;
     const n=Math.min(4,quoi.length);
     gagnerVP(p,n,J('vp.surproduction','Surproduction {v}',{v:quoi.join('')}));
-    if(p===G.player)addLog(J('journal.surproduction_vp_excedent_dela_plafond_p','🏭 Surproduction {v} : +{n} VP — l\'excédent au-delà du plafond est perdu, mais il rapporte.',{v:quoi.join(' '),n:n}),'gold');
-    else addLog(J('journal.surproduit_vp','🏭 {emoji} {nation} surproduit ({v}) : +{n} VP.',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),v:quoi.join(''),n:n}),'dim');
+    /* Une ligne, la même pour toutes les nations, dans la colonne de la nation (22/09). */
+    logAuteur(p,()=>addLog(J('journal.surproduction_nation','🏭 {emoji} {nation} — surproduction ({v}) : +{n} VP',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),v:quoi.join(''),n:n}),p===G.player?'gold':'dim'));
   }
 }
 function rEmoji(r){return{energy:'<i class=ri-energy></i>',materials:'<i class=ri-materials></i>',science:'<i class=ri-science></i>',morale:'<i class=ri-morale></i>',force:'⚔️'}[r]||r;}
@@ -2627,7 +2633,46 @@ function estEliminee(p){ return !!p && (!p.colonies || p.colonies.length===0); }
    Une seule définition, appelée à la capture (élimination en cours de tour) ET à chaque
    début de manche — deux copies de cette règle finiraient par diverger. */
 function eliminerRendreLaMain(p){ if(!estEliminee(p))return false; p.acLeft=0; p._passedRound=true; return true; }
+/* ═══ UNE NATION ÉLIMINÉE SORT DU JEU — PAS SEULEMENT DU TOUR DE TABLE (partie 29BD, 22/09) ═══
+   Marc : « le jeu à la fin panique parce que j'ai disparu sans disparaître ». Éliminé au tour 9, il
+   restait dans le tirage des cartes Stratégie, dans le calcul des tensions (« les Terriens te
+   distancent de 7 colonies : +9 »), dans les guerres populaires — une guerre lui a été déclarée
+   APRÈS son élimination —, dans l'initiative de fin de tour (il y a détruit une route), et il
+   encaissait encore sa surproduction. Une seule liste, lue par toutes ces règles. */
+function nationsEnJeu(){ return (typeof allPlayers==='function'?allPlayers():[]).filter(p=>p&&p.civ&&!estEliminee(p)); }
+/* Ce qu'on fait UNE fois à l'élimination : ses guerres s'éteignent (il n'y a plus rien à conquérir ni
+   à défendre), les tensions envers elle et les siennes retombent à zéro. Appelée au début de chaque
+   tour (avant l'usure des guerres) et au début du tour de table : idempotente. */
+function retirerNationsEliminees(){
+  for(const p of (typeof allPlayers==='function'?allPlayers():[])){
+    if(!p||!p.civ||!estEliminee(p)||p._horsJeu)continue;
+    p._horsJeu=(G&&G.turn)||0;
+    const id=p.civ.id;
+    if(Array.isArray(G.wars)){ const av=G.wars.length; G.wars=G.wars.filter(w=>!(w&&(w.a===id||w.b===id))); if(G.wars.length!==av&&typeof syncWarState==='function'){ try{ syncWarState(); }catch(e){} } }
+    for(const o of allPlayers()){ if(!o||o===p||!o.civ)continue; try{ setTens(id,o.civ.id,0); setTens(o.civ.id,id,0); }catch(e){} }
+  }
+}
+/* LE JOUEUR LOCAL, ÉLIMINÉ, EN SOLO : il regarde la fin. Aucune fenêtre ne l'attend plus — les
+   ordinateurs jouent sans pause, le bilan et les événements se referment d'eux-mêmes, et seul le
+   décompte final s'affiche. En ligne, c'est le pilote du serveur qui répond à sa place (driver.js). */
+function _spectateurSolo(){
+  try{ return !!(typeof G!=='undefined'&&G&&G.player&&G.phase!=='over'&&!(typeof _decisionActive==='function'&&_decisionActive())&&!G.player._remoteHuman&&!G.player._isAI&&estEliminee(G.player)); }catch(e){ return false; }
+}
+function _spectateurBandeau(){
+  try{
+    if(typeof document==='undefined'||!document.body||typeof document.createElement!=='function')return;
+    let b=document.getElementById('elim-bandeau');
+    if(!b){ b=document.createElement('div'); b.id='elim-bandeau';
+      b.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:700;background:#141a36;border:2px solid #8a93b8;border-radius:14px;padding:18px 22px;max-width:min(88vw,420px);text-align:center;color:#e8ecff;box-shadow:0 10px 40px rgba(0,0,0,.6)';
+      document.body.appendChild(b); }
+    b.innerHTML='<div style="font-size:1.6em">🏳️</div><div style="font-weight:800;margin:6px 0">'+t('elim.titre','Tu n\'as plus aucune colonie')+'</div>'
+      +'<div style="font-size:.9em;color:#c7d0ee;line-height:1.45">'+t('elim.texte','Les autres nations terminent la partie. Le résultat final s\'affiche dès qu\'elles ont fini.')+'</div>'
+      +'<div style="margin-top:10px;font-size:.85em;color:#9fb0e0">'+t('elim.tour','Tour {n} / {m}',{n:G.turn,m:G.maxTurns})+'</div>';
+  }catch(e){}
+}
+function _spectateurBandeauRetirer(){ try{ const b=document.getElementById('elim-bandeau'); if(b)b.remove(); }catch(e){} }
 function appliquerEliminations(){
+  retirerNationsEliminees();
   for(const p of (typeof allPlayers==='function'?allPlayers():[])){
     if(!eliminerRendreLaMain(p))continue;
     if(!p._elimineeDit){ p._elimineeDit=true;
@@ -3272,7 +3317,8 @@ function initGame(civId,aiCivIds){
      moment-là, et elle ne touche pas aux nations qui ont déjà un profil. */
   attribuerProfilsIA();
   drawStars();drawConnections();
-  addLog(J('journal.partie_vs','🚀 Partie ! {nom} vs {v}',{nom:_i18nRef(CIVS[civId],'name'),v:G.ais.map(a=>a.civ.name).join(', ')}),'gold');
+  /* Les adversaires en RÉFÉRENCES imbriquées : joints en chaîne, ils restaient en français dans une partie anglaise (29BD). */
+  logAuteur('systeme',()=>addLog(J('journal.partie_vs','🚀 Partie ! {nom} vs {v}',{nom:_i18nRef(CIVS[civId],'name'),v:G.ais.map(a=>J('journal.nation_nom','{emoji} {nation}',{emoji:a.civ.emoji,nation:_i18nRef(a.civ,'name')})).reduce((a,b)=>a===null?b:J('commun.joint','{a}{sep}{b}',{a:a,sep:', ',b:b}),null)}),'gold'));
   addLog(J('journal.bonus_national','⭐ Bonus national : {v}',{v:(CIVS[civId].techBonus?TECH_BRANCHES[CIVS[civId].techBonus].emoji+' '+TECH_BRANCHES[CIVS[civId].techBonus].label+' −1<i class=ri-science></i>':J('journal.aucun',"Aucun"))}));
   renderLogLegend();
   if(!_decisionActive())showAgendaSelModal(); // serveur : le driver lance le draft d'agenda APRÈS avoir fixé les sièges humain/IA
@@ -3330,7 +3376,7 @@ function _scHideConfirm(){_scConfirmArmed=false;if(_scHasConfirmDom())document.g
    ×24 dans le journal d'une partie de test, et un bandeau « ⬆️ Phobos Nv.2 » offert au joueur
    pour une amélioration qui n'était pas la sienne. */
 function _estLocal(n){return n===G.player;}
-function _scGuard(){if(_scConfirmArmed){if(typeof addLog==='function')addLog(J('journal.valide_ou_annule_action_avant_jouer_autr','⚠️ Valide (✓) ou annule (↩) ton action avant d\'en jouer une autre.'),'red');return true;}return false;} // bloque l'enchaînement tant qu'une action n'est pas confirmée
+function _scGuard(){if(_scConfirmArmed){if(typeof addLog==='function')addLog(J('journal.valide_ou_annule_action_avant_jouer_autr','⚠️ Valider (✓) ou annuler (↩) l\'action en cours avant d\'en jouer une autre.'),'red');return true;}return false;} // bloque l'enchaînement tant qu'une action n'est pas confirmée
 function scConfirmValidate(){ // fige l'action (plus d'annulation) PUIS relance l'entrelacement (l'IA joue maintenant)
   _scHideConfirm();undoStack=[];render();
   if(typeof G!=='undefined'&&G&&G._il&&G._humanActive){G._ilPassTries=0;setTimeout(_ilMaybePass,20);}
@@ -3670,6 +3716,7 @@ function showInvestmentModal(){
   // Chaque IA choisit STRATÉGIQUEMENT (le joueur choisit en dernier)
   for(const a of G.ais)a._inv1=chooseInvestmentForAI(a,1);
   G.aiInvest=G.ais[0]?G.ais[0]._inv1:null;   // ÉCHO d'affichage local — ne JAMAIS s'en servir pour une règle (dépend de la perspective)
+  if(_spectateurSolo()){ G.turn++; setTimeout(runStrategyDraft,0); return; }   // éliminé : rien à investir
   if(_decisionActive()){ // mode serveur : chaque HUMAIN choisit son investissement Niv.1 (les invités d'abord, puis l'hôte)
     /* (Une variable `_invOpts` traînait ici, construite puis jamais utilisée : les options
        envoyées viennent de `_invOptions(nation)`, plus bas. Supprimée — du code mort qui a
@@ -3723,6 +3770,7 @@ function showInvestmentModal2(){
   // Celui qui a terminé son tour 6 en dernier (l'IA) choisit en premier
   for(const a of G.ais)a._inv2=chooseInvestmentForAI(a,2);
   G.aiInvest2=G.ais[0]?G.ais[0]._inv2:null;  // ÉCHO d'affichage local — voir ci-dessus
+  if(_spectateurSolo()){ G.turn++; setTimeout(runStrategyDraft,0); return; }
   if(_decisionActive()){ // mode serveur : chaque HUMAIN choisit son investissement Niv.2 (les invités d'abord, puis l'hôte)
     // Même flux que le niveau 1 : la file des joueurs va dans `G`, pas dans une fermeture.
     fluxDonnees().fileInvest=G.ais.filter(a=>!a._isAI).map(a=>a.civ.id);
@@ -3911,7 +3959,7 @@ function showDysonModal(){
 function dysonRenounce(){
   document.getElementById('dyson-modal').classList.add('hidden');
   G._dysonWarTargets=null;
-  if(typeof undo==='function'&&undoStack.length>0){undo();addLog(J('journal.sphere_dyson_achat_annule_renonces_monop','↩️ Sphère de Dyson : achat annulé — tu renonces au monopole. Pas de guerre.'),'dim');}
+  if(typeof undo==='function'&&undoStack.length>0){undo();addLog(J('journal.sphere_dyson_achat_annule_renonces_monop','↩️ Sphère de Dyson : achat annulé — renonce au monopole. Pas de guerre.'),'dim');}
   render();
 }
 function applyDysonClose(){
@@ -4001,9 +4049,9 @@ function showAiDysonModal(aiId,cb){
 function aiDysonDecide(war){
   document.getElementById('dyson-modal').classList.add('hidden');
   const aiId=G._aiDysonId;const cb=G._aiDysonCb;G._aiDysonId=null;G._aiDysonCb=null;
-  if(war){G.warRisk=10;declareWar(J('guerre.raison_dyson_ennemie','Sphère de Dyson ennemie — refus du monopole énergétique !'),'player',aiId);addLog(J('journal.refuses_sphere_dyson_guerre_declaree','⚔️ Tu refuses la Sphère de Dyson — guerre déclarée !'),'red');}
+  if(war){G.warRisk=10;declareWar(J('guerre.raison_dyson_ennemie','Sphère de Dyson ennemie — refus du monopole énergétique !'),'player',aiId);addLog(J('journal.refuses_sphere_dyson_guerre_declaree','⚔️ refuse la Sphère de Dyson — guerre déclarée !'),'red');}
   else{
-    addLog(J('journal.acceptes_monopole_energetique_sphere_dys','🤝 Tu acceptes le monopole énergétique de la Sphère de Dyson.'),'dim');
+    addLog(J('journal.acceptes_monopole_energetique_sphere_dys','🤝 accepte le monopole énergétique de la Sphère de Dyson.'),'dim');
     dysonPartage(G.player);
     // Accepter le monopole = geste d'apaisement : termine toute guerre FRAÎCHEMENT déclarée avec le bâtisseur ce tour et calme la tension bilatérale.
     const _builder=G.ais.find(a=>a.civ.id===aiId);
@@ -4012,7 +4060,7 @@ function aiDysonDecide(war){
       const _i=G.wars.indexOf(_w);if(_i>=0)G.wars.splice(_i,1);
       setTens('player',aiId,2);setTens(aiId,'player',2);
       syncWarState();
-      addLog(J('journal.acceptation_monopole_apaise_guerre_evite','🕊️ Ton acceptation du monopole apaise {v} — la guerre est évitée.',{v:(_builder?_builder.civ.emoji+' '+_builder.civ.name:J('journal.nation',"la nation"))}),'gold');
+      addLog(J('journal.acceptation_monopole_apaise_guerre_evite','🕊️ Son acceptation du monopole apaise {v} — la guerre est évitée.',{v:(_builder?J('journal.nation_nom','{emoji} {nation}',{emoji:_builder.civ.emoji,nation:_i18nRef(_builder.civ,'name')}):J('journal.nation',"la nation"))}),'gold');
     }
   }
   /* ⚠️ LES AUTRES NATIONS EXISTENT AUSSI. Cette fonction ne traitait que `G.player` : quand une IA
@@ -4038,7 +4086,7 @@ function aiDysonDecide(war){
           declarerGuerre(_n,_bat,J('guerre.raison_dyson_refus','Sphère de Dyson — refus du monopole énergétique'),'ai');
           const _dwn=_warBetween(_n.civ.id,_bat.civ.id); if(_dwn)_dwn.aiAggressor=true;
         }
-        addLog(J('journal.refuse_monopole_guerre_declaree_batisseu_2','⚔️ {emoji} {nation} REFUSE le monopole de {v} — guerre déclarée au bâtisseur (tension 10).',{emoji:_n.civ.emoji,nation:_i18nRef(_n.civ,'name'),v:(_bat?_bat.civ.emoji+' '+_bat.civ.name:aiId)}),'red');
+        addLog(J('journal.refuse_monopole_guerre_declaree_batisseu_2','⚔️ {emoji} {nation} REFUSE le monopole de {v} — guerre déclarée au bâtisseur (tension 10).',{emoji:_n.civ.emoji,nation:_i18nRef(_n.civ,'name'),v:(_bat?J('journal.nation_nom','{emoji} {nation}',{emoji:_bat.civ.emoji,nation:_i18nRef(_bat.civ,'name')}):aiId)}),'red');
       }
     }
   }
@@ -4489,7 +4537,7 @@ function runStrategyDraft(){
   _runStrategyDraftAfterAnnounce();
 }
 function _runStrategyDraftAfterAnnounce(){
-  const nations=[G.player,...G.ais];
+  const nations=[G.player,...G.ais].filter(n=>!estEliminee(n));   // éliminée : plus de carte Stratégie
   /* ORDRE DU DRAFT : le joueur le plus FAIBLE choisit en premier (règle voulue par Marc).
      ⚠️ BUG CORRIGÉ LE 2026-08-07 : on comparait `calcVP(a)` à `calcVP(b)` — or `calcVP` rend un
      OBJET `{colVP,…,total}`, pas un nombre. Donc `va!==vb` était TOUJOURS vrai (deux objets
@@ -4520,7 +4568,7 @@ function _runStrategyDraftAfterAnnounce(){
      lui ni moi ne pouvions le prouver. Maintenant si l'ordre est faux, il se voit. */
   try{
     /* Fait de partie, pas d'une nation — voir la note d'auteur du journal. */
-    logAuteur('systeme',()=>addLog(J('journal.ordre_draft_strategie_faible_fort','🃏 Ordre du draft Stratégie (du plus faible au plus fort) : {vp}',{vp:order.map((p,i)=>(i+1)+'. '+p.civ.name+' ('+vpAffiche(p)+' VP, '+(p.forceTokens||0)+'⚔️)').join(' · ')}),'dim'));
+    logAuteur('systeme',()=>addLog(J('journal.ordre_draft_strategie_faible_fort','🃏 Ordre du draft Stratégie (du plus faible au plus fort) : {vp}',{vp:order.map((p,i)=>J('journal.ordre_draft_item','{i}. {emoji} {nation} ({vp} VP, {f}⚔️)',{i:i+1,emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),vp:vpAffiche(p),f:(p.forceTokens||0)})).reduce((a,b)=>a===null?b:J('commun.joint','{a}{sep}{b}',{a:a,sep:' · ',b:b}),null)}),'dim'));
   }catch(e){}
   /* TAILLE DE LA PIOCHE — constante à tous les tours (choix de Marc, 2026-08-07 : option « b »).
      AVANT : `nations + (tour===1 ? 3 : 2)`. La pioche perdait donc une carte entre le tour 1 et le
@@ -4538,7 +4586,7 @@ function _runStrategyDraftAfterAnnounce(){
   G._stratPool=shuffle([..._cartes]).slice(0,poolSize);
   // Tracé aussi : « je vois 3 cartes » et « le code en prépare 5 » ne peuvent plus rester une
   // discussion d'opinion. Si le journal dit 5 et que l'écran en montre 3, le défaut est APRÈS ici.
-  try{ addLog(J('journal.pioche_strategie_cartes_nations_2_plafon','🃏 Pioche Stratégie : {poolsize} cartes pour {v} nations ({v2} + 2, plafonné à {v3}).',{poolsize:poolSize,v:nations.length,v2:nations.length,v3:STRATEGY_CARDS.length}),'dim'); }catch(e){}
+  try{ logAuteur('systeme',()=>addLog(J('journal.pioche_strategie_cartes_nations_2_plafon','🃏 Pioche Stratégie : {poolsize} cartes pour {v} nations ({v2} + 2, plafonné à {v3}).',{poolsize:poolSize,v:nations.length,v2:nations.length,v3:STRATEGY_CARDS.length}),'dim')); }catch(e){}
   /* ⚠️ ON RANGE DES IDENTIFIANTS, PAS DES OBJETS NATION — ET C'EST UN CORRECTIF, PAS UN STYLE.
      `G._stratOrder` contenait les objets eux-mêmes, et la file était consommée par comparaison
      d'IDENTITÉ (`G._stratOrder[0]===nat`). Ça marche tant que la partie vit en mémoire. Dès qu'elle
@@ -4891,11 +4939,11 @@ function applyCalmTension(aiId,mode,amount){
     const prevD=getTens(aiId,'player');
     setTens(aiId,'player',Math.max(0,prevD-amount));
     const _n=(G.ais.find(a=>a.civ.id===aiId)||{civ:{name:aiId,emoji:''}});
-    addLog(J('journal.mission_diplomatique_chez_tension_envers','🕊️ Mission diplomatique chez {emoji} {nation} : sa tension envers toi {prevd} → {v}/10 (−{amount})',{emoji:_n.civ.emoji,nation:_i18nRef(_n.civ,'name'),prevd:prevD,v:getTens(aiId,'player'),amount:amount}),'gold');
+    addLog(J('journal.mission_diplomatique_chez_tension_envers','🕊️ Mission diplomatique chez {emoji} {nation} : sa tension envers {nation2} {prevd} → {v}/10 (−{amount})',{emoji:_n.civ.emoji,nation:_i18nRef(_n.civ,'name'),nation2:_i18nRef(G.player.civ,'name'),prevd:prevD,v:getTens(aiId,'player'),amount:amount}),'gold');
     /* Le geste que Marc réclamait : il efface la mémoire des agressions, pas seulement la jauge. */
     { const _r=(typeof rancuneDe==='function')?rancuneDe(aiId,'player'):0;
       if(_r>0&&typeof apaiserRancune==='function'){ apaiserRancune(G.player,_n);
-        addLog(J('journal.oublie_rancune_effacee_demandes_seront_n','🤝 {emoji} {nation} oublie {v} — la rancune est effacée, tes demandes seront de nouveau écoutées.',{emoji:_n.civ.emoji,nation:_i18nRef(_n.civ,'name'),v:(_r>1?J('journal.agressions_2',"tes {r} agressions",{r:_r}):J('journal.agression_2',"ton agression"))}),'gold'); } }
+        addLog(J('journal.oublie_rancune_effacee_demandes_seront_n','🤝 {emoji} {nation} oublie {v} — la rancune est effacée, les demandes de {nation2} seront de nouveau écoutées.',{emoji:_n.civ.emoji,nation:_i18nRef(_n.civ,'name'),nation2:_i18nRef(G.player.civ,'name'),v:(_r>1?J('journal.agressions_2',"les {r} agressions de {nation2}",{r:_r,nation2:_i18nRef(G.player.civ,'name')}):J('journal.agression_2',"l'agression de {nation2}",{nation2:_i18nRef(G.player.civ,'name')}))}),'gold'); } }
     addAction('🕊️',J('action.diplomatie','Diplomatie'),0,{},J('action.tension_2','{nation} : sa tension −{amount}',{nation:_i18nRef(_n.civ,'name'),amount:amount}));
     G.player.stratBonus=null;
     _playerStratDone();
@@ -4931,7 +4979,7 @@ function applyCalmTension(aiId,mode,amount){
   const prev=getTens('player',aiId);
   setTens('player',aiId,Math.max(0,prev-amount));
   const _vers=(G.ais||[]).find(a=>a&&a.civ&&a.civ.id===aiId); // le NOM, pas l'identifiant (« jupiteriens » en minuscule dans D538)
-  addLog(J('journal.calme_tension_vers_10','🕊️ {emoji} {nation} calme sa tension vers {v} : −{amount} ({prev} → {v2}/10)',{emoji:G.player.civ.emoji,nation:_i18nRef(G.player.civ,'name'),v:(_vers?_vers.civ.emoji+' '+_vers.civ.name:aiId),amount:amount,prev:prev,v2:getTens('player',aiId)}),'gold');
+  addLog(J('journal.calme_tension_vers_10','🕊️ {emoji} {nation} calme sa tension vers {v} : −{amount} ({prev} → {v2}/10)',{emoji:G.player.civ.emoji,nation:_i18nRef(G.player.civ,'name'),v:(_vers?J('journal.nation_nom','{emoji} {nation}',{emoji:_vers.civ.emoji,nation:_i18nRef(_vers.civ,'name')}):aiId),amount:amount,prev:prev,v2:getTens('player',aiId)}),'gold');
   if(mode==='strategy'){
     G.player.stratBonus=null;
     _playerStratDone();
@@ -4966,7 +5014,7 @@ function calmerPopulation(nat, cibleId){
   nat.res.morale=Math.min(getResCapFor(nat).morale||10,(nat.res.morale||0)+1);
   const avant=getTens(nat.civ.id,cible.civ.id);
   setTens(nat.civ.id,cible.civ.id,Math.max(0,avant-CALME_POP_APAISEMENT));
-  addLog(J('journal.calme_population_vis_vis_tension_envers','🕊️ {v} calme sa population vis-à-vis de {emoji} {nation} : {v2} tension envers elle {avant} → {v3}/10 (−{calmepopapaisement}), +1<i class=ri-morale></i>',{v:_evName(nat),emoji:cible.civ.emoji,nation:_i18nRef(cible.civ,'name'),v2:(nat===G.player?J('journal.ligne_3',"ta"):J('journal.ligne_4',"sa")),avant:avant,v3:getTens(nat.civ.id,cible.civ.id),calmepopapaisement:CALME_POP_APAISEMENT}),'gold');
+  addLog(J('journal.calme_population_vis_vis_tension_envers','🕊️ {v} calme sa population vis-à-vis de {emoji} {nation} : {v2} tension envers elle {avant} → {v3}/10 (−{calmepopapaisement}), +1<i class=ri-morale></i>',{v:_evName(nat),emoji:cible.civ.emoji,nation:_i18nRef(cible.civ,'name'),v2:J('journal.ligne_4',"sa"),avant:avant,v3:getTens(nat.civ.id,cible.civ.id),calmepopapaisement:CALME_POP_APAISEMENT}),'gold');
   return true;
 }
 function diplomatieCivique(nat, cibleId){
@@ -4983,7 +5031,7 @@ function diplomatieCivique(nat, cibleId){
   nat.acLeft-=1; nat.res.materials-=MISSION_DIPLO_COUT_MAT; nat.spentThisTurn=(nat.spentThisTurn||0)+1+MISSION_DIPLO_COUT_MAT;
   const avant=getTens(cible.civ.id,nat.civ.id);
   setTens(cible.civ.id,nat.civ.id,Math.max(0,avant-MISSION_DIPLO_APAISEMENT));
-  addLog(J('journal.mission_diplomatique_chez_tension_envers_2','🕊️ Mission diplomatique de {v} chez {emoji} {nation} : sa tension envers {nation2} {avant} → {v2}/10 (−{missiondiploapaisement}, −{cout}<i class=ri-materials></i>)',{v:_evName(nat),emoji:cible.civ.emoji,nation:_i18nRef(cible.civ,'name'),nation2:(nat===G.player?J('journal.toi',"toi"):_i18nRef(nat.civ,'name')),avant:avant,v2:getTens(cible.civ.id,nat.civ.id),missiondiploapaisement:MISSION_DIPLO_APAISEMENT,cout:MISSION_DIPLO_COUT_MAT}),'gold');
+  addLog(J('journal.mission_diplomatique_chez_tension_envers_2','🕊️ Mission diplomatique de {v} chez {emoji} {nation} : sa tension envers {nation2} {avant} → {v2}/10 (−{missiondiploapaisement}, −{cout}<i class=ri-materials></i>)',{v:_evName(nat),emoji:cible.civ.emoji,nation:_i18nRef(cible.civ,'name'),nation2:_i18nRef(nat.civ,'name'),avant:avant,v2:getTens(cible.civ.id,nat.civ.id),missiondiploapaisement:MISSION_DIPLO_APAISEMENT,cout:MISSION_DIPLO_COUT_MAT}),'gold');
   return true;
 }
 function skipStrategy(){document.getElementById('strategy-modal').classList.add('hidden');G.player.stratBonus=null;G._playerDraftCard=null;_playerStratDone();}
@@ -5057,7 +5105,7 @@ function tomberRoutesOrphelines(){
     let jetons=0; tombees.forEach(r=>{jetons+=(r.tokens||0);});
     if(jetons>0)p.forceTokens=(p.forceTokens||0)+jetons;
     if(typeof updateConnections==='function')updateConnections(p);
-    const _nn=id=>(NODES[id]&&NODES[id].name)||id;
+    const _nn=id=>NODES[id]?_i18nRef(NODES[id],'name'):id;   // référence, traduite chez le lecteur
     addLog(J('journal.route_abandonnee_aucune_extremite_lui','🛤️ {emoji} {nation} : {v} route(s) abandonnée(s) — plus aucune extrémité à lui ({v2}){jetons}.',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),v:tombees.length,v2:tombees.map(r=>_nn(r.from)+'→'+_nn(r.to)).join(', '),jetons:(jetons>0?J('journal.jeton_force_rendu'," — {jetons} jeton(s) Force rendu(s)",{jetons:jetons}):'')}),'red');
   }
 }
@@ -5066,6 +5114,7 @@ function _startTurnPrep(){
   G._prepDoneTurn=G.turn;
   /* Une escarmouche ne passe pas la nuit — et surtout pas devant `usureDesGuerres` (§134 étape 3). */
   purgerEscarmouches();
+  retirerNationsEliminees();   // une nation éliminée n'a plus de guerre à user (29BD : −4🙂 d'usure au tour 10)
   usureDesGuerres();   // AVANT tout le reste : le moral du tour part déjà entamé
   tomberRoutesOrphelines();   // routes sans extrémité à soi (Marc, 15/09)
   if(typeof enforceCaps==='function')enforceCaps(); // écrêtage : correction des excès du tour précédent (après entretien)
@@ -5095,9 +5144,9 @@ function _startTurnPrep(){
      joueurs conservaient indéfiniment les jetons d'une carte Stratégie et leurs renforts militaires
      (avantage permanent non voulu). Le message nomme la nation quand ce n'est pas celle qui agit. */
   allPlayers().forEach(p=>{
-    const _moi=(p===G.player), _nom=_moi?'':(p.civ.emoji+' '+p.civ.name+' : ');
-    if(p.stratForceBonus){p.forceTokens=Math.max(0,p.forceTokens-p.stratForceBonus);addLog(J('journal.jetons_force_temporaires_expires','⏱️ {nom}Jetons Force temporaires expirés (−{jetons}).',{nom:_nom,jetons:p.stratForceBonus}),'dim');p.stratForceBonus=0;}
-    if(p.milLoseNext){p.forceTokens=Math.max(0,p.forceTokens-p.milLoseNext);addLog(J('journal.renforts_militaires_dissous_jeton','⏱️ {nom}Renforts militaires dissous (−{v} jeton(s)).',{nom:_nom,v:p.milLoseNext}),'dim');p.milLoseNext=0;}
+    /* Chaque ligne dans la colonne de SA nation, nommée en tête (22/09). */
+    if(p.stratForceBonus){p.forceTokens=Math.max(0,p.forceTokens-p.stratForceBonus);logAuteur(p,()=>addLog(J('journal.jetons_temporaires_expires_nation','{emoji} {nation} — ⏱️ jetons Force temporaires expirés (−{jetons}).',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),jetons:p.stratForceBonus}),'dim'));p.stratForceBonus=0;}
+    if(p.milLoseNext){p.forceTokens=Math.max(0,p.forceTokens-p.milLoseNext);logAuteur(p,()=>addLog(J('journal.renforts_dissous_nation','{emoji} {nation} — ⏱️ renforts militaires dissous (−{v} jeton(s)).',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),v:p.milLoseNext}),'dim'));p.milLoseNext=0;}
   });
   if(G.player.civ.id==='terriens'&&(G.player.res.morale||0)>=5)addGovPts(G.player,1);
   for(const ai of G.ais){if(ai.civ.id==='terriens'&&(ai.res.morale||0)>=5)addGovPts(ai,1);}
@@ -5572,6 +5621,10 @@ function guerresPreparer(apres){
   const fraiches=G.wars.filter(w=>w.justDeclared).slice().sort(parOrdre).map(cle);
   G.wars.forEach(w=>{ if(w.justDeclared) w.justDeclared=false; });
   d.guerres=enCours.map(k=>({a:k.a,b:k.b,fraiche:false})).concat(fraiches.map(k=>({a:k.a,b:k.b,fraiche:true})));
+  /* Joueur éliminé, en solo : les guerres restantes sont celles des AUTRES. Leur phase de fin de tour
+     passe par les fenêtres de `G.player` (sans pilote en solo, rien n'y répondrait) — elle est donc
+     sautée ; les ordinateurs continuent de s'assaillir pendant leurs tours d'action (29BD, 22/09). */
+  if(typeof _spectateurSolo==='function'&&_spectateurSolo()) d.guerres=[];
   d.guerreIdx=0;
   d.apresGuerres=apres||'stFinDeTour';   // un NOM, pas une fonction : un nom se sérialise
   /* On note QUI entre dans la file, pour pouvoir le remettre en place à la sortie (voir
@@ -5611,7 +5664,7 @@ function guerreEtape(){
   // on proposait un combat contre une nation qui n'a plus rien à défendre).
   const _van=G.ais.find(a=>a.civ.id===guerreAdverseId());
   if(_van&&(!_van.colonies||_van.colonies.length===0)){
-    const _n=_van.civ.emoji+' '+_van.civ.name;
+    const _n=_nomNation(_van);   // référence, traduite chez le lecteur
     endWar(guerreAdverseId());
     /* ⚠️ CE MESSAGE SE RÉPÉTAIT À CHAQUE FIN DE TOUR (Marc, B628 : « la nation ceinturienne s'est
        éteinte, or elle m'attaque au dernier tour »). Une nation sans colonie n'est pas « asservie »
@@ -5814,7 +5867,7 @@ function guerreCombatLiveChoisi(committed){
   const warEnName=guerreEnnemiNom();
   // ROUTE_ATTACK / STANDOFF / DEFEND : déjà résolus par leur propre flux → on enchaîne sur l'ennemi.
   if(committed===undefined||committed===null||typeof committed==='string'||((committed|0)<=0&&!G._cruiserDeployed)){
-    addLog(J('journal.tiens_position_aucun_assaut_tour','🛡️ Tu tiens ta position — aucun assaut ce tour.'),'dim'); guerreAssautIAPuisSuivante(); return; // 0 jeton = TENIR (pas un combat perdu d'avance)
+    addLog(J('journal.tiens_position_aucun_assaut_tour','🛡️ tient sa position — aucun assaut ce tour.'),'dim'); guerreAssautIAPuisSuivante(); return; // 0 jeton = TENIR (pas un combat perdu d'avance)
   }
   /* ⚠️ LE DÉFENSEUR HUMAIN CHOISIT SA DÉFENSE À CHAQUE COMBAT, PAS SEULEMENT AU PREMIER ASSAUT.
      L'assaut initial demandait bien au défenseur humain ses jetons (`stAssautJoueurChoisi`), mais
@@ -5953,7 +6006,7 @@ function guerreFraicheOuvrirCombat(){ showWarCombatModal('guerreFraicheCombatCho
 function guerreFraicheCombatChoisi(committed){
   const warEnName=guerreEnnemiNom();
   if(committed===undefined||committed===null||typeof committed==='string'||((committed|0)<=0&&!G._cruiserDeployed)){
-    addLog(J('journal.tiens_position_aucun_assaut_tour','🛡️ Tu tiens ta position — aucun assaut ce tour.'),'dim'); guerreSuivante(); return; // 0 jeton = TENIR
+    addLog(J('journal.tiens_position_aucun_assaut_tour','🛡️ tient sa position — aucun assaut ce tour.'),'dim'); guerreSuivante(); return; // 0 jeton = TENIR
   }
   const res=resolveWarCombat(committed);
   showWarModal(J('combat.combat_contre','⚔️ Combat contre {warenname}',{warenname:warEnName}),
@@ -6245,12 +6298,17 @@ function interleaveStep(){
     if(!acted||actor.acLeft<=0) actor._passedRound=true;
     G._ilIdx++;
     const _newE=[]; for(const e of (G.log||[])){ if(e===G._ilMarkEntry) break; _newE.push(e); if(_newE.length>60) break; }
-    const since=_newE.map(e=>_logTexte(e).replace(/<[^>]+>/g,'').trim());
-    G._ilLines=since.filter(t=>/^\u{1F916}/u.test(t)).map(t=>t.replace(/^\u{1F916}\s*/u,'')).reverse();
-    _ilShow(G._ilLines);
+    /* Les coups de l'ordinateur : lignes « 🤖 » (civiques, pouvoir) et EN-TÊTES d'action (colonise,
+       améliore, route, achète — écrits par la règle depuis le 22/09, sans « 🤖 »). */
+    G._ilLines=_newE.filter(e=>e&&(e.entete||/^\u{1F916}/u.test(_logTexte(e).replace(/<[^>]+>/g,'').trim())))
+      .map(e=>journalEtiqueter(e,_logTexte(e)).replace(/<[^>]+>/g,'').trim()).reverse();
+    const _spect=_spectateurSolo();
+    if(!_spect)_ilShow(G._ilLines);
     render();
     if(G._aiAssaultCtx){ G._ilPaused=true; return; }
-    if(G._ilPlayerHits&&G._ilPlayerHits.length){ G._ilPaused=true; _showPlayerHitModal(); return; } // une nation t'a attaqué → popup à valider
+    if(_spect&&G._ilPlayerHits&&G._ilPlayerHits.length&&G._spectHitsVus){ G._ilPlayerHits=[]; }   // éliminé depuis un moment : plus aucune fenêtre (le journal dit tout)
+    if(G._ilPlayerHits&&G._ilPlayerHits.length){ G._ilPaused=true; if(_spect)G._spectHitsVus=true; _showPlayerHitModal(); return; } // une nation t'a attaqué → popup à valider (éliminé : la DERNIÈRE, celle qui l'a fait tomber, s'affiche encore une fois)
+    if(_spect){ G._spectHitsVus=true; _spectateurBandeau(); setTimeout(interleaveStep, 0); return; }   // éliminé : les autres finissent sans pause
     setTimeout(interleaveStep, 1000);
     return;
   }
@@ -6560,44 +6618,60 @@ function advancePirates(){
   if(!npcPiratesActive())return;
   if(G._piratesTour===G.turn)return;      // une seule attaque par tour, quel que soit le chemin
   G._piratesTour=G.turn;
-  const _pilles=[];
-  for(const p of allPlayers()) logAuteur(p, ()=>{
-    if(!p||!p.civ||p.civ.id==='ceinturiens')return; // ils vendent leur contrebande aux Ceinturiens
-    if(!(p.routes||[]).length)return;
+  /* ═══ UN ÉVÉNEMENT, PUIS UNE LIGNE PAR NATION, TOUTES BÂTIES PAREIL (Marc, 22/09) ═══
+     « Événement pirates : Terriens — perd 1 route… / Martien, immunité grâce à IA défensive. »
+     Avant : « ☠️ Pirates ! Route X de 🌍 Terriens pillée » pour les uns, « 🛡️ Routes de 🔴 Martiens
+     immunisées » pour les autres, et la tension « vs Ceinturiens +1 » sans nation du tout — rangée
+     chez le joueur alors qu'elle frappait les Terriens. On rassemble d'abord, on écrit ensuite :
+     l'en-tête (système), puis chaque nation, nommée en tête, dans sa propre colonne. */
+  const _pilles=[], lignes=[];
+  const _seg=r=>(NODES[r.from]?_i18nRef(NODES[r.from],'name'):r.from)+'→'+(NODES[r.to]?_i18nRef(NODES[r.to],'name'):r.to);
+  for(const p of allPlayers()){
+    if(!p||!p.civ||p.civ.id==='ceinturiens')continue; // ils vendent leur contrebande aux Ceinturiens
+    if(estEliminee(p))continue;
+    if(!(p.routes||[]).length)continue;
+    const _N={emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name')};
     if(routesProtegeesParTech(p)){
-      if(p.routes.some(routeAPorteeDesPirates)) addLog(J('journal.routes_immunisees_contre_pirates','🛡️ Routes de {emoji} {nation} immunisées contre les pirates ({v}).',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),v:techsProtegeantRoutes(p).join(', ')}),'gold');
-      return;
+      if(p.routes.some(routeAPorteeDesPirates)){
+        const _t=techsProtegeantRoutes(p).reduce((a,b)=>a===null?b:J('commun.joint','{a}{sep}{b}',{a:a,sep:', ',b:b}),null);
+        lignes.push({p,cls:'gold',m:J('journal.pirates_immunise','{emoji} {nation} — 🛡️ routes immunisées contre les pirates ({v})',Object.assign({v:_t||''},_N))});
+      }
+      continue;
     }
     const prises=[];
     for(const r of p.routes){
       const ch=chancePillagePirates(p,r); if(ch<=0)continue;
       if(Math.random()>=ch)continue;
       const k=_ressourcePillee(p);
-      const seg=(NODES[r.from]?_i18nRef(NODES[r.from],'name'):r.from)+'→'+(NODES[r.to]?_i18nRef(NODES[r.to],'name'):r.to);
+      const seg=_seg(r);
       if(k){ p.res[k]=Math.max(0,(p.res[k]||0)-1); }
       prises.push({seg:seg,k:k});
-      addLog(k?J('journal.pirates_pillent_route','☠️ Pirates ! Route {seg} de {emoji} {nation} pillée : −1{res}.',{seg:seg,emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),res:rEmoji(k)})
-              :J('journal.pirates_pillent_route_rien','☠️ Pirates ! Route {seg} de {emoji} {nation} attaquée — rien à prendre.',{seg:seg,emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name')}),'red');
+      lignes.push({p,cls:'red',m:k?J('journal.pirates_pille_route','{emoji} {nation} — ☠️ route {seg} pillée : −1{res}',Object.assign({seg:seg,res:rEmoji(k)},_N))
+                                 :J('journal.pirates_pille_route_rien','{emoji} {nation} — ☠️ route {seg} attaquée : rien à prendre',Object.assign({seg:seg},_N))});
     }
-    if(!prises.length)return;
+    if(!prises.length)continue;
     _pilles.push(p);
     const _lignes=prises.map(x=>x.k?J('avis.pirates_ligne','• {seg} : −1{res}',{seg:x.seg,res:rEmoji(x.k)}):J('avis.pirates_ligne_rien','• {seg} : rien à prendre',{seg:x.seg}))
       .reduce((a,b)=>a===null?b:J('commun.joint','{a}{sep}{b}',{a:a,sep:'<br>',b:b}),null);
     notifyNationHit(p,J('avis.pirates_titre','☠️ Les pirates ont pillé tes routes'),
       J('avis.pirates_corps','{n} route(s) pillée(s) ce tour :<br>{lignes}<br><br>Les routes à 60 jours ou moins de la ceinture principale ou de Kuiper sont exposées : 70 % sans jeton, 30 % avec. 🔍 Réseau Orbital, 🔍 IA Défensive et 🔮 Liens Empathes en protègent totalement.',{n:prises.length,lignes:_lignes}));
     if(typeof gainToast==='function'&&!p._isAI){ try{ gainToast(J('toast.pirates','☠️ Pirates : {n} route(s) pillée(s)',{n:prises.length})); }catch(e){} }
-  });
-  if(!_pilles.length)return;
-  const ceinturAI=allPlayers().find(a=>a.civ.id==='ceinturiens');
-  if(ceinturAI){
-    /* +1 PAR NATION PILLÉE ET PAR TOUR, quel que soit le nombre de routes (Marc, 21/09) — et
-       SEULEMENT la nation pillée (banc test_pirates_tension_pillee.js). */
-    for(const v of _pilles){ if(v!==ceinturAI) addTens(v.civ.id,ceinturAI.civ.id,1); }
-    addLog(J('journal.tension_vs_ceinturiens_1_soutien_secret','☠️ Tension vs Ceinturiens +1 (soutien secret aux pirates)'),'dim');
-  }else{
-    G.warRisk=Math.min(10,(G.warRisk||0)+1);
-    addLog(J('journal.raid_pirate_risque_guerre_1','☠️ Raid pirate — risque de guerre +1'),'red');
   }
+  const ceinturAI=allPlayers().find(a=>a.civ.id==='ceinturiens'&&!estEliminee(a));
+  if(_pilles.length){
+    if(ceinturAI){
+      /* +1 PAR NATION PILLÉE ET PAR TOUR, quel que soit le nombre de routes (Marc, 21/09) — et
+         SEULEMENT la nation pillée (banc test_pirates_tension_pillee.js). La ligne le dit pour ELLE. */
+      for(const v of _pilles){ if(v===ceinturAI)continue; addTens(v.civ.id,ceinturAI.civ.id,1);
+        lignes.push({p:v,cls:'dim',m:J('journal.pirates_tension','{emoji} {nation} — tension envers {emoji2} {nation2} +1 (soutien secret aux pirates) → {v}/10',{emoji:v.civ.emoji,nation:_i18nRef(v.civ,'name'),emoji2:ceinturAI.civ.emoji,nation2:_i18nRef(ceinturAI.civ,'name'),v:getTens(v.civ.id,ceinturAI.civ.id)})}); }
+    }else{
+      G.warRisk=Math.min(10,(G.warRisk||0)+1);
+      lignes.push({p:null,cls:'red',m:J('journal.raid_pirate_risque_guerre_1','☠️ Raid pirate — risque de guerre +1')});
+    }
+  }
+  if(!lignes.length)return;
+  logAuteur('systeme',()=>addLog(J('journal.pirates_entete','☠️ Pirates — attaques du début de tour'),'red'));
+  for(const l of lignes) logAuteur(l.p||'systeme',()=>addLog(l.m,l.cls));
 }
 /* ============================================================ MAINTENANCE ============================================================ */
 /* `_applyMoraleFlags` (pénalités lues AVANT les revenus sur un moral figé) est supprimée le 04/09 :
@@ -6605,6 +6679,7 @@ function advancePirates(){
 function doMaintenance(){
   const result={energyCost:0,matCost:0,routeEnergyCost:0,routeMatGain:0,moraleLostCols:0,moraleLostRoutes:0};
   for(const p of allPlayers()){
+    if(estEliminee(p))continue;   // hors jeu : plus d'entretien non plus
     /* ⚠️ DÉFAUT CORRIGÉ LE 2026-08-09 (signalé par Marc : « Biosphère Autonome semble ne plus
        fonctionner »). Il ne le semblait pas : elle ne fonctionnait pas. `disc` ne comptait que
        `stratBonus.upkeepDiscount` — un bonus que PLUS AUCUNE carte ne pose depuis que Consolidation
@@ -6707,11 +6782,19 @@ function _emitNetRevenueLog(maint){
   for(const r of['energy','materials','science']){const a=net[r];if(a!==0)parts.push((a>=0?'+':'')+a+rEmoji(r));}
   const netM=d.grossM-(d.conquestPen||0)-(d.manif||0)-(maint.moraleLostCols||0);
   if(d.conquestPen||d.manif||maint.moraleLostCols){
-    parts.push('<i class=ri-morale></i> '+(d.grossM>=0?'+':'')+d.grossM+' '+t('revenu.brut','brut')+(d.conquestPen?' −'+d.conquestPen+' '+t('revenu.conquete','conquête'):'')+(d.manif?' −'+d.manif+' '+t('revenu.tension','tension'):'')+(maint.moraleLostCols?' −'+maint.moraleLostCols+' '+t('revenu.entretien','entretien'):'')+' → '+(netM>=0?'+':'')+netM+' '+t('revenu.net','net'));
+    /* Des messages J, pas t() : « brut / tension / net » partaient en français dans un journal anglais (29BD). */
+    const _mp=[J('revenu.moral_brut','<i class=ri-morale></i> {v} brut',{v:(d.grossM>=0?'+':'')+d.grossM})];
+    if(d.conquestPen)_mp.push(J('revenu.moins_conquete','−{n} conquête',{n:d.conquestPen}));
+    if(d.manif)_mp.push(J('revenu.moins_tension','−{n} tension',{n:d.manif}));
+    if(maint.moraleLostCols)_mp.push(J('revenu.moins_entretien','−{n} entretien',{n:maint.moraleLostCols}));
+    _mp.push(J('revenu.fleche_net','→ {v} net',{v:netM}));
+    parts.push(_mp.reduce((a,b)=>a===null?b:J('commun.joint','{a}{sep}{b}',{a:a,sep:' ',b:b}),null));
   }else if(d.grossM!==0){
     parts.push((d.grossM>=0?'+':'')+d.grossM+'<i class=ri-morale></i>');
   }
-  if(parts.length)addLog(J('journal.revenus_nets_apres_entretien','💰 Revenus nets (après entretien) : {v}',{v:parts.join(' ')}));
+  /* La ligne parle du revenu du joueur local : elle porte SON nom (sans lui, elle tombait dans la
+     colonne « système » ou dans celle du dernier joueur actif). */
+  if(parts.length)logAuteur(G.player,()=>addLog(J('journal.revenus_nets_apres_entretien','💰 Revenus nets (après entretien) : {v}',{v:parts.reduce((a,b)=>a===null?b:J('commun.joint','{a}{sep}{b}',{a:a,sep:' ',b:b}),null)})));
 }
 // ── TOOLTIP REVENU : détail des sources et malus permanents (lecture seule) ──
 function revenueBreakdownHTML(p){
@@ -7059,6 +7142,7 @@ function revenusBruts(p, opts){
 function doRevenues(){
   let playerGains={};
   for(const p of allPlayers()){
+    if(estEliminee(p))continue;   // hors jeu : plus de revenu, score figé (29BD)
     /* ═══ LA RÈGLE DU MORAL, TELLE QUE MARC L'A FIXÉE (04/09) ═══
        « Si tu es à la fin du tour, APRÈS le revenu y compris de moral, alors tu divises par deux. »
        Donc, dans cet ordre : 1) le revenu de MORAL est versé (jamais puni : « faut pas diviser le
@@ -7094,10 +7178,10 @@ function doRevenues(){
     const _mj=p.res.morale||0;
     p._moraleRev=_mj;
     if(_mj===0){
-      addLog((p===G.player?t('journal.guerre_civile_moral_0_apres_revenus_aucu',"💥 GUERRE CIVILE ! Moral 0 après revenus — aucune ressource ce tour (le moral perçu est gardé)."):t('journal.guerre_civile_chez_moral_0_aucune_ressou',"💥 Guerre civile chez {emoji} {nation} — moral 0, aucune ressource ce tour.",{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name')})),'red');
+      logAuteur(p,()=>addLog(J('journal.guerre_civile_nation','{emoji} {nation} — 💥 GUERRE CIVILE ! Moral 0 après revenus — aucune ressource ce tour (le moral perçu est gardé).',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name')}),'red'));
       for(const r of Object.keys(gains))gains[r]=0;
     }else if(_mj===1){
-      addLog((p===G.player?t('journal.moral_1_apres_revenus_energie_materiaux',"⚠️ Moral 1 après revenus — énergie, matériaux et savoir ÷2 ce tour."):t('journal.moral_critique_chez_1_ressources_sont_di',"⚠️ Moral critique chez {emoji} {nation} (1) — ses ressources sont divisées par deux.",{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name')})),'red');
+      logAuteur(p,()=>addLog(J('journal.moral_1_nation','{emoji} {nation} — ⚠️ Moral 1 après revenus — énergie, matériaux et savoir ÷2 ce tour.',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name')}),'red'));
       for(const r of Object.keys(gains))gains[r]=Math.floor((gains[r]||0)/2);
     }
     /* 3) le reste */
@@ -7156,7 +7240,7 @@ function toggleMode(m){
 }
 function handleNodeClick(nodeId){
   // Tout clic sur un nœud ouvre SA FICHE (plus d'action « en aveugle » selon un mode).
-  // Les boutons 🏗/🛤 ne servent plus qu'à surligner les cibles possibles sur la carte.
+  // Les boutons 🏗️/🛤️ ne servent plus qu'à surligner les cibles possibles sur la carte.
   showNodePopup(nodeId);
 }
 /* ═══ LA NATION QUI AGIT EST UN ARGUMENT, PLUS UNE VARIABLE GLOBALE ═══
@@ -7174,7 +7258,7 @@ function buyTech(cardId, nation){
   const card=CARDS_POOL.find(c=>c.id===cardId);if(!card)return;
   if(!isTechAvailable(card,_n)){
     if(card.tier===3&&!_n.cards.some(c=>c.branch===card.branch&&c.tier===2))
-      addLog(J('journal.vous_devez_abord_posseder_personnellemen','⚠️ Vous devez d\'abord posséder personnellement la T2 de cette branche.'),'red');
+      addLog(J('journal.vous_devez_abord_posseder_personnellemen','⚠️ Il faut d\'abord posséder soi-même la T2 de cette branche.'),'red');
     else addLog(J('journal.branche_non_encore_debloquee_achetez_abo','⚠️ Branche non encore débloquée (achetez d\'abord T{v}).',{v:card.tier-1}),'red');
     return;
   }
@@ -7190,7 +7274,7 @@ function buyTech(cardId, nation){
      dans l'autre sens. On compare désormais les deux formes, dans les DEUX branches : une T3 volée
      n'entre pas dans `G.techTaken`, donc sans cela on pouvait aussi la voler puis l'acheter. */
   const _dejaPossedee=possedeCarte(_n,cardId);
-  if(_dejaPossedee){addLog(J('journal.vous_possedez_deja_carte_achetee_ou_copi','⚠️ Vous possédez déjà cette carte (achetée ou copiée par espionnage).'),'red');return;}
+  if(_dejaPossedee){addLog(J('journal.vous_possedez_deja_carte_achetee_ou_copi','⚠️ Carte déjà possédée (achetée ou copiée par espionnage).'),'red');return;}
   if(isTechExclusive(card)){
     if(G.techTaken.has(cardId)){addLog(J('journal.carte_deja_prise_autre_faction','⚠️ Cette carte est déjà prise par une autre faction.'),'red');return;}
   }
@@ -7200,6 +7284,7 @@ function buyTech(cardId, nation){
   for(const[r,a]of Object.entries(cost)){if((_n.res[r]||0)<a){addLog(J('journal.assez_besoin','⚠️ Pas assez de {v} (besoin {a}).',{v:rLabel(r),a:a}),'red');return;}}
   if(_estLocal(_n))saveUndo();
   _n.acLeft-=acCost;
+  logEntete(J('journal.entete_achete','{emoji} {nation} — achète {emojicarte} {nom}',{emoji:_n.civ.emoji,nation:_i18nRef(_n.civ,'name'),emojicarte:card.emoji,nom:_i18nRef(card,'name')}),_n._isAI?'dim':'green');
   _n.spentThisTurn+=acCost+Object.values(cost).reduce((s,v)=>s+v,0);
   for(const[r,a]of Object.entries(cost))_n.res[r]-=a;
   _n.cards.push(card);applyCard(card,_n);
@@ -7238,7 +7323,8 @@ function buyTech(cardId, nation){
      Un achat d'ordinateur écrivait TROIS lignes — celle-ci en vert, puis « 🤖 X achète » et
      « ↳ X paie » — dont les deux dernières disent déjà tout. On supprime donc la ligne verte pour
      les nations tenues par l'ordinateur : le journal raccourcit et la couleur cesse de mentir. */
-  if(!_n._isAI) addLog(J('journal.ac','✅ {emoji} {nom} — {cout} AC{cout2}',{emoji:card.emoji,nom:_i18nRef(card,'name'),cout:acCost,cout2:(costStr?' '+costStr:'')}),'green');
+  /* (L'ancienne ligne « ✅ carte — coût » est remplacée par l'en-tête écrit au paiement et par la
+     sous-ligne « ↳ paie » : même information, dans le bon ordre, pour toutes les nations.) */
   addAction(card.emoji,J('commun.ref','{v}',{v:_i18nRef(card,'name')}),acCost,cost,J('commun.ref','{v}',{v:_i18nRef(card,'effect')}));
   /* ══ ICI FINIT LA RÈGLE, ICI COMMENCE L'AFFICHAGE ══
      ⚠️ CES TROIS FENÊTRES S'OUVRAIENT CHEZ LE JOUEUR QUAND C'ÉTAIT UNE IA QUI ACHETAIT.
@@ -7283,7 +7369,7 @@ function buyGeneral(cardId, nation){
     if(_n._milBoughtThisTurn.has(card.id)){addLog(J('journal.deja_achete_tour_1_tour','⚠️ {nom} déjà acheté ce tour (1×/tour).',{nom:_i18nRef(card,'name')}),'red');return;}
     /* ⚠️ « UNE SEULE FOIS » VEUT DIRE PAR JOUEUR, PAS PAR PARTIE. C'est la possession qui compte,
        et elle se lit dans les cartes de CETTE nation — pas dans un registre commun. */
-    if(!card.repeatable&&_n.cards.some(c=>c.id===card.id)){addLog(J('journal.possedes_deja_seule_partie','⚠️ {nom} — tu la possèdes déjà (une seule par partie).',{nom:_i18nRef(card,'name')}),'red');return;}
+    if(!card.repeatable&&_n.cards.some(c=>c.id===card.id)){addLog(J('journal.possedes_deja_seule_partie','⚠️ {nom} — déjà possédée (une seule par partie).',{nom:_i18nRef(card,'name')}),'red');return;}
   }
   const acCost=card.ac||1;
   if(_n.acLeft<acCost){addLog(J('journal.assez_ac_besoin','⚠️ Pas assez d\'AC (besoin {cout}).',{cout:acCost}),'red');return;}
@@ -7326,7 +7412,7 @@ function buyMarket(cardId){
   const isPerTurn=!!card.perTurn;
   const isRepeat=!!(card.repeatable||card.calmAction||isPerTurn); // perTurn = pas bloqué à vie, mais 1×/tour (voir ci-dessous)
   if(isGov){
-    if(G.player.govForm===cardId){addLog(J('journal.deja_forme_gouvernement_actuelle','⚠️ {nom} est déjà ta forme de gouvernement actuelle.',{nom:_i18nRef(card,'name')}),'red');return;}
+    if(G.player.govForm===cardId){addLog(J('journal.deja_forme_gouvernement_actuelle','⚠️ {nom} est déjà la forme de gouvernement actuelle.',{nom:_i18nRef(card,'name')}),'red');return;}
   } else if(isPerTurn){
     if(!G.player._civicPerTurn)G.player._civicPerTurn=new Set();
     if(G.player._civicPerTurn.has(cardId)){addLog(J('journal.deja_active_tour_1_tour','⚠️ {nom} déjà activé ce tour (1×/tour).',{nom:_i18nRef(card,'name')}),'red');return;}
@@ -7426,9 +7512,9 @@ function applyCard(card,p){
      ⚠️ Les deux techs sont déjà traitées ensemble ailleurs (`techProt` en défense de route, routes
      inattaquables) : c'est bien la MÊME règle, elle était juste incomplète ici. */
   if(card.spec==='ia_immune'||card.spec==='empath_routes'){
-    const _nomTech=(card.spec==='ia_immune'?t('ui.ia_defensive','IA Défensive'):t('ui.lien_empathe','Lien Empathe'));
+    const _nomTech=_i18nRef(card,'name');   // référence : rendue dans la langue du lecteur (« IA Défensive » dans un journal anglais, 29BD)
     let recalled=0; for(const r of p.routes){if((r.tokens||0)>0){p.forceTokens+=r.tokens;recalled+=r.tokens;r.tokens=0;}}
-    if(recalled>0){updateConnections(p);if(p===G.player)addLog(J('journal.jeton_rappele_routes_desormais_protegees','🛡️ {nomtech} : {recalled} jeton(s) rappelé(s) des routes (désormais protégées sans jeton) → rendus à ta réserve.',{nomtech:_nomTech,recalled:recalled}),'gold');}
+    if(recalled>0){updateConnections(p);logAuteur(p,()=>addLog(J('journal.jeton_rappele_routes_desormais_protegees','🛡️ {nomtech} : {recalled} jeton(s) rappelé(s) des routes (désormais protégées sans jeton) → rendus à la réserve.',{nomtech:_nomTech,recalled:recalled}),'gold'));}
   }
   // Exploration Extra-Solaire : choisir UNE planète parmi Éris/Pluton/Triton (≥5 techs)
   if(card.spec==='extrasolar'){
@@ -7456,7 +7542,7 @@ function _extraSolarColonize(p,nid){
   const connected=(typeof checkConnected==='function')?checkConnected(nid,p):false;
   p.colonies.push({nodeId:nid,level:1,connected,noUpgrade:!!occupied});
   updateConnections(p);
-  if(p===G.player)addLog(J('journal.extra_solaire_colonises','🚀 Extra-Solaire : tu colonises {noeud}{v} !',{noeud:_i18nRef(NODES[nid],'name'),v:(occupied?J('journal.accord_commercial_force_non_ameliorable'," (accord commercial forcé — non améliorable)"):'')}),'gold');
+  if(p===G.player)addLog(J('journal.extra_solaire_colonises','🚀 Extra-Solaire : colonise {noeud}{v} !',{noeud:_i18nRef(NODES[nid],'name'),v:(occupied?J('journal.accord_commercial_force_non_ameliorable'," (accord commercial forcé — non améliorable)"):'')}),'gold');
   else addLog(J('journal.ia_extra_solaire','🤖 IA Extra-Solaire → {noeud}{v}',{noeud:_i18nRef(NODES[nid],'name'),v:(occupied?J('journal.accord_force'," (accord forcé)"):'')}),'dim');
 }
 function showExtraSolarChoice(){
@@ -7524,6 +7610,7 @@ function doColonize(nodeId, nation){
   if(cost._useStrat)_n._stratColUsed=true;
   _n.acLeft-=ac;_n.res.materials-=mat;_n.res.energy-=en;
   _n.spentThisTurn+=ac+mat+en;
+  logEntete(J('journal.entete_colonise','{emoji} {nation} — 🚩 colonise {noeud}',{emoji:_n.civ.emoji,nation:_i18nRef(_n.civ,'name'),noeud:_i18nRef(node,'name')}),_n._isAI?'dim':'green');
   const connected=checkConnected(nodeId,_n);
   _n.colonies.push({nodeId,level:1,connected});
   updateConnections(_n);
@@ -7538,13 +7625,22 @@ function doColonize(nodeId, nation){
     const msg=(isRemoteCol?t('ui.biosphere_avancee_malus_annule',' — Biosphère Avancée : malus annulé !'):'');
     addLog(J('journal.nv_1_amelioration_conditions_vie_1','🏠 {noeud} Nv.1 — amélioration des conditions de vie (+1<i class=ri-morale></i>){msg}',{noeud:_i18nRef(node,'name'),msg:msg}),'gold');
   }
-  addLog(J('journal.colonie','🏗️ Colonie sur {noeud}{v}',{noeud:_i18nRef(node,'name'),v:(connected?J('journal.connectee'," ✓ connectée"):J('journal.non_connectee'," ✗ non connectée"))}),'green');
+  addLog(J('journal.colonie_etat','{noeud} :{v}',{noeud:_i18nRef(node,'name'),v:(connected?J('journal.connectee'," ✓ connectée"):J('journal.non_connectee'," ✗ non connectée"))}),connected?'green':'dim');
   addAction('🏗️',J('action.coloniser','Coloniser {noeud}',{noeud:_i18nRef(node,'name')}),ac,{materials:mat,energy:en},(connected?J('action.connectee',"Connectée"):J('action.non_connectee',"Non connectée")));
   // Discovery
   if(!G._discCache)G._discCache={};
   let disc=G._discCache[nodeId];
   if(!disc){disc=DISCOVERY_TILES[Math.floor(Math.random()*DISCOVERY_TILES.length)];G._discCache[nodeId]=disc;}
-  G._decouverteEnAttente={disc,nodeId,moral:(isRemoteCol&&!hasSpec(_n,'bio2_bonus'))?0:1,connected:!!connected}; // dans G : une tuile en attente doit survivre à une sauvegarde
+  G._decouverteEnAttente={disc,nodeId,moral:(isRemoteCol&&!hasSpec(_n,'bio2_bonus'))?0:1,connected:!!connected,civ:_n.civ.id}; // dans G : une tuile en attente doit survivre à une sauvegarde
+  /* ═══ LA DÉCOUVERTE APPARTIENT À CELUI QUI COLONISE (partie 29BD, 22/09) ═══
+     ⚠️ Depuis que l'ordinateur colonise par `doColonize` (cerveau tacticien), sa tuile restait EN
+     ATTENTE : rien ne la refermait pour lui. La fenêtre s'ouvrait chez le joueur (solo), ou le
+     serveur la soldait à la prochaine action humaine (`_postAction` → `dismissDiscovery`) — qui la
+     versait au joueur actif. Marc a ainsi encaissé les Reliques d'Aliens des colonies terriennes de
+     Titan et de Déimos, et reçu leur fenêtre « Colonisation réussie ».
+     Une nation qui n'est pas le joueur local n'a pas de fenêtre : sa tuile s'applique tout de suite,
+     à ELLE. `dismissDiscovery` lit désormais la nation rangée dans la tuile, plus le joueur actif. */
+  if(!_estLocal(_n)||_n._isAI){ appliquerDecouverte(); return; }
   showDiscoveryModal(disc);
 }
 // Colonies au paysage attrayant → bonus moral au Niv.2
@@ -7574,6 +7670,7 @@ function doUpgrade(nodeId,nat){
   _n.acLeft-=ac;_n.res.materials-=mat;_n.res.energy-=en;_n.res.science-=sci;
   _n.spentThisTurn+=ac+mat+en+sci;
   col.level=targetLv;
+  logEntete(J('journal.entete_ameliore','{emoji} {nation} — ⬆️ améliore {noeud} → Nv.{n}',{emoji:_n.civ.emoji,nation:_i18nRef(_n.civ,'name'),noeud:_i18nRef(node,'name'),n:targetLv}),_n._isAI?'dim':'green');
   if(col._conquest){col._conquest=0;addLog(J('journal.developpee_population_conquise_apaisee_f','🏗️ {noeud} développée — la population conquise est apaisée (fin du mécontentement).',{noeud:_i18nRef(node,'name')}),'green');}
   // Bonus moral one-time au Niv.2
   if(targetLv===2){
@@ -7585,7 +7682,7 @@ function doUpgrade(nodeId,nat){
       addLog(J('journal.paysage_remarquable_conditions_vie_1','🌅 Paysage remarquable sur {noeud} — conditions de vie (+1<i class=ri-morale></i>)',{noeud:_i18nRef(node,'name')}),'gold');
     }
   }
-  addLog(J('journal.nv_tour_desormais','⬆️ {noeud} Nv.{targetlv} — +<i class=ri-science></i>{v}/tour désormais',{noeud:_i18nRef(node,'name'),targetlv:targetLv,v:(targetLv>=3?2:1)}),'green');
+  addLog(J('journal.nv_tour_desormais','+<i class=ri-science></i>{v}/tour désormais ({noeud} Nv.{targetlv})',{noeud:_i18nRef(node,'name'),targetlv:targetLv,v:(targetLv>=3?2:1)}),'green');
   addAction('⬆️',J('action.nv_4','{noeud} Nv.{targetlv}',{noeud:_i18nRef(node,'name'),targetlv:targetLv}),ac,{materials:mat,energy:en,science:sci},J('action.hub_tour','Hub: +<i class=ri-science></i>{v}/tour',{v:(targetLv>=3?2:1)}));
   if(_estLocal(_n))scArmConfirm(t('confirme.nv','⬆️ {noeud} Nv.{targetlv}',{noeud:_i18nRef(node,'name'),targetlv:targetLv}),[{kind:'pt',icon:rEmoji('science'),val:(targetLv>=3?2:1)}]);
 }
@@ -7669,7 +7766,7 @@ function doEstablishRoute(from,to, nation){
   if(rc._useFree&&_n.investBonus)_n.investBonus.freeRte--;
   const newRoute={from,to,tokens:0};
   _n.routes.push(newRoute);updateConnections(_n);
-  addLog(J('journal.route','🛤️ Route {nom} → {nom2}{v}',{nom:_i18nRef(fn,'name'),nom2:_i18nRef(tn,'name'),v:(rc._useFree?J('journal.gratuite'," (GRATUITE)"):'')}),'green');
+  logEntete(J('journal.entete_route','{emoji} {nation} — 🔗 route {nom} → {nom2}{v}',{emoji:_n.civ.emoji,nation:_i18nRef(_n.civ,'name'),nom:_i18nRef(fn,'name'),nom2:_i18nRef(tn,'name'),v:(rc._useFree?J('journal.gratuite'," (GRATUITE)"):'')}),_n._isAI?'dim':'green');
   addAction('🛤️',J('action.route_3','Route {nom} → {nom2}',{nom:_i18nRef(fn,'name'),nom2:_i18nRef(tn,'name')}),rc.ac,{materials:rc.mat},J('action.construite','Construite'));
   /* ORDINATEUR : pas de fenêtre — la règle de Marc décide du jeton (voir `protegerRouteIA`).
      L'IA de Navigation pose le sien gratuitement, comme pour un humain. */
@@ -7701,7 +7798,7 @@ function doEstablishRoute(from,to, nation){
     if(hasSpec(_n,'route_force_free')){
       newRoute.tokens=1;                       // posé pour de vrai…
       updateConnections(_n);             // …donc la route compte pour la connectivité
-      addLog(J('journal.route_protegee_gratuitement_ia_navigatio','🛤️ Route protégée gratuitement (IA de Navigation) — jeton posé sans puiser dans ta réserve.'),'dim');
+      addLog(J('journal.route_protegee_gratuitement_ia_navigatio','🔗 Route protégée gratuitement (IA de Navigation) — jeton posé sans puiser dans la réserve.'),'dim');
     }
     if(_estLocal(_n))scArmConfirm(t('confirme.route','🛤️ Route'),[{kind:'pt',icon:rEmoji('materials'),val:1}]);
     render();
@@ -8323,7 +8420,7 @@ function resolveRouteAttack(attacker,defender,route,commit){
   commit=Math.max(1,commit|0);
   const rn=(NODES[route.from]?.name||route.from)+'→'+(NODES[route.to]?.name||route.to);
   const youAtk=(attacker===G.player);
-  const atkName=youAtk?'Tu':(attacker.civ.emoji+' '+attacker.civ.name);
+  const atkName=J('journal.nation_nom','{emoji} {nation}',{emoji:attacker.civ.emoji,nation:_i18nRef(attacker.civ,'name')});   // plus de « Tu » au journal (22/09)
   const techProt=routeProtegee(defender,{tokens:0}); // même définition que partout ailleurs (voir routeProtegee)
   const tok=route.tokens||0;
   if(techProt){addLog(J('journal.route_protegee_tech_jeton_non_perdable_a','🛡️ Route {rn} protégée (tech, jeton non perdable) — attaque sans effet.',{rn:rn}),youAtk?'red':'gold');return {held:true};}
@@ -8331,7 +8428,7 @@ function resolveRouteAttack(attacker,defender,route,commit){
   const wasProtected=tok>=1;
   defender.routes=defender.routes.filter(r=>r!==route);updateConnections(defender);
   if(wasProtected){applyCombatEngage(attacker,commit,true);addLog(J('journal.detruit_route_jeton_protection_brise_jet','💥 {atkname} DÉTRUIT la route {rn} — jeton de protection brisé ; jetons engagés en récupération.',{atkname:atkName,rn:rn}),youAtk?'gold':'red');}
-  else{addLog(J('journal.detruit_route_non_protegee_reconstruire','💥 {atkname} DÉTRUIT la route {rn} — non protégée, à reconstruire ; tes jetons reviennent (pas de récupération).',{atkname:atkName,rn:rn}),youAtk?'gold':'red');}
+  else{addLog(J('journal.detruit_route_non_protegee_reconstruire','💥 {atkname} DÉTRUIT la route {rn} — non protégée, à reconstruire ; les jetons de l\'attaquant reviennent (pas de récupération).',{atkname:atkName,rn:rn}),youAtk?'gold':'red');}
   if(!youAtk)notifyNationHit(defender,J('avis.detruit_route','{v} détruit ta route',{v:(attacker.civ?_i18nRef(attacker.civ,'name'):J('avis.nation',"Une nation"))}),J('avis.detruite','{rn} est détruite{v}.',{rn:rn,v:(wasProtected?J('avis.protection_brisee'," (protection brisée)"):J('avis.reconstruire'," — à reconstruire"))}));
   return {destroyed:true};
 }
@@ -8347,7 +8444,7 @@ function attackEnemyRoute(aiId,ri){
   // pourtant les routes partout ailleurs. Une seule règle : `routesProtegeesParTech`.
   if(routesProtegeesParTech(ai)){addLog(J('journal.routes_protegees_inattaquables','🛡️ Routes de {nation} protégées ({v}) — inattaquables.',{nation:_i18nRef(ai.civ,'name'),v:techsProtegeantRoutes(ai).join(', ')}),'red');return;}
   const need=((route.tokens||0)>=1)?2:1; // route protégée par un jeton → 2 jetons pour la briser
-  if(engageableTokens(G.player)<need){addLog(J('journal.te_faut_jeton_force_engageable_route','⚠️ Il te faut {need} jeton(s) Force engageable(s) pour cette route{jetons}.',{need:need,jetons:((route.tokens||0)>=1?J('journal.protegee_jeton'," (protégée par un jeton)"):'')}),'red');return;}
+  if(engageableTokens(G.player)<need){addLog(J('journal.te_faut_jeton_force_engageable_route','⚠️ Il faut {need} jeton(s) Force engageable(s) pour cette route{jetons}.',{need:need,jetons:((route.tokens||0)>=1?J('journal.protegee_jeton'," (protégée par un jeton)"):'')}),'red');return;}
   undoStack=[];
   G.player.acLeft-=1;G.player.spentThisTurn+=1;G.player._attacksThisTurn=(G.player._attacksThisTurn||0)+1;
   resolveRouteAttack(G.player,ai,route,need);
@@ -8387,7 +8484,7 @@ function resolveAiAssault(ai,targetId,commit){
     const newLvl=capturerNoeud(ai,targetId);
     ai._warRecapture=null;war.aiRecaptureTarget=null;
     p.res.morale=Math.max(0,(p.res.morale||0)-1);
-    addLog(J('journal.reprend_vs_nv_perds_colonie_1','🏴 {emoji} {nation} REPREND {v} ! ({apow}⚔️ vs {pdef}🛡️, Nv.{newlvl}) — tu perds la colonie, −1<i class=ri-morale></i>',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),v:(node?_i18nRef(node,'name'):targetId),apow:aPow,pdef:pDef,newlvl:newLvl}),'red');
+    addLog(J('journal.reprend_vs_nv_perds_colonie_1','🏴 {emoji} {nation} REPREND {v} à {emoji2} {nation2} ! ({apow}⚔️ vs {pdef}🛡️, Nv.{newlvl}) — colonie perdue, −1<i class=ri-morale></i>',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),emoji2:p.civ.emoji,nation2:_i18nRef(p.civ,'name'),v:(node?_i18nRef(node,'name'):targetId),apow:aPow,pdef:pDef,newlvl:newLvl}),'red');
     G.aiActions.push(_i18nAplatir({emoji:'🏴',name:J('action.reprend','Reprend {v}',{v:(node?_i18nRef(node,'name'):targetId)}),desc:J('action.vs','{apow}⚔️ vs {pdef}🛡️',{apow:aPow,pdef:pDef})}));
     notifyNationHit(p,J('avis.prend','{nation} prend {v}',{nation:_i18nRef(ai.civ,'name'),v:(node?_i18nRef(node,'name'):targetId)}),J('avis.colonie_tombe_nv_combat_contre_perds_1_m','Ta colonie tombe (Nv.{newlvl}) — combat {apow} contre {pdef}. Tu perds 1 moral.',{newlvl:newLvl,apow:aPow,pdef:pDef}));
   }else{
@@ -8666,7 +8763,7 @@ function _resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,p){
     if(_vpCombat&&typeof gagnerVP==='function')gagnerVP(p,2,J('vp.combat_gagne_contre','Combat gagné contre {nation}',{nation:_i18nRef(ai.civ,'name')}));
     if(_aiCru)croiseurEnReparation(ai); // croiseur IA en réparation suite à l'échec de l'assaut
     ai.res.morale=Math.max(0,(ai.res.morale||0)-1);
-    resultTxt=J('ui.defense_reussie_vs','🛡️ Défense réussie ! {pdef}🛡️ vs {apow}⚔️ — {v}',{pdef:pDef,apow:aPow,v:(target.type==='colony'?J('ui.colonie_tient','Colonie {nom} tient.',{nom:_i18nRef(target,'name')}):J('ui.route_tient','Route {nom} tient.',{nom:_i18nRef(target,'name')}))});cls='win';
+    resultTxt=J('ui.defense_reussie_vs','🛡️ Défense réussie ! {pdef}🛡️ vs {apow}⚔️ — {v}',{pdef:pDef,apow:aPow,v:(target.type==='colony'?J('ui.colonie_tient','Colonie {nom} tient.',{nom:_nomCible(target)}):J('ui.route_tient','Route {nom} tient.',{nom:_nomCible(target)}))});cls='win';
     addLog(J('journal.repousse_vs','🛡️ {emoji} {nation} repoussé ({pdef}🛡️ vs {apow}⚔️).',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),pdef:pDef,apow:aPow}),'gold');
   }else{
     if(war)war.winsBy[ai.civ.id]=(war.winsBy[ai.civ.id]||0)+1;
@@ -8677,7 +8774,7 @@ function _resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,p){
     const _reparTxt=cruDef?croiseurEnReparation(p,{sansFenetre:true}):'';
     let lost;
     if(target.type==='route'){
-      target.obj.tokens=0;updateConnections(p);lost=J('ui.route_neutralisee_jeton_protection_perdu','🛤️ Route {nom} neutralisée — jeton de protection perdu.',{nom:_i18nRef(target,'name')});
+      target.obj.tokens=0;updateConnections(p);lost=J('ui.route_neutralisee_jeton_protection_perdu','🛤️ Route {nom} neutralisée — jeton de protection perdu.',{nom:_nomCible(target)});
     }else{
       // RÈGLE UNIFIÉE (Marc) : une colonie vaincue est CAPTURÉE IMMÉDIATEMENT au niveau −1, dans les DEUX
       // SENS. Avant, seule TA colonie était d'abord « rétrogradée » (il fallait 3 assauts à l'ennemi pour
@@ -8688,7 +8785,7 @@ function _resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,p){
          capitale. Une seule capture pour tout le monde : `capturerNoeud`. */
       const _newLvl=capturerNoeud(ai,col.nodeId);
       if(war)war.aiRecaptureTarget=null;
-      lost=J('ui.colonie_capturee_nv_perds','🏴 Colonie {nom} CAPTURÉE par {nation} (Nv.{newlvl}) — tu la perds !',{nom:_i18nRef(target,'name'),nation:_i18nRef(ai.civ,'name'),newlvl:_newLvl});
+      lost=J('ui.colonie_capturee_nv_perds','🏴 Colonie {nom} CAPTURÉE par {nation} (Nv.{newlvl}) — perdue !',{nom:_nomCible(target),nation:_i18nRef(ai.civ,'name'),newlvl:_newLvl});
     }
     p.res.morale=Math.max(0,(p.res.morale||0)-1);
     resultTxt=J('ui.defense_insuffisante_vs_1','💥 Défense insuffisante ! {pdef}🛡️ vs {apow}⚔️<br><strong style="color:#ff9977">{lost}</strong> (−1<i class=ri-morale></i>){v}',{pdef:pDef,apow:aPow,lost:lost,v:(_reparTxt?J('ui.repar_span','<br><span style="color:#ffcc66">{r}</span>',{r:_reparTxt}):'')});cls='loss';
@@ -8699,7 +8796,7 @@ function _resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,p){
      attaques de route n'ont lieu que pendant une vraie guerre, où la tension est déjà à 10. */
   if(target&&target.type==='colony') tensionApresAssaut(ai,p,aPow>pDef);
   if(war&&war.escarmouche) finEscarmouche(war);
-  const _act=_i18nAplatir({emoji:'⚔️',name:J('action.assaut','Assaut sur {nom}',{nom:_i18nRef(target,'name')}),desc:J('action.vs','{apow}⚔️ vs {pdef}🛡️',{apow:aPow,pdef:pDef})});
+  const _act=_i18nAplatir({emoji:'⚔️',name:J('action.assaut','Assaut sur {nom}',{nom:_nomCible(target)}),desc:J('action.vs','{apow}⚔️ vs {pdef}🛡️',{apow:aPow,pdef:pDef})});
   if(ai._turnActions)ai._turnActions.push(_act);else ai._turnActions=[_act];
   render();
   showWarModal(J('combat.attaque','⚔️ {emoji} {nation} attaque',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name')}),resultTxt,{txt:(cls==='win'?J('ui.positions_tiennent','Tes positions tiennent.'):J('ui.subi_pertes','Tu as subi des pertes.')),cls},ai.civ.id,p);
@@ -8867,7 +8964,7 @@ const TENSION_APAISEMENT_CONQUETE = 4;
 function griefTechnologique(){
   const out=[];
   if((G.turn||0)<TENSION_TOUR_TECH) return out;             // Marc, 21/09 : dès le tour 7, une fois par couple
-  const nations=allPlayers().filter(n=>n&&n.civ);
+  const nations=nationsEnJeu();
   const r3=n=>(n.cards||[]).filter(c=>c&&c.tier===3).length;
   for(const x of nations) for(const y of nations){
     if(x===y) continue;
@@ -8885,8 +8982,7 @@ function griefTechnologique(){
        bien enregistré dans `out` ; on ne l'ÉCRIT que s'il a déplacé quelque chose. */
     if(apres===avant) continue;
     /* Comme les autres griefs : on n'écrit que ce qui concerne le joueur qui lit. */
-    if(x===G.player) addLog(J('journal.avance_technologique_rang_3_toi_tension','🔬 Avance technologique de {emoji} {nation} ({ecart} rang{v} 3 de plus que toi) : ta tension +{v2} → {apres}/10',{emoji:y.civ.emoji,nation:_i18nRef(y.civ,'name'),ecart:ecart,v:(ecart>1?'s':''),v2:apres-avant,apres:apres}),'red');
-    else if(y===G.player) addLog(J('journal.jalouse_avance_technologique_rang_3_ecar','🔬 {emoji} {nation} jalouse ton avance technologique ({ecart} rang{v} 3 d\'écart) : sa tension envers toi +{v2} → {apres}/10',{emoji:x.civ.emoji,nation:_i18nRef(x.civ,'name'),ecart:ecart,v:(ecart>1?'s':''),v2:apres-avant,apres:apres}),'red');
+    if(x===G.player||y===G.player) logAuteur(x,()=>addLog(J('journal.jalouse_avance_technologique','🔬 {emoji} {nation} — jalouse l\'avance technologique de {emoji2} {nation2} ({ecart} rang{v} 3 d\'écart) : tension +{v2} → {apres}/10',{emoji:x.civ.emoji,nation:_i18nRef(x.civ,'name'),emoji2:y.civ.emoji,nation2:_i18nRef(y.civ,'name'),ecart:ecart,v:(ecart>1?'s':''),v2:apres-avant,apres:apres}),'red'));
   }
   return out;
 }
@@ -8946,7 +9042,7 @@ function updateTension(){
       add+=(_chargesEtouffe.has(x.civ.id)?6:1);
     return add;
   };
-  const _toutes=(typeof allPlayers==='function')?allPlayers():[G.player].concat(G.ais||[]);
+  const _toutes=nationsEnJeu();   // une nation éliminée ne reproche plus rien et ne se voit plus rien reprocher (29BD)
   /* ═══ POURQUOI CES DEUX GRIEFS SONT DES ÉVÉNEMENTS ET NON DES ÉTATS ═══
      Premier réglage, le 2026-08-24 : +4 et +6 RÉPÉTÉS À CHAQUE TOUR tant que la situation durait.
      Le banc `mesure_tensions.js` a tranché en dix parties — 67 guerres populaires contre 10 sur le
@@ -8973,8 +9069,8 @@ function updateTension(){
       if(ecart>=6&&!vu.d6){vu.d6=G.turn;ch+=6;}
       if(!ch)continue;
       _chargesDominance.set(x.civ.id+'|'+y.civ.id,ch);
-      if(x===G.player) addLog(J('journal.dominance_toi','👑 {emoji} {nation} te distance ({ecart} colonies connectées d\'avance) : ta tension +{n}',{emoji:y.civ.emoji,nation:_i18nRef(y.civ,'name'),ecart:ecart,n:ch}),'red');
-      else if(y===G.player) addLog(J('journal.dominance_eux','👑 {emoji} {nation} jalouse ton expansion ({ecart} colonies connectées d\'avance) : sa tension envers toi +{n}',{emoji:x.civ.emoji,nation:_i18nRef(x.civ,'name'),ecart:ecart,n:ch}),'red');
+      /* Troisième personne, la nation qui s'agace en tête (22/09 : plus de « te distance », « ton expansion »). */
+      if(x===G.player||y===G.player) logAuteur(x,()=>addLog(J('journal.dominance','👑 {emoji} {nation} — {emoji2} {nation2} la distance ({ecart} colonies connectées d\'avance) : tension +{n}',{emoji:x.civ.emoji,nation:_i18nRef(x.civ,'name'),emoji2:y.civ.emoji,nation2:_i18nRef(y.civ,'name'),ecart:ecart,n:ch}),'red'));
     }
   }
   for(const x of _toutes){
@@ -9041,10 +9137,11 @@ function updateTension(){
   { const _d=fluxDonnees(); _d.guerrePopFenetre=false; }   // nouveau tour : aucune fenêtre ouverte (drapeau jamais laissé collé)
   _guerrePopSuivante();   // file du tour précédent, s'il en reste (fenêtre fermée sans passer par la suite)
   for(const ai of G.ais){
+    if(estEliminee(G.player)||estEliminee(ai))continue;   // hors jeu (29BD : guerre déclarée au joueur éliminé)
     if(_warBetween(_moiId(),ai.civ.id))continue;   // même règle que ci-dessus, couple par couple
     let addP=_tensionVers(G.player,ai), addA=_tensionVers(ai,G.player);
     // Appliquer
-    if(addP>0){addTens('player',ai.civ.id,addP);addLog(J('journal.tension_vs_10','😡 Ta tension vs {nation} +{addp} → {v}/10',{nation:_i18nRef(ai.civ,'name'),addp:addP,v:getTens('player',ai.civ.id)}),'dim');}
+    if(addP>0){addTens('player',ai.civ.id,addP);logAuteur(G.player,()=>addLog(J('journal.tension_envers','😡 {emoji} {nation} — tension envers {emoji2} {nation2} +{addp} → {v}/10',{emoji:G.player.civ.emoji,nation:_i18nRef(G.player.civ,'name'),emoji2:ai.civ.emoji,nation2:_i18nRef(ai.civ,'name'),addp:addP,v:getTens('player',ai.civ.id)}),'dim'));}
     else if(getTens('player',ai.civ.id)>0)addTens('player',ai.civ.id,-1); // paix : −1/tour
     if(addA>0)addTens(ai.civ.id,'player',addA);
     else if(getTens(ai.civ.id,'player')>0)addTens(ai.civ.id,'player',-1); // paix : −1/tour
@@ -9084,11 +9181,11 @@ function updateTension(){
     nat._manifLoss=hostiles.length;
     if(!hostiles.length)continue;
     nat.res.morale=Math.max(0,(nat.res.morale||0)-hostiles.length);
-    const detail=hostiles.map(a=>a.civ.name+' '+getTens(nat.civ.id,a.civ.id)+'/10').join(', ');
-    if(nat===G.player)
-      addLog(J('journal.tensions_elevees_manifestations','😤 Tensions élevées ({detail}) — manifestations : −{v}<i class=ri-morale></i>',{detail:detail,v:hostiles.length}),'red');
-    else
-      addLog(J('journal.manifestations','😤 {emoji} {nation} — manifestations ({detail}) : −{v}<i class=ri-morale></i>',{emoji:nat.civ.emoji,nation:_i18nRef(nat.civ,'name'),detail:detail,v:hostiles.length}),'dim');
+    /* Les noms passent en RÉFÉRENCES (liste imbriquée) : joints en chaîne, ils partaient en
+       français dans un journal anglais (« High tensions (Jupitériens 9/10) », 29BD). */
+    const detail=hostiles.map(a=>J('journal.manif_item','{nation} {v}/10',{nation:_i18nRef(a.civ,'name'),v:getTens(nat.civ.id,a.civ.id)}))
+      .reduce((a,b)=>a===null?b:J('commun.joint','{a}{sep}{b}',{a:a,sep:', ',b:b}),null);
+    logAuteur(nat,()=>addLog(J('journal.manifestations','😤 {emoji} {nation} — manifestations ({detail}) : −{v}<i class=ri-morale></i>',{emoji:nat.civ.emoji,nation:_i18nRef(nat.civ,'name'),detail:detail,v:hostiles.length}),nat===G.player?'red':'dim'));
   }
 }
 /* La suite de la GUERRE POPULAIRE : un NOM rangé dans `G._flux.donnees`.
@@ -9228,15 +9325,17 @@ function prixDeLaGuerreHTML(nat){
     const acMax=(nat&&nat.acMax)||5, acRed=Math.ceil(acMax/2);   // arrondi au supérieur (16/09)
     const ap1=Math.max(0,m-u), ap2=Math.max(0,m-2*u);
     let etat='';
-    if(ap1<=0) etat=t('prixguerre.moral_zero','<b style="color:#ff8a7a">ton moral tomberait à 0 dès demain</b>');
-    else if(ap1===1) etat=t('prixguerre.moral_un','<b style="color:#ffcc66">ton moral serait à 1 demain</b>');
-    else etat=t('prixguerre.moral_passe','ton moral passerait à <b>{a}</b> demain, <b>{b}</b> le tour d\'après',{a:ap1,b:ap2});
-    return '<div style="margin-top:10px;padding:9px 11px;border:1px solid #8a2626;background:#2a0f0f;'
-      +'border-radius:10px;text-align:left;line-height:1.5">'
-      +'<b style="color:#ff9a8a">'+t('prixguerre.titre','⚠️ Ce que coûte la guerre')+'</b><br>'
-      +t('prixguerre.usure','<b>−{u}<i class=ri-morale></i> à chaque camp dès le DÉBUT du tour prochain</b>, et encore −{u} à chaque tour tant qu\'elle dure. Tu as {m}<i class=ri-morale></i> : {etat}.',{u:u,m:m,etat:etat})+'<br>'
-      +t('prixguerre.moral_regles','<span style="color:#ffcc66">Moral 1</span> en fin de tour → <b>revenus divisés par deux</b>. <span style="color:#ff8a7a">Moral 0</span> → <b>aucun revenu</b> et tes actions tombent de {max} à <b>{red}</b>.',{max:acMax,red:acRed})+'<br>'
-      +'<span style="opacity:.8">'+t('prixguerre.paix_gratuite','Faire la paix avant la fin du tour ne coûte aucun moral.')+'</span></div>';
+    if(ap1<=0) etat=J('prixguerre.moral_zero','<b style="color:#ff8a7a">ton moral tomberait à 0 dès demain</b>');
+    else if(ap1===1) etat=J('prixguerre.moral_un','<b style="color:#ffcc66">ton moral serait à 1 demain</b>');
+    else etat=J('prixguerre.moral_passe','ton moral passerait à <b>{a}</b> demain, <b>{b}</b> le tour d\'après',{a:ap1,b:ap2});
+    /* UN MESSAGE J, PAS UNE CHAÎNE : ce bloc part au joueur dans la décision « guerre populaire », écrit
+       par le serveur. Rendu avec t(), il arrivait en français chez le joueur anglais (29BD). En solo,
+       la concaténation le rend dans la langue de l'écran (`toString`). */
+    return J('prixguerre.bloc','<div style="margin-top:10px;padding:9px 11px;border:1px solid #8a2626;background:#2a0f0f;border-radius:10px;text-align:left;line-height:1.5"><b style="color:#ff9a8a">{titre}</b><br>{usure}<br>{regles}<br><span style="opacity:.8">{paix}</span></div>',{
+      titre:J('prixguerre.titre','⚠️ Ce que coûte la guerre'),
+      usure:J('prixguerre.usure','<b>−{u}<i class=ri-morale></i> à chaque camp dès le DÉBUT du tour prochain</b>, et encore −{u} à chaque tour tant qu\'elle dure. Tu as {m}<i class=ri-morale></i> : {etat}.',{u:u,m:m,etat:etat}),
+      regles:J('prixguerre.moral_regles','<span style="color:#ffcc66">Moral 1</span> en fin de tour → <b>revenus divisés par deux</b>. <span style="color:#ff8a7a">Moral 0</span> → <b>aucun revenu</b> et tes actions tombent de {max} à <b>{red}</b>.',{max:acMax,red:acRed}),
+      paix:J('prixguerre.paix_gratuite','Faire la paix avant la fin du tour ne coûte aucun moral.')});
   }catch(e){ return ''; }
 }
 function guerrePopulaireAuto(offense,offenseur){
@@ -9312,14 +9411,14 @@ function triggerGuereeForcee(offendedSide,targetAi,opts){
       return true;
     }
     if(_decisionActive()){ // EN LIGNE : router le choix vers le joueur (sinon la modale ne s'affiche jamais côté serveur headless)
-      const _rts=aiAllRoutes.map(function(r,i){return {i:i, name:(NODES[r.from]?.name||r.from)+'→'+(NODES[r.to]?.name||r.to), need:((r.tokens||0)>=1?2:1), prot:((r.tokens||0)>=1)};});
+      const _rts=aiAllRoutes.map(function(r,i){return {i:i, name:J('commun.fleche','{a}→{b}',{a:(NODES[r.from]?_i18nRef(NODES[r.from],'name'):r.from),b:(NODES[r.to]?_i18nRef(NODES[r.to],'name'):r.to)}), need:((r.tokens||0)>=1?2:1), prot:((r.tokens||0)>=1)};});
       _emitDecision('forced_war', G.player,
-        {enemy:fwAi.civ.id, enemyName:fwAi.civ.name, routes:_rts,
+        {enemy:fwAi.civ.id, enemyName:_jRef(fwAi.civ,'name'), routes:_rts,
          /* `cols` = TOUTES les colonies à portée de guerre (même règle que la fenêtre d'assaut).
             `colTarget`/`colName` restent envoyés : ils désignent la plus proche et servent encore au
             pilote, au bot et aux bancs — un client ancien continue donc de fonctionner. */
-         cols:_fwCibles.map(function(t){const _n=NODES[t.col.nodeId]||{};return {node:t.col.nodeId, name:(_n.name||t.col.nodeId), level:(t.col.level||1), dist:t.dist, isHome:(t.col.nodeId===fwAi.civ.home)};}),
-         colTarget:(nearestAiCol?nearestAiCol.col.nodeId:null), colName:(nearestAiCol?(NODES[nearestAiCol.col.nodeId]?.name||nearestAiCol.col.nodeId):null),
+         cols:_fwCibles.map(function(t){const _n=NODES[t.col.nodeId]||{};return {node:t.col.nodeId, name:(_n.name?_jRef(_n,'name'):t.col.nodeId), level:(t.col.level||1), dist:t.dist, isHome:(t.col.nodeId===fwAi.civ.home)};}),
+         colTarget:(nearestAiCol?nearestAiCol.col.nodeId:null), colName:(nearestAiCol?(NODES[nearestAiCol.col.nodeId]?_jRef(NODES[nearestAiCol.col.nodeId],'name'):nearestAiCol.col.nodeId):null),
          myForce:(G.player.forceTokens||0),
          /* Le prix de la guerre est calculé ICI, côté moteur, pour la nation qui décide : le client
             n'a pas à le recalculer et ne peut pas en donner une version différente. */
@@ -9347,9 +9446,9 @@ function triggerGuereeForcee(offendedSide,targetAi,opts){
       { const _w=_warBetween(_moiId(),fwAi.civ.id); if(_w)encaisserPenalitesPopulaires(_w); }   // acte de guerre : les malus tombent
       playerRouteNearAI.tokens=0;G.player.forceTokens=Math.max(0,G.player.forceTokens-1);
       updateConnections(G.player);
-      addLog(J('journal.ia_attaque_route_guerre_populaire_route','😡 L\'IA attaque ta route (guerre populaire) : {nom}→{nom2} — route neutralisée, −1 jeton !',{nom:_i18nRef(NODES[playerRouteNearAI.from],'name'),nom2:_i18nRef(NODES[playerRouteNearAI.to],'name')}),'red');
+      addLog(J('journal.ia_attaque_route_guerre_populaire_route','😡 {emoji} {nation} attaque une route de {emoji2} {nation2} (guerre populaire) : {nom}→{nom2} — route neutralisée, −1 jeton !',{emoji:fwAi.civ.emoji,nation:_i18nRef(fwAi.civ,'name'),emoji2:G.player.civ.emoji,nation2:_i18nRef(G.player.civ,'name'),nom:_i18nRef(NODES[playerRouteNearAI.from],'name'),nom2:_i18nRef(NODES[playerRouteNearAI.to],'name')}),'red');
     }else{
-      addLog(J('journal.ia_lance_raids_frontieres_guerre_populai','😡 L\'IA lance des raids sur tes frontières (guerre populaire).'),'red');
+      addLog(J('journal.ia_lance_raids_frontieres_guerre_populai','😡 {emoji} {nation} lance des raids sur les frontières de {emoji2} {nation2} (guerre populaire).',{emoji:fwAi.civ.emoji,nation:_i18nRef(fwAi.civ,'name'),emoji2:G.player.civ.emoji,nation2:_i18nRef(G.player.civ,'name')}),'red');
     }
   }
   return true;
@@ -9360,7 +9459,7 @@ function forcedWarChoiceRoute(idx){
   const r=fwcAi?fwcAi.routes[idx]:null;
   if(!r)return;
   const prot=(r.tokens||0)>=1;const need=prot?2:1;
-  if(engageableTokens(G.player)<need){addLog(J('journal.te_faut_jeton_force_engageable_route_2','⚠️ Il te faut {need} jeton{v} Force engageable{v2} pour cette route{v3}.',{need:need,v:(need>1?'s':''),v2:(need>1?'s':''),v3:(prot?J('journal.protegee'," (protégée)"):'')}),'red');return;} // garde la fenêtre ouverte
+  if(engageableTokens(G.player)<need){addLog(J('journal.te_faut_jeton_force_engageable_route_2','⚠️ Il faut {need} jeton{v} Force engageable{v2} pour cette route{v3}.',{need:need,v:(need>1?'s':''),v2:(need>1?'s':''),v3:(prot?J('journal.protegee'," (protégée)"):'')}),'red');return;} // garde la fenêtre ouverte
   G.player._attacksThisTurn=(G.player._attacksThisTurn||0)+1;
   document.getElementById('forced-war-modal').classList.add('hidden');
   G._pendingRouteAtk={ai:fwcAi, route:r, prot:prot, mode:'forced'}; // même modale récupérer/détruire que la fenêtre de combat
@@ -9392,7 +9491,7 @@ function forcedWarChoiceColony(nodeId){
    de dépense, la file reprend. Nommée pour survivre à une sauvegarde. */
 function stAssautForceReponse(committed){
   if(committed===undefined||committed===null||typeof committed==='string'||((committed|0)<=0&&!G._cruiserDeployed)){
-    addLog(J('journal.tiens_position_aucun_assaut_tour','🛡️ Tu tiens ta position — aucun assaut ce tour.'),'dim');
+    addLog(J('journal.tiens_position_aucun_assaut_tour','🛡️ tient sa position — aucun assaut ce tour.'),'dim');
     G._assaultThenSuite=null; fluxDonnees().assautCible=null; fluxDonnees().assautEnnemi=null;
     if(!_guerrePopSuiteJouer())render(); return;
   }
@@ -9429,7 +9528,7 @@ function forcedWarDemandPeace(){
   const ai=G.warWith?G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0]:G.ais[0];
   const fin=()=>{ G.playerTension=0;G.aiTension=0; if(!_guerrePopSuiteJouer())render(); };
   if(!ai){ fin(); return; }
-  const nom=ai.civ.emoji+' '+ai.civ.name;
+  const nom=_nomNation(ai);   // référence (« Terriens refuses to pay » dans un journal anglais, 29BD)
   const t=tributDe(ai);
   /* ═══ UN HUMAIN N'EST PAS UNE FORMULE (partie 5B38, 07/09) ═══
      Marc exige la paix dans sa guerre populaire contre les Ceinturiens — tenus par son ami. La
@@ -9520,7 +9619,7 @@ function updateWarRisk(){
   const segs=getContestedSegments();
   if(segs.length>0){G.warRisk=Math.min(10,G.warRisk+segs.length);addLog(J('journal.route_conflit_risque','⚠️ {v} route(s) en conflit — risque +{v2}',{v:segs.length,v2:segs.length}),'dim');}
   else if(G.warRisk>0&&!G.warState)G.warRisk=Math.max(0,G.warRisk-1);
-  if(G.warRisk>=10&&!G.warState)declareWar(J('guerre.raison_tensions_max','Tensions au maximum ({n}/10) !',{n:G.warRisk}));
+  if(G.warRisk>=10&&!G.warState&&!estEliminee(G.player))declareWar(J('guerre.raison_tensions_max','Tensions au maximum ({n}/10) !',{n:G.warRisk}));
 }
 /* ⚠️ `agresseurCiv` AJOUTÉ LE 2026-08-09 (défaut signalé par Marc sur la Sphère de Dyson).
    `declaredBy` est une ÉTIQUETTE relative au lecteur : `'player'` veut dire « moi », et pour la
@@ -9630,7 +9729,7 @@ function tensionApresAssaut(agresseur, victime, coloniePrise){
   if(avant>=10)return;
   const apres=Math.min(10,avant+seuil);
   setTens(v,a,apres);
-  addLog(J('journal.tension_10_10_peuple_exige_guerre_fin_to','🔥 Tension {emoji} {nation} → {emoji2} {nation2} : {avant} → {seuil}/10 ({v}). À 10, le peuple exige la guerre en fin de tour.',{emoji:victime.civ.emoji,nation:_i18nRef(victime.civ,'name'),emoji2:agresseur.civ.emoji,nation2:_i18nRef(agresseur.civ,'name'),avant:avant,seuil:apres,v:(coloniePrise?J('journal.colonie_prise',"colonie prise"):J('journal.assaut_repousse',"assaut repoussé"))}),'red');
+  addLog(J('journal.tension_10_10_peuple_exige_guerre_fin_to','🔥 {emoji} {nation} — tension envers {emoji2} {nation2} : {avant} → {seuil}/10 ({v}). À 10, le peuple exige la guerre en fin de tour.',{emoji:victime.civ.emoji,nation:_i18nRef(victime.civ,'name'),emoji2:agresseur.civ.emoji,nation2:_i18nRef(agresseur.civ,'name'),avant:avant,seuil:apres,v:(coloniePrise?J('journal.colonie_prise',"colonie prise"):J('journal.assaut_repousse',"assaut repoussé"))}),'red');
 }
 function declarerGuerre(agresseur, cible, raison, declaredBy, opts){
   opts=opts||{};
@@ -10021,7 +10120,7 @@ function resolveWarCombat(playerCommitted, attaquant){
   /* Le croiseur est décidé AVANT le plafond : ce qu'il coûte n'est plus engageable en jetons. */
   {const _cruPrevu=!!G._cruiserDeployed&&cruiserAvailable(_atk)&&cruiserAfford(_atk);
    const _cap=Math.max(0,Math.min(_atk.forceTokens||0,maxAffordableTokens(_atk,reserveCroiseur(_atk,_cruPrevu))));
-   if(engagedP>_cap){ addLog(J('journal.engagement_reduit_jeton_peux_engager_peu','⚠️ Engagement réduit à {cap} jeton(s) — tu ne peux engager que ce que tu peux PAYER{v}.',{cap:_cap,v:(_cruPrevu?J('journal.supercroiseur_compris',", Supercroiseur compris"):'')}),'red'); engagedP=_cap; }}
+   if(engagedP>_cap){ addLog(J('journal.engagement_reduit_jeton_peux_engager_peu','⚠️ Engagement réduit à {cap} jeton(s) — on ne peut engager que ce qu\'on peut PAYER{v}.',{cap:_cap,v:(_cruPrevu?J('journal.supercroiseur_compris',", Supercroiseur compris"):'')}),'red'); engagedP=_cap; }}
   const _cruOn=!!G._cruiserDeployed&&cruiserAvailable(_atk)&&cruiserAfford(_atk);G._cruiserDeployed=false;
   if(_cruOn){const _cc=cruiserPay(_atk);addLog(J('journal.supercroiseur_deploye','⚓ Supercroiseur déployé (+{v}⚔️, {cc}).',{v:_atk.cruiserPower||5,cc:_cc}),'gold');}
   const pPow=engagedP+pBonus+pEmpathBonus+(_cruOn?(_atk.cruiserPower||5):0); // Supercroiseur : +5 si déployé ce combat
@@ -10207,7 +10306,7 @@ function doPostWarColonize(nodeId){
   p.res.materials-=matCost;p.res.energy-=enCost;
   const connected=checkConnected(nodeId,p);
   p.colonies.push({nodeId,level:1,connected});updateConnections(p);
-  addLog(J('journal.butin_guerre_colonises','🏗️ Butin de guerre : tu colonises {noeud} !',{noeud:_i18nRef(node,'name')}),'gold');
+  addLog(J('journal.butin_guerre_colonises','🚩 Butin de guerre : colonise {noeud} !',{noeud:_i18nRef(node,'name')}),'gold');
   render();dismissWarModal();
 }
 function endWar(aiId){
@@ -10223,12 +10322,12 @@ function endWar(aiId){
     G.player.res.morale=Math.min(8,(G.player.res.morale||0)+1);
     if(ewAiId){setTens('player',ewAiId,0);setTens(ewAiId,'player',5);}
     G.warRisk=Math.max(0,G.warRisk-6);
-    txt=J('combat.guerre_gagnee_1','🏆 Guerre gagnée ! +1<i class=ri-morale></i>');cls='win';addLog(J('journal.guerre_gagnee_1_tension_toi_0_ennemi_5','🏆 Guerre gagnée — +1<i class=ri-morale></i> (tension : toi 0, ennemi 5)'),'gold');
+    txt=J('combat.guerre_gagnee_1','🏆 Guerre gagnée ! +1<i class=ri-morale></i>');cls='win';addLog(J('journal.guerre_gagnee_1_tension_toi_0_ennemi_5','🏆 Guerre gagnée — +1<i class=ri-morale></i> (tension : la sienne 0, celle de l\'ennemi 5)'),'gold');
   } else if(war.wins.ai>war.wins.player){
     // Joueur perd : pas de pénalité de fin (les combats ont déjà coûté). L'IA gagnante gagne +1<i class=ri-morale></i>. Tension : toi 5, IA 0.
     if(warEnemyEW)warEnemyEW.res.morale=Math.min(8,(warEnemyEW.res.morale||0)+1);
     if(ewAiId){setTens('player',ewAiId,5);setTens(ewAiId,'player',0);}
-    txt=J('combat.guerre_perdue','💀 Guerre perdue.');cls='loss';addLog(J('journal.guerre_perdue_tension_toi_5_ennemi_0','💀 Guerre perdue (tension : toi 5, ennemi 0)'),'red');
+    txt=J('combat.guerre_perdue','💀 Guerre perdue.');cls='loss';addLog(J('journal.guerre_perdue_tension_toi_5_ennemi_0','💀 Guerre perdue (tension : la sienne 5, celle de l\'ennemi 0)'),'red');
   } else {
     // Égalité : −1<i class=ri-morale></i>, tension → 4 des deux côtés.
     G.player.res.morale=Math.max(0,(G.player.res.morale||0)-1);
@@ -10556,7 +10655,7 @@ function attribuerProfilsIA(){
     /* On ne l'ANNONCE que pour les nations réellement tenues par l'ordinateur : inutile de dire au
        joueur qu'il a un tempérament dont il ne verra jamais l'effet. */
     if(n._isAI!==false){
-      try{ addLog(J('journal.temperament','🧠 {emoji} {nation} — tempérament : {emoji2} {v} ({v2})',{emoji:n.civ.emoji,nation:_i18nRef(n.civ,'name'),emoji2:PROFILS_IA[n._profil].emoji,v:PROFILS_IA[n._profil].nom,v2:_i18nRef(PROFILS_IA[n._profil],'desc')}),'dim'); }catch(e){}
+      try{ addLog(J('journal.temperament','🧠 {emoji} {nation} — tempérament : {emoji2} {v} ({v2})',{emoji:n.civ.emoji,nation:_i18nRef(n.civ,'name'),emoji2:PROFILS_IA[n._profil].emoji,v:(_i18nRef(PROFILS_IA[n._profil],'nom')||PROFILS_IA[n._profil].nom),v2:_i18nRef(PROFILS_IA[n._profil],'desc')}),'dim'); }catch(e){}
     }
   }
 }
@@ -11499,8 +11598,8 @@ function appliquerCoup(nat,coup){
          `resoudreAssautIA` inscrit déjà son fait d'armes : « Capture Titan » quand la place tombe,
          « Assaut repoussé par X » sinon, « Assaut sur X — frappe surprise » contre un humain. Le
          garde-fou du bas compare les NOMS : « Capture Titan » ≠ « Assaut sur Titan », donc les deux
-         lignes passaient. Marc lisait, pour UNE action : « Capture Titan, 3 AC, −4⚡ −4🪨 −2⚔ »
-         puis « Assaut sur Titan, 3 AC, −4⚡ −4🪨 −2⚔ » — coût compté deux fois dans toute lecture
+         lignes passaient. Marc lisait, pour UNE action : « Capture Titan, 3 AC, −4⚡ −4🪨 −2⚔️ »
+         puis « Assaut sur Titan, 3 AC, −4⚡ −4🪨 −2⚔️ » — coût compté deux fois dans toute lecture
          de ce carnet, bancs compris. Quatre occurrences dans la seule partie 20C9 (T6, T8×2, T9).
          Le paiement réel, lui, n'a jamais été doublé : une seule ligne « ↳ paie » en face. */
       case 'accord':    e={emoji:'🤝',name:J('action.accord','Accord {noeud}',{noeud:nom(coup.node)}),desc:''}; break;
@@ -11519,12 +11618,10 @@ function appliquerCoup(nat,coup){
        ⚠️ On garde la tournure EXACTE de l'ancien chemin (« 🤖 <nation> colonise <nœud> », sans
        emoji de nation) : le journal, les rapports de fin de partie et plusieurs bancs la relisent. */
     const _N=_i18nRef(nat.civ,'name'), _nd=id=>_i18nRef(NODES[id]||{id:id,name:id},'name');
+    /* ⚠️ COLONISER, AMÉLIORER, ROUTE, TECHNOLOGIE : PLUS DE LIGNE ICI (22/09). La règle écrit
+       elle-même son en-tête au moment où elle paie (`logEntete`) — pour l'ordinateur comme pour le
+       joueur. Écrite ici, APRÈS la règle, la ligne arrivait sous ses propres effets. */
     const phrase={
-      coloniser: function(){ return J('journal.ia_colonise','🤖 {nation} colonise {noeud}',{nation:_N,noeud:_nd(coup.node)}); },
-      ameliorer: function(){ const c=(nat.colonies||[]).find(x=>x.nodeId===coup.node);
-                             return J('journal.ia_ameliore_nv','🤖 {nation} améliore {noeud} Nv.{n}',{nation:_N,noeud:_nd(coup.node),n:((c&&c.level)||'')}); },
-      route:     function(){ return J('journal.ia_route_vers','🤖 {nation} route → {noeud}',{nation:_N,noeud:_nd(coup.to)}); },
-      tech:      function(){ const c=CARDS_POOL.find(x=>x.id===coup.card); return J('journal.ia_achete','🤖 {nation} achète {nom}',{nation:_N,nom:c?_i18nRef(c,'name'):coup.card}); },
       /* ⚠️ PAS DE `civique` NON PLUS. Même raison qu'au carnet ci-dessus : `aiBuyCivic` écrit déjà
          sa ligne — et mieux que celle-ci, puisqu'elle porte l'emoji de la carte (« 🤖 Jupitériens
          achète ☄️ Capture d'astéroïdes »). C'est le second des deux doublons de la partie C04C. */
@@ -11822,7 +11919,7 @@ function resoudreAssautIA(ai,nodeId,opts){
      calque, à la lettre. La seule différence légitime demeure : l'humain choisit ses jetons de
      DÉFENSE dans une fenêtre (`showAiAssaultDefenseModal`) au lieu de subir un calcul. */
   if(best._isAI===false){
-    const _nom=(NODES[bestCol.nodeId]&&NODES[bestCol.nodeId].name)||bestCol.nodeId;
+    const _nom=NODES[bestCol.nodeId]?_i18nRef(NODES[bestCol.nodeId],'name'):bestCol.nodeId;   // référence : « Ganymède » dans un journal anglais sinon
     G._warFocusColony=bestCol.nodeId;
     let _w=_warBetween(ai.civ.id,best.civ.id);
     if(!_w){
@@ -12013,7 +12110,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
     if(G.aiActions.length>fromIdx){
       const parts=[];
       for(const r of ['energy','materials','science']){ if(cost[r])parts.push('−'+cost[r]+rEmoji(r)); }
-      if(cost.force)parts.push(t('journal.moins_jetons_force','−{n} jeton(s) Force',{n:cost.force}));
+      if(cost.force)parts.push(J('journal.moins_jetons_force','−{n} jeton(s) Force',{n:cost.force}));   // J : « jeton(s) Force » restait en français dans un journal anglais (29BD)
       for(const r of ['energy','materials','science']){ if(gain[r])parts.push('+'+gain[r]+rEmoji(r)); }
       /* Un assaut ne dépense ses jetons qu'à la résolution du combat (après la fenêtre de défense) :
          « (aucune ressource) » était donc faux et trompeur (§120.13). On le dit tel quel. */
@@ -12021,11 +12118,11 @@ function _doAITurnInterne(aiPlayer,oneShot){
       /* ⚠️ PAS DE `+` : ce suffixe part dans le journal en ligne. Concaténé, il serait figé en
        français (Marc, 20/09 : « ↳ Belters pays: 3 AP — jetons Force engagés… »). On le garde en
        message J, que la phrase porteuse reçoit en paramètre. */
-    const _suffixe=parts.length?J('journal.suffixe_parts',' {v}',{v:parts.join(' ')}):(_assaut?J('journal.jetons_engages_resolution',' — jetons Force engagés à la résolution du combat'):J('journal.aucune_ressource',' (aucune ressource)'));
-      addLog(J('journal.paie','   ↳ {emoji} {nation} paie : {v}{suffixe}',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),v:(acP?J('journal.ac_3',"{acp} AC",{acp:acP}):J('journal.0_ac',"0 AC")),suffixe:_suffixe}),'dim');
+    const _suffixe=parts.length?J('journal.suffixe_parts',' {v}',{v:parts.reduce((a,b)=>a===null?b:J('commun.joint','{a}{sep}{b}',{a:a,sep:' ',b:b}),null)}):(_assaut?J('journal.jetons_engages_resolution',' — jetons Force engagés à la résolution du combat'):J('journal.aucune_ressource',' (aucune ressource)'));
+      addLogSous(J('journal.paie','   ↳ {emoji} {nation} paie : {v}{suffixe}',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),v:(acP?J('journal.ac_3',"{acp} AC",{acp:acP}):J('journal.0_ac',"0 AC")),suffixe:_suffixe}),'dim');
     }
   }
-  function _aiStep(fn){const bAc=ai.acLeft,bRes=_aiSnapRes(),i0=G.aiActions.length;const r=fn();_aiRec(bAc,bRes,i0);return r;}
+  function _aiStep(fn){const bAc=ai.acLeft,bRes=_aiSnapRes(),i0=G.aiActions.length;G._enteteAction=null;G._entetePayee=false;const r=fn();_aiRec(bAc,bRes,i0);return r;}
   // ── POUVOIRS GRATUITS (0 AC, 1×/tour) — l'IA active le sien quand c'est utile et abordable (parité joueur) ──
   {const _bA=ai.acLeft,_bR=_aiSnapRes(),_i0=G.aiActions.length;
   if(!ai.abilityUsed){
@@ -12176,7 +12273,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
       const _nom=(NODES[cible]?_i18nRef(NODES[cible],'name'):cible);
       const _etape=(b!==cible)?J('journal.via',' (via {n})',{n:(NODES[b]?_i18nRef(NODES[b],'name'):b)}):'';
       addLog(J('journal.route_2','🤖 {nation} route → {nom}{etape}',{nation:_i18nRef(ai.civ,'name'),nom:_nom,etape:_etape}),'dim');
-      G.aiActions.push(_i18nAplatir({emoji:'🛤️',name:J('action.route_2','Route → {nom}{etape}',{nom:_nom,etape:_etape}),desc:(tok?J('action.1_deploye','1⚔ déployé'):J('action.non_protegee','non protégée'))}));
+      G.aiActions.push(_i18nAplatir({emoji:'🛤️',name:J('action.route_2','Route → {nom}{etape}',{nom:_nom,etape:_etape}),desc:(tok?J('action.1_deploye','1⚔️ déployé'):J('action.non_protegee','non protégée'))}));
       return true;
     };
     /* Le réseau déjà relié : la base et tout ce que les routes atteignent. */
@@ -13247,10 +13344,17 @@ function calcVP(p){
 function calcVPDetRendu(p,dict){
   const _dAnc=(typeof SOLAR_LANG_DICT!=='undefined')?SOLAR_LANG_DICT:undefined;
   try{
+    /* ⚠️ LE DÉCOMPTE D'ABORD, LA TRADUCTION DES TABLES ENSUITE. Les cartes d'une nation sont des
+       COPIES (sauvegarde, reprise) : `_i18nRef` les reconnaît par id ET nom français. Une fois les
+       tables passées en anglais, la copie française ne ressemblait plus à rien et restait en français
+       (« Ordinateur Quantique » dans le rapport anglais de 29BD). */
+    const v=calcVP(p), det={};
     globalThis.SOLAR_LANG_DICT=dict||null;
     if(dict) i18nTraduireDonnees();
-    const v=calcVP(p), det={};
-    const _r=x=>String(_i18nTexte(x)).replace(/<[^>]+>/g,'');
+    /* Les icônes de ressource deviennent leur emoji AVANT qu'on retire le HTML : sinon « toutes les
+       cartes qui génèrent ⚡ » devenait « … qui génèrent  → » dans le rapport (29BD). */
+    const _ico={energy:'⚡',materials:'🪨',science:'🔬',morale:'🙂'};
+    const _r=x=>String(_i18nTexte(x)).replace(/<i\s+class=["']?ri-(energy|materials|science|morale)["']?\s*><\/i>/gi,(m,k)=>_ico[k]).replace(/<[^>]+>/g,'');
     for(const k of Object.keys(v.det||{})) det[k]=(v.det[k]||[]).map(_r);
     return {det:det, extraDetail:(v.extraDetail||[]).map(_r),
       name:String(_i18nTexte(J('commun.ref','{v}',{v:_i18nRef(p.civ,'name')}))),
@@ -13403,7 +13507,7 @@ function _analyseTexte(){
   const photos=(G&&G._photos)||[], trace=(G&&G._traceIA)||[];
   L.push('');
   L.push('═══════════ ANALYSE — TRAJECTOIRE DES NATIONS ═══════════');
-  L.push('(par tour : VP · ⚡🪨🔬❤️ · colonies/routes/cartes · jetons · ⚔ si en guerre)');
+  L.push('(par tour : VP · ⚡🪨🔬❤️ · colonies/routes/cartes · jetons · ⚔️ si en guerre)');
   if(!photos.length)L.push('  (aucune photo — partie trop courte ou version antérieure)');
   else{
     const tours=[...new Set(photos.map(x=>x.t))].sort((a,b)=>a-b);
@@ -13413,7 +13517,7 @@ function _analyseTexte(){
         L.push('    '+String(x.nat).padEnd(12)+' VP '+String(x.vp).padStart(3)
           +'  '+String(x.e).padStart(2)+'⚡ '+String(x.m).padStart(2)+'🪨 '+String(x.s).padStart(2)+'🔬 '+String(x.mo).padStart(2)+'❤️'
           +'  '+x.col+' col / '+x.rt+' rt / '+x.ca+' cartes  '+String(x.jt).padStart(2)+' jetons'
-          +(x.guerre?'  ⚔ EN GUERRE':''));
+          +(x.guerre?'  ⚔️ EN GUERRE':''));
       }
     }
   }
@@ -13556,13 +13660,13 @@ function copyEndLog(){copyLogText();} // compat écran de fin
 function cloreGuerresEnCours(){
   if(!G||!Array.isArray(G.wars)||!G.wars.length) return;
   const nom=id=>{ const n=(typeof allPlayers==='function'?allPlayers():[G.player].concat(G.ais||[]))
-    .find(x=>x&&x.civ&&x.civ.id===id); return n?(n.civ.emoji+' '+n.civ.name):id; };
+    .find(x=>x&&x.civ&&x.civ.id===id); return n?J('journal.nation_nom','{emoji} {nation}',{emoji:n.civ.emoji,nation:_i18nRef(n.civ,'name')}):id; };   // référence : traduite chez le lecteur (29BD)
   for(const w of G.wars.slice()){
     const a=w.a, b=w.b, va=(w.winsBy&&w.winsBy[a])||0, vb=(w.winsBy&&w.winsBy[b])||0;
     let verdict;
     if(va>vb) verdict=J('ui.emporte_combat_gagne_contre','{noeud} l\'emporte ({va} combat(s) gagné(s) contre {vb})',{noeud:nom(a),va:va,vb:vb});
     else if(vb>va) verdict=J('ui.emporte_combat_gagne_contre_2','{noeud} l\'emporte ({vb} combat(s) gagné(s) contre {va})',{noeud:nom(b),vb:vb,va:va});
-    else verdict=(va===0?t('ui.aucun_combat_livre_guerre_eteint_sans_va','aucun combat livré — la guerre s\'éteint sans vainqueur'):J('ui.match_nul','match nul ({n} combat(s) partout)',{n:va}));
+    else verdict=(va===0?J('ui.aucun_combat_livre_guerre_eteint_sans_va','aucun combat livré — la guerre s\'éteint sans vainqueur'):J('ui.match_nul','match nul ({n} combat(s) partout)',{n:va}));
     addLog(J('journal.fin_partie_guerre','🏳️ Fin de partie — guerre {noeud} ↔ {noeud2} : {verdict}.',{noeud:nom(a),noeud2:nom(b),verdict:verdict}),'gold');
   }
   G.wars=[];
@@ -13570,6 +13674,7 @@ function cloreGuerresEnCours(){
 }
 function doEndGame(){
   G.phase='over';scClearSave();
+  _spectateurBandeauRetirer();
   /* Avant le décompte : le journal doit dire comment les guerres finissent.
      ⚠️ Le commentaire est écrit AU-DESSUS et non en fin de ligne : la suite de cette fonction tient
      sur une seule ligne très longue, et un `//` posé là avalerait tout le calcul des points.
@@ -13577,7 +13682,7 @@ function doEndGame(){
      avec « pVP is not defined ». */
   cloreGuerresEnCours();
   const pVP=calcVP(G.player);const aiVPs=G.ais.map(ai=>({ai,vp:calcVP(ai)}));const bestAiVP=aiVPs.reduce((best,x)=>x.vp.total>best.vp.total?x:best,aiVPs[0]||{ai:null,vp:{total:0}});const aVP=bestAiVP.vp;
-  addLog(J('journal.fin','═══ FIN ═══'),'gold');addLog(J('journal.toi_vp','Toi : {vp} VP',{vp:pVP.total}),'gold');G.ais.forEach(ai=>addLog(J('journal.vp','{nation} : {vp} VP',{nation:_i18nRef(ai.civ,'name'),vp:calcVP(ai).total})));
+  addLog(J('journal.fin','═══ FIN ═══'),'gold');[G.player].concat(G.ais).forEach(n=>logAuteur('systeme',()=>addLog(J('journal.vp_final','{emoji} {nation} : {vp} VP',{emoji:n.civ.emoji,nation:_i18nRef(n.civ,'name'),vp:calcVP(n).total}),n===G.player?'gold':'')));   // plus de « Toi : » (22/09)
   // Révélation des agendas secrets (une ligne par nation, attribuée à la nation)
   for(const p of [G.player,...G.ais]){try{if(p.agenda&&p.agenda.name){const _asc=(typeof p.agenda.score==='function')?p.agenda.score(p):0;_journalAuto(p.civ.name,'Agenda secret révélé : '+p.agenda.name,_asc+' VP');}}catch(e){}}
   render();
@@ -13767,9 +13872,9 @@ function renderSystemMap(){
   const rp=document.getElementById('routes-p'),ra=document.getElementById('routes-ai');
   rp.innerHTML='';ra.innerHTML='';
   const contested=getContestedSegments();
-  for(const seg of contested){const f=NODES[seg.from],t=NODES[seg.to];if(!f||!t)continue;const P=routePoint(seg.from,seg.to,0.5);ra.innerHTML+=`<path d="${routePathD(seg.from,seg.to)}" fill="none" stroke="#ff5500" stroke-width="5" stroke-opacity=".22"/><text x="${P.x.toFixed(1)}" y="${(P.y-MT(4)).toFixed(1)}" text-anchor="middle" font-size="${MT(10)}" fill="#ff7744">⚠</text>`;}
-  for(let ri=0;ri<G.player.routes.length;ri++){const r=G.player.routes[ri];const f=NODES[r.from],_tn=NODES[r.to];if(!f||!_tn)continue;const canManage=G.phase==='actions';const d=routePathD(r.from,r.to);const P=routePoint(r.from,r.to,0.5);const mx=P.x,my=P.y;rp.innerHTML+=`<path d="${d}" fill="none" stroke="${G.player.civ.color}" stroke-width="2.5" stroke-opacity=".75" stroke-dasharray="5,3"/>`;if((r.tokens||0)>0){rp.innerHTML+=`<rect x="${(mx-MT(6)).toFixed(1)}" y="${(my-MT(6)).toFixed(1)}" width="${MT(12)}" height="${MT(12)}" fill="${G.player.civ.color}" opacity=".88" rx="4"/><text x="${mx.toFixed(1)}" y="${(my+MT(4)).toFixed(1)}" text-anchor="middle" font-size="${MT(8)}" fill="white">⚔</text>`;}if(canManage){rp.innerHTML+=`<path d="${d}" fill="none" stroke="transparent" stroke-width="16" onclick="showRouteManageModal(${ri})" style="cursor:pointer"/><circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="${MT(7)}" fill="${(r.tokens||0)>0?'#ff8844':'#224488'}" fill-opacity=".7" stroke="${(r.tokens||0)>0?'#ffaa66':'#4a9eff'}" stroke-width="1" onclick="showRouteManageModal(${ri})" style="cursor:pointer" title="${(r.tokens||0)>0?t('carte.rappeler_jeton','↩️ Rappeler jeton'):t('carte.deployer_jeton','⚔️ Déployer jeton')}"/>`;} }
-  for(const aiP of G.ais){for(const r of aiP.routes){const f=NODES[r.from],t=NODES[r.to];if(!f||!t)continue;ra.innerHTML+=`<path d="${routePathD(r.from,r.to)}" fill="none" stroke="${aiP.civ.color}" stroke-width="2" stroke-opacity=".5" stroke-dasharray="4,4"/>`;if((r.tokens||0)>0){const P=routePoint(r.from,r.to,0.5);const mx=P.x+MT(8),my=P.y-MT(8);ra.innerHTML+=`<rect x="${(mx-MT(5)).toFixed(1)}" y="${(my-MT(5)).toFixed(1)}" width="${MT(10)}" height="${MT(10)}" fill="${aiP.civ.color}" opacity=".7" rx="3"/><text x="${mx.toFixed(1)}" y="${(my+MT(3.5)).toFixed(1)}" text-anchor="middle" font-size="${MT(7)}" fill="white">⚔</text>`;}}
+  for(const seg of contested){const f=NODES[seg.from],t=NODES[seg.to];if(!f||!t)continue;const P=routePoint(seg.from,seg.to,0.5);ra.innerHTML+=`<path d="${routePathD(seg.from,seg.to)}" fill="none" stroke="#ff5500" stroke-width="5" stroke-opacity=".22"/><text x="${P.x.toFixed(1)}" y="${(P.y-MT(4)).toFixed(1)}" text-anchor="middle" font-size="${MT(10)}" fill="#ff7744">⚠️</text>`;}
+  for(let ri=0;ri<G.player.routes.length;ri++){const r=G.player.routes[ri];const f=NODES[r.from],_tn=NODES[r.to];if(!f||!_tn)continue;const canManage=G.phase==='actions';const d=routePathD(r.from,r.to);const P=routePoint(r.from,r.to,0.5);const mx=P.x,my=P.y;rp.innerHTML+=`<path d="${d}" fill="none" stroke="${G.player.civ.color}" stroke-width="2.5" stroke-opacity=".75" stroke-dasharray="5,3"/>`;if((r.tokens||0)>0){rp.innerHTML+=`<rect x="${(mx-MT(6)).toFixed(1)}" y="${(my-MT(6)).toFixed(1)}" width="${MT(12)}" height="${MT(12)}" fill="${G.player.civ.color}" opacity=".88" rx="4"/><text x="${mx.toFixed(1)}" y="${(my+MT(4)).toFixed(1)}" text-anchor="middle" font-size="${MT(8)}" fill="white">⚔️</text>`;}if(canManage){rp.innerHTML+=`<path d="${d}" fill="none" stroke="transparent" stroke-width="16" onclick="showRouteManageModal(${ri})" style="cursor:pointer"/><circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="${MT(7)}" fill="${(r.tokens||0)>0?'#ff8844':'#224488'}" fill-opacity=".7" stroke="${(r.tokens||0)>0?'#ffaa66':'#4a9eff'}" stroke-width="1" onclick="showRouteManageModal(${ri})" style="cursor:pointer" title="${(r.tokens||0)>0?t('carte.rappeler_jeton','↩️ Rappeler jeton'):t('carte.deployer_jeton','⚔️ Déployer jeton')}"/>`;} }
+  for(const aiP of G.ais){for(const r of aiP.routes){const f=NODES[r.from],t=NODES[r.to];if(!f||!t)continue;ra.innerHTML+=`<path d="${routePathD(r.from,r.to)}" fill="none" stroke="${aiP.civ.color}" stroke-width="2" stroke-opacity=".5" stroke-dasharray="4,4"/>`;if((r.tokens||0)>0){const P=routePoint(r.from,r.to,0.5);const mx=P.x+MT(8),my=P.y-MT(8);ra.innerHTML+=`<rect x="${(mx-MT(5)).toFixed(1)}" y="${(my-MT(5)).toFixed(1)}" width="${MT(10)}" height="${MT(10)}" fill="${aiP.civ.color}" opacity=".7" rx="3"/><text x="${mx.toFixed(1)}" y="${(my+MT(3.5)).toFixed(1)}" text-anchor="middle" font-size="${MT(7)}" fill="white">⚔️</text>`;}}
   }
   // (Attaque de route par clic sur la carte retirée : peu lisible. On attaque les routes via la fenêtre de combat ou la guerre populaire forcée.)
   // Pirates NPC (masqué si l'une des factions joue Pirates)
@@ -14027,6 +14132,19 @@ function renderMap(){
   drawConnections();
   renderSystemMap();
 }
+/* ═══ MODE COMPACT DES TECHNOLOGIES — choisi par le joueur (Marc, 22/09) ═══
+   Un bouton en bas de l'écran des technologies. Gardé sur l'appareil. Sur téléphone : deux filières
+   côte à côte, les rangs empilés ; sur ordinateur (≥ 600 px) : une filière par ligne, les rangs de
+   gauche à droite. La disposition est dans index.html (`#tech-body.tech-compact`). */
+function techCompactChoisi(){ try{ return localStorage.getItem('sc_tech_compact')==='1'; }catch(e){ return false; } }
+function basculerTechCompact(){
+  try{ localStorage.setItem('sc_tech_compact', techCompactChoisi()?'0':'1'); }catch(e){}
+  try{ const b=document.getElementById('tech-body'); if(b) b.scrollTop=0; }catch(e){}
+  renderTechTree();
+}
+/* Le mot écrit dans le rouleau, une lettre par ligne (variante B, 22/09). Passe par un attribut
+   `data-bloque`, lu par `content:attr(...)` en CSS : `&#10;` y fait les retours à la ligne. */
+function _motBloqueAttr(){ return String(t('techs.bloque','BLOQUÉ')).split('').map(c=>c.replace(/&/g,'&amp;').replace(/"/g,'&quot;')).join('&#10;'); }
 function getTechAreaMode(){
   const h=document.getElementById('tech-area').offsetHeight;
   return h<130?'compact':'full';
@@ -14086,13 +14204,16 @@ function _appliquerRiviere(remonter){
 function renderTechTree(){
   const body=document.getElementById('tech-body');
   const _scrollAvant=body?body.scrollTop:0;
-  const compact=getTechAreaMode()==='compact';
+  /* Le mode compact est un CHOIX du joueur, plus une déduction de la hauteur du panneau : cette hauteur
+     vaut 0 quand l'onglet est caché, et le rendu fait à ce moment-là basculait tout seul en compact. */
+  const compact=techCompactChoisi();
+  const _bloqueAttr=_motBloqueAttr();
   let html='<div id="riv-tech">';
   for(const[branchId,branch]of Object.entries(TECH_BRANCHES)){
     // Branche Empathes : visible seulement si Union Sacrée a été jouée
     if(branchId==='empathes'&&!G.empathesFounder)continue;
     const isBonus=G.player.civ.techBonus===branchId;
-    html+=`<div class="tb-row"><div class="tb-label" style="color:${branch.color};border-left:2px solid ${branch.color}60;font-size:.6em">${branch.emoji}<span style="display:${compact?'none':'inline'};margin-left:3px">${branch.label}</span>${isBonus?'<span class="tb-bonus-star">★</span>':''}</div><div class="tb-cards">`;
+    html+=`<div class="tb-row"><div class="tb-label" style="color:${branch.color};border-left:2px solid ${branch.color}60;font-size:.6em">${branch.emoji}<span style="margin-left:3px">${branch.label}</span>${isBonus?'<span class="tb-bonus-star">★</span>':''}</div><div class="tb-cards">`;
     for(let tier=1;tier<=3;tier++){
       const card=CARDS_POOL.find(c=>c.branch===branchId&&c.tier===tier);
       if(!card){html+=`<div class="tcard tlocked" style="opacity:.15;min-height:${compact?'22px':'68px'}"><div class="tc-header"><span class="tc-name" style="color:#3a3a6a">—</span></div></div>`;if(tier<3)html+=`<div class="tcard-arr">→</div>`;continue;}
@@ -14143,7 +14264,7 @@ function renderTechTree(){
         const acLabel=card.tier===3?'2AC':'1AC';
         const costStr=Object.entries(cost).map(([r,a])=>'-'+a+rEmoji(r)).join(' ');
         const compactStatus=playerOwned?'<span style="color:#66cc66">✓</span>'+(!exclusive&&aiOwned?`<span style="color:#9080c0">+${_aiEmoji}</span>`:''):exclusiveTaken?'<span style="color:#7880a0">🤖</span>':!exclusive&&aiOwned?`<span style="color:#9080c0;font-size:.85em">${_aiEmoji}+</span><span class="res-tag energy" style="font-size:.9em">${acLabel}</span> `+costStr:'<span class="res-tag energy" style="font-size:.9em">'+acLabel+'</span> '+costStr;
-        html+=`<div class="${cls}"${_cornee?` title="${card.name} — ${_raisonLock}"`:''} onclick="${onclick}" onmouseleave="hideCardPreview()" style="border-top:2px solid ${branch.color}80">
+        html+=`<div class="${cls}"${_cornee?` title="${card.name} — ${_raisonLock}" data-bloque="${_bloqueAttr}"`:''} onclick="${onclick}" onmouseleave="hideCardPreview()" style="border-top:2px solid ${branch.color}80">
           <div class="tc-header">
             <span class="tc-name">${card.emoji} ${card.name}</span>
             <span class="tc-tier">T${tier}</span>
@@ -14155,7 +14276,7 @@ function renderTechTree(){
         else if(exclusiveTaken)costDisplay='<span style="color:#ff9d9d">'+t('techs.prise','⛔ Prise')+'</span>';
         else if(!canAfford)costDisplay='<span class="res-tag energy" style="font-size:.85em;opacity:.6">'+(card.tier===3?'2':'1')+t('commun.ac','AC')+'</span> <span style="color:#cc8844;font-size:.82em">'+Object.entries(cost).map(([r,a])=>{const have=G.player.res[r]||0;const ok=have>=a;return`<span style="color:${ok?'#8898b8':'#ff7744'}">${a}${rEmoji(r)}</span>`;}).join(' ')+'</span>';
         else costDisplay='<span class="res-tag energy" style="font-size:.85em">'+(card.tier===3?'2':'1')+t('commun.ac','AC')+'</span> '+costHtmlStr;
-        html+=`<div class="${cls}"${_cornee?` title="${card.name} — ${_raisonLock}"`:''} onclick="${onclick}" style="border-top:2px solid ${branch.color}80;min-height:68px;cursor:pointer">
+        html+=`<div class="${cls}"${_cornee?` title="${card.name} — ${_raisonLock}" data-bloque="${_bloqueAttr}"`:''} onclick="${onclick}" style="border-top:2px solid ${branch.color}80;min-height:68px;cursor:pointer">
           <div class="tc-header"><span class="tc-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2">${card.name}</span><span class="tc-tier">T${tier}</span></div>
           <div class="tc-art${CARD_ART.has(card.id)?' tc-illus':''}" style="${CARD_ART.has(card.id)?`background-image:url('assets/cards/${card.id}.png')`:`background:${artBg}`}">${CARD_ART.has(card.id)?'':card.emoji}${statusBadge}${lockOverlay}</div>
           <div class="tc-body">
@@ -14172,7 +14293,7 @@ function renderTechTree(){
   // ── RIVIÈRE ÉCO & SOCIÉTÉ — Marché Civique (cartes répétables, coût <i class=ri-materials></i>) ──
   html+='<div id="riv-civ" style="display:none">';
   html+=`<div class="gen-row" id="sec-civ" style="border-top:2px solid #2a3a5a;padding-top:3px">
-    <div class="gen-label" style="color:#88c8ff;font-size:.56em">💼<span style="display:${compact?'none':'inline'};margin-left:2px">${t('marche.eco_societe','Éco &amp; Société')}</span></div>`;
+    <div class="gen-label" style="color:#88c8ff;font-size:.56em">💼<span style="margin-left:2px">${t('marche.eco_societe','Éco &amp; Société')}</span></div>`;
   // Cartes répétables mises EN TÊTE de la rivière (les plus utilisées, donc les plus faciles à trouver) :
   // Extraction d'He3, Capture d'astéroïdes, puis Investissement dans la Recherche (demande de Marc).
   const _civTop=['cm_explore','cm_forages','cm_research'];
@@ -14200,10 +14321,10 @@ function renderTechTree(){
          · achetable → pleine lumière. */
       const _cls=(taken?' gc-corne no-buy':(!canBuy&&!isCurrentForm?' no-buy':''))+(isCurrentForm?' gc-mine':'');
       if(compact){
-        html+=`<div class="gcard gc-compact${_cls}" onclick="showMarketDetail('${card.id}')" style="border-top:2px solid ${border}">
+        html+=`<div class="gcard gc-compact${_cls}"${_cls.includes('gc-corne')?` data-bloque="${_bloqueAttr}"`:''} onclick="showMarketDetail('${card.id}')" style="border-top:2px solid ${border}">
           <div class="gc-header"><span class="gc-name">${card.emoji} ${card.name}${govTag}</span><span class="gc-cost">${taken?'✗':isCurrentForm?'✓':canBuy?'1AC '+costStr:'—'}</span></div></div>`;
       } else {
-        html+=`<div class="gcard${_cls}" onclick="showMarketDetail('${card.id}')" style="border-top:2px solid ${border};cursor:pointer">
+        html+=`<div class="gcard${_cls}"${_cls.includes('gc-corne')?` data-bloque="${_bloqueAttr}"`:''} onclick="showMarketDetail('${card.id}')" style="border-top:2px solid ${border};cursor:pointer">
           <div class="gc-header"><span class="gc-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2">${card.name}${govTag}</span></div>
           <div class="gc-art${CARD_ART.has(card.id)?' gc-illus':''}" style="${CARD_ART.has(card.id)?`background:#0a0a18 url('assets/cards/${card.id}.png') center/cover no-repeat`:`background:${artBg}`}">${CARD_ART.has(card.id)?'':card.emoji}<span style="position:absolute;top:1px;right:2px;font-size:.55em;color:${badgeCol}">${badge}</span></div>
           <div class="gc-body"><div class="tc-effect" style="color:#8898b8">${card.effect}</div>
@@ -14251,10 +14372,10 @@ function renderTechTree(){
       const _gcBloque=(!_reqOk)||(taken&&!_repet);
       const _gcCls=(_gcBloque?' gc-corne no-buy':(!canBuy?' no-buy':''))+(mine?' gc-mine':'');
       if(compact){
-        r+=`<div class="gcard gc-compact${_gcCls}" onclick="showGeneralDetail('${card.id}')" style="border-top:2px solid ${border}">
+        r+=`<div class="gcard gc-compact${_gcCls}"${_gcBloque?` data-bloque="${_bloqueAttr}"`:''} onclick="showGeneralDetail('${card.id}')" style="border-top:2px solid ${border}">
           <div class="gc-header"><span class="gc-name">${card.emoji} ${card.name}</span><span class="gc-cost">${taken?'✗':!_reqOk?'🔒':canBuy?_acN+t('commun.ac','AC'):'—'}</span></div></div>`;
       } else {
-        r+=`<div class="gcard${_gcCls}" onclick="showGeneralDetail('${card.id}')" style="border-top:2px solid ${border};cursor:pointer">
+        r+=`<div class="gcard${_gcCls}"${_gcBloque?` data-bloque="${_bloqueAttr}"`:''} onclick="showGeneralDetail('${card.id}')" style="border-top:2px solid ${border};cursor:pointer">
           <div class="gc-header"><span class="gc-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2">${card.name}</span></div>
           <div class="gc-art${CARD_ART.has(card.id)?' gc-illus':''}" style="${CARD_ART.has(card.id)?`background:#0a0a18 url('assets/cards/${card.id}.png') center/cover no-repeat`:`background:${artBg}`}">${CARD_ART.has(card.id)?'':card.emoji}${(card.repeatable||card.perTurn)?'<span style="position:absolute;top:1px;right:3px;font-size:.55em;color:#ffaa44">∞</span>':''}</div>
           <div class="gc-body"><div class="tc-effect" style="color:#8898b8">${card.effect}</div>
@@ -14268,7 +14389,11 @@ function renderTechTree(){
   // ── RIVIÈRE MILITAIRE ──
   html+='<div id="riv-mil" style="display:none"><div id="sec-mil"></div>'
       + renderNonBranchRow('⚔️ Militaire',milCards,6) + '</div>';
+  /* Le bouton du mode compact, en bas de l'écran — sous les trois rivières. */
+  html+='<div class="tech-bascule-zone"><button type="button" class="tech-bascule" onclick="basculerTechCompact()">'
+      +(compact?'<span class="tb-ico tb-ico-det"></span>'+t('techs.mode_detaille','Mode détaillé'):'<span class="tb-ico tb-ico-comp"></span>'+t('techs.mode_compact','Mode compact'))+'</button></div>';
   body.innerHTML=html;
+  try{ body.classList.toggle('tech-compact',!!compact); }catch(e){}
   _appliquerRiviere(false);   // ⚠️ après chaque rendu : sinon on retombe sur les trois rivières visibles
   if(_scrollAvant) body.scrollTop=_scrollAvant;   // même page, même endroit
   const unlocked=Object.values(G.branchTiers).filter(t=>t>0).length;
@@ -14457,7 +14582,7 @@ function showNodePopup(nodeId){
   if(!pCol){
     const{ac,mat,en}=colonizeCost(G.player);
     const outerLock=false; // extra-solaire colonisable par tous (la tech reste pour la colonie gratuite)
-    if(!aCol){const ok=!outerLock&&G.player.acLeft>=ac&&(G.player.res.materials||0)>=mat&&(G.player.res.energy||0)>=en;acts.innerHTML+=`<button class="npop-btn" ${ok?'':'disabled'} onclick="doColonize('${nodeId}');closePopup();render()">${t('noeud.coloniser','🏗 Coloniser')}<br><small>−${ac} ${t('commun.ac','AC')} −${mat}<i class=ri-materials></i> −${en}<i class=ri-energy></i>${outerLock?' · '+t('noeud.biosphere_requise','Biosphère requise'):''}</small></button>`;}
+    if(!aCol){const ok=!outerLock&&G.player.acLeft>=ac&&(G.player.res.materials||0)>=mat&&(G.player.res.energy||0)>=en;acts.innerHTML+=`<button class="npop-btn" ${ok?'':'disabled'} onclick="doColonize('${nodeId}');closePopup();render()">${t('noeud.coloniser','🏗️ Coloniser')}<br><small>−${ac} ${t('commun.ac','AC')} −${mat}<i class=ri-materials></i> −${en}<i class=ri-energy></i>${outerLock?' · '+t('noeud.biosphere_requise','Biosphère requise'):''}</small></button>`;}
     else if(!accord){
       const _accAI=aColAI;
       const _atWar=_accAI&&_warBetween(_moiId(),_accAI.civ.id);
@@ -14468,7 +14593,7 @@ function showNodePopup(nodeId){
       acts.innerHTML+=`<button class="npop-btn" ${accordOk?'':'disabled'} onclick="showAccordInfo('${nodeId}')">${t('noeud.accord_btn','🤝 Accord Commercial')}<br><small>${_accTitle}</small></button>`;
       const tc=2;const _cA=coutAssautAC(G.player,nodeId);const _dA=detailCoutAssaut(G.player,nodeId);
       const atkOk=G.player.acLeft>=_cA&&G.player.forceTokens>=tc;
-      acts.innerHTML+=`<button class="npop-btn" style="border-color:#9a1a1a;color:#ff8888" ${atkOk?'':'disabled'} onclick="attackColony('${nodeId}')">${t('noeud.attaquer','💥 Attaquer')}<br><small>${_cA}${t('commun.ac','AC')} -${tc}⚔${_dA.jours!==null?(' · '+t('noeud.jours_voyage','{j} j de voyage',{j:_dA.jours})):''}${_dA.rabais?' 🌀':''} — ${t('noeud.declenche_guerre','DÉCLENCHE GUERRE')}</small></button>`;
+      acts.innerHTML+=`<button class="npop-btn" style="border-color:#9a1a1a;color:#ff8888" ${atkOk?'':'disabled'} onclick="attackColony('${nodeId}')">${t('noeud.attaquer','💥 Attaquer')}<br><small>${_cA}${t('commun.ac','AC')} -${tc}⚔️${_dA.jours!==null?(' · '+t('noeud.jours_voyage','{j} j de voyage',{j:_dA.jours})):''}${_dA.rabais?' 🌀':''} — ${t('noeud.declenche_guerre','DÉCLENCHE GUERRE')}</small></button>`;
     }else{
       // Accord actif : commerce & transit autorisés, PAS de colonisation partagée. On peut rompre l'accord pour attaquer.
       const tc=2;const _cA=coutAssautAC(G.player,nodeId);const _dA=detailCoutAssaut(G.player,nodeId);
@@ -14477,7 +14602,7 @@ function showNodePopup(nodeId){
       /* ⚠️ CE BOUTON ÉTAIT ÉCRIT DEUX FOIS. Le second, sous un `if(!G.warState)`, appelait exactement
          la même fonction avec un libellé différent : hors guerre, la fenêtre affichait donc DEUX
          boutons « Rompre l'accord & Attaquer » l'un sous l'autre. Un seul suffit, et il dit tout. */
-      acts.innerHTML+=`<button class="npop-btn" style="border-color:#9a1a1a;color:#ff8888" ${atkOk?'':'disabled'} onclick="breakAccordAndAttack('${nodeId}')">${t('noeud.rompre_attaquer',"💥 Rompre l'accord & Attaquer")}<br><small>${_cA}${t('commun.ac','AC')} -${tc}⚔${_dA.jours!==null?(' · '+_dA.jours+' j'):''} — ${t('noeud.revoque_guerre',"révoque l'accord, DÉCLENCHE LA GUERRE")}</small></button>`;
+      acts.innerHTML+=`<button class="npop-btn" style="border-color:#9a1a1a;color:#ff8888" ${atkOk?'':'disabled'} onclick="breakAccordAndAttack('${nodeId}')">${t('noeud.rompre_attaquer',"💥 Rompre l'accord & Attaquer")}<br><small>${_cA}${t('commun.ac','AC')} -${tc}⚔️${_dA.jours!==null?(' · '+_dA.jours+' j'):''} — ${t('noeud.revoque_guerre',"révoque l'accord, DÉCLENCHE LA GUERRE")}</small></button>`;
     }
   }
   if(pCol&&pCol.level<node.maxLv&&!pCol.noUpgrade){
@@ -14485,9 +14610,9 @@ function showNodePopup(nodeId){
     const _uac=1;const _umat=3;const _uen=1;
     const _uok=G.player.acLeft>=_uac&&(G.player.res.materials||0)>=_umat&&(G.player.res.energy||0)>=_uen&&(G.player.res.science||0)>=1;
     const _ubonus=nodeId==='callisto'?'+2<i class=ri-morale></i>':ATTRACTIVE_COLS.includes(nodeId)?'+1<i class=ri-morale></i>':'';
-    acts.innerHTML+=`<button class="npop-btn" ${_uok?'':'disabled'} onclick="doUpgrade('${nodeId}');closePopup();render()">${t('noeud.niveau','⬆ Niveau {n}',{n:_tLv})}<br><small>−${_uac} ${t('commun.ac','AC')} −${_umat}<i class=ri-materials></i> −${_uen}<i class=ri-energy></i> −1<i class=ri-science></i>${_ubonus&&_tLv===2?' '+_ubonus:''}</small></button>`;
+    acts.innerHTML+=`<button class="npop-btn" ${_uok?'':'disabled'} onclick="doUpgrade('${nodeId}');closePopup();render()">${t('noeud.niveau','⬆️ Niveau {n}',{n:_tLv})}<br><small>−${_uac} ${t('commun.ac','AC')} −${_umat}<i class=ri-materials></i> −${_uen}<i class=ri-energy></i> −1<i class=ri-science></i>${_ubonus&&_tLv===2?' '+_ubonus:''}</small></button>`;
   }
-  if(pCol||nodeId===G.player.civ.home){const _rc=routeCost(G.player);const ac=_rc.ac,mat=_rc.mat,force=_rc.force||0;for(const adj of node.conn){const already=G.player.routes.find(r=>(r.from===nodeId&&r.to===adj)||(r.from===adj&&r.to===nodeId));if(!already){const ok=G.player.acLeft>=ac&&(G.player.res.materials||0)>=mat&&G.player.forceTokens>=force;acts.innerHTML+=`<button class="npop-btn" ${ok?'':'disabled'} onclick="doEstablishRoute('${nodeId}','${adj}');closePopup();render()">🛤 → ${NODES[adj].emoji} ${NODES[adj].name}<br><small>−${ac} ${t('commun.ac','AC')} −${mat}<i class=ri-materials></i>${force>0?' −'+force+' '+t('commun.jetons','jeton(s)'):''}</small></button>`;}}}
+  if(pCol||nodeId===G.player.civ.home){const _rc=routeCost(G.player);const ac=_rc.ac,mat=_rc.mat,force=_rc.force||0;for(const adj of node.conn){const already=G.player.routes.find(r=>(r.from===nodeId&&r.to===adj)||(r.from===adj&&r.to===nodeId));if(!already){const ok=G.player.acLeft>=ac&&(G.player.res.materials||0)>=mat&&G.player.forceTokens>=force;acts.innerHTML+=`<button class="npop-btn" ${ok?'':'disabled'} onclick="doEstablishRoute('${nodeId}','${adj}');closePopup();render()">🛤️ → ${NODES[adj].emoji} ${NODES[adj].name}<br><small>−${ac} ${t('commun.ac','AC')} −${mat}<i class=ri-materials></i>${force>0?' −'+force+' '+t('commun.jetons','jeton(s)'):''}</small></button>`;}}}
   // Raid contextuel : disponible sur toute colonie ennemie présente sur ce nœud
   if(aCol&&aColAI&&G.phase==='actions'){
     const _rtc=2;
@@ -14600,7 +14725,7 @@ function addAction(emoji,name,acPaid,resPaid,gainDesc){plafonnerMoral();if(!G.tu
 const _nomFr=_i18nTexte(name),_gainFr=_i18nTexte(gainDesc);
 const _entry={emoji,name:_nomFr,acPaid:acPaid||0,resPaid:resPaid||{},gainDesc:_gainFr||''};
 _memoJChamp(_entry,'name',name);_memoJChamp(_entry,'gainDesc',gainDesc);
-G.turnActions.push(_entry);if(G.player){if(!G.player._turnActions)G.player._turnActions=[];G.player._turnActions.push(_entry);}/* journal par nation : indispensable au bilan en multijoueur */if(G){G._scStuckTries=0;try{G._journal=G._journal||[];G._journal.push({turn:G.turn||0,nat:(G.player&&G.player.civ&&G.player.civ.name)||'Toi',name:_nomFr,ac:acPaid||0,cost:_normCost(resPaid),gain:_riToText(_gainFr),war:_isWarAct(_nomFr),auto:false});}catch(e){}}showToast(emoji,_nomFr,acPaid,resPaid,_gainFr);/* ⚠️ LA ROTATION SE COMPTE EN ACTIONS DÉPENSÉES, PAS EN COUPS (Marc, 20/09). Deux règles ici :
+G.turnActions.push(_entry);/* « ↳ paie » sous l'en-tête de l'action du joueur — même ligne que pour l'ordinateur (22/09). */try{if(G._enteteAction&&!G._entetePayee&&G._enteteAction.civ===(G.player&&G.player.civ&&G.player.civ.id)){const _pp=[];for(const[r,a]of Object.entries(resPaid||{}))if(a>0)_pp.push('−'+a+rEmoji(r));addLogSous(J('journal.paie','   ↳ {emoji} {nation} paie : {v}{suffixe}',{emoji:G.player.civ.emoji,nation:_i18nRef(G.player.civ,'name'),v:((acPaid||0)?J('journal.ac_3',"{acp} AC",{acp:acPaid}):J('journal.0_ac',"0 AC")),suffixe:(_pp.length?J('journal.suffixe_parts',' {v}',{v:_pp.join(' ')}):J('journal.aucune_ressource',' (aucune ressource)'))}),'dim');}}catch(e){}if(G.player){if(!G.player._turnActions)G.player._turnActions=[];G.player._turnActions.push(_entry);}/* journal par nation : indispensable au bilan en multijoueur */if(G){G._scStuckTries=0;try{G._journal=G._journal||[];G._journal.push({turn:G.turn||0,nat:(G.player&&G.player.civ&&G.player.civ.name)||'Toi',name:_nomFr,ac:acPaid||0,cost:_normCost(resPaid),gain:_riToText(_gainFr),war:_isWarAct(_nomFr),auto:false});}catch(e){}}showToast(emoji,_nomFr,acPaid,resPaid,_gainFr);/* ⚠️ LA ROTATION SE COMPTE EN ACTIONS DÉPENSÉES, PAS EN COUPS (Marc, 20/09). Deux règles ici :
    · un coup À 0 AC — le POUVOIR NATIONAL — ne rend pas la main. Il ne coûte pas d'action, il ne
      doit pas en coûter une dans le tour de table. L'ordinateur enchaînait déjà pouvoir + action
      dans le même passage (`doAITurn`), le joueur non : sa partie 2A5F, tour 6, montre son
@@ -14623,14 +14748,23 @@ function showDiscoveryModal(disc){
 }
 function dismissDiscovery(){
   document.getElementById('discovery-modal').classList.add('hidden');
+  appliquerDecouverte();
+  render();
+}
+/* La tuile en attente s'applique à la nation qui a colonisé (`civ` rangé dans la tuile). Sans ce
+   champ (sauvegarde d'avant le 22/09), repli sur `G.player`, le comportement d'origine. */
+function appliquerDecouverte(){
   if(G._decouverteEnAttente){
     const{disc,nodeId}=G._decouverteEnAttente;G._decouverteDerniere=G._decouverteEnAttente;G._decouverteEnAttente=null;
-    const p=G.player;
+    const _cid=G._decouverteDerniere.civ;
+    const p=(_cid&&allPlayers().find(x=>x&&x.civ&&x.civ.id===_cid))||G.player;
+    const _local=(p===G.player&&!p._isAI);
     if(disc.res)for(const[r,a]of Object.entries(disc.res)){const caps=getResCapFor(p);p.res[r]=Math.min(caps[r]||10,(p.res[r]||0)+a);}
     if(disc.rGain)for(const[r,a]of Object.entries(disc.rGain))p.rpt[r]=(p.rpt[r]||0)+a;
     if(disc.force)p.forceTokens+=disc.force;
     if(disc.vp)gagnerVP(p,disc.vp,J('vp.decouverte','Découverte : {nom}',{nom:_i18nRef(disc,'name')}));
-    addLog(J('journal.decouverte','🗺️ Découverte : {nom} — {v}',{nom:_i18nRef(disc,'name'),v:_i18nRef(disc,'desc')}),'gold');
+    logAuteur(p,()=>addLog(J('journal.decouverte','🗺️ Découverte : {nom} — {v}',{nom:_i18nRef(disc,'name'),v:_i18nRef(disc,'desc')}),'gold'));
+    if(!_local)return;   // l'ordinateur : ni fenêtre, ni confirmation à armer
     /* ═══ LE COLONISATEUR VOIT CE QU'IL A GAGNÉ (Marc, 21/09) ═══
        En ligne, la fenêtre « Découverte » n'existe que dans le DOM factice du serveur : `_postAction`
        la referme aussitôt et le joueur ne voyait jamais ses gains. On lui envoie une fenêtre à LUI
@@ -14639,18 +14773,17 @@ function dismissDiscovery(){
     if(typeof _decisionActive==='function'&&_decisionActive()&&typeof notifyNationHit==='function'){
       const _nd0=NODES[nodeId]||{}, _ea=G._decouverteDerniere||{};
       const _l=[];
-      _l.push(J('avis.colo_etat','🏗️ {noeud} Nv.1 — {v}',{noeud:_i18nRef(_nd0,'name'),v:(_ea.connected?J('journal.connectee'," ✓ connectée"):J('journal.non_connectee'," ✗ non connectée"))}));
+      _l.push(J('avis.colo_etat','🚩 {noeud} Nv.1 — {v}',{noeud:_i18nRef(_nd0,'name'),v:(_ea.connected?J('journal.connectee'," ✓ connectée"):J('journal.non_connectee'," ✗ non connectée"))}));
       if(_nd0.baseVP)_l.push(J('avis.colo_vp','+{n} VP (colonie)',{n:_nd0.baseVP}));
       _l.push(_ea.moral?J('avis.colo_moral','+1<i class=ri-morale></i> (conditions de vie)'):J('avis.colo_moral_nul','<i class=ri-morale></i> net 0 (colonie éloignée)'));
       _l.push(J('avis.colo_decouverte','🗺️ Découverte : <b>{nom}</b> — {v}',{nom:_i18nRef(disc,'name'),v:_i18nRef(disc,'desc')}));
-      notifyNationHit(p,J('avis.colo_titre','🏗️ Colonisation réussie'),_l.reduce((a,b)=>a===null?b:J('commun.joint','{a}{sep}{b}',{a:a,sep:'<br>',b:b}),null));
+      notifyNationHit(p,J('avis.colo_titre','🚩 Colonisation réussie'),_l.reduce((a,b)=>a===null?b:J('commun.joint','{a}{sep}{b}',{a:a,sep:'<br>',b:b}),null),'colonisation');
     }
     // Colonisation terminée (découverte fermée) → popup de confirmation annulable
     const _nd=NODES[nodeId];const _cg=[];
     if(_nd&&_nd.baseVP)_cg.push({kind:'vp',val:_nd.baseVP});
     scArmConfirm(t('confirme.ligne','🏗️ {v}',{v:(_nd&&_i18nRef(_nd,'name')||J('confirme.colonie',"Colonie"))}),_cg);
   }
-  render();
 }
 function showWarModal(title,body,result,adverseId,owner){
   if(typeof G!=='undefined'&&G&&G._simulationIA)return;   // coup simulé (tacticien) : rien à l'écran — voir `simulerCoup`
@@ -14692,7 +14825,9 @@ function showWarModal(title,body,result,adverseId,owner){
       civs:[_moi,_adv].filter(Boolean), ownerName:(_own&&_own.civ)?(_own.civ.emoji+' '+_own.civ.name):''}, 'stWarResultFerme');
     return;
   }
+  if(_spectateurSolo()&&!_warOf(G.player.civ.id)){ setTimeout(dismissWarModal,0); return; }   // éliminé : les guerres des AUTRES se lisent au journal (la sienne, qui vient de le faire tomber, s'affiche encore)
   document.getElementById('wm-title').textContent=title;
+  { const _f=document.getElementById('wm-fen'); if(_f&&_f.classList){ _f.classList.remove('fen-peace'); _f.classList.add('fen-war'); } }   // fenêtre partagée avec l'avis de colonisation (ton vert)
   /* Blason (14/09) : médaillon + nom de l'adversaire. `adverseId` explicite, sinon l'ennemi de guerre courant. */
   { let _adv=(adverseId!==undefined)?adverseId:null; if(_adv===null){ try{ _adv=guerreAdverseId(); }catch(e){ _adv=null; } }
     const _n=_adv?allPlayers().find(function(x){return x&&x.civ&&x.civ.id===_adv;}):null;
@@ -14953,7 +15088,7 @@ function rejectPeace(){
   // La suite de la paix est un NOM : on la met de côté au lieu de la « garder sous le coude » dans
   // une fermeture — le bouton « Annuler » doit pouvoir y revenir même après un rechargement.
   const suite=fluxDonnees().suitePaix; fluxDonnees().suitePaix=null;
-  if(!ai||!cols.length){addLog(J('journal.poursuis_guerre_aucune_colonie_ennemie_a','⚔️ Tu poursuis la guerre (aucune colonie ennemie à assaillir ce tour).'),'red');if(suite)fluxAppeler(suite,'WAR');return;}
+  if(!ai||!cols.length){addLog(J('journal.poursuis_guerre_aucune_colonie_ennemie_a','⚔️ poursuit la guerre (aucune colonie ennemie à assaillir ce tour).'),'red');if(suite)fluxAppeler(suite,'WAR');return;}
   G._warContinueSuite=suite;
   _showAssaultPicker(ai,cols);
 }
@@ -14970,7 +15105,7 @@ function _showAssaultPicker(ai,cols){
 function _warContinueNoAttack(){
   document.getElementById('war-combat-modal').classList.add('hidden');
   const suite=G._warContinueSuite;G._warContinueSuite=null;
-  addLog(J('journal.poursuis_guerre_sans_assaut_tour','🛡️ Tu poursuis la guerre sans assaut ce tour.'),'dim');
+  addLog(J('journal.poursuis_guerre_sans_assaut_tour','🛡️ poursuit la guerre sans assaut ce tour.'),'dim');
   if(suite)fluxAppeler(suite,'WAR');
 }
 function _warContinueAssault(nodeId){
@@ -15197,9 +15332,9 @@ function cibleChangeeDeMains(nat,nodeId){
     const ennemi=allPlayers().find(n=>n&&n.civ&&n.civ.id===ennemiId); if(!ennemi)return null;
     if((ennemi.colonies||[]).some(c=>c.nodeId===nodeId))return null;          // toujours à lui : rien à dire
     const nouveau=allPlayers().find(n=>n&&n!==ennemi&&(n.colonies||[]).some(c=>c.nodeId===nodeId));
-    const nom=(NODES[nodeId]&&NODES[nodeId].name)||nodeId;
+    const nom=NODES[nodeId]?_i18nRef(NODES[nodeId],'name'):nodeId;   // référence (journal relu dans la langue du lecteur)
     const msg=nouveau
-      ?J('journal.cible_changee_de_mains','⚠️ {noeud} a changé de mains entre ton choix et ton assaut : {emoji} {nation} l\'a prise. Choisis une autre cible.',{noeud:nom,emoji:nouveau.civ.emoji,nation:_i18nRef(nouveau.civ,'name')})
+      ?J('journal.cible_changee_de_mains','⚠️ {noeud} a changé de mains entre le choix et l\'assaut : {emoji} {nation} l\'a prise. Il faut choisir une autre cible.',{noeud:nom,emoji:nouveau.civ.emoji,nation:_i18nRef(nouveau.civ,'name')})
       :J('journal.cible_plus_a_ennemi','⚠️ {noeud} n\'appartient plus à {emoji} {nation}. Choisis une autre cible.',{noeud:nom,emoji:ennemi.civ.emoji,nation:_i18nRef(ennemi.civ,'name')});
     if(nat._cibleChangeeDite!==nodeId+'@'+G.turn){ nat._cibleChangeeDite=nodeId+'@'+G.turn; addLog(msg,'red'); }
     return String(msg);   // affiché tel quel dans la fenêtre de guerre (le ⚠️ est dans le texte)
@@ -15290,7 +15425,7 @@ function warAttackRoute(idx){
   const r=warAtkAi?warAtkAi.routes[idx]:null;
   if(!r){document.getElementById('war-combat-modal').classList.add('hidden');const _s=_combatSuiteLire();if(_s)_s(0);return;}
   const prot=(r.tokens||0)>=1;const need=prot?2:1;
-  if(engageableTokens(G.player)<need){addLog(J('journal.te_faut_jeton_force_engageable_route_2','⚠️ Il te faut {need} jeton{v} Force engageable{v2} pour cette route{v3}.',{need:need,v:(need>1?'s':''),v2:(need>1?'s':''),v3:(prot?J('journal.protegee'," (protégée)"):'')}),'red');return;} // on laisse rechoisir
+  if(engageableTokens(G.player)<need){addLog(J('journal.te_faut_jeton_force_engageable_route_2','⚠️ Il faut {need} jeton{v} Force engageable{v2} pour cette route{v3}.',{need:need,v:(need>1?'s':''),v2:(need>1?'s':''),v3:(prot?J('journal.protegee'," (protégée)"):'')}),'red');return;} // on laisse rechoisir
   G._pendingRouteAtk={ai:warAtkAi, route:r, prot:prot};
   document.getElementById('war-combat-modal').classList.add('hidden');
   showRouteCaptureModal(r, prot);
@@ -15344,7 +15479,7 @@ function routeCaptureChoice(capture){
     if(capture){if(!p.routes)p.routes=[];p.routes.push({from:r.from,to:r.to,tokens:0});updateConnections(p);} // aucune perte : le jeton reste en réserve
   }
   const rn=(NODES[r.from]?.name||r.from)+'→'+(NODES[r.to]?.name||r.to);
-  addLog(J('journal.ligne_8','{v}{rn}{jetons}',{v:(capture?J('journal.captures_route',"🎖️ Tu captures la route "):J('journal.detruis_route',"💥 Tu détruis la route ")),rn:rn,jetons:(ctx.prot?J('journal.defenseur_1_jeton_1_tiens_recuperation'," — défenseur −1 jeton, 1 des tiens en récupération."):J('journal.sans_cout'," — sans coût."))}),'gold');
+  addLog(J('journal.ligne_8','{v}{rn}{jetons}',{v:(capture?J('journal.captures_route','🎖️ capture la route '):J('journal.detruis_route','💥 détruit la route ')),rn:rn,jetons:(ctx.prot?J('journal.defenseur_1_jeton_1_tiens_recuperation',' — défenseur −1 jeton, 1 jeton de l\'attaquant en récupération.'):J('journal.sans_cout'," — sans coût."))}),'gold');
   // Contexte GUERRE POPULAIRE FORCÉE : on apaise la tension et on reprend le flux de guerre forcée.
   if(ctx.mode==='forced'){
     if(ai)halveTensions('player',ai.civ.id);
@@ -15614,6 +15749,7 @@ function showEOTModal(maint,revs,warCombat,warEnd){
     return;
   }
   if(typeof _ilHide==='function')_ilHide();
+  if(_spectateurSolo()){ _spectateurBandeau(); setTimeout(continueAfterEOT,0); return; }   // éliminé : pas de bilan à lire
   document.getElementById('eot-title').textContent=t('bilan.titre','📊 Bilan du Tour {n}',{n:G.turn});
   document.getElementById('eot-body').innerHTML=buildEOTBody(maint,revs,warCombat,warEnd);
   document.getElementById('eot-modal').classList.remove('hidden');
@@ -15624,6 +15760,7 @@ function showEventModal(ev,msg){
     _emitNotice('event_result', null, {event:{id:ev.id,name:_jRef(ev,'name'),emoji:ev.emoji,type:ev.type}, msg}, '_evSuiteJouer');   // `msg` J ou chaîne : `_i18nAplatir` fait voyager la clé
     return;
   }
+  if(_spectateurSolo()){ setTimeout(dismissEventModal,0); return; }
   msg=_i18nTexte(msg)||'';   // J (résolution d'événement) ou {k,fr,p} relu d'une sauvegarde → texte dans la langue du lecteur
   const typeColors={competition:'#9a2222',menace:'#9a5a22',opportunite:'#226a42'};const typeBg={competition:'#3a0808',menace:'#3a1a08',opportunite:'#083a18'};const typeLabels={competition:t('evt.competition','Compétition'),menace:t('evt.menace','Menace'),opportunite:t('evt.opportunite','Opportunité')};
   const card=document.getElementById('evm-card');card.className='fen fen-event evt-card '+(ev.type||'');card.style.borderColor='';   // Blason : la couleur vient de la classe de type
@@ -15750,6 +15887,7 @@ function showEventAnnounce(ev,onDone){
     _emitNotice('event_announce', null, {event:{id:ev.id,name:_jRef(ev,'name'),emoji:ev.emoji,type:ev.type,preview:(ev.preview?_jRef(ev,'preview'):'')}}, 'stAnnonceLue');
     return;
   }
+  if(_spectateurSolo()){ _eventAnnounceCb=(typeof onDone==='function')?onDone:null; setTimeout(dismissEventAnnounce,0); return; }
   const typeColors={competition:'#cc4444',menace:'#cc8844',opportunite:'#44cc88'};
   const typeLabels={competition:'⚔️ '+t('evt.competition','Compétition'),menace:'⚠️ '+t('evt.menace','Menace'),opportunite:'✨ '+t('evt.opportunite','Opportunité')};
   document.getElementById('ea-emoji').textContent=ev.emoji;
@@ -15880,6 +16018,45 @@ function logAuteur(qui, fn){
   _auteurLog=(qui&&qui.civ&&qui.civ.id)?qui.civ.id:(typeof qui==='string'?qui:null);
   try{ return fn(); } finally { _auteurLog=av; }
 }
+function _sujetDuModele(fr,p){
+  try{
+    if(typeof fr!=='string'||!p||!/^\s*(?:[^\p{L}\p{N}\s{<]+\s+)?\{emoji\}\s*\{nation\}/u.test(fr))return null;
+    const v=p.nation;
+    if(typeof v==='string'){
+      const m=/^@nation\.([a-z]+)\./.exec(v); if(m)return m[1];
+      const n=allPlayers().find(x=>x&&x.civ&&(x.civ.name===v||x.civ.id===v)); if(n)return n.civ.id;
+    }
+    const n2=allPlayers().find(x=>x&&x.civ&&x.civ.emoji===p.emoji); return n2?n2.civ.id:null;
+  }catch(e){ return null; }
+}
+/* ═══ CHAQUE LIGNE PORTE LE NOM DE SA NATION (Marc, 22/09) ═══
+   « Toutes les éléments nation des listes doivent toujours être présentés de la même manière :
+   Martien : acquiert IA défensive… Il faut que je puisse chercher facilement par couleur et avec le
+   nom de ma nation ; ce qui me concerne ne doit pas être sans label de nation. »
+   Une ligne écrite par une nation commence donc TOUJOURS par « {emoji} {Nation} — ». Si elle la
+   nomme déjà en tête (« 🤖 Terriens achète… », « ⚔️ 🟠 Jupitériens frappe… »), on remet la nation
+   devant et le symbole après ; sinon on l'ajoute. Les lignes du système (tirage, initiative,
+   événement) et les sous-lignes « ↳ » restent telles quelles.
+   Fait AU RENDU, dans la langue du lecteur (`nomDe`), à un seul endroit pour l'écran, le rapport
+   et le courriel : le message rangé dans l'état ne change pas. */
+var _etiquetteRe={};   // expressions compilées une fois par nation et par langue (le journal est re-rendu à chaque ligne)
+function journalEtiqueter(e,texte,nomDe){
+  try{
+    let s=String(texte==null?'':texte);
+    if(!e||typeof e!=='object'||!e.civ)return s;
+    if(/^\s*↳/.test(s))return s;
+    const nat=allPlayers().find(x=>x&&x.civ&&x.civ.id===e.civ); if(!nat)return s;
+    const em=nat.civ.emoji||'', nom=(typeof nomDe==='function'?nomDe(nat.civ):t('nation.'+nat.civ.id+'.nom',nat.civ.name))||nat.civ.name;
+    s=s.replace(/^\s+/,'').replace(/^🤖\s*/u,'');
+    const _ck=em+'|'+nom;
+    let re=_etiquetteRe[_ck];
+    if(!re){ const esc=x=>String(x).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      re=_etiquetteRe[_ck]=new RegExp('^((?:[^\\p{L}\\p{N}\\s<]+\\s+)?)(?:'+esc(em)+'\\s*)?'+esc(nom)+'(?:\\s*[—:]\\s*|\\s+|$)','u'); }
+    const m=s.match(re);
+    if(m){ const sym=m[1].trim(); return em+' '+nom+' — '+((sym&&sym!==em)?sym+' ':'')+s.slice(m[0].length); }
+    return em+' '+nom+' — '+s;
+  }catch(err){ return String(texte==null?'':texte); }
+}
 function _logCivCourante(){
   if(_auteurLog!==null) return _auteurLog;
   try{ return (G&&G.player&&G.player.civ)?G.player.civ.id:null; }catch(e){ return null; }
@@ -15917,7 +16094,7 @@ function _journalHTML(log){
      donc elle la précède ici : on la garde en attente et on la range SOUS l'action qui suit. */
   for(const e of log){
     if(!e) continue;
-    const msg=_logTexte(e);
+    const msg=journalEtiqueter(e,_logTexte(e));
     const cls=(typeof e==='object'&&e.cls)?e.cls:'';
     if(/^\s*↳/.test(msg)){ enAttente.push({e,msg,cls}); continue; }
     const turn=(typeof e==='object'&&e.turn!==undefined&&e.turn!==null)?e.turn:null;
@@ -15927,6 +16104,29 @@ function _journalHTML(log){
   }
   while(enAttente.length){ const s=enAttente.pop(); out+=ligne(s.e,s.msg,s.cls,true); }
   return out;
+}
+/* ═══ L'ACTION D'ABORD, SES EFFETS ENSUITE (Marc, 22/09) ═══
+   « D'abord le Terrien colonise, on doit donc voir ça en bas du journal, puis ce qu'il a gagné, puis
+   que la colonie n'est pas connectée. » Les lignes d'une action s'écrivaient dans l'ordre où la règle
+   les produisait : conditions de vie, colonie, PUIS « 🤖 Terriens colonise », PUIS « ↳ paie ». Lu
+   dans l'ordre, on apprenait les gains avant l'action.
+   Une action s'ouvre donc par son EN-TÊTE (`logEntete`, écrit par la règle elle-même dès qu'elle a
+   payé, pour toutes les nations), et son coût « ↳ paie » se range JUSTE SOUS l'en-tête
+   (`addLogSous`), quel que soit le moment où il est connu. Les effets suivent. */
+function logEntete(msg,cls){
+  addLog(msg,cls);
+  if(!G||G._simulationIA||!Array.isArray(G.log)||!G.log[0])return;
+  G.log[0].entete=true; G._enteteAction=G.log[0]; G._entetePayee=false;
+}
+function addLogSous(msg,cls){
+  const h=(G&&!G._entetePayee)?G._enteteAction:null;
+  addLog(msg,cls);
+  if(!h||!G||G._simulationIA||!Array.isArray(G.log))return;
+  if(!G.log[0]||G.log[0].civ!==h.civ||h.turn!==G.turn)return;   // l'en-tête d'une AUTRE nation (ou d'un autre tour) : on ne s'y range pas
+  G._entetePayee=true;
+  const i=G.log.indexOf(h); if(i<=1)return;          // l'en-tête est la ligne d'avant : rien à déplacer
+  const e=G.log.shift(); G.log.splice(i-1,0,e);
+  try{ const el=(typeof _aUnEcran==='function'&&!_aUnEcran())?null:document.getElementById('log-content'); if(el)el.innerHTML=_journalHTML(G.log); }catch(err){}
 }
 function addLog(msg,cls=''){
   /* Pendant une simulation de l'IA, le moteur joue des coups qui n'auront pas lieu : les journaliser
@@ -15943,10 +16143,18 @@ function addLog(msg,cls=''){
      journal ; les ajouter ici plutôt qu'aux ~600 appels d'`addLog` garantit qu'aucune ligne n'y
      échappe — y compris celles qu'on écrira demain. */
   /* Un message `J(...)` garde sa clé et ses paramètres à côté du texte (voir `J`). */
-  var _k=null,_p=null; if(msg&&typeof msg==='object'&&msg.k){ _k=msg.k; _p=msg.p||null; msg=t(msg.k,msg.fr,msg.p); }
+  var _k=null,_p=null,_fr=null; if(msg&&typeof msg==='object'&&msg.k){ _k=msg.k; _p=msg.p||null; _fr=msg.fr; msg=t(msg.k,msg.fr,msg.p); }
   const _e={msg,cls,civ:_logCivCourante(),turn:(G&&G.turn)||0}; if(_k){ _e.k=_k; if(_p)_e.p=_p; }
+  /* LE SUJET DÉCLARÉ PAR LE MESSAGE L'EMPORTE SUR L'AUTEUR SUPPOSÉ (partie 29BD, 22/09).
+     « 🏭 {emoji} {nation} surproduit », « ⚓ {emoji} {nation} déploie son Supercroiseur » : quand le
+     modèle COMMENCE par une nation, c'est d'elle que parle la ligne — le modèle le dit, on ne le
+     devine pas. L'auteur par défaut (`G.player`, ou le dernier joueur activé en ligne) rangeait ces
+     lignes chez Marc, et l'étiquette de nation ci-dessous les aurait signées de son nom. */
+  { const _suj=_sujetDuModele(_fr,_p); if(_suj)_e.civ=_suj; }
   G.log.unshift(_e);
-  const el=document.getElementById('log-content');
+  /* Sans écran (serveur, bancs), le journal n'est pas redessiné à chaque ligne : c'était un rendu
+     COMPLET par ligne écrite, soit un coût quadratique (un banc de 3000 tours ne finissait plus). */
+  const el=(typeof _aUnEcran==='function'&&!_aUnEcran())?null:document.getElementById('log-content');
   /* Chaque ligne affiche discrètement son tour et sa nation. Le journal en jeu devient lisible
      comme un compte rendu de partie : « T3 Martiens │ … ». Même information que dans /debug et
      dans le rapport copié — un seul format, trois endroits. */
@@ -16026,7 +16234,7 @@ function _scShowStuckModal(){
         '<div style="font-size:1.05em;font-weight:700;color:#ffd0d0;margin-bottom:10px">'+t('bloque.titre','⚠️ Tu sembles bloqué')+'</div>'+
         '<div style="font-size:.9em;color:#c8d8f8;margin-bottom:18px;line-height:1.5">'+_txt+'</div>'+
         '<div style="display:flex;flex-direction:column;gap:9px">'+
-          '<button onclick="_scStuckPass()" style="padding:11px;background:#16401a;border:1px solid #2f6b34;color:#9ad89a;border-radius:9px;font-weight:700;cursor:pointer;font-size:.95em">'+t('bloque.passer','⏭ Passer mes actions et finir le tour')+'</button>'+
+          '<button onclick="_scStuckPass()" style="padding:11px;background:#16401a;border:1px solid #2f6b34;color:#9ad89a;border-radius:9px;font-weight:700;cursor:pointer;font-size:.95em">'+t('bloque.passer','⏭️ Passer mes actions et finir le tour')+'</button>'+
           '<button onclick="_scStuckRestart()" style="padding:11px;background:#4a1010;border:1px solid #c85050;color:#ffd0d0;border-radius:9px;font-weight:700;cursor:pointer;font-size:.95em">'+t('bloque.recommencer','↺ Recommencer la partie du début')+'</button>'+
           '<button onclick="_scStuckDismiss()" style="padding:8px;background:#14182e;border:1px solid #3a3a5a;color:#9898b8;border-radius:9px;cursor:pointer;font-size:.85em">'+t('bloque.fermer','Fermer (continuer à essayer)')+'</button>'+
         '</div>'+
@@ -16054,6 +16262,7 @@ function annoncerAuxTiers(a,b,title,body){
   try{
     for(const h of allPlayers()){
       if(!h||h===a||h===b||h._isAI!==false)continue;
+      if(estEliminee(h))continue;   // hors jeu : les nouvelles des autres ne le concernent plus
       notifyNationHit(h,title,body);
     }
   }catch(e){}
@@ -16069,13 +16278,24 @@ function annoncerPaixAuxTiers(a,b,detail){
   annoncerAuxTiers(a,b,J('avis.paix','🕊️ Paix : {nation} et {nation2}',{nation:_nomNation(a),nation2:_nomNation(b)}),
     J('avis.ont_fait_paix','<b>{nation}</b> et <b>{nation2}</b> ont fait la paix{v}.',{nation:_nomNation(a),nation2:_nomNation(b),v:(detail?J('avis.tiret_detail',' — {d}',{d:detail}):'')}));
 }
-function notifyNationHit(victim,title,body){
+/* Le nom d'une cible d'assaut (colonie ou route), en RÉFÉRENCES de nœuds : `target.name` est une
+   chaîne française figée à la sélection de la cible. */
+function _nomCible(target){
+  try{
+    if(target&&target.type==='colony'&&target.obj&&NODES[target.obj.nodeId])return _i18nRef(NODES[target.obj.nodeId],'name');
+    if(target&&target.type==='route'&&target.obj){ const r=target.obj; return (NODES[r.from]?_i18nRef(NODES[r.from],'name'):r.from)+'→'+(NODES[r.to]?_i18nRef(NODES[r.to],'name'):r.to); }
+  }catch(e){}
+  return (target&&target.name)||'';
+}
+/* `genre` (facultatif) : 'colonisation' pour une bonne nouvelle — la fenêtre prend alors le ton
+   vert de la paix, pas le médaillon ⚔️ et le bandeau « GUERRE » (Marc, 22/09). */
+function notifyNationHit(victim,title,body,genre){
   if(typeof G!=='undefined'&&G&&G._simulationIA)return;   // coup simulé (tacticien) : rien à l'écran — voir `simulerCoup`
   try{
     if(!victim)return;
     if(victim._isAI)return;                       // IA : pas de fenêtre, tout est déjà journalisé
     if(typeof _decisionActive==='function'&&_decisionActive()){
-      _emitNotice('raid_hit', victim, {title:title||t('fen.attaque','Attaque'), body:body||''}, 'stRien');   // suite nommée : une fermeture ne survit pas à une sauvegarde
+      _emitNotice('raid_hit', victim, {title:title||t('fen.attaque','Attaque'), body:body||'', genre:genre||null}, 'stRien');   // suite nommée : une fermeture ne survit pas à une sauvegarde
       return;
     }
     _notePlayerHit(_i18nTexte(title),_i18nTexte(body));                   // solo / local : comportement d'origine

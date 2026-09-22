@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-22 · v10.89';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-22 · v10.92';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -521,15 +521,19 @@ function showHitReal(pending){
   /* Cette fenêtre partage `#war-modal` avec le résultat de combat : sans cela elle gardait le médaillon
      et le nom du DERNIER combat (Martiens, puis Ceinturiens…) — l'un des « il me fait passer pour »
      de D538. Ici le titre dit tout : médaillon neutre, pas de nom. */
+  /* UNE COLONISATION N'EST PAS UNE ATTAQUE (Marc, 22/09) : même fenêtre, mais au ton vert de la paix,
+     médaillon 🚩 et bandeau « Colonisation ». La fenêtre est partagée : on remet le ton rouge sinon. */
+  const _colo=(o.genre==='colonisation');
+  try{ const f=document.getElementById('wm-fen'); if(f){ f.classList.toggle('fen-peace',_colo); f.classList.toggle('fen-war',!_colo); } }catch(e){}
   try{ const e=document.getElementById('wm-emoji'), nm=document.getElementById('wm-nation'), kk=document.getElementById('wm-kicker');
     /* Blason B : si le titre nomme la nation qui te frappe → « attaqué par NATION » ; sinon médaillon neutre. */
-    let n=null; try{ const G=scGetG(); const _tt=String(o.title||''); n=[G.player].concat(G.ais||[]).find(x=>x&&x.civ&&_tt.indexOf(x.civ.name)>=0&&x.civ.id!==STATE.myCiv)||null; }catch(e){}
-    if(e)e.textContent=n?n.civ.emoji:'⚔️'; if(nm)nm.textContent=n?n.civ.name:'';
-    if(kk){ kk.textContent=((((n?t('web.attaque','attaqué par'):'Guerre')))); kk.classList.toggle('fen-prep',!!n); } }catch(e){}
+    let n=null; if(!_colo){ try{ const G=scGetG(); const _tt=String(o.title||''); n=[G.player].concat(G.ais||[]).find(x=>x&&x.civ&&_tt.indexOf(x.civ.name)>=0&&x.civ.id!==STATE.myCiv)||null; }catch(e){} }
+    if(e)e.textContent=_colo?'🚩':(n?n.civ.emoji:'⚔️'); if(nm)nm.textContent=n?n.civ.name:'';
+    if(kk){ kk.textContent=_colo?t('web.colonisation','Colonisation'):(n?t('web.attaque','attaqué par'):t('ui.guerre','Guerre')); kk.classList.toggle('fen-prep',!!n); } }catch(e){}
   if(b)b.innerHTML=o.body||'';
   if(r)r.classList.add('hidden');
   const go=()=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide({}); };
-  const btn=m.querySelector('.war-btn'); if(btn){ btn.innerHTML='<span class="k">Compris</span>'; btn.onclick=go; }
+  const btn=m.querySelector('.war-btn'); if(btn){ btn.innerHTML='<span class="k">'+t('ui.compris','Compris')+'</span>'; btn.onclick=go; }
   m.classList.remove('hidden');
   return true;
 }
@@ -539,6 +543,7 @@ function showWarResultReal(pending){
   const m=document.getElementById('war-modal'); if(!m) return false;
   const _ti=document.getElementById('wm-title'), b=document.getElementById('wm-body'), r=document.getElementById('wm-result');
   if(_ti)_ti.textContent=o.title||'⚔️ Combat';
+  try{ const f=document.getElementById('wm-fen'); if(f){ f.classList.remove('fen-peace'); f.classList.add('fen-war'); } }catch(e){}   // la fenêtre a pu servir à une colonisation
   /* Blason (14/09) : l'adversaire en médaillon. `civs` = [propriétaire, adversaire] ; « Vu par X » si on
      est le tiers spectateur (préfixe ajouté par le serveur dans ownerName). */
   try{ const G=scGetG(); const me=(typeof myNation==='function'&&myNation())||G.player; const civs=o.civs||[];
@@ -546,7 +551,7 @@ function showWarResultReal(pending){
     const n=advId?[G.player].concat(G.ais||[]).find(x=>x&&x.civ&&x.civ.id===advId):null;
     const e=document.getElementById('wm-emoji'), nm=document.getElementById('wm-nation'), kk=document.getElementById('wm-kicker');
     if(e)e.textContent=n?n.civ.emoji:'⚔️'; if(nm)nm.textContent=n?((window._scPseudo&&window._scPseudo[n.civ.id])||n.civ.name):'';
-    if(kk){ kk.textContent=n?'contre':'Guerre'; kk.classList.toggle('fen-prep',!!n); } }catch(e){}
+    if(kk){ kk.textContent=n?t('web.contre','contre'):t('ui.guerre','Guerre'); kk.classList.toggle('fen-prep',!!n); } }catch(e){}
   if(b)b.innerHTML=o.body||'';
   if(r){ const res=o.result||null;
     // Même correctif que dans le puits de notices : ces phrases portent les icônes de ressources
@@ -1381,7 +1386,7 @@ function actionMenu(){
   const acLeft = me ? ' — '+me.acLeft+' AC' : '';
   const cols=listColonize(), rts=listRoutes(), techs=listTechs(), ups=listUpgrades();
   const btn=(id,label,n)=>t('web.ligne_9','<button class="opt" id="{id}"{v}>{label}{v2}</button>',{id:id,v:(n?'':' disabled style="opacity:.45"'),label:label,v2:(n?' <span class="muted">('+n+' choix)</span>':t('web.aucune_cible',' <span class="muted">(aucune cible)</span>'))});
-  decisionPanel(t('web.tour_ia_joue_coup_moi_passer_fin_ma_manc','<h2>🎮 Ton tour{ac}</h2>\n    {v}\n    {v2}\n    {v3}\n    {v4}\n    <button class="opt" id="sc-auto">🤖 L\'IA joue ce coup pour moi</button>\n    <button class="opt" id="sc-pass">⏭ Passer (fin de ma manche)</button>\n    <div class="muted" style="margin-top:6px">Ce menu est un secours : le mieux est de jouer directement sur le plateau (coloniser, routes, techs, gouvernement, raid, attaque, pouvoir — tout est branché). 1 action = la main passe, puis revient à toi s\'il te reste des AC.</div>',{ac:acLeft,v:btn('sc-a-col','🏗 Coloniser',cols.length),v2:btn('sc-a-rte','🛤 Route',rts.length),v3:btn('sc-a-tech','🔬 Acheter une tech',techs.length),v4:btn('sc-a-up','⬆️ Améliorer une colonie',ups.length)}));
+  decisionPanel(t('web.tour_ia_joue_coup_moi_passer_fin_ma_manc','<h2>🎮 Ton tour{ac}</h2>\n    {v}\n    {v2}\n    {v3}\n    {v4}\n    <button class="opt" id="sc-auto">🤖 L\'IA joue ce coup pour moi</button>\n    <button class="opt" id="sc-pass">⏭️ Passer (fin de ma manche)</button>\n    <div class="muted" style="margin-top:6px">Ce menu est un secours : le mieux est de jouer directement sur le plateau (coloniser, routes, techs, gouvernement, raid, attaque, pouvoir — tout est branché). 1 action = la main passe, puis revient à toi s\'il te reste des AC.</div>',{ac:acLeft,v:btn('sc-a-col','🏗️ Coloniser',cols.length),v2:btn('sc-a-rte','🛤️ Route',rts.length),v3:btn('sc-a-tech','🔬 Acheter une tech',techs.length),v4:btn('sc-a-up','⬆️ Améliorer une colonie',ups.length)}));
   const sub=(items, mk)=>{ // sous-menu générique
     decisionPanel(t('web.choisis_retour','<h2>Choisis</h2>{v}<button class="opt" id="sc-back">↩ Retour</button>',{v:items.map((it,i)=>`<button class="opt" data-i="${i}"><b>${it.label}</b><br><span class="muted">${it.sub||''}</span></button>`).join('')}));
     document.querySelectorAll('#sc-decision .opt[data-i]').forEach(b=>{ b.onclick=()=>mk(items[parseInt(b.getAttribute('data-i'))]); });
@@ -1431,6 +1436,11 @@ function injectStyles(){
   #sc-ov .liens{display:flex;justify-content:center;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:.8em}
   #sc-ov .liens a,#sc-ov .liens span{color:#8f98bf;text-decoration:none;cursor:pointer}
   #sc-ov .liens a:hover{color:#bcd3ff}
+  #sc-ov .sc-btn-aide{flex:1;display:block;text-align:center;text-decoration:none;border:1px solid #2a3a6a;border-radius:10px;padding:12px 10px;font-family:var(--font-titre,inherit);font-size:.7em;letter-spacing:.08em;text-transform:uppercase;color:#c8d4ff;background:#0b0d24}
+  #sc-ov .sc-btn-aide:hover{border-color:#4a6aaa;color:#fff}
+  #sc-ov .sc-pied{display:flex;justify-content:center;align-items:center;gap:8px;margin-top:12px;font-size:.72em;color:#8f98bf;opacity:.85}
+  #sc-ov .sc-pied a{color:#8f98bf;text-decoration:none}
+  #sc-ov .sc-pied a:hover{color:#bcd3ff}
   /* Sièges de « Nouvelle partie » : médaillon, nom, base, sélecteur, ⓘ ; détail replié (Marc : caché au départ). */
   #sc-ov .siege{background:#0b0d24;border:1px solid #232750;border-radius:12px;padding:8px 8px 8px 10px;margin:8px 0}
   #sc-ov .siege .haut{display:flex;align-items:center;gap:9px}
@@ -1725,7 +1735,7 @@ function _buildLabel(){
 function screenAuth(mode){
   const isReg = mode==='register';
   let savedUser=''; try{ savedUser=localStorage.getItem('sc_ws_user')||''; }catch(e){}
-  overlay(t('web.solar_nbsp','\n    <div class="fen-medal">🚀</div>\n    <div class="fen-kicker">Solar</div>\n    <h2>{v}</h2>\n    <div class="sous">&nbsp;</div>\n    <input id="sc-u" type="email" inputmode="email" placeholder="{v2}" autocomplete="email" enterkeyhint="next" value="{saveduser}">\n    <div style="position:relative">\n      <input id="sc-p" type="password" placeholder="{v3}" autocomplete="{v4}" enterkeyhint="go" style="padding-right:44px">\n      <button type="button" id="sc-eye" title="{v5}" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#8fb0e0;font-size:1.1em;cursor:pointer;padding:4px 8px">👁</button>\n    </div>\n    <div class="muted" style="font-size:.78em;margin:2px 0 6px">{v6}</div>\n    <div class="err" id="sc-err"></div>\n    <button class="pri" id="sc-go">{v7}</button>\n    <button class="sec" id="sc-alt">{v8}</button>\n    <button class="sec" id="sc-close">{tour}</button>\n    <div class="liens">\n      <a href="tutorial.html">{v9}</a><a href="regles.html">{v10}</a><a href="confidentialite.html">{v11}</a>\n    </div>\n    <div class="lv-langue">{v12}</div>\n    <div class="muted" style="font-size:.72em;opacity:.7;margin-top:9px;text-align:center">{v13}</div>\n  ',{v:(isReg?t('auth.creer_compte','Créer un compte'):t('auth.titre_connexion','Connexion')),v2:t('auth.ph_email','Ton adresse email'),saveduser:savedUser,v3:t('auth.ph_mdp6','Mot de passe (min. 6)'),v4:(isReg?'new-password':'current-password'),v5:t('auth.oeil','Afficher / masquer le mot de passe'),v6:t('auth.email_info',"Ton email sert d'identifiant et reçoit les scores de fin de partie."),v7:(isReg?t('auth.btn_creer','Créer le compte'):t('auth.connexion','Se connecter')),v8:(isReg?t('auth.deja_compte',"J'ai déjà un compte"):t('auth.creer_compte','Créer un compte')),tour:t('auth.retour_solo','↩ Retour au jeu solo'),v9:t('lien.tutoriel','🎓 Tutoriel'),v10:t('lien.regles','📖 Règles'),v11:t('lien.confidentialite','🔒 Confidentialité'),v12:(typeof i18nSelecteurHTML==='function'?i18nSelecteurHTML():''),v13:_buildLabel()}));
+  overlay(t('web.solar_nbsp','\n    <div class="fen-medal">🚀</div>\n    <div class="fen-kicker">Solar</div>\n    <h2>{v}</h2>\n    <div class="sous">&nbsp;</div>\n    <input id="sc-u" type="email" inputmode="email" placeholder="{v2}" autocomplete="email" enterkeyhint="next" value="{saveduser}">\n    <div style="position:relative">\n      <input id="sc-p" type="password" placeholder="{v3}" autocomplete="{v4}" enterkeyhint="go" style="padding-right:44px">\n      <button type="button" id="sc-eye" title="{v5}" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#8fb0e0;font-size:1.1em;cursor:pointer;padding:4px 8px">👁️</button>\n    </div>\n    <div class="muted" style="font-size:.78em;margin:2px 0 6px">{v6}</div>\n    <div class="err" id="sc-err"></div>\n    <button class="pri" id="sc-go">{v7}</button>\n    <button class="sec" id="sc-alt">{v8}</button>\n    <button class="sec" id="sc-close">{tour}</button>\n    <div class="liens">\n      <a href="tutorial.html">{v9}</a><a href="regles.html">{v10}</a><a href="confidentialite.html">{v11}</a>\n    </div>\n    <div class="lv-langue">{v12}</div>\n    <div class="muted" style="font-size:.72em;opacity:.7;margin-top:9px;text-align:center">{v13}</div>\n  ',{v:(isReg?t('auth.creer_compte','Créer un compte'):t('auth.titre_connexion','Connexion')),v2:t('auth.ph_email','Ton adresse email'),saveduser:savedUser,v3:t('auth.ph_mdp6','Mot de passe (min. 6)'),v4:(isReg?'new-password':'current-password'),v5:t('auth.oeil','Afficher / masquer le mot de passe'),v6:t('auth.email_info',"Ton email sert d'identifiant et reçoit les scores de fin de partie."),v7:(isReg?t('auth.btn_creer','Créer le compte'):t('auth.connexion','Se connecter')),v8:(isReg?t('auth.deja_compte',"J'ai déjà un compte"):t('auth.creer_compte','Créer un compte')),tour:t('auth.retour_solo','↩ Retour au jeu solo'),v9:t('lien.tutoriel','🎓 Tutoriel'),v10:t('lien.regles','📖 Règles'),v11:t('lien.confidentialite','🔒 Confidentialité'),v12:(typeof i18nSelecteurHTML==='function'?i18nSelecteurHTML():''),v13:_buildLabel()}));
   _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
   /* Touche « Aller » du clavier : ces champs ne sont pas dans un <form>, il n'y a donc aucune
      validation implicite. Sans ça, la flèche du clavier mobile ne fait rien (signalé par Marc). */
@@ -1737,7 +1747,7 @@ function screenAuth(mode){
    if(_u)_u.addEventListener('keydown',_onKey); if(_p)_p.addEventListener('keydown',_onKey);}
   // Œil : afficher / masquer le mot de passe
   {const eye=document.getElementById('sc-eye'), pw=document.getElementById('sc-p');
-   if(eye&&pw)eye.onclick=()=>{ const show=pw.type==='password'; pw.type=show?'text':'password'; eye.textContent=show?'🙈':'👁'; pw.focus(); };}
+   if(eye&&pw)eye.onclick=()=>{ const show=pw.type==='password'; pw.type=show?'text':'password'; eye.textContent=show?'🙈':'👁️'; pw.focus(); };}
   document.getElementById('sc-close').onclick = ()=>{ _errCb=null; hideOverlay(); };
   document.getElementById('sc-go').onclick = ()=>{
     const user=document.getElementById('sc-u').value.trim(), pass=document.getElementById('sc-p').value;
@@ -1773,7 +1783,7 @@ function _ligneReprise(p){
   const urgent = p.aMoiDeJouer;
   /* La corbeille est À CÔTÉ du bouton, jamais DEDANS : un bouton dans un bouton n'est pas du HTML
      valide et le clic partirait au mauvais endroit. (Marc, 04/09 : « supprimer les parties test ».) */
-  return t('web.ligne_11','<div class="rep"><button class="{v} sc-reprise" data-code="{v2}"><div>{v3}<b>{v4}</b> · {tour}</div><div style="font-size:.88em;opacity:.9;margin-top:3px">{joueurs}</div><div style="font-size:.8em;opacity:.65;margin-top:3px">{v5}</div></button><button class="sec sc-suppr" data-code="{v6}" title="{v7}">🗑</button></div>',{v:(urgent?'pri':'sec'),v2:esc(p.code),v3:(urgent?t('lobby.a_toi','▶ À TOI DE JOUER — '):''),v4:esc(p.code),tour:tour,joueurs:joueurs,v5:t('lobby.derniere_activite','dernière activité : {d}',{d:_dateFr(p.maj)}),v6:esc(p.code),v7:t('lobby.supprimer_partie','Supprimer cette partie')});
+  return t('web.ligne_11','<div class="rep"><button class="{v} sc-reprise" data-code="{v2}"><div>{v3}<b>{v4}</b> · {tour}</div><div style="font-size:.88em;opacity:.9;margin-top:3px">{joueurs}</div><div style="font-size:.8em;opacity:.65;margin-top:3px">{v5}</div></button><button class="sec sc-suppr" data-code="{v6}" title="{v7}">🗑️</button></div>',{v:(urgent?'pri':'sec'),v2:esc(p.code),v3:(urgent?t('lobby.a_toi','▶ À TOI DE JOUER — '):''),v4:esc(p.code),tour:tour,joueurs:joueurs,v5:t('lobby.derniere_activite','dernière activité : {d}',{d:_dateFr(p.maj)}),v6:esc(p.code),v7:t('lobby.supprimer_partie','Supprimer cette partie')});
 }
 function screenLobby(){
   STATE.game=null; STATE.myCiv=null; STATE.started=false;
@@ -1796,28 +1806,18 @@ function screenLobby(){
     <button class="pri" id="sc-create" style="margin-top:12px">${t('lobby.creer','Créer une partie')}</button>
     <div class="row" style="margin-top:8px"><input id="sc-code" placeholder="${t('lobby.ph_code',"Code d'invitation")}" style="margin:0"><button class="sec" id="sc-join" style="margin:0;flex:0 0 auto;width:auto">${t('lobby.rejoindre','Rejoindre')}</button></div>
     <div class="err" id="sc-err"></div>
-    <!-- Supprimer son compte DEPUIS l'appli : exige par Apple (5.1.1) et Google Play. Discret,
-         mais present la ou l'on gere son compte — pas cache dans une page de reglement. -->
-    <div class="liens">
-      <span id="sc-refresh">${t('lobby.rafraichir','🔄 Rafraîchir')}</span><span id="sc-logout">${t('lobby.deconnexion','Se déconnecter')}</span><span id="sc-close">${t('lobby.solo','↩ Solo')}</span>
-    </div>
-    <!-- ATTENTION : ce bloc est dans un gabarit JS. Pas de guillemet oblique ici, il refermerait
-         le gabarit et casserait tout le fichier (erreur commise en écrivant ce commentaire).
-         LE LIEN DU TUTORIEL EXISTAIT DEJA, MAIS SUR L'AUTRE ECRAN (Marc, 26/08). L'ecran de saisie
-         de l'email le porte depuis longtemps ; seulement, des qu'un compte est memorise, on ne le
-         voit plus : on arrive directement ICI. C'est donc cet ecran-la qui est la fenetre de
-         connexion pour un joueur qui revient. Les deux le portent maintenant : un lien d'aide doit
-         etre la ou l'on hesite, pas la ou l'on tape. -->
-    <!-- LE LIEN DE SUPPRESSION EST A PART (Marc, 18/09 : trop pres des autres boutons, clics par erreur).
-         Il quitte la rangee des actions courantes (Rafraichir / Deconnexion / Solo) pour rejoindre
-         Confidentialite, avec un ecart au-dessus et a gauche : on ne le touche pas en visant autre chose. -->
-    <div class="liens" style="margin-top:14px">
-      <a href="tutorial.html">${t('lien.tutoriel','🎓 Tutoriel')}</a><a href="regles.html">${t('lien.regles','📖 Règles')}</a><a href="confidentialite.html">${t('lien.confidentialite','🔒 Confidentialité')}</a><a href="#" id="sc-suppr-compte" style="color:#c88;margin-left:22px;opacity:.75;font-size:.92em">${t('compte.supprimer','Supprimer mon compte')}</a>
+    <!-- ═══ ACCUEIL CONNECTÉ, REFAIT LE 22/09 (Marc) ═══
+         Plus de « Rafraîchir » (la liste des parties se met à jour seule), plus de « Solo » (le jeu
+         hors ligne est l'affaire de l'application), Tutoriel et Règles en vrais boutons, et tout ce
+         qui touche au compte (déconnexion, confidentialité, suppression) rangé un niveau plus bas,
+         derrière « Mon compte », à côté de la version : on n'y clique pas par hasard. Pas de guillemet
+         oblique dans ce commentaire (gabarit JS). -->
+    <div class="row sc-aides" style="margin-top:12px">
+      <a class="sc-btn-aide" href="tutorial.html">${t('lien.tutoriel','🎓 Tutoriel')}</a>
+      <a class="sc-btn-aide" href="regles.html">${t('lien.regles','📖 Règles')}</a>
     </div>
     <div class="lv-langue">${(typeof i18nSelecteurHTML==='function')?i18nSelecteurHTML():''}</div>
-    <!-- La version ICI aussi (Marc, 13/09) : un joueur dont le compte est memorise arrive
-         directement sur cet ecran et devait se deconnecter pour lire le numero de version. -->
-    <div class="muted" style="font-size:.72em;opacity:.7;margin-top:9px;text-align:center">${_buildLabel()}</div>
+    <div class="sc-pied"><a href="#" id="sc-compte">${t('lobby.mon_compte','⚙️ Mon compte')}</a><span>·</span><span>${_buildLabel()}</span></div>
   `);
   _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
   [...document.querySelectorAll('.sc-reprise')].forEach(b=>{
@@ -1831,15 +1831,43 @@ function screenLobby(){
       send({t:'supprimer_partie', code});
     };
   });
-  document.getElementById('sc-refresh').onclick = ()=> send({t:'mes_parties'});
   document.getElementById('sc-create').onclick = ()=>{ STATE._surLobby=false; screenCreate(); };
   document.getElementById('sc-join').onclick = ()=>{
     const code=document.getElementById('sc-code').value.trim().toUpperCase();
     if(code){ STATE._surLobby=false; send({t:'join', code}); }
   };
+  document.getElementById('sc-compte').onclick = (ev)=>{ ev.preventDefault(); STATE._surLobby=false; screenCompte(); };
+  _lobbyAutoRafraichir();
+}
+/* LA LISTE DES PARTIES SE MET À JOUR TOUTE SEULE (22/09) — elle remplace le lien « Rafraîchir ».
+   Toutes les 30 s tant qu'on est sur l'accueil, et au retour sur l'onglet ou l'application. On ne
+   redemande PAS pendant qu'on tape un code d'invitation : le nouvel affichage effacerait la saisie. */
+function _lobbyAutoRafraichir(){
+  if(STATE._lobbyTimer) return;
+  const demander=()=>{
+    if(!STATE._surLobby||!STATE.connected) return;
+    const c=document.getElementById('sc-code');
+    if(c&&(c.value||document.activeElement===c)) return;
+    send({t:'mes_parties'});
+  };
+  STATE._lobbyTimer=setInterval(demander,30000);
+  try{ document.addEventListener('visibilitychange',()=>{ if(!document.hidden) demander(); }); }catch(e){}
+}
+/* ═══ MON COMPTE (22/09) ═══ Adresse, déconnexion, confidentialité — et, tout en bas, la suppression
+   du compte, qu'Apple et Google exigent accessible depuis l'appli sans qu'elle soit sous le doigt. */
+function screenCompte(){
+  overlay(`
+    <div class="fen-medal">⚙️</div>
+    <div class="fen-kicker">${t('compte.titre','Mon compte')}</div>
+    <h2>${esc(STATE.user||'')}</h2>
+    <button class="sec" id="sc-logout" style="margin-top:14px">${t('lobby.deconnexion','Se déconnecter')}</button>
+    <a class="sc-btn-aide" href="confidentialite.html" style="display:block;margin-top:6px">${t('lien.confidentialite','🔒 Confidentialité')}</a>
+    <button class="sec" id="sc-close" style="margin-top:6px">← ${t('commun.retour','Retour')}</button>
+    <div style="margin-top:26px;text-align:center"><a href="#" id="sc-suppr-compte" style="color:#c88;opacity:.75;font-size:.8em;text-decoration:none">${t('compte.supprimer','Supprimer mon compte')}</a></div>
+  `);
+  document.getElementById('sc-close').onclick = ()=>{ screenLobby(); };
   document.getElementById('sc-logout').onclick = ()=>{ try{ if(STATE.game&&STATE.game.code) send({t:'leave'}); }catch(e){} STATE.user=null; STATE.token=null; STATE.game=null; try{localStorage.removeItem('sc_ws_token'); localStorage.removeItem('sc_ws_game');}catch(e){} screenAuth('login'); };
-  document.getElementById('sc-close').onclick = ()=>{ _errCb=null; STATE._surLobby=false; hideOverlay(); };
-  document.getElementById('sc-suppr-compte').onclick = (ev)=>{ ev.preventDefault(); STATE._surLobby=false; screenSupprimerCompte(); };
+  document.getElementById('sc-suppr-compte').onclick = (ev)=>{ ev.preventDefault(); screenSupprimerCompte(); };
 }
 /* ═══ SUPPRIMER SON COMPTE ═══ Ce que ça efface est dit AVANT, en clair ; le mot de passe est
    redemandé (le serveur le verifie) ; « Annuler » ramene au lobby sans rien faire. */
@@ -1859,7 +1887,7 @@ function screenSupprimerCompte(){
     <button class="sec" id="sc-close">${t('commun.annuler','Annuler')}</button>
   `);
   _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
-  document.getElementById('sc-close').onclick = ()=>{ _errCb=null; screenLobby(); };
+  document.getElementById('sc-close').onclick = ()=>{ _errCb=null; screenCompte(); };   // on revient d'où l'on vient : Mon compte
   document.getElementById('sc-go').onclick = ()=>{
     const pass=document.getElementById('sc-p').value;
     if(!pass){ _errCb(t('compte.err_mdp','Entre ton mot de passe pour confirmer.')); return; }
@@ -1956,7 +1984,7 @@ function renderWait(){
 }
 
 // ── Panneau de décision générique (contrat de réponses = celui des modales du jeu) ──
-// Le bouton « 👁 Voir le plateau » a été RETIRÉ (demande de Marc) : c'était un ajout de la version en ligne,
+// Le bouton « 👁️ Voir le plateau » a été RETIRÉ (demande de Marc) : c'était un ajout de la version en ligne,
 // absent du jeu d'origine. Les fenêtres se comportent désormais comme celles du jeu (on répond, elles se ferment).
 /* ═══ RÉDUIRE UNE FENÊTRE POUR ALLER VOIR SES MENUS ═══
    Marc, 05/09 : « on peut jamais voir les menus Empire ou Diplomatie quand y a des événements qui
