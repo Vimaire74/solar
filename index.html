@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-09-22 · v10.93';</script>
+<script>window.SOLAR_BUILD_HTML='2026-09-22 · v10.94';</script>
 <!-- i18n.js EN TÊTE, avant tout script du corps : il choisit la langue et charge lang/<code>.js (synchrone).
      Les écrans d'accueil (scripts inline plus bas) et moteur.js (qui porte t()) le trouvent déjà là. -->
 <script src="i18n.js"></script>
@@ -1200,34 +1200,15 @@ body{font-size:var(--sc-fs,16px);}
   -webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat}
 .tb-ico-comp{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='2.5' width='5' height='5' rx='1'/%3E%3Crect x='9' y='2.5' width='5' height='5' rx='1'/%3E%3Crect x='2' y='9' width='5' height='5' rx='1'/%3E%3Crect x='9' y='9' width='5' height='5' rx='1'/%3E%3C/svg%3E")}
 .tb-ico-det{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='2.5' width='12' height='4.5' rx='1'/%3E%3Crect x='2' y='9' width='12' height='4.5' rx='1'/%3E%3C/svg%3E")}
-/* — compact, téléphone : UNE colonne, le titre de filière AU-DESSUS de ses trois rangs (Marc, 22/09,
-     maquette validée). Avant : deux filières côte à côte, donc des noms coupés à 390 px. — */
+/* — MODE COMPACT : LES TROIS RIVIÈRES ONT LE MÊME HABILLAGE (Marc, 22/09, 2e essai) —
+     « La différence de visuel entre les techs et les actions est trop perturbante » et, sur
+     téléphone, « les lignes sont beaucoup trop petites pour cliquer avec le doigt ». Les
+     technologies empruntent donc la LIGNE D'ACTION (`.act-l`, plus bas) : un bloc par filière,
+     son titre au-dessus, ses rangs dessous. Une colonne sur téléphone, deux sur ordinateur. */
 #tech-body.tech-compact #riv-tech{display:block}
-#tech-body.tech-compact .tb-row{flex-direction:column;align-items:stretch;padding:0;gap:0;overflow:hidden;border-radius:8px;margin-bottom:6px}
-#tech-body.tech-compact .tb-label{width:auto!important;font-size:.64em!important;padding:5px 8px;border-radius:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#tech-body.tech-compact .tb-cards{flex-direction:column;gap:0}
 #tech-body.tech-compact .tcard-arr{display:none}
-#tech-body.tech-compact .tcard{min-height:0!important;height:30px;border-radius:0;border-width:0;border-top:1px solid #1a1a3e!important}
-#tech-body.tech-compact .tcard .tc-header{font-size:.66em;padding:0 8px;min-height:0}
-#tech-body.tech-compact .tcard .tc-name{font-size:1em;font-weight:600}
-#tech-body.tech-compact .tcard .res-tag{display:none}
-#tech-body.tech-compact .tcard .tc-tier{display:inline;font-size:.72em;opacity:.7;margin-right:4px}
-#tech-body.tech-compact .tcard .tc-header>span:last-child{font-size:.82em!important;white-space:nowrap}
-#tech-body.tech-compact .tcard.tc-corne .tc-header{padding-right:21px}
-/* — compact, ordinateur : le titre au-dessus, les trois rangs côte à côte dessous. UNE filière par
-     ligne jusqu'à 1400 px : à deux colonnes sur 1100 px, les noms étaient coupés (« Autonomous
-     Biospher… ») et les coûts rognés. — */
 @media (min-width:600px){
-  #tech-body.tech-compact #riv-tech{display:block}
-  #tech-body.tech-compact .tb-row{margin-bottom:6px}
-  #tech-body.tech-compact .tb-cards{flex-direction:row;gap:0}
-  #tech-body.tech-compact .tb-cards .tcard{flex:1;min-width:0;width:auto;border-left:1px solid #1a1a3e!important;border-top:0!important}
-  #tech-body.tech-compact .tb-cards .tcard:first-child{border-left:0!important}
-  #tech-body.tech-compact .tcard-arr{display:none}
-}
-@media (min-width:1400px){
-  #tech-body.tech-compact #riv-tech{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
-  #tech-body.tech-compact .tb-row{margin-bottom:0}
+  #tech-body.tech-compact #riv-tech{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;align-items:start}
 }
 /* ═══ ACTIONS ÉCO & SOCIÉTÉ ET MILITAIRES — LISTE PAR FAMILLE (Marc, 22/09, maquette validée) ═══
    Ces cartes ne forment pas une chaîne de niveaux : c'est un catalogue d'actions. En mode compact
@@ -1239,7 +1220,8 @@ body{font-size:var(--sc-fs,16px);}
 .act-fam-titre::after{content:'';flex:1;height:1px;background:#1f1f45}
 .act-liste{display:flex;flex-direction:column;gap:4px}
 .act-l{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;background:#0d0d22;
-  border:1px solid #1f1f45;border-left:3px solid var(--ac,#66cc88);border-radius:7px;padding:6px 9px;cursor:pointer}
+  border:1px solid #1f1f45;border-left:3px solid var(--ac,#66cc88);border-radius:7px;padding:8px 10px;cursor:pointer;
+  min-height:44px}   /* 44 px : la hauteur d'une cible au doigt (Marc, 22/09) */
 .act-l:hover{border-color:#39569c;background:#101030}
 .act-l .al-ico{font-size:1.02em;line-height:1}
 .act-l .al-nom{font-family:var(--font-titre);font-size:.74em;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1254,7 +1236,9 @@ body{font-size:var(--sc-fs,16px);}
 .act-l.al-mien{background:#0c1a2c}
 .act-l.al-mien .al-nom{color:#9fd8ff}
 @media (min-width:600px){
-  #tech-body.tech-compact .act-liste{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+  /* Les ACTIONS s'étalent sur deux colonnes ; les filières de technologies, elles, sont déjà
+     rangées deux par ligne (voir #riv-tech), donc leurs rangs restent empilés dans l'ordre T1→T3. */
+  #tech-body.tech-compact #riv-civ .act-liste,#tech-body.tech-compact #riv-mil .act-liste{display:grid;grid-template-columns:1fr 1fr;gap:5px}
 }
 </style>
 </head>

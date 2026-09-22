@@ -2031,7 +2031,7 @@ window.SOLAR_LANG_DICT = {
   "revenu.reserves_ceinture": "☠️ Belt Reserves",
   "revenu.transit_partenaire": "🔗 {noeud} (transit through a partner)",
   "techs.bonus_nation": " — ★ Nation bonus -1<i class=ri-science></i>",
-  "techs.t2_de_branche": "you need YOUR T2 of this branch",
+  "techs.t2_de_branche": "your own T2 of this branch is required",
   "ui.6_met_fin_guerre": "6<i class=ri-materials></i> (ends the war)",
   "ui.accepter_accord": "✅ Accept the agreement",
   "ui.accepter_monopole_refuser_guerre": "<div style=\"display:flex;gap:8px;flex-wrap:wrap\"><button class=\"eot-btn\" style=\"flex:1;margin-top:0;background:#0e2a18;border-color:#3a8a5a;color:#9fe8b8\" onclick=\"aiDysonDecide(false)\">🤝 Accept the monopoly</button><button class=\"eot-btn\" style=\"flex:1;margin-top:0;background:linear-gradient(135deg,#8a2222,#5a0a0a);border-color:#cc4444;color:#ffcccc\" onclick=\"aiDysonDecide(true)\">⚔️ Refuse — war</button></div>",
@@ -2238,4 +2238,7 @@ window.SOLAR_LANG_DICT = {
   "actions.fam_renforts": "Reinforcements — lost next turn",
   "actions.badge_gouv": "GOV",
   "actions.demande": "needs {n}",
+  "techs.a_toi_court": "Yours",
+  "techs.prise_court": "Taken",
+  "techs.palier_ferme": "tier T{n} not open yet",
 };

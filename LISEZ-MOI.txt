@@ -1,9 +1,9 @@
-LOT 17 — À UPLOADER  ·  22/09/2026  ·  v10.93 / sw v214
+LOT 17 — À UPLOADER  ·  22/09/2026  ·  v10.94 / sw v215
 
 CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas encore en ligne).
 
-   index.html          → estampille v10.93
-   tutorial.html       → régénéré (v10.93)
+   index.html          → estampille v10.94
+   tutorial.html       → régénéré (v10.94)
    online.js           → v10.87 (défense : la case Supercroiseur compte toujours ; espionnage)
    moteur.js           → v10.84 + tensions + v10.87
    sw.js               → cache v208
@@ -17,9 +17,10 @@ CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas enc
 
 Redéploie les DEUX ressources dans Coolify (site + serveur).
 
-v10.93 — RIVIÈRES COMPACTES : UNE COLONNE, ACTIONS EN LISTE (voir REPRISE.md §158)
-   · Technologies en compact : une filière par bloc, titre au-dessus, trois rangs dessous.
-     Sur ordinateur, les trois rangs passent de gauche à droite sous le titre.
+v10.94 — RIVIÈRES COMPACTES : UN SEUL HABILLAGE (voir REPRISE.md §158 et §158.1)
+   · Technologies en compact : MÊME ligne que les actions — un bloc par filière, titre au-dessus,
+     ses trois rangs dessous (nom entier, rang, coût à droite, effet dessous).
+     Lignes d'au moins 44 px : cliquables au doigt. Une colonne sur téléphone, deux sur ordinateur.
    · Éco & Société et Militaire en compact : une LIGNE par action, rangée par famille
      (répétables · une fois par partie · gouvernement ; renforts · une fois par partie),
      nom entier, coût à droite, effet dessous, prérequis écrit en clair sur les cartes fermées.

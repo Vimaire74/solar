@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-22 · v10.93';
+const SOLAR_BUILD_MOTEUR = '2026-09-22 · v10.94';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -2272,9 +2272,9 @@ function techLockReason(card,p){
   if(card.branch==='empathes'&&typeof isEmpathesAvailableFor==='function'&&!isEmpathesAvailableFor(pp))
     return t('techs.reservee_empathes','réservée aux Empathes');
   if(card.tier>((G.branchTiers&&G.branchTiers[card.branch])||0)+1)
-    return 'palier T'+card.tier+' pas encore ouvert';
+    return t('techs.palier_ferme','palier T{n} pas encore ouvert',{n:card.tier});   // traduit : la ligne compacte l'affiche (22/09)
   if(card.tier===3&&!pp.cards.some(function(c){return c.branch===card.branch&&c.tier===2;}))
-    return t('techs.t2_de_branche','il te faut TA T2 de cette branche');
+    return t('techs.t2_de_branche','ta T2 de cette branche est requise');
   return null;
 }
 function isTechAvailable(card,p){
@@ -14264,10 +14264,15 @@ function renderTechTree(){
     // Branche Empathes : visible seulement si Union Sacrée a été jouée
     if(branchId==='empathes'&&!G.empathesFounder)continue;
     const isBonus=G.player.civ.techBonus===branchId;
-    html+=`<div class="tb-row"><div class="tb-label" style="color:${branch.color};border-left:2px solid ${branch.color}60;font-size:.6em">${branch.emoji}<span style="margin-left:3px">${branch.label}</span>${isBonus?'<span class="tb-bonus-star">★</span>':''}</div><div class="tb-cards">`;
+    /* COMPACT : la filière prend l'habillage des actions (Marc, 22/09 — « un visuel similaire à
+       celui des actions sociales et militaires », et des lignes assez hautes pour le doigt).
+       DÉTAILLÉ : la rivière d'origine, inchangée. */
+    const _lignesTech=[];
+    if(compact) html+=`<div class="act-fam"><div class="act-fam-titre" style="color:${branch.color}">${branch.emoji} ${branch.label}${isBonus?'<span class="tb-bonus-star">★</span>':''}</div><div class="act-liste">`;
+    else html+=`<div class="tb-row"><div class="tb-label" style="color:${branch.color};border-left:2px solid ${branch.color}60;font-size:.6em">${branch.emoji}<span style="margin-left:3px">${branch.label}</span>${isBonus?'<span class="tb-bonus-star">★</span>':''}</div><div class="tb-cards">`;
     for(let tier=1;tier<=3;tier++){
       const card=CARDS_POOL.find(c=>c.branch===branchId&&c.tier===tier);
-      if(!card){html+=`<div class="tcard tlocked" style="opacity:.15;min-height:${compact?'22px':'68px'}"><div class="tc-header"><span class="tc-name" style="color:#3a3a6a">—</span></div></div>`;if(tier<3)html+=`<div class="tcard-arr">→</div>`;continue;}
+      if(!card){ if(!compact){html+=`<div class="tcard tlocked" style="opacity:.15;min-height:68px"><div class="tc-header"><span class="tc-name" style="color:#3a3a6a">—</span></div></div>`;if(tier<3)html+=`<div class="tcard-arr">→</div>`;} continue;}
       /* CARTE BLOQUÉE PAR UN PRÉREQUIS → COIN CORNÉ (demande de Marc, 2026-08-07).
          La carte reste ENTIÈRE : on ne replie plus rien, on ne cache rien. Un coin replié en haut à
          droite, comme on marque une page dans un livre, dit « celle-ci, tu ne peux pas encore ».
@@ -14313,14 +14318,18 @@ function renderTechTree(){
       const onclick=`showTechDetail('${card.id}')`;
       if(compact){
         const acLabel=card.tier===3?'2AC':'1AC';
-        const costStr=Object.entries(cost).map(([r,a])=>'-'+a+rEmoji(r)).join(' ');
+        const costStr=Object.entries(cost).map(([r,a])=>'−'+a+rEmoji(r)).join(' ');
         const compactStatus=playerOwned?'<span style="color:#66cc66">✓</span>'+(!exclusive&&aiOwned?`<span style="color:#9080c0">+${_aiEmoji}</span>`:''):exclusiveTaken?'<span style="color:#7880a0">🤖</span>':!exclusive&&aiOwned?`<span style="color:#9080c0;font-size:.85em">${_aiEmoji}+</span><span class="res-tag energy" style="font-size:.9em">${acLabel}</span> `+costStr:'<span class="res-tag energy" style="font-size:.9em">'+acLabel+'</span> '+costStr;
-        html+=`<div class="${cls}"${_cornee?` title="${card.name} — ${_raisonLock}" data-bloque="${_bloqueAttr}"`:''} onclick="${onclick}" onmouseleave="hideCardPreview()" style="border-top:2px solid ${branch.color}80">
-          <div class="tc-header">
-            <span class="tc-name">${card.emoji} ${card.name}</span>
-            <span class="tc-tier">T${tier}</span>
-            <span style="font-size:.58em;margin-left:4px;flex-shrink:0">${compactStatus}</span>
-          </div></div>`;
+        /* Même ligne que les actions : emoji · nom entier + rang · coût à droite · effet dessous.
+           Le prix devient un état quand la carte n'est pas achetable (à toi, prise, prérequis). */
+        const _prix=playerOwned?'<span class="al-res">✓ '+t('techs.a_toi_court','À toi')+'</span>'
+          :exclusiveTaken?'<span class="al-res">⛔ '+t('techs.prise_court','Prise')+'</span>'
+          :_cornee?'<span class="al-res">🔒</span>':undefined;
+        _lignesTech.push(_ligneAction({
+          emoji:card.emoji, nom:card.name, badge:'T'+tier, couleur:branch.color,
+          onclick:onclick, bloque:_cornee||exclusiveTaken, mien:playerOwned,
+          prix:_prix, ac:(card.tier===3?2:1), cout:costStr,
+          effet:(_cornee?'🔒 '+_raisonLock:card.effect) }));
       } else {
         let costDisplay;
         if(playerOwned)costDisplay='<span style="color:#8df59d">'+t('techs.a_toi','✓ À toi')+'</span>';
@@ -14336,9 +14345,9 @@ function renderTechTree(){
           </div>
         </div>`;
       }
-      if(tier<3)html+=`<div class="tcard-arr">→</div>`;
+      if(!compact&&tier<3)html+=`<div class="tcard-arr">→</div>`;
     }
-    html+=`</div></div>`;
+    html+=compact?(_lignesTech.join('')+`</div></div>`):`</div></div>`;
   }
   html+='</div>';   // ← fin de la rivière TECHNOLOGIES
   // ── RIVIÈRE ÉCO & SOCIÉTÉ — Marché Civique (cartes répétables, coût <i class=ri-materials></i>) ──
