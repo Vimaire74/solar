@@ -1,9 +1,9 @@
-LOT 17 — À UPLOADER  ·  22/09/2026  ·  v10.92 / sw v213
+LOT 17 — À UPLOADER  ·  22/09/2026  ·  v10.93 / sw v214
 
 CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas encore en ligne).
 
-   index.html          → estampille v10.92
-   tutorial.html       → régénéré (v10.92)
+   index.html          → estampille v10.93
+   tutorial.html       → régénéré (v10.93)
    online.js           → v10.87 (défense : la case Supercroiseur compte toujours ; espionnage)
    moteur.js           → v10.84 + tensions + v10.87
    sw.js               → cache v208
@@ -17,6 +17,14 @@ CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas enc
 
 Redéploie les DEUX ressources dans Coolify (site + serveur).
 
+v10.93 — RIVIÈRES COMPACTES : UNE COLONNE, ACTIONS EN LISTE (voir REPRISE.md §158)
+   · Technologies en compact : une filière par bloc, titre au-dessus, trois rangs dessous.
+     Sur ordinateur, les trois rangs passent de gauche à droite sous le titre.
+   · Éco & Société et Militaire en compact : une LIGNE par action, rangée par famille
+     (répétables · une fois par partie · gouvernement ; renforts · une fois par partie),
+     nom entier, coût à droite, effet dessous, prérequis écrit en clair sur les cartes fermées.
+   · Le mode détaillé ne change pas.
+
 v10.92 — PARTIE 29BD : ÉLIMINATION, JOURNAL, DÉCOUVERTES, TRADUCTIONS (voir REPRISE.md §157)
    · Une nation sans colonie sort du jeu : plus de Stratégie, de tension, de guerre, de revenu.
      En ligne le serveur répond pour elle et la partie file jusqu'au décompte ; en solo, un bandeau
@@ -27,6 +35,9 @@ v10.92 — PARTIE 29BD : ÉLIMINATION, JOURNAL, DÉCOUVERTES, TRADUCTIONS (voir 
    · Fenêtre « Colonisation réussie » au ton vert (🚩), plus le médaillon de guerre.
    · Traductions (nations, AP, guerre populaire, cartes du rapport, tempéraments) ; emojis 🏗️ 🛤️.
    · Côté serveur : le journal n'est plus redessiné à chaque ligne (gros gain de temps de calcul).
+   · Tirage des Stratégies : l'agenda SECRET ne compte plus dans le classement (il se devinait à la
+     place de chacun dans la file) ; le panneau Empire n'affiche plus non plus le total réel des
+     ordinateurs. Le fichier de debug donne le détail du tri, tour par tour. Règles FR et EN à jour.
 
 v10.91 — TECHNOLOGIES : ROULEAU « BLOQUÉ » ET MODE COMPACT (voir REPRISE.md §156)
    · Rouleau des cartes bloquées : « BLOQUÉ » / « LOCKED » en lettres blanches empilées ; la carte

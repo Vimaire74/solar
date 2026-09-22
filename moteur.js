@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-22 · v10.92';
+const SOLAR_BUILD_MOTEUR = '2026-09-22 · v10.93';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -4557,12 +4557,29 @@ function _runStrategyDraftAfterAnnounce(){
     try{ if(typeof _netIncome==='function'){ const n=_netIncome(p)||{}; return (n.materials||0)+(n.energy||0); } }catch(e){}
     return ((p.rpt&&p.rpt.materials)||0)+((p.rpt&&p.rpt.energy)||0);
   };
-  const _criteres=p=>[calcVP(p).total,(p.forceTokens||0),(p.colonies||[]).length,(p.routes||[]).length,_revenu(p)];
+  /* ⚠️ LE SCORE VISIBLE, PAS LE TOTAL RÉEL (Marc, 22/09) : « il faut enlever l'agenda secret du compte
+     des points, quelqu'un pourrait deviner. » Le tri comptait `calcVP(p).total`, agenda secret
+     compris, alors que le journal affiche le score SANS l'agenda. Outre l'ordre incompréhensible
+     (partie 29BD : 21 affichés, 33 comptés), la place d'une nation dans le tirage TRAHISSAIT son
+     agenda — un joueur attentif pouvait en déduire qu'il était rempli. On trie donc sur ce que tout
+     le monde voit, `vpAffiche`. */
+  const _criteres=p=>[vpAffiche(p),(p.forceTokens||0),(p.colonies||[]).length,(p.routes||[]).length,_revenu(p)];
   const order=nations.slice().sort((a,b)=>{
     const ca=_criteres(a), cb=_criteres(b);
     for(let i=0;i<ca.length;i++) if(ca[i]!==cb[i]) return ca[i]-cb[i];   // croissant : le plus faible choisit avant
     return 0;
   });
+  /* ═══ LES CRITÈRES RÉELS, DANS LE FICHIER DE DEBUG SEULEMENT (Marc, 22/09) ═══
+     Le tri compte le TOTAL de points, agenda secret compris ; la ligne du journal, elle, affiche le
+     score SANS l'agenda (`vpAffiche`), parce que l'agenda reste secret jusqu'à la fin. Partie 29BD :
+     Marc lisait « Jupitériens 26 · Ceinturiens 29 · Martiens 21 » et se croyait mal classé — son
+     agenda ⚡ Empire énergétique valait déjà +12, donc 33 réels. Marc : « garde les facteurs de tri
+     invisibles, mais ajoute des informations là-dessus dans le fichier de debug. » */
+  try{
+    if(!G._traceDraft)G._traceDraft=[];
+    G._traceDraft.push({t:G.turn, l:order.map(p=>{const c=_criteres(p), _v=calcVP(p);
+      return {nat:p.civ.name, vu:c[0], reel:_v.total, agenda:(_v.agendasVP||0), jt:c[1], col:c[2], rt:c[3], rev:c[4]};})});
+  }catch(e){}
   /* L'ordre est ÉCRIT dans le journal : c'était invérifiable, donc indiscutable dans les deux sens.
      Marc : « y a toujours un bug sur la détermination du joueur le plus faible » — sans trace, ni
      lui ni moi ne pouvions le prouver. Maintenant si l'ordre est faux, il se voit. */
@@ -13522,6 +13539,21 @@ function _analyseTexte(){
     }
   }
   L.push('');
+  L.push('═══════════ ANALYSE — ORDRE DU TIRAGE DES STRATÉGIES ═══════════');
+  L.push('(le tri se fait sur le VP VISIBLE — agenda secret EXCLU, décision de Marc du 22/09 —');
+  L.push(' puis jetons, colonies, routes, revenu. Le VP réel est rappelé pour contrôle seulement.)');
+  {
+    const td=(G&&G._traceDraft)||[];
+    if(!td.length)L.push('  (aucun tirage tracé — partie d\'une version antérieure)');
+    else for(const d of td){
+      L.push('  Tour '+d.t);
+      d.l.forEach((x,i)=>L.push('    '+(i+1)+'. '+String(x.nat).padEnd(12)
+        +' VP trié '+String(x.vu).padStart(3)
+        +' (réel '+String(x.reel).padStart(3)+(x.agenda?(', dont agenda '+x.agenda):'')+')'
+        +' · '+String(x.jt).padStart(2)+'⚔️ · '+x.col+' col · '+x.rt+' rt · revenu '+x.rev));
+    }
+  }
+  L.push('');
   L.push('═══════════ ANALYSE — DÉCISIONS DES IA ═══════════');
   L.push('(coup retenu · sa note · le dauphin et sa note · nombre de coups réellement évalués)');
   L.push('Cerveau : '+((typeof nomCerveauCourant==='function')?nomCerveauCourant():'?'));
@@ -14201,6 +14233,25 @@ function _appliquerRiviere(remonter){
   }
   if(remonter){ const body=document.getElementById('tech-body'); if(body) body.scrollTop=0; }
 }
+/* ═══ UNE LIGNE D'ACTION (Éco & Société, Militaire — mode compact) ═══
+   Maquette validée par Marc le 22/09 : ces cartes ne forment pas une chaîne de niveaux, c'est un
+   catalogue. Une ligne = emoji · nom entier + pastille de famille · coût à droite · effet dessous.
+   Le style vit dans index.html (`.act-l`), comme tout le reste de l'apparence. */
+function _ligneAction(o){
+  const cls='act-l'+(o.bloque?' al-bloc':'')+(o.mien?' al-mien':'');
+  const prix=(o.prix!==undefined&&o.prix!==null)?o.prix
+    :('<span class="al-ac">'+(o.ac||1)+' '+t('commun.ac','AC')+'</span><span class="al-res">'+(o.cout||'—')+'</span>');
+  return '<div class="'+cls+'" style="--ac:'+o.couleur+'" onclick="'+o.onclick+'">'
+    +'<span class="al-ico">'+(o.emoji||'')+'</span>'
+    +'<span class="al-nom">'+o.nom+(o.badge?'<span class="al-badge">'+o.badge+'</span>':'')+'</span>'
+    +'<span class="al-prix">'+prix+'</span>'
+    +'<span class="al-effet">'+(o.effet||'')+'</span></div>';
+}
+/* Une famille d'actions : son titre, puis ses lignes. Rien si la famille est vide. */
+function _familleActions(titre,lignes){
+  if(!lignes.length)return '';
+  return '<div class="act-fam"><div class="act-fam-titre">'+titre+'</div><div class="act-liste">'+lignes.join('')+'</div></div>';
+}
 function renderTechTree(){
   const body=document.getElementById('tech-body');
   const _scrollAvant=body?body.scrollTop:0;
@@ -14292,7 +14343,8 @@ function renderTechTree(){
   html+='</div>';   // ← fin de la rivière TECHNOLOGIES
   // ── RIVIÈRE ÉCO & SOCIÉTÉ — Marché Civique (cartes répétables, coût <i class=ri-materials></i>) ──
   html+='<div id="riv-civ" style="display:none">';
-  html+=`<div class="gen-row" id="sec-civ" style="border-top:2px solid #2a3a5a;padding-top:3px">
+  html+=compact?`<div id="sec-civ">`
+    :`<div class="gen-row" id="sec-civ" style="border-top:2px solid #2a3a5a;padding-top:3px">
     <div class="gen-label" style="color:#88c8ff;font-size:.56em">💼<span style="margin-left:2px">${t('marche.eco_societe','Éco &amp; Société')}</span></div>`;
   // Cartes répétables mises EN TÊTE de la rivière (les plus utilisées, donc les plus faciles à trouver) :
   // Extraction d'He3, Capture d'astéroïdes, puis Investissement dans la Recherche (demande de Marc).
@@ -14300,6 +14352,9 @@ function renderTechTree(){
   const cmSocial=CIVIC_MARKET.filter(c=>c.type==='social')
     .sort((a,b)=>(_civTop.indexOf(a.id)<0?99:_civTop.indexOf(a.id))-(_civTop.indexOf(b.id)<0?99:_civTop.indexOf(b.id)));
   const cmGov=CIVIC_MARKET.filter(c=>c.type==='government');
+  /* MODE COMPACT : trois familles de lignes (répétables · une fois par partie · gouvernement).
+     MODE DÉTAILLÉ : les cartes illustrées d'origine, inchangées. */
+  const _civLignes=[[],[],[]];
   for(const subGroup of[cmSocial,cmGov]){
     for(const card of subGroup){
       const isGov=card.type==='government';
@@ -14321,8 +14376,13 @@ function renderTechTree(){
          · achetable → pleine lumière. */
       const _cls=(taken?' gc-corne no-buy':(!canBuy&&!isCurrentForm?' no-buy':''))+(isCurrentForm?' gc-mine':'');
       if(compact){
-        html+=`<div class="gcard gc-compact${_cls}"${_cls.includes('gc-corne')?` data-bloque="${_bloqueAttr}"`:''} onclick="showMarketDetail('${card.id}')" style="border-top:2px solid ${border}">
-          <div class="gc-header"><span class="gc-name">${card.emoji} ${card.name}${govTag}</span><span class="gc-cost">${taken?'✗':isCurrentForm?'✓':canBuy?'1AC '+costStr:'—'}</span></div></div>`;
+        const _grp=isGov?2:(isRepeat?0:1);
+        _civLignes[_grp].push(_ligneAction({
+          emoji:card.emoji, nom:card.name, badge:(isCurrentForm?'✓':isRepeat?'∞':isGov?t('actions.badge_gouv','GOUV'):'1×'),
+          couleur:border, onclick:`showMarketDetail('${card.id}')`, bloque:taken, mien:isCurrentForm,
+          prix:(taken?'<span class="al-res">✗ '+t('marche.deja_utilise_court','Déjà utilisé')+'</span>'
+                :isCurrentForm?'<span class="al-res">✓ '+t('marche.forme_actuelle_court','Forme actuelle')+'</span>':undefined),
+          ac:1, cout:Object.entries(cost).map(([r2,a])=>'−'+a+rEmoji(r2)).join(' '), effet:card.effect }));
       } else {
         html+=`<div class="gcard${_cls}"${_cls.includes('gc-corne')?` data-bloque="${_bloqueAttr}"`:''} onclick="showMarketDetail('${card.id}')" style="border-top:2px solid ${border};cursor:pointer">
           <div class="gc-header"><span class="gc-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2">${card.name}${govTag}</span></div>
@@ -14333,12 +14393,18 @@ function renderTechTree(){
       }
     }
   }
+  if(compact) html+=_familleActions(t('actions.fam_repetables','Répétables — chaque tour'),_civLignes[0])
+    +_familleActions(t('actions.fam_une_fois','Une fois par partie'),_civLignes[1])
+    +_familleActions(t('actions.fam_gouvernement','Gouvernement — une forme à la fois'),_civLignes[2]);
   html+=`</div>`;
   // Civiques (permanentes)
   const civCards=(G.civRiver||[]).filter(c=>c&&!G.techTaken.has(c.id));
   const milCards=(G.milRiver||[]).filter(c=>c);
   function renderNonBranchRow(label,cards,maxShow){
-    let r=`<div class="gen-row"><div class="gen-label">${label}</div>`;
+    /* Compact : deux familles de lignes (renforts répétables · une fois par partie). Détaillé : les
+       cartes illustrées d'origine. Même règle des deux côtés, seul l'habillage change. */
+    const _lignes=[[],[]];
+    let r=compact?'':`<div class="gen-row"><div class="gen-label">${label}</div>`;
     const shown=cards.slice(0,maxShow);
     for(const card of shown){
       // Civique : taken = joueur l'a déjà (1× par joueur). Militaire : grisé si déjà acheté CE tour (1×/tour). Autre : techTaken global.
@@ -14372,8 +14438,14 @@ function renderTechTree(){
       const _gcBloque=(!_reqOk)||(taken&&!_repet);
       const _gcCls=(_gcBloque?' gc-corne no-buy':(!canBuy?' no-buy':''))+(mine?' gc-mine':'');
       if(compact){
-        r+=`<div class="gcard gc-compact${_gcCls}"${_gcBloque?` data-bloque="${_bloqueAttr}"`:''} onclick="showGeneralDetail('${card.id}')" style="border-top:2px solid ${border}">
-          <div class="gc-header"><span class="gc-name">${card.emoji} ${card.name}</span><span class="gc-cost">${taken?'✗':!_reqOk?'🔒':canBuy?_acN+t('commun.ac','AC'):'—'}</span></div></div>`;
+        const _nomReq=(!_reqOk&&card.reqCard)?(CARDS_POOL.find(c=>c.id===card.reqCard)||{}).name:null;
+        _lignes[_repet?0:1].push(_ligneAction({
+          emoji:card.emoji, nom:card.name, badge:_repet?'∞':'1×', couleur:border,
+          onclick:`showGeneralDetail('${card.id}')`, bloque:_gcBloque, mien:mine,
+          prix:(taken?'<span class="al-res">✗ '+t('techs.acquis','Acquis')+'</span>'
+                :!_reqOk?'<span class="al-res">🔒</span>':undefined),
+          ac:_acN, cout:Object.entries(cost).map(([r2,a])=>'−'+a+rEmoji(r2)).join(' '),
+          effet:(_nomReq?'🔒 '+t('actions.demande','demande {n}',{n:_nomReq}):card.effect) }));
       } else {
         r+=`<div class="gcard${_gcCls}"${_gcBloque?` data-bloque="${_bloqueAttr}"`:''} onclick="showGeneralDetail('${card.id}')" style="border-top:2px solid ${border};cursor:pointer">
           <div class="gc-header"><span class="gc-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2">${card.name}</span></div>
@@ -14383,6 +14455,8 @@ function renderTechTree(){
         </div>`;
       }
     }
+    if(compact) return _familleActions(t('actions.fam_renforts','Renforts — perdus au tour suivant'),_lignes[0])
+      +_familleActions(t('actions.fam_une_fois','Une fois par partie'),_lignes[1]);
     r+=`</div>`;return r;
   }
   html+='</div>';   // ← fin de la rivière ÉCO & SOCIÉTÉ
@@ -14505,7 +14579,9 @@ function renderRight(){
      +'<span>'+r.n.civ.emoji+'</span><span style="flex:1;color:'+(r.n.civ.color||'#c8d8f8')+';font-weight:700">'+r.n.civ.name+(r.moi?' ('+t('commun.toi','toi')+')':'')+'</span>'
      +'<strong style="color:#ffd700">'+r.vp+' VP</strong>'+(r.moi?'':'<span style="opacity:.55;font-size:.8em"> '+t('commun.est','est.')+'</span>')
      +'</div>').join('');}
-  document.getElementById('r-ai').innerHTML=G.ais.map(ai=>{const aiVP=calcVP(ai);const aiCd=ai.forceCooldown.reduce((s,fc)=>s+fc.count,0);const _int=getIntelLevel(G.player);const pf=perceivedForce(G.player,ai);const forceTxt=pf.exact?('⚔️'+pf.val+(aiCd>0?'(+'+aiCd+'cd)':'')+' <span style="color:#5a7a66">'+t('empire.renseignement','(renseignement)')+'</span>'):('⚔️~'+pf.val+' <span style="color:#5a6a8a">'+t('empire.sans_renseignement','(±3, sans renseignement)')+'</span>');const eco=_int>=2?('<i class=ri-energy></i>'+(ai.res.energy||0)+' <i class=ri-materials></i>'+(ai.res.materials||0)+' <i class=ri-science></i>'+(ai.res.science||0)+' <i class=ri-morale></i>'+(ai.res.morale||0)):'<span style="color:#5a6a8a">'+t('empire.eco_inconnus','éco &amp; moral : inconnus (tech Renseignement)')+'</span>';const cru=croiseurLigne(ai);return`${ai.civ.emoji} <strong>${ai.civ.name}</strong> · Nv.${ai.gov_level}<br>${eco}<br>${forceTxt} · ${t('empire.cols_routes','Cols:{c} Routes:{r}',{c:ai.colonies.length,r:ai.routes.length})}${cru?'<br>'+cru:''}<br><strong style="color:#ffd700">${t('empire.vp_estimes','~{vp} VP estimés',{vp:aiVP.total})}</strong>`;}).join('<hr style="border-color:#1a1a3a;margin:4px 0">');
+  /* ⚠️ « ~VP estimés » montrait le total RÉEL de l'ordinateur, agenda secret compris (même fuite que
+     l'ordre du tirage, Marc 22/09). On affiche le score visible, comme partout ailleurs. */
+  document.getElementById('r-ai').innerHTML=G.ais.map(ai=>{const aiVP={total:vpAffiche(ai)};const aiCd=ai.forceCooldown.reduce((s,fc)=>s+fc.count,0);const _int=getIntelLevel(G.player);const pf=perceivedForce(G.player,ai);const forceTxt=pf.exact?('⚔️'+pf.val+(aiCd>0?'(+'+aiCd+'cd)':'')+' <span style="color:#5a7a66">'+t('empire.renseignement','(renseignement)')+'</span>'):('⚔️~'+pf.val+' <span style="color:#5a6a8a">'+t('empire.sans_renseignement','(±3, sans renseignement)')+'</span>');const eco=_int>=2?('<i class=ri-energy></i>'+(ai.res.energy||0)+' <i class=ri-materials></i>'+(ai.res.materials||0)+' <i class=ri-science></i>'+(ai.res.science||0)+' <i class=ri-morale></i>'+(ai.res.morale||0)):'<span style="color:#5a6a8a">'+t('empire.eco_inconnus','éco &amp; moral : inconnus (tech Renseignement)')+'</span>';const cru=croiseurLigne(ai);return`${ai.civ.emoji} <strong>${ai.civ.name}</strong> · Nv.${ai.gov_level}<br>${eco}<br>${forceTxt} · ${t('empire.cols_routes','Cols:{c} Routes:{r}',{c:ai.colonies.length,r:ai.routes.length})}${cru?'<br>'+cru:''}<br><strong style="color:#ffd700">${t('empire.vp_estimes','~{vp} VP estimés',{vp:aiVP.total})}</strong>`;}).join('<hr style="border-color:#1a1a3a;margin:4px 0">');
 }
 function renderActions(){
   const active=G.phase==='actions';

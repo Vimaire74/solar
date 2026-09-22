@@ -2232,4 +2232,10 @@ window.SOLAR_LANG_DICT = {
   "evt.tempete_epargnee": "🛡️ spared (Defensive AI)",
   "commun.fleche": "{a}→{b}",
   "prixguerre.bloc": "<div style=\"margin-top:10px;padding:9px 11px;border:1px solid #8a2626;background:#2a0f0f;border-radius:10px;text-align:left;line-height:1.5\"><b style=\"color:#ff9a8a\">{titre}</b><br>{usure}<br>{regles}<br><span style=\"opacity:.8\">{paix}</span></div>",
+  "actions.fam_repetables": "Repeatable — every turn",
+  "actions.fam_une_fois": "Once per game",
+  "actions.fam_gouvernement": "Government — one form at a time",
+  "actions.fam_renforts": "Reinforcements — lost next turn",
+  "actions.badge_gouv": "GOV",
+  "actions.demande": "needs {n}",
 };
