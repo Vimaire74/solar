@@ -281,7 +281,7 @@ function couleurCarte(card){
   return TYPE_COLORS[card.type]||'#2a2a5a';
 }
 // Cartes disposant d'une illustration servie dans assets/cards/<id>.png (ajouter l'id au fil des illustrations)
-const CARD_ART=new Set(['bio1','prop1','drones1','quant1','bio2','nav2','hyper3','reseau2','vegetal1','exploit1','terra3','iadef3','robo2','extra3','empathic2','eveil3','extract2','dyson3','mil3','mil2','liens1','gov_senat','gov_democratie','mil_invest','mil1','comm2','tele3','gov_corpo','cm_culture','cm_propagande','cm_social','cm_calm','cm_research','cm_univ','cm_reform','gov_tyrannie','cm_explore','cm_forages']);
+const CARD_ART=new Set(['cm_diplomatie','bio1','prop1','drones1','quant1','bio2','nav2','hyper3','reseau2','vegetal1','exploit1','terra3','iadef3','robo2','extra3','empathic2','eveil3','extract2','dyson3','mil3','mil2','liens1','gov_senat','gov_democratie','mil_invest','mil1','comm2','tele3','gov_corpo','cm_culture','cm_propagande','cm_social','cm_calm','cm_research','cm_univ','cm_reform','gov_tyrannie','cm_explore','cm_forages']);
 const CARDS_POOL=[
   // ── EXPANSION ────────────────────────────────────────────────────────────────
   {id:'bio1',branch:'expansion',tier:1,type:'expansion',name:'Biosphère Autonome',emoji:'🏗️',
