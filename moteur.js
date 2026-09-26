@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-22 · v10.94';
+const SOLAR_BUILD_MOTEUR = '2026-09-24 · v10.95';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -410,6 +410,14 @@ const STRATEGY_CARDS=[
   {id:'st10',name:'Initiative',emoji:'🥇',desc:'Tu joues en premier ce tour, mais tu es 2ᵉ si un joueur a choisi Initiative planifiée le tour précédent.',initiative:'tour'},
   {id:'st11',name:'Initiative planifiée',emoji:'📅',desc:'Tu joueras en premier le tour prochain.',initiative:'prochain'},
 ];
+/* Rend la tuile canonique à partir de son identifiant. Accepte aussi un objet, pour les parties
+   enregistrées AVANT le 23/09 qui rangeaient la tuile elle-même. Rend null si l'identifiant ne
+   correspond à rien : l'appelant retire alors une tuile neuve. */
+function _tuileDecouverte(ref){
+  if(!ref)return null;
+  const id=(typeof ref==='string')?ref:ref.id;
+  return DISCOVERY_TILES.find(function(t){return t.id===id;})||null;
+}
 const DISCOVERY_TILES=[
   {id:'dt1',name:'Gisement Riche',emoji:'⛏️',desc:'+2<i class=ri-materials></i> immédiats.',res:{materials:2}},
   {id:'dt2',name:'Relique Alien',emoji:'👽',desc:'+2<i class=ri-science></i> et +1 VP de bonus.',res:{science:2},vp:1},
@@ -1218,12 +1226,12 @@ function _evDiploConfirm(propId){
   const autres=allPlayers().filter(function(n){return n!==prop;});
   /* Plus de −5 de tension « tout de même » (Marc, 21/09) : c'était un doublon de `_evDiploResolve`.
      L'événement ne baisse la tension QUE par le pacte signé, qui la remet à 0. */
-  let made=0;
+  let made=0, _enAttente=0; const _faute=[];
   for(const o of autres){
     if(!_evDiploSel[o.civ.id])continue;
     const war=_warBetween(prop.civ.id,o.civ.id);
     const needM=6; // coût uniforme : 6 matériaux par nation (plus de surcoût énergie en cas de guerre)
-    if((prop.res.materials||0)<needM){addLog(J('journal.assez_materiaux_pacte_avec_6_requis','🕊️ {emoji} {nation} : pas assez de matériaux pour le pacte avec {nation2} (6 requis).',{emoji:prop.civ.emoji,nation:_i18nRef(prop.civ,'name'),nation2:_i18nRef(o.civ,'name')}),'red');continue;}
+    if((prop.res.materials||0)<needM){addLog(J('journal.assez_materiaux_pacte_avec_6_requis','🕊️ {emoji} {nation} : pas assez de matériaux pour le pacte avec {nation2} (6 requis).',{emoji:prop.civ.emoji,nation:_i18nRef(prop.civ,'name'),nation2:_i18nRef(o.civ,'name')}),'red');_faute.push(o);continue;}
     /* ⚠️ UN PACTE SE SIGNE À DEUX. Il s'appliquait sans que l'autre nation ait son mot à dire :
        on payait 6🪨 et le pacte existait, même si la nation visée n'en voulait pas.
        Elle peut désormais refuser, selon la même règle qu'un accord commercial — et l'on ne paie
@@ -1246,6 +1254,7 @@ function _evDiploConfirm(propId){
          texte:J('ui.te_propose_pacte_non_agression_4_tours_t','{emoji} {nation} te propose un PACTE DE NON-AGRESSION de 4 tours : tension remise à zéro entre vous, fin de la guerre s\'il y en a une, +1<i class=ri-morale></i> et +4 VP pour chacun. C\'est lui qui paie les 6<i class=ri-materials></i>.',{emoji:prop.civ.emoji,nation:_i18nRef(prop.civ,'name')}),
          options:[{id:'yes',name:J('ui.accepter_pacte','🕊️ Accepter le pacte')},{id:'no',name:J('ui.refuser_x','❌ Refuser')}]},
         'stPacteReponse', null);
+      _enAttente++;
       continue;
     }
     const _avis=accordAcceptable(o,prop);
@@ -1278,7 +1287,22 @@ function _evDiploConfirm(propId){
   /* Le journal est PARTAGÉ : « aucun pacte conclu » sans nom laissait croire que PERSONNE n'avait
      rien signé, alors que deux lignes plus haut deux pactes venaient d'être annoncés par un autre
      joueur (log de Marc, partie CC36). On nomme la nation. */
-  if(made===0)addLog(J('journal.sommet_diplomatique_aucun_pacte_signe_te','🕊️ {emoji} {nation} — sommet diplomatique : aucun pacte signé.',{emoji:prop.civ.emoji,nation:_i18nRef(prop.civ,'name')}),'dim');
+  /* ═══ UN PACTE QUI ÉCHOUE FAUTE DE MATÉRIAUX DOIT SE VOIR (Marc, 23/09, partie C062) ═══
+     Au tour 2 il coche le pacte avec les Martiens, il n'a que 3🪨 sur les 6 requis, et le jeu
+     renonce en écrivant une ligne rouge parmi trente. Il a joué quatre tours en se croyant
+     protégé, et s'est fait piller par ce même Martien aux tours 1, 3, 4 et 5. La règle du pacte
+     est juste ; c'est le silence qui l'a trompé. On le lui dit maintenant en face. */
+  if(_faute.length&&typeof notifyNationHit==='function'){
+    const _noms=_faute.map(function(n){return J('commun.emoji_nom','{emoji} {nom}',{emoji:n.civ.emoji,nom:_i18nRef(n.civ,'name')});}).join(', ');
+    notifyNationHit(prop,J('avis.pacte_non_conclu','🕊️ Pacte NON conclu'),
+      J('avis.pacte_manque_materiaux','Il faut <b>6<i class=ri-materials></i> par pacte</b>, et tu n\'en avais pas assez.<br><br>Aucun pacte avec {v} n\'a été signé — tu n\'es <b>pas</b> protégé de cette nation.<br><br>Rien ne t\'a été prélevé.',{v:_noms}));
+  }
+  /* ⚠️ ON NE CONCLUT PAS AVANT D'AVOIR LA RÉPONSE (Marc, 23/09, partie 821C, tour 6). Le journal
+     écrivait « Jupitériens — sommet diplomatique : aucun pacte signé » juste après « en attente de
+     sa réponse… », donc avant que Marc ait répondu — et son refus arrivait deux lignes plus bas.
+     La conclusion racontait la fin avant le milieu. Tant qu'une proposition attend, on se tait :
+     la réponse écrira elle-même sa ligne, pacte signé ou refus. */
+  if(made===0&&_enAttente===0)addLog(J('journal.sommet_diplomatique_aucun_pacte_signe_te','🕊️ {emoji} {nation} — sommet diplomatique : aucun pacte signé.',{emoji:prop.civ.emoji,nation:_i18nRef(prop.civ,'name')}),'dim');
   if(_simul)_accordsVerifierFin(); else _appelerSuite(done);
 }
 
@@ -6422,11 +6446,34 @@ function stApresEvenement(){
   d.apresEvenement=null; d.evenementCourant=null;
   if(nom) fluxAppeler(nom);
 }
+/* ═══ VICTOIRE TOTALE PAR ÉLIMINATION (Marc, 23/09, partie 821C) ═══
+   « Le jeu devrait s'arrêter à deux si j'élimine l'autre. Victoire totale par élimination. J'ai
+   fait le tour 10 pour rien. » Dans son journal, les Jupitériens perdent leur dernière colonie au
+   tour 9 et le jeu déroule quand même un tour 10 entier, seul contre personne.
+   Dès qu'il ne reste qu'UNE nation en jeu, la partie s'achève.
+   ⚠️ ON COUPE À LA FIN DU TOUR, PAS AU MOMENT DE L'ÉLIMINATION. La surproduction et l'écrêtage du
+   tour en cours sont dus, et interrompre une manche en son milieu laisserait des fenêtres en vol.
+   Le tour où l'élimination a lieu se termine donc normalement ; c'est le SUIVANT qui n'a plus lieu.
+   Banc : server/test_fin_par_elimination.js */
+function _victoireParElimination(){
+  try{
+    if(!G||G.phase==='over')return false;
+    const _toutes=(typeof allPlayers==='function')?allPlayers():[];
+    if(_toutes.length<2)return false;                 // partie à une seule nation : rien à conclure
+    const _vivantes=(typeof nationsEnJeu==='function')?nationsEnJeu():[];
+    if(_vivantes.length>1)return false;
+    const _seule=_vivantes[0];
+    G._finParElimination=(_seule&&_seule.civ)?_seule.civ.id:null;
+    if(_seule&&_seule.civ)addLog(J('journal.victoire_totale_elimination','🏆 {emoji} {nation} reste seule en jeu — victoire totale par élimination, la partie s\'achève.',{emoji:_seule.civ.emoji,nation:_i18nRef(_seule.civ,'name')}),'gold');
+    return true;
+  }catch(e){ return false; }
+}
 function continueAfterEOT(){
   document.getElementById('eot-modal').classList.add('hidden');
   if(typeof surproductionVP==='function')surproductionVP();   // AVANT l'écrêtage : c'est l'excédent qu'on compte
   enforceCaps(); // DÉBUT DU TOUR SUIVANT : ressources plafonnées (12⚡ / 20🪨 / 10🔬 / 10🙂, moins sous forme autoritaire)
   if(G.turn>=G.maxTurns)doEndGame();
+  else if(_victoireParElimination())doEndGame();
   else if(G.turn===2&&!G.player._inv1){showInvestmentModal();}   // niv.1 : choix fin T2, effet T3→T5
   else if(G.turn===6&&!G.player._inv2){showInvestmentModal2();} // niv.2 : choix fin T6, effet T7→T9
   else{G.turn++;runStrategyDraft();}
@@ -7646,9 +7693,23 @@ function doColonize(nodeId, nation){
   addAction('🏗️',J('action.coloniser','Coloniser {noeud}',{noeud:_i18nRef(node,'name')}),ac,{materials:mat,energy:en},(connected?J('action.connectee',"Connectée"):J('action.non_connectee',"Non connectée")));
   // Discovery
   if(!G._discCache)G._discCache={};
-  let disc=G._discCache[nodeId];
-  if(!disc){disc=DISCOVERY_TILES[Math.floor(Math.random()*DISCOVERY_TILES.length)];G._discCache[nodeId]=disc;}
-  G._decouverteEnAttente={disc,nodeId,moral:(isRemoteCol&&!hasSpec(_n,'bio2_bonus'))?0:1,connected:!!connected,civ:_n.civ.id}; // dans G : une tuile en attente doit survivre à une sauvegarde
+  /* ⚠️ ON RANGE L'IDENTIFIANT DE LA TUILE, JAMAIS LA TUILE — Marc, 23/09, parties 821C et C062 :
+     sept colonisations rendent « Terrain Rocailleux », puis dix rendent « Anomalie Spatiale ».
+     Une seule tuile par partie, une autre à la partie suivante.
+     LA CAUSE. On rangeait ici une RÉFÉRENCE vers une entrée de `DISCOVERY_TILES`. Le cerveau
+     `tacticien` simule chaque coup : photo JSON, coup joué, puis restauration par
+     `_fusionEnPlace`/`_recoudre`, qui fusionnent EN PLACE — les champs de la photo sont recopiés
+     DANS l'objet vivant. L'objet vivant étant une entrée de la table globale, chaque restauration
+     réécrivait la table. Entrée après entrée, les huit tuiles devenaient huit copies de la même,
+     et tout tirage ultérieur rendait cette tuile-là quel que soit l'indice tiré.
+     C'est exactement le piège contre lequel `_fusionEnPlace` protège déjà les FONCTIONS (« non pas
+     dans une copie, mais dans la TABLE GLOBALE, définitivement ») : la garde ne couvrait pas les
+     données. Une chaîne de caractères, elle, ne peut pas être fusionnée en place.
+     Banc : server/test_table_decouvertes_intacte.js */
+  let disc=_tuileDecouverte(G._discCache[nodeId]);
+  if(!disc)disc=DISCOVERY_TILES[Math.floor(Math.random()*DISCOVERY_TILES.length)];
+  G._discCache[nodeId]=disc.id;
+  G._decouverteEnAttente={disc:disc.id,nodeId,moral:(isRemoteCol&&!hasSpec(_n,'bio2_bonus'))?0:1,connected:!!connected,civ:_n.civ.id}; // dans G : une tuile en attente doit survivre à une sauvegarde
   /* ═══ LA DÉCOUVERTE APPARTIENT À CELUI QUI COLONISE (partie 29BD, 22/09) ═══
      ⚠️ Depuis que l'ordinateur colonise par `doColonize` (cerveau tacticien), sa tuile restait EN
      ATTENTE : rien ne la refermait pour lui. La fenêtre s'ouvrait chez le joueur (solo), ou le
@@ -14840,7 +14901,7 @@ function dismissDiscovery(){
    champ (sauvegarde d'avant le 22/09), repli sur `G.player`, le comportement d'origine. */
 function appliquerDecouverte(){
   if(G._decouverteEnAttente){
-    const{disc,nodeId}=G._decouverteEnAttente;G._decouverteDerniere=G._decouverteEnAttente;G._decouverteEnAttente=null;
+    const{nodeId}=G._decouverteEnAttente;const disc=_tuileDecouverte(G._decouverteEnAttente.disc);if(!disc){G._decouverteEnAttente=null;return;}G._decouverteDerniere=G._decouverteEnAttente;G._decouverteEnAttente=null;
     const _cid=G._decouverteDerniere.civ;
     const p=(_cid&&allPlayers().find(x=>x&&x.civ&&x.civ.id===_cid))||G.player;
     const _local=(p===G.player&&!p._isAI);
@@ -15430,6 +15491,39 @@ function _warSelectColonyTarget(nodeId){
   if(!_aUnEcran())return;             // le reste est du dessin
   _warShowAttackSlider();
 }
+/* ═══ CE QU'ON A LE DROIT DE SAVOIR AVANT D'ASSAILLIR (Marc, 23/09, partie C062) ═══
+   « Quand je fais une attaque le jeu me donne à l'avance les jetons misés par l'autre nation, c'est
+   pas logique. Trop facile. » Et sa règle : on voit venir une armada de loin, donc le DÉFENSEUR
+   connaît la force exacte de l'attaque ; à l'inverse assaillir est hasardeux, il faut estimer.
+   Ce que la fenêtre affiche n'est donc pas une réponse, c'est une aide à la réflexion.
+
+   ⚠️ DEUX FUITES RÉPARÉES ICI, toutes deux contraires à `regles.html` §14.7 (« sans Réseau
+   Orbital : estimation à ±3, économie et moral cachés, défense adverse inconnue au moment
+   d'engager ») :
+     · on appelait `defenseIA()`, qui calcule ce que l'ordinateur va RÉELLEMENT engager d'après ses
+       ressources payables — on lisait donc son économie, et on annonçait sa décision avant qu'il la
+       prenne ;
+     · la branche brouillard affichait `aiTok`, le compte EXACT, sous l'étiquette « ~n (±1) ».
+
+   CE QUI RESTE PUBLIC, et qu'on annonce : la garnison (`garrisonOf` : 10 pour une capitale tenue
+   par sa nation, 1 sinon) et la POSSESSION du supercroiseur (« on ne cache pas un supercroiseur,
+   c'est trop gros », Marc, 07/09 — son état de réparation, lui, reste secret, donc `hasCruiser` et
+   non `cruiserAvailable`). Les Empathes ne sont qu'un rappel : au joueur d'aller lire ses
+   technologies. Banc : server/test_fenetre_assaut_brouillard.js */
+function _defensePossibleHTML(p,ai,nodeId){
+  if(!ai||!ai.civ)return '';
+  const _gar=(typeof garrisonOf==='function')?garrisonOf(ai,nodeId):1;
+  const _capitale=!!(nodeId&&nodeId===ai.civ.home&&_gar>1);
+  const _pf=(typeof perceivedForce==='function')?perceivedForce(p,ai):{exact:true,val:(ai.forceTokens||0)};
+  const _bits=[];
+  _bits.push(_capitale?t('guerre.def_garnison_capitale','<strong>{n}</strong> garnison de capitale',{n:_gar})
+                      :t('guerre.def_garnison','<strong>{n}</strong> garnison',{n:_gar}));
+  _bits.push(_pf.exact?t('guerre.def_jetons_exact','jusqu\'à <strong>{n}</strong> jeton(s)',{n:_pf.val})
+                      :t('guerre.def_jetons_flou','environ <strong>{n}</strong> jeton(s) (±3)',{n:_pf.val}));
+  if(ai.hasCruiser)_bits.push(t('guerre.def_croiseur','supercroiseur <strong>+{n}</strong>',{n:(ai.cruiserPower||5)}));
+  _bits.push(t('guerre.def_empathes','empathes ?'));
+  return (_pf.exact?'🛰️ ':'🌫️ ')+t('guerre.def_possible','Défense possible : {v}',{v:_bits.join(' · ')});
+}
 function _warShowAttackSlider(){
   if(!_aUnEcran())return;   // dessine un curseur : sans écran, il n'y a rien à dessiner
   /* Le défenseur est celui qui TIENT le nœud visé — plus « la guerre en cours ou la première IA » :
@@ -15441,11 +15535,6 @@ function _warShowAttackSlider(){
   /* Même règle de défense qu'en ligne (`defenseIA`, appelée par le serveur) : une seule logique. Avant,
      le solo engageait TOUT ce qui était payable et le serveur suivait `defenseIA` (21/09). */
   const usableDef=ai?((ai._isAI!==false&&typeof defenseIA==='function')?defenseIA(ai,p,_warAttackColonyTarget):Math.min(aiTok,maxAffordableTokens(ai))):0;
-  // Bonus de défense GRATUITS de l'ennemi (ne coûtent ni énergie ni matériaux) : Empathes et Supercroiseur.
-  // Ils étaient absents de l'affichage → on pouvait perdre « 4 contre 5 » face à une nation à 0⚡ sans comprendre.
-  const _freeDef=ai?(((typeof hasSpec==='function'&&hasSpec(ai,'empath_routes'))?2:0)
-                    +((typeof hasSpec==='function'&&hasSpec(ai,'empath_tele'))?2:0)
-                    +((typeof cruiserAvailable==='function'&&cruiserAvailable(ai)&&typeof cruiserAfford==='function'&&cruiserAfford(ai))?(ai.cruiserPower||5):0)):0;
   const aiCommitted=usableDef; // l'IA engagera ce qu'elle peut payer (la garnison +1 est ajoutée au combat)
   G._aiWarCommitted=aiCommitted;
   const stratBonus=(p.stratBonus&&p.stratBonus.combatBonus)||0;
@@ -15466,9 +15555,7 @@ function _warShowAttackSlider(){
     t('guerre.cible','Cible : <strong style="color:#ffaa66">{n}</strong>',{n:(targetNode?targetNode.emoji+' '+targetNode.name:'?')})+'<br>'+
     t('guerre.jetons_engageables','Tes jetons engageables : <strong>{n}</strong>',{n:engageable})+
     (stratBonus?'<br>'+t('guerre.bonus_strat','Bonus stratégie : <strong>+{n}</strong>',{n:stratBonus}):'')+
-    '<br><span style="color:#7880a0;font-size:.82em">'+(intel>=2
-      ? t('guerre.def_ennemie','🛰️ Défense ennemie totale : <strong>{n}</strong>',{n:(usableDef+1+_freeDef)})
-      : t('guerre.force_ennemie','🌫️ Force ennemie totale : <strong>~{n}</strong> jeton(s) (±1)',{n:aiTok}))+'</span>';
+    '<br><span style="color:#7880a0;font-size:.82em">'+_defensePossibleHTML(p,ai,_warAttackColonyTarget)+'</span>';
   const slider=document.getElementById('wcm-slider');
   slider.parentElement.style.display='';
   document.getElementById('wcm-power').style.display='';
@@ -15661,6 +15748,27 @@ function warHoldPosition(){
     {const _s=_combatSuiteLire(); if(_s)_s('STANDOFF');}
   }
 }
+/* ═══ ON VOIT L'ARMADA ARRIVER (Marc, 23/09) ═══
+   « Quand on attaque une colonie, ce n'est pas une totale surprise. Avec les télescopes, senseurs
+   etc. on voit arriver une armada de loin, donc le défenseur a une connaissance exacte du niveau
+   d'attaque quand il doit défendre. À l'inverse attaquer une colonie ou une capitale est
+   hasardeux. » (Un raid échappe à cette règle : un ou deux pillards ne se voient pas venir.)
+   C'est le pendant exact de ce qu'on retire côté attaquant dans `_defensePossibleHTML` : là on
+   estime, ici on sait. Le chiffre existait déjà — `G._aiWarCommitted` est fixé juste au-dessus —
+   on ne le montrait simplement pas, et le joueur choisissait ses jetons à l'aveugle.
+   Le supercroiseur n'est annoncé que comme POSSIBLE : sa sortie se décide à la résolution.
+   Banc : server/test_fenetre_defense_armada.js */
+function _armadaAnnonceHTML(att,jetons){
+  if(!att||!att.civ)return '';
+  const _emp=((typeof hasSpec==='function'&&hasSpec(att,'empath_routes'))?2:0)
+            +((typeof hasSpec==='function'&&hasSpec(att,'empath_tele'))?2:0);
+  const _bits=[t('defense.armada_jetons','<strong>{n}</strong> jeton(s) engagé(s)',{n:jetons})];
+  if(_emp)_bits.push(t('defense.armada_empathes','+{n} empathes',{n:_emp}));
+  if(att.hasCruiser)_bits.push(t('defense.armada_croiseur','supercroiseur possible +{n}',{n:(att.cruiserPower||5)}));
+  return '<span style="color:#ffaa77;font-size:.9em">'
+    +t('defense.armada','🔭 {emoji} {nation} lance l\'assaut : {v}',{emoji:att.civ.emoji,nation:_i18nRef(att.civ,'name'),v:_bits.join(' · ')})
+    +'</span><br>';
+}
 function warDefendTarget(){
   // Étape 2 : slider pour choisir les jetons de défense
   const p=G.player;
@@ -15674,6 +15782,7 @@ function warDefendTarget(){
   document.getElementById('wcm-info').innerHTML=
     t('defense.cible','Cible menacée : <strong style="color:#ffaa77">{n}</strong>',{n:tName})+'<br>'+
     t('defense.jetons_dispo','Tes jetons disponibles : <strong>{n}</strong>',{n:p.forceTokens})+'<br>'+
+    _armadaAnnonceHTML(wdAi,aiCommitted)+
     '<span style="color:#7880a0;font-size:.82em">'+t('defense.aide','Plus tu en engages, plus la défense est solide. 0 jeton = tu subis sans résistance.')+'</span>';
   const slider=document.getElementById('wcm-slider');
   slider.parentElement.style.display='';

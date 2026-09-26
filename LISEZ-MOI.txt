@@ -1,4 +1,4 @@
-LOT 17 — À UPLOADER  ·  22/09/2026  ·  v10.94 / sw v215
+LOT 17 — À UPLOADER  ·  24/09/2026  ·  v10.95 / sw v216
 
 CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas encore en ligne).
 
@@ -101,3 +101,29 @@ v10.84 — voir REPRISE.md §150 (pacte +4 VP, Opulence 6 VP, routes, fenêtre d
 APRÈS LE REDÉPLOIEMENT
    Journaux Coolify du serveur :  Langues chargées : en (2163 clés)
    Écran d'accueil : Version 2026-09-22 · v10.91
+
+────────────────────────────────────────────────────────────────────────
+v10.95 (24/09) — six corrections, toutes nées des logs des parties 821C et C062
+
+  ⚠️ LA TABLE DES DÉCOUVERTES ÉTAIT DÉTRUITE À CHAQUE PARTIE. Le cache rangeait une
+     référence vers la table globale ; la simulation des IA la réécrivait en place, et les
+     huit tuiles finissaient identiques. D'où sept « Terrain Rocailleux » dans 821C et dix
+     « Anomalie Spatiale » dans C062. On range l'identifiant, plus l'objet.
+  · La partie s'arrête dès qu'il ne reste qu'une nation — victoire totale par élimination,
+     à la fin du tour. Plus de tour joué contre personne.
+  · Un pacte qui échoue faute de matériaux le DIT au joueur, au lieu d'une ligne de journal.
+  · Le journal n'écrit plus « aucun pacte signé » avant que la réponse soit arrivée.
+  ⚠️ LA FENÊTRE D'ASSAUT LISAIT L'ÉCONOMIE DE L'ADVERSAIRE pour annoncer sa défense exacte.
+     Elle n'annonce plus que le public : garnison (10 capitale / 1 colonie), jetons estimés
+     (exacts avec le Réseau Orbital, ±3 sinon), supercroiseur s'il est possédé, rappel
+     « empathes ? ». Plus de total.
+  · La fenêtre de DÉFENSE annonce enfin la force exacte de l'attaque — on voit l'armada
+     arriver de loin.
+
+  Fichiers de ce lot touchés : index.html, tutorial.html, moteur.js, online.js, sw.js,
+  lang/en.js.
+  Cinq bancs neufs dans server/ (découvertes, élimination, pacte, assaut, défense).
+
+  RAPPEL : redéploie les DEUX ressources Coolify (site + serveur).
+  L'appli Android est déjà reconstruite en 10.95 (versionCode 1095) : il ne te reste qu'à
+  presser ▶ Run dans Android Studio.
