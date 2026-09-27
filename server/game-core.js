@@ -25,6 +25,10 @@ function makeEl(id) {
     },
     setAttribute(){}, getAttribute(){ return null; }, removeAttribute(){}, hasAttribute(){ return false; },
     appendChild(c){ return c; }, removeChild(c){ return c; }, insertBefore(c){ return c; }, replaceChild(){},
+    /* Le décor ne sait pas ANALYSER du HTML — il se contente de ne pas jeter. Un banc qui veut
+       mesurer le balisage d'une fenêtre le demande donc à la fonction qui le construit (voir
+       `scDemander`), et pilote ensuite les boutons par leur id, que `getElementById` met en cache. */
+    insertAdjacentHTML(){}, insertAdjacentElement(c){ return c; },
     addEventListener(){}, removeEventListener(){}, dispatchEvent(){ return true; },
     querySelector(){ return makeEl(); }, querySelectorAll(){ return []; },
     getBoundingClientRect(){ return { left:0, top:0, right:0, bottom:0, width:0, height:0, x:0, y:0 }; },

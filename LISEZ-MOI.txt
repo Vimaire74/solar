@@ -1,4 +1,4 @@
-LOT 17 — À UPLOADER  ·  24/09/2026  ·  v10.95 / sw v216
+LOT 17 — À UPLOADER  ·  26/09/2026  ·  v11.01 / sw v222
 
 CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas encore en ligne).
 
@@ -6,7 +6,7 @@ CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas enc
    tutorial.html       → régénéré (v10.94)
    online.js           → v10.87 (défense : la case Supercroiseur compte toujours ; espionnage)
    moteur.js           → v10.84 + tensions + v10.87
-   sw.js               → cache v208
+   sw.js               → cache v222
    regles.html         → règles FR
    regles.en.html      → règles EN
    lang/en.js          → traductions
@@ -16,6 +16,80 @@ CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas enc
    server/server.js    → langues chargées au démarrage + rapport de fin traduit (v10.87)
 
 Redéploie les DEUX ressources dans Coolify (site + serveur).
+
+v11.01 — LE MORAL BRIDÉ NE RAPPORTE PLUS DE POINTS, ET LE README DIT SA VERSION (§166)
+   · Partie B285 : les Terriens sous Tyrannie (moral plafonné à 6) avaient un revenu de moral de
+     12/tour dont ils jetaient la moitié chaque tour — et le rapport leur comptait +5 VP, le
+     maximum. Règle de Marc : pas de bonus de moral pour une nation dont le maximum est 6 ou 7.
+     Le rapport écrit désormais pourquoi le poste est à 0.
+   · Pour uploader/lot17/LISEZ-MOI.md porte un BANDEAU DE VERSION en tête, vérifié par
+     server/test_versions.js : il annonçait v10.83 alors que le lot était en v11.00.
+   Bancs : server/test_vp_moral_plafonne.js (neuf) · server/test_versions.js (point 5 ajouté)
+
+v11.00 — LA MAQUETTE DU 23/09 EST ENTIÈREMENT LIVRÉE (voir REPRISE.md §165)
+   Les trois derniers éléments bruts du navigateur :
+   · CARTES DE NATION sous 360 px : pleine largeur et horizontales (emblème à gauche, les cinq
+     chiffres sur une ligne, couleur de la nation dans le bord gauche). Cause : width:46% +
+     min-width:140px, qui laissait deux cartes de 140 px sur un écran de 320.
+   · CHOIX DU SIÈGE : quatre boutons de 44 px au lieu d'un <select>, chacun avec sa description,
+     sous le nom de la nation — plus rien ne déborde. « Moi » est unique par construction.
+   · PACTES : la ligne entière est la cible (44 px, case dorée) au lieu d'une case native de 13 px ;
+     les deux boutons sont ceux du jeu, et le principal compte les pactes choisis.
+   · Fiche de nœud : « ☠️ Risque pirate ++ » remplace le texte sur les repaires (choix de Marc).
+   Banc neuf : server/test_apparence_mobile.js
+   9 clés anglaises ajoutées, 3 retirées.
+
+⚠️ test_alternance N'EST PLUS ROUGE — et ce n'était pas le pilote (voir REPRISE.md §164)
+   Le banc datait du 28/08 et n'avait pas suivi la RÈGLE DE LA DETTE arrivée le 20/09 : une nation
+   qui dépense 2 AC en un coup doit laisser jouer les autres une fois de plus (`_passesDues`), donc
+   elle a encore des AC et ne peut pourtant pas jouer. Le banc la comptait parmi celles qui
+   « pouvaient jouer » et accusait le joueur d'un passage volé — alors que ce passage lui était dû.
+   Sonde : 2 signalements, 2 expliqués entièrement par une dette. Aucune ligne de moteur.js,
+   online.js ni driver.js n'a changé. Seul server/test_alternance.js est corrigé (+ une
+   contre-épreuve neuve : un vrai vol reste détecté). 5 exécutions vertes de suite.
+   → « une nation rejoue occasionnellement son tour » de §138/§139 est CLOS : rien à corriger.
+
+v10.99 — LES DEUX DERNIERS DÉFAUTS DES CAPTURES MOBILES (voir REPRISE.md §163)
+   · RANG 3 GRISÉ : `isTechExclusive` rend vrai dès tier>=3, donc ton propre achat d'une T3
+     remplissait G.techTaken et la ligne compacte recevait `.al-bloc` (opacity .55) en même temps
+     que `.al-mien`. Les SEPT technologies de rang 3 étaient concernées, jamais les rangs 1 et 2.
+     Désormais « à moi » l'emporte sur « prise » ; une T3 prise par une AUTRE nation reste atténuée.
+   · PLUS AUCUNE FENÊTRE DU NAVIGATEUR : les 7 `confirm()` restants (quitter une partie en ligne,
+     renoncer, concéder, supprimer une partie, supprimer son compte, refuser la paix sans moyens,
+     abandonner une partie solo) passent par `scDemander` — couleurs du jeu, texte en paragraphes,
+     boutons NOMMÉS de 44 px, corps défilable sous un max-height (= « fenêtre réductible »).
+     Échap et un clic hors de la fenêtre valent NON : une suppression de compte ne part pas
+     sur une fermeture accidentelle. 22 clés anglaises ajoutées.
+   server/game-core.js est aussi dans ce lot (insertAdjacentHTML ajouté au décor des bancs).
+   Bancs neufs : server/test_tech_mienne_pas_grisee.js · server/test_fenetre_confirmation.js
+   ⚠️ test_alternance est rouge — défaut ANTÉRIEUR et aléatoire (une nation rejoue parfois son
+     tour), documenté en §138 et §163.4. Ce n'est pas une régression de cette version.
+
+v10.98 — DEUX PETITS DÉFAUTS DES CAPTURES MOBILES (voir REPRISE.md §162)
+   · « 7/6 BRANCHES » : le dénominateur était écrit en dur à 6 alors que TECH_BRANCHES en compte 7
+     (la septième, 🔮 Empathes, ne s'ouvre qu'avec l'Union Sacrée). On compte désormais les branches
+     réellement ouvertes, numérateur et dénominateur sur le même ensemble.
+     Partie ordinaire : toujours « n/6 », rien ne change. Avec l'Union Sacrée : « n/7 ».
+   · NOM DE LA CEINTURE PRINCIPALE : écrit en entier, sur DEUX lignes (deux arcs concentriques),
+     et le premier caractère à 24 unités du bord gauche du plateau — angle de départ calculé
+     (acos((x − Soleil.x) / r)) au lieu d'un 88° + startOffset 2 % qui posait le texte à x ≈ 83.
+     Chaque rayon a son propre angle : c'est ce qui aligne les deux lignes entre elles.
+     La ceinture de Kuiper garde son arc unique. EN : « MAIN ASTEROID » / « BELT ».
+   Bancs neufs : server/test_compteur_branches.js · server/test_etiquette_ceinture.js
+
+v10.97 — PLUS DE JETON SUR UNE ROUTE QUI N'EN A PLUS BESOIN (voir REPRISE.md §161)
+   Partie 1E11 : « depuis que j'ai IA Défensive, le jeu ne me donne plus le choix de mettre ou pas
+   un jeton, et il en met un automatiquement ». Deux technologies se télescopaient :
+   · 🌀 Hyperpropulsion pose le jeton d'office et gratuitement (et supprime la fenêtre de choix) ;
+   · 🛡️ IA Défensive rend les routes protégées SANS jeton (« Rappelle tes jetons des routes »).
+   Ensemble : un jeton posé d'office qui ne sert à rien, visible dans le bandeau de force et
+   compté dans l'agenda ⚔️ Armada Solaire.
+   · `routesProtegeesParTech` est désormais consultée par les QUATRE portes qui posent un jeton
+     (porte commune, construction humaine, construction de l'ordinateur, bouton « Déployer »).
+   · L'ordinateur : son garde-fou existait mais était court-circuité par l'ordre des lignes.
+   · SANS IA Défensive, rien ne change : le jeton gratuit d'Hyperpropulsion reste posé (il sert).
+   · Le journal nommait « IA de Navigation » au lieu d'Hyperpropulsion — corrigé.
+   Banc neuf : server/test_jeton_route_inutile.js (5 points rouges avant, 4 contre-épreuves).
 
 v10.94 — RIVIÈRES COMPACTES : UN SEUL HABILLAGE (voir REPRISE.md §158 et §158.1)
    · Technologies en compact : MÊME ligne que les actions — un bloc par filière, titre au-dessus,
@@ -127,3 +201,14 @@ v10.95 (24/09) — six corrections, toutes nées des logs des parties 821C et C0
   RAPPEL : redéploie les DEUX ressources Coolify (site + serveur).
   L'appli Android est déjà reconstruite en 10.95 (versionCode 1095) : il ne te reste qu'à
   presser ▶ Run dans Android Studio.
+
+────────────────────────────────────────────────────────────────────────
+v10.96 (26/09) — carte : les colonies des autres nations se voient enfin
+
+  · Leur anneau faisait l'épaisseur de leur niveau — donc UN pixel au niveau 1, contre
+     deux pour les tiennes. Il passe à max(2, niveau+1), comme le tien.
+  · Opacité : 0,85 pour une colonie reliée, 0,75 pour une non reliée (avant 0,65 / 0,45).
+  · Le tiret continue de dire « non reliée » ; tes colonies restent distinctes par le
+     rayon, le tiret plus long et ta couleur.
+
+  Fichier touché : moteur.js. Banc : server/test_anneaux_colonies_lisibles.js

@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-09-24 · v10.95';</script>
+<script>window.SOLAR_BUILD_HTML='2026-09-26 · v11.01';</script>
 <!-- i18n.js EN TÊTE, avant tout script du corps : il choisit la langue et charge lang/<code>.js (synchrone).
      Les écrans d'accueil (scripts inline plus bas) et moteur.js (qui porte t()) le trouvent déjà là. -->
 <script src="i18n.js"></script>
@@ -60,6 +60,10 @@ body{background:#070718;color:#c8d8f8;font-family:var(--font-corps);font-size:va
 .civ-cards{display:flex;gap:10px}
 .civ-card{width:160px;padding:10px 12px;background:#0f0f2a;border:2px solid #2a2a5a;border-radius:10px;cursor:pointer;transition:all .2s;text-align:center}
 .civ-card:hover{border-color:#4a9eff;transform:translateY(-4px);box-shadow:0 0 18px rgba(74,158,255,.3)}
+/* Au-dessus de 360 px ce conteneur n'existe pas pour la mise en page : la carte reste ce qu'elle
+   était. Voir la règle `@media (max-width:359px)` plus bas, et le commentaire de `.civ-corps`
+   dans moteur.js. */
+.civ-corps{display:contents}
 .civ-card.sel{border-color:#ffd700;box-shadow:0 0 18px rgba(255,215,0,.4)}
 .civ-card.ai-pick{border-color:#cc4444;box-shadow:0 0 14px rgba(200,60,60,.35)}
 .civ-pick-badge{margin-top:8px;padding:3px 8px;border-radius:4px;font-size:.72em;font-weight:bold;display:inline-block}
@@ -436,6 +440,22 @@ body{background:#070718;color:#c8d8f8;font-family:var(--font-corps);font-size:va
 .fen .ea-name{margin:0}
 .fen .ea-desc{margin:0}
 .fen .ea-btn{background:#163a6b;border:1px solid #2f6fbf;color:#e8f1ff}
+/* ═══ LIGNES DE PACTE (maquette validée par Marc, 23/09) ═══
+   Elles remplacent des `<input type="checkbox">` de 13 px, impossibles à viser au doigt et dessinés
+   en blanc et gris par le navigateur au milieu d'une fenêtre sombre. La LIGNE ENTIÈRE est la cible,
+   44 px de haut, et la case dorée dit l'état. Voir `showDiploEventModal` dans moteur.js. */
+.pactes-l{display:flex;flex-direction:column;gap:7px;margin:4px 0}
+.pacte-l{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;text-align:left;
+  padding:10px 11px;border-radius:10px;cursor:pointer;font-family:inherit;font-size:.92em;
+  background:#0b0d24;border:1px solid #2a2a5a;color:#dbe1f7}
+.pacte-l[aria-pressed="true"]{border-color:#ffd700;background:#241f08}
+.pacte-l:focus-visible{outline:2px solid #ffd700;outline-offset:2px}
+.pacte-case{width:20px;height:20px;border-radius:5px;border:2px solid #5a6390;flex:none;
+  display:grid;place-items:center;font-size:.8em;color:transparent}
+.pacte-l[aria-pressed="true"] .pacte-case{background:#ffd700;border-color:#ffd700;color:#0b0d24}
+.pacte-txt{min-width:0}
+.pacte-txt b{color:#fff}
+.pacte-det{display:block;font-size:.84em;color:#9fb4d6;line-height:1.3;margin-top:1px}
 
 /* Investment modal */
 #invest-modal,#invest2-modal,#espionage-modal,#empath-copy-modal,#dyson-modal{position:fixed;inset:0;background:rgba(4,4,18,.92);backdrop-filter:blur(7px);z-index:370;display:flex;align-items:center;justify-content:center}
@@ -621,6 +641,33 @@ body{max-width:var(--appw,480px);margin:0 auto;height:100dvh;height:100vh;positi
 #difficulty-sel .diff-btn{flex:1;text-align:center;padding:8px 4px;font-size:.74em;}
 .civ-cards{flex-wrap:wrap;justify-content:center;gap:10px;}
 .civ-card{width:46%;min-width:140px;}
+/* ⚠️ SOUS 360 px, LES CARTES DE NATION PASSENT À L'HORIZONTALE (maquette validée par Marc, 23/09).
+   CAUSE MESURÉE : la règle ci-dessus impose `width:46%` ET `min-width:140px`, avec 10 px d'écart.
+   Sur le Flip 6 replié — 320 px — le conteneur ne fait que 264 px et deux cartes en réclament 290 :
+   elles passent donc à la ligne, mais gardent leurs 140 px, au milieu d'un écran à moitié vide. Le
+   passif se casse alors en six lignes et une carte mesure trois écrans de haut.
+   La carte prend donc toute la largeur et se range en deux colonnes — emblème à gauche, corps à
+   droite, les cinq chiffres sur UNE ligne. La couleur de la nation passe du trait horizontal au
+   bord gauche, où elle tient sans occuper de hauteur.
+   ⚠️ Le survol est neutralisé ici : `translateY(-4px)` au doigt décale la cible pendant le tap. */
+@media (max-width:359px){
+  .civ-cards{gap:8px;}
+  .civ-card{
+    width:100%;min-width:0;padding:10px;text-align:left;
+    display:grid;grid-template-columns:42px 1fr;gap:10px;align-items:start;
+    border-left:4px solid var(--civ-col,#2a2a5a);
+  }
+  .civ-card:hover{transform:none;}
+  .civ-corps{display:block;min-width:0;}
+  .civ-emoji{font-size:1.9em;margin:0;line-height:1.1;text-align:center;}
+  .civ-card h3{margin:0 0 3px;font-size:1em;}
+  .civ-bar{display:none;}
+  .civ-stat{display:inline-flex;gap:4px;font-size:.78em;padding:0;margin-right:10px;}
+  .civ-passive{margin-top:6px;border-top:0;padding-top:0;font-size:.74em;}
+  /* Le badge « ✓ Vous » / « 🤖 » est ajouté à la CARTE, pas au corps : sans cette ligne il
+     retomberait dans la colonne de l'emblème. */
+  .civ-card>.civ-pick-badge{grid-column:2;margin-top:6px;}
+}
 .btn-go{width:100%;padding:14px;font-size:1.05em;}
 
 /* ---------- Barre du haut fixe ---------- */

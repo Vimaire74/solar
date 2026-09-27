@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-24 · v10.95';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-26 · v11.01';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -721,11 +721,16 @@ function showOptsReal(pending, modalId, contId, key, allowNone){
    puisse pas mentir. En dessous de 2, on demande confirmation ; on n'interdit rien.
 
    Rend `true` si on peut continuer. */
+/* ⚠️ REND MAINTENANT UNE PROMESSE (26/09), parce que la fenêtre est celle du jeu et plus celle du
+   navigateur. Ses deux appelants sont des gestionnaires de clic : ils deviennent `async` et
+   l'attendent. Le cas « on peut continuer » reste immédiat — `Promise.resolve(true)`. */
 function _confirmerGuerreSansMoyens(o){
   const n=(o&&o.maxEngage!==undefined)?o.maxEngage:null;
-  if(n===null||n>=2) return true;
+  if(n===null||n>=2) return Promise.resolve(true);
   const s=(o&&o.stocks)||{};
-  return confirm(t('web.manques_ressources_attaquer_peux_engager','⚠️ Tu manques de ressources pour attaquer.\n\nTu ne peux engager que {n} jeton{v} ce tour-ci (stocks : {cout}🪨 {cout2}⚡ — il faut 1🪨 +1⚡ par jeton engagé).\n\nRefuser la paix maintenant, c\'est poursuivre une guerre que tu n\'as pas les moyens de mener.\n\nContinuer quand même ?',{n:n,v:(n>1?'s':''),cout:s.materials||0,cout2:s.energy||0}));
+  return scDemander({titre:t('web.guerre_sans_moyens_titre','Guerre sans moyens'),
+    ok:t('web.guerre_sans_moyens_oui','Continuer quand même'),annuler:t('web.guerre_sans_moyens_non','Revenir'),danger:true,
+    texte:t('web.manques_ressources_attaquer_peux_engager','⚠️ Tu manques de ressources pour attaquer.\n\nTu ne peux engager que {n} jeton{v} ce tour-ci (stocks : {cout}🪨 {cout2}⚡ — il faut 1🪨 +1⚡ par jeton engagé).\n\nRefuser la paix maintenant, c\'est poursuivre une guerre que tu n\'as pas les moyens de mener.\n\nContinuer quand même ?',{n:n,v:(n>1?'s':''),cout:s.materials||0,cout2:s.energy||0})});
 }
 // VRAIE modale de paix (#peace-modal) : offre de ressources +/− + Proposer la paix / Se battre.
 function showPeaceReal(pending){
@@ -758,7 +763,7 @@ function showPeaceReal(pending){
   const bOk=m.querySelector('.fen-btn.ok')||m.querySelectorAll('.atk-btns button')[0];
   const bNo=m.querySelector('.fen-btn.no')||m.querySelectorAll('.atk-btns button')[1];
   if(bOk)bOk.onclick=function(){ const off=(G&&G._peaceOffer)||{materials:0,energy:0,science:0}; close(); if(STATE._realDecide)STATE._realDecide({accept:true,offer:off}); };
-  if(bNo)bNo.onclick=function(){ if(!_confirmerGuerreSansMoyens(o))return; close(); if(STATE._realDecide)STATE._realDecide({accept:false}); };
+  if(bNo)bNo.onclick=async function(){ if(!await _confirmerGuerreSansMoyens(o))return; close(); if(STATE._realDecide)STATE._realDecide({accept:false}); };
   m.style.display='flex'; m.classList.remove('hidden');
   return true;
 }
@@ -1243,9 +1248,11 @@ function installIntercepts(){
     // recharger la page (qui ré-embarquait dans la partie fantôme). Ramène au lobby (création d'une partie).
     if(typeof window.scAbandonGame==='function' && !window.scAbandonGame._scOff){
       const o=window.scAbandonGame;
-      window.scAbandonGame=function(){
+      window.scAbandonGame=async function(){   /* async : `scDemander` rend une promesse (voir moteur.js) */
         if(STATE.started || (STATE.game&&STATE.game.code)){
-          if(!confirm(t('web.quitter_partie_ligne_revenir_menu_partie','Quitter cette partie en ligne et revenir au menu ? La partie sera terminée pour tous les joueurs.'))) return;
+          if(!await scDemander({titre:t('web.quitter_titre','Quitter la partie en ligne'),
+              texte:t('web.quitter_partie_ligne_revenir_menu_partie','Quitter cette partie en ligne et revenir au menu ? La partie sera terminée pour tous les joueurs.'),
+              ok:t('web.quitter_oui','Quitter la partie'),annuler:t('web.quitter_non','Rester'),danger:true})) return;
           try{ localStorage.removeItem('sc_ws_game'); }catch(e){}
           send({t:'leave'});
           return;
@@ -1449,9 +1456,25 @@ function injectStyles(){
      le menu IA/Moi hors de la carte (capture Samsung du 18/09). */
   #sc-ov .siege .nom{flex:1;min-width:0;overflow-wrap:anywhere;font-weight:600;color:#fff;line-height:1.2}
   #sc-ov .siege .nom small{display:block;font-weight:400;color:#8f98bf;font-size:.8em}
-  #sc-ov .siege select{width:auto;flex:0 0 auto;margin:0;padding:9px 8px;font-family:var(--font-titre,inherit);font-size:.62em;letter-spacing:.04em;text-transform:uppercase;color:#c8d4ff;background:#131740;border-color:#2a3a6a;max-width:32vw;text-overflow:ellipsis}
   @media (max-width:400px){ #sc-ov .siege .nom{font-size:.9em} }
-  #sc-ov .siege select.moi{background:#163a6b;border-color:#2f6fbf;color:#e8f1ff}
+  /* ⚠️ LA LISTE DES SIÈGES REMPLACE UN <select> (maquette validée par Marc, 23/09). L'ancien
+     style est retiré, pas commenté : il plafonnait la largeur à 32vw avec un text-overflow,
+     c'est-à-dire qu'il ROGNAIT le libellé — et à 320 px « — absente — » débordait quand même.
+     Ici chaque choix est une ligne pleine largeur de 44 px (la cible au doigt), sous le nom de la
+     nation plutôt qu'à côté : plus rien ne peut déborder à droite. */
+  #sc-ov .siege .haut{flex-wrap:wrap}
+  #sc-ov .siege-choix{display:flex;flex-direction:column;gap:6px;width:100%;margin-top:8px}
+  #sc-ov .sc-opt{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;text-align:left;
+    padding:9px 11px;border-radius:10px;cursor:pointer;font-family:inherit;font-size:.95em;
+    background:#0b0d24;border:1px solid #2a2a5a;color:#dbe1f7}
+  #sc-ov .sc-opt[aria-pressed="true"]{border-color:#4a9eff;background:#163a6b;color:#e8f1ff}
+  #sc-ov .sc-opt:focus-visible{outline:2px solid #4a9eff;outline-offset:2px}
+  #sc-ov .sc-coche{width:18px;height:18px;border-radius:50%;border:2px solid #5a6390;flex:none}
+  #sc-ov .sc-opt[aria-pressed="true"] .sc-coche{border-color:#4a9eff;box-shadow:inset 0 0 0 4px #4a9eff}
+  #sc-ov .sc-lab{min-width:0}
+  #sc-ov .sc-desc{display:block;font-size:.8em;color:#8f98bf;line-height:1.3}
+  /* Le siège que TU joues se repère d'un coup d'œil, comme avant avec le menu marqué « moi ». */
+  #sc-ov .siege-choix.moi{box-shadow:0 0 0 1px #2f6fbf inset;border-radius:11px}
   #sc-ov .siege .i{width:32px;height:32px;padding:0;border-radius:50%;border:1px solid #2a3a6a;display:grid;place-items:center;font-family:var(--font-titre,inherit);font-size:.7em;color:#4a9eff;background:transparent;flex:0 0 auto;text-transform:none}
   #sc-ov .siege .det{display:none;margin-top:8px;padding-top:8px;border-top:1px solid #1d2350;font-size:.86em;line-height:1.45}
   #sc-ov .siege.on .det{display:block}
@@ -1582,15 +1605,19 @@ function concederVisible(oui){
   show('renoncer-btn', humains && !!STATE.isHost);
   show('recommencer-btn', !humains);
 }
-window.scRenoncer = function(){
+window.scRenoncer = async function(){   /* async : `scDemander` rend une promesse (voir moteur.js) */
   if(!STATE.game || !STATE.started){ alert(t('web.aucune_partie_cours','Aucune partie en cours.')); return; }
-  const ok = confirm(t('web.renoncer_jouer_ia_reprend_nation_immedia','RENONCER À JOUER\n\nUne IA reprend ta nation immédiatement et la partie continue sans toi. Tu ne pourras pas revenir.\n\nConfirmer ?'));
+  const ok = await scDemander({titre:t('web.renoncer_titre','Renoncer à jouer'),
+    texte:t('web.renoncer_jouer_ia_reprend_nation_immedia','RENONCER À JOUER\n\nUne IA reprend ta nation immédiatement et la partie continue sans toi. Tu ne pourras pas revenir.\n\nConfirmer ?'),
+    ok:t('web.renoncer_oui','Renoncer'),annuler:t('web.renoncer_non','Continuer à jouer'),danger:true});
   if(!ok) return;
   send({t:'renoncer'});
 };
-window.scConcede = function(){
+window.scConcede = async function(){   /* async : `scDemander` rend une promesse (voir moteur.js) */
   if(!STATE.game || !STATE.started){ alert(t('web.aucune_partie_cours','Aucune partie en cours.')); return; }
-  const ok = confirm(t('web.conceder_victoire_renonces_victoire_quit','CONCÉDER LA VICTOIRE\n\nTu renonces à la victoire et tu quittes définitivement cette partie.\n\nLes autres joueurs choisiront alors, à l\'unanimité, si la partie continue avec une IA à ta place ou si elle s\'arrête là.\n\nConfirmer ?'));
+  const ok = await scDemander({titre:t('web.conceder_titre','Concéder la victoire'),
+    ok:t('web.conceder_oui','Concéder'),annuler:t('web.conceder_non','Continuer à jouer'),danger:true,
+    texte:t('web.conceder_victoire_renonces_victoire_quit','CONCÉDER LA VICTOIRE\n\nTu renonces à la victoire et tu quittes définitivement cette partie.\n\nLes autres joueurs choisiront alors, à l\'unanimité, si la partie continue avec une IA à ta place ou si elle s\'arrête là.\n\nConfirmer ?')});
   if(!ok) return;
   send({t:'concede'});
   concedePanelHTML(t('web.as_concede_autres_joueurs_decident_si_pa','<h2>🏳️ Tu as concédé</h2><p style="color:#c7d4ee;font-size:.9em;line-height:1.5">Les autres joueurs décident si la partie continue avec une IA à ta place, ou si elle s\'arrête.</p><div id="sc-concede-etat" style="color:#9fb4d8;font-size:.84em;margin-top:10px">En attente de leur réponse…</div>'));
@@ -1825,9 +1852,11 @@ function screenLobby(){
   });
   /* Supprimer est définitif : on demande confirmation, et on reste sur le lobby. */
   [...document.querySelectorAll('.sc-suppr')].forEach(b=>{
-    b.onclick = ()=>{
+    b.onclick = async ()=>{   /* async : `scDemander` rend une promesse (voir moteur.js) */
       const code=b.getAttribute('data-code');
-      if(!confirm(t('lobby.confirm_suppr','Supprimer définitivement la partie {code} ?',{code:code}))) return;
+      if(!await scDemander({titre:t('lobby.suppr_titre','Supprimer la partie'),
+          texte:t('lobby.confirm_suppr','Supprimer définitivement la partie {code} ?',{code:code}),
+          ok:t('lobby.suppr_oui','Supprimer'),annuler:t('commun.annuler','Annuler'),danger:true})) return;
       send({t:'supprimer_partie', code});
     };
   });
@@ -1888,10 +1917,12 @@ function screenSupprimerCompte(){
   `);
   _errCb = (msg)=>{ const e=document.getElementById('sc-err'); if(e) e.textContent=msg; };
   document.getElementById('sc-close').onclick = ()=>{ _errCb=null; screenCompte(); };   // on revient d'où l'on vient : Mon compte
-  document.getElementById('sc-go').onclick = ()=>{
+  document.getElementById('sc-go').onclick = async ()=>{   /* async : `scDemander` rend une promesse (voir moteur.js) */
     const pass=document.getElementById('sc-p').value;
     if(!pass){ _errCb(t('compte.err_mdp','Entre ton mot de passe pour confirmer.')); return; }
-    if(!confirm(t('compte.confirm','Supprimer définitivement le compte {user} ?',{user:STATE.user}))) return;
+    if(!await scDemander({titre:t('compte.suppr_titre','Supprimer le compte'),
+        texte:t('compte.confirm','Supprimer définitivement le compte {user} ?',{user:STATE.user}),
+        ok:t('compte.suppr_oui','Supprimer mon compte'),annuler:t('commun.annuler','Annuler'),danger:true})) return;
     send({t:'supprimer_compte', pass});
   };
 }
@@ -1921,7 +1952,34 @@ function _siegesInteractifs(){
       m.addEventListener('touchmove',()=>clearTimeout(t),{passive:true});
       m.addEventListener('contextmenu',e=>e.preventDefault());
     }
-    const sel=sg.querySelector('select'); if(sel){ const maj=()=>sel.classList.toggle('moi',sel.value==='host'); sel.onchange=maj; maj(); }
+    /* ⚠️ PLUS DE `<select>` (maquette validée par Marc le 23/09). Android ouvrait sa propre liste
+       grise, et sur cet écran le menu fermé débordait à droite pour les Jupitériens et les
+       Ceinturiens. Une liste de boutons du jeu : 44 px par ligne, pleine largeur, et chaque choix
+       s'explique — « Humain » ne disait pas qu'il faut le code de la partie.
+       ⚠️ « MOI » EST UNIQUE PAR CONSTRUCTION : le choisir sur un siège rend l'ancien à l'IA. Avant,
+       deux sièges pouvaient porter « Moi » et l'erreur n'arrivait qu'à la validation — pire, le
+       `return` dans le `forEach` de `sc-make` ne l'interrompait pas, il passait juste au siège
+       suivant en gardant le premier hôte. Le cas ne peut plus se produire. */
+    const grp=sg.querySelector('.siege-choix'); if(!grp) return;
+    const majMoi=()=>{ const b=grp.querySelector('.sc-opt[aria-pressed="true"]'); grp.classList.toggle('moi',!!b&&b.getAttribute('data-v')==='host'); };
+    grp.addEventListener('click',ev=>{
+      const b=ev.target.closest('.sc-opt'); if(!b||!grp.contains(b)) return;
+      const v=b.getAttribute('data-v');
+      if(v==='host'){
+        document.querySelectorAll('#sc-ov .siege-choix').forEach(autre=>{
+          if(autre===grp) return;
+          const h=autre.querySelector('.sc-opt[data-v="host"][aria-pressed="true"]');
+          if(!h) return;
+          h.setAttribute('aria-pressed','false');
+          const ia=autre.querySelector('.sc-opt[data-v="ai"]'); if(ia)ia.setAttribute('aria-pressed','true');
+          autre.classList.remove('moi');
+        });
+      }
+      grp.querySelectorAll('.sc-opt').forEach(o=>o.setAttribute('aria-pressed',o===b?'true':'false'));
+      majMoi();
+      const e=document.getElementById('sc-err'); if(e)e.textContent='';
+    });
+    majMoi();
   });
 }
 function screenCreate(){
@@ -1934,12 +1992,13 @@ function screenCreate(){
       <div class="haut">
         <div class="medal2" style="--c:${c?c.color:'#4a9eff'}" title="${t('creer.fiche','Fiche de la nation')}">${c?c.emoji:label.split(' ')[0]}</div>
         <div class="nom">${c?esc(c.name):label}<small>${t('creer.base','Base : {b}',{b:esc(home)})}</small></div>
-        <select data-civ="${id}">
-          <option value="none">${t('creer.absente','— absente —')}</option>
-          <option value="host"${i===0?' selected':''}>${t('creer.moi','Moi')}</option>
-          <option value="open">${t('creer.humain','Humain')}</option>
-          <option value="ai"${i>0?' selected':''}>${t('commun.ia','IA')}</option>
-        </select>
+        <div class="siege-choix" data-civ="${id}" role="group" aria-label="${t('creer.qui_joue','Qui joue cette nation ?')}">
+          ${[['ai',t('commun.ia','IA'),t('creer.desc_ia',"L'ordinateur joue cette nation")],
+             ['host',t('creer.moi','Moi'),t('creer.desc_moi',"C'est toi qui la joues")],
+             ['open',t('creer.humain','Humain'),t('creer.desc_humain','Un autre joueur rejoint avec le code de la partie')],
+             ['none',t('creer.absente','Absente'),t('creer.desc_absente','Cette nation ne participe pas')]]
+            .map(([v,nom,desc])=>`<button type="button" class="sc-opt" data-v="${v}" aria-pressed="${(i===0?v==='host':v==='ai')?'true':'false'}"><span class="sc-coche"></span><span class="sc-lab">${nom}<span class="sc-desc">${desc}</span></span></button>`).join('')}
+        </div>
       </div>
       <div class="det">${_ficheNation(id)}</div>
     </div>`; }).join('');
@@ -1957,11 +2016,12 @@ function screenCreate(){
   _siegesInteractifs();
   document.getElementById('sc-make').onclick = ()=>{
     let myCiv=null; const seats=[];
-    document.querySelectorAll('#sc-ov select[data-civ]').forEach(s=>{
-      const k=s.value, civId=s.getAttribute('data-civ');
+    document.querySelectorAll('#sc-ov .siege-choix[data-civ]').forEach(g=>{
+      const b=g.querySelector('.sc-opt[aria-pressed="true"]');
+      const k=b?b.getAttribute('data-v'):'none', civId=g.getAttribute('data-civ');
       if(k==='none') return;
-      if(k==='host'){ if(myCiv){ _errCb(t('creer.err_un_seul','Un seul siège « Moi (hôte) ».')); return; } myCiv=civId; }
-      else seats.push({civId, ai:(k==='ai')});
+      if(k==='host'){ myCiv=civId; return; }   // unique par construction, voir `_siegesInteractifs`
+      seats.push({civId, ai:(k==='ai')});
     });
     if(!myCiv){ _errCb(t('creer.err_moi','Choisis un siège « Moi (hôte) ».')); return; }
     if(seats.length<1){ _errCb(t('creer.err_deux','Au moins 2 nations.')); return; }
@@ -2212,7 +2272,7 @@ function askLocalDecision(pending){
       decisionPanel(body);
       document.getElementById('sc-peace').onclick=()=>done({accept:true, offer:{materials:0,energy:0,science:0}});
       // Même garde-fou que dans la vraie modale : le panneau de repli ne doit pas être plus permissif.
-      document.getElementById('sc-war').onclick=()=>{ if(_confirmerGuerreSansMoyens(o)) done({accept:false}); };
+      document.getElementById('sc-war').onclick=async ()=>{ if(await _confirmerGuerreSansMoyens(o)) done({accept:false}); };
       return;
     }
     if(k==='ai_dyson'){ body+=t('web.bati_sphere_dyson_accepter_refuser_guerr','<div>{v} a bâti la Sphère de Dyson.</div>\n        <button class="opt" id="sc-acc">🤝 Accepter</button><button class="opt" id="sc-ref">⚔️ Refuser (guerre)</button>',{v:(o.builderName||t('avis.nation','Une nation'))});

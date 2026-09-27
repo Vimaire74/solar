@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-24 · v10.95';
+const SOLAR_BUILD_MOTEUR = '2026-09-26 · v11.01';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -1210,11 +1210,39 @@ function showDiploEventModal(onDone){
   const rows=G.ais.map(function(ai){
     const war=_warBetween(_moiId(),ai.civ.id);
     const cost=(war?t('ui.6_met_fin_guerre','6<i class=ri-materials></i> (met fin à la guerre)'):'6<i class=ri-materials></i>');
-    return '<label style="display:flex;align-items:flex-start;gap:8px;margin:5px 0;padding:8px 10px;background:#141a30;border:1px solid #2a3a6a;border-radius:8px;color:#cfe0ff;cursor:pointer"><input type="checkbox" style="margin-top:3px" onchange="_evDiploToggle(\''+ai.civ.id+'\',this.checked)"> <span>'+ai.civ.emoji+' <b>'+ai.civ.name+'</b> — '+t('evt.pacte_4_tours','pacte 4 tours')+' · '+cost+(war?' · <span style="color:#ff7766">'+t('evt.en_guerre_mot','en guerre')+'</span>':'')+'<br><span style="font-size:.82em;color:#9fb4d6">'+_evAiInfo(ai)+'</span></span></label>';
+    /* ⚠️ PLUS DE CASE NATIVE (maquette validée par Marc le 23/09). Un `<input type="checkbox">`
+       fait 13 px sur un téléphone : impossible à viser au doigt, et le navigateur le dessine en
+       blanc et gris au milieu d'une fenêtre sombre. La ligne entière devient la cible — 44 px de
+       haut, case dorée à gauche — et c'est `aria-pressed` qui porte l'état, lu par `_evDiploConfirm`
+       comme par le compteur du bouton de validation. */
+    return '<button type="button" class="pacte-l" aria-pressed="false" data-civ="'+ai.civ.id+'" onclick="_evPacteBascule(this)"><span class="pacte-case">\u2713</span><span class="pacte-txt">'+ai.civ.emoji+' <b>'+ai.civ.name+'</b> — '+t('evt.pacte_4_tours','pacte 4 tours')+' · '+cost+(war?' · <span style="color:#ff7766">'+t('evt.en_guerre_mot','en guerre')+'</span>':'')+'<span class="pacte-det">'+_evAiInfo(ai)+'</span></span></button>';
   }).join('');
-  _evOverlay('<div style="font-size:2.2em;text-align:center">🕊️</div><div style="text-align:center;font-weight:700;margin-bottom:4px">'+t('evt.accords_diplomatiques','Accords Diplomatiques')+'</div><div style="color:#9fb4d6;font-size:.82em;text-align:center;margin-bottom:10px">'+t('evt.accords_diplomatiques_desc','Pacte de non-agression : 4 tours, 6<i class=ri-materials></i> par nation. Met fin à une guerre. +1<i class=ri-morale></i> et +4 VP par pacte conclu, tension 0 avec le partenaire.')+'</div>'+_evMyStats()+rows+'<button class="ea-btn" onclick="_evDiploConfirm()" style="margin-top:10px">'+t('evt.conclure_pactes','Conclure les pactes sélectionnés')+'</button><button class="ea-btn" onclick="_evDiploNone()" style="margin-top:6px;background:#2a2f45">'+t('evt.aucun_pacte','Aucun pacte')+'</button>');
+  _evOverlay('<div style="font-size:2.2em;text-align:center">🕊️</div><div style="text-align:center;font-weight:700;margin-bottom:4px">'+t('evt.accords_diplomatiques','Accords Diplomatiques')+'</div><div style="color:#9fb4d6;font-size:.82em;text-align:center;margin-bottom:10px">'+t('evt.accords_diplomatiques_desc','Pacte de non-agression : 4 tours, 6<i class=ri-materials></i> par nation. Met fin à une guerre. +1<i class=ri-morale></i> et +4 VP par pacte conclu, tension 0 avec le partenaire.')+'</div>'+_evMyStats()+'<div class="pactes-l">'+rows+'</div>'
+    /* Les boutons du jeu (`.fen-btn`), pas des boutons de navigateur habillés à la main : vert pour
+       l'accord, neutre pour le refus, 52 px de haut. Le principal COMPTE les pactes choisis — un
+       « Conclure les pactes sélectionnés » ne disait pas combien, ni qu'il n'y en avait aucun. */
+    +'<div class="fen-btns fen-col" style="margin-top:10px"><button type="button" class="fen-btn ok" id="ev-pactes-go" onclick="_evDiploConfirm()"></button>'
+    +'<button type="button" class="fen-btn ghost" onclick="_evDiploNone()">'+t('evt.aucun_pacte','Aucun pacte')+'</button></div>');
+  _evPacteMajBouton();
 }
 function _evDiploToggle(aiId,on){_evDiploSel[aiId]=on;}
+/* Une ligne de pacte cliquée : elle porte son propre état, et le bouton de validation se renomme. */
+function _evPacteBascule(btn){
+  if(!btn)return;
+  const on=btn.getAttribute('aria-pressed')!=='true';
+  btn.setAttribute('aria-pressed',on?'true':'false');
+  _evDiploToggle(btn.getAttribute('data-civ'),on);
+  _evPacteMajBouton();
+}
+/* « Conclure 2 pactes », « Aucun pacte choisi » — le bouton dit ce qu'il va faire, et se désactive
+   quand il ne ferait rien : c'est « Aucun pacte » qui sert alors à sortir. */
+function _evPacteMajBouton(){
+  const b=document.getElementById('ev-pactes-go'); if(!b)return;
+  const n=Object.keys(_evDiploSel||{}).filter(function(k){return _evDiploSel[k];}).length;
+  b.disabled=(n===0);
+  b.textContent=n===0?t('evt.aucun_pacte_choisi','Aucun pacte choisi')
+    :(n===1?t('evt.conclure_un_pacte','Conclure 1 pacte'):t('evt.conclure_n_pactes','Conclure {n} pactes',{n:n}));
+}
 function _evDiploNone(){_evDiploSel={};_evDiploConfirm();}
 function _evDiploConfirm(propId){
   /* ⚠️ LE SIGNATAIRE N'EST PLUS « LA NATION ACTIVE ». Cette fonction lisait `G.player` d'un bout à
@@ -1658,8 +1686,10 @@ function scDeserialize(s){return JSON.parse(s,function(k,v){if(v&&v.__set)return
 let _scLastSave=0;
 function scSaveGame(){try{if(window.SC_TUTO)return;if(!G||!G.player||!G.phase||G.phase==='over')return;const n=Date.now();if(n-_scLastSave<1500)return;_scLastSave=n;localStorage.setItem('sc_save',scSerialize());}catch(e){}}
 function scClearSave(){try{localStorage.removeItem('sc_save');}catch(e){}}
-function scAbandonGame(){
-  if(!confirm(t('accueil.confirm_abandon','Abandonner la partie en cours et revenir à l\'écran d\'accueil ? Cette partie sera définitivement perdue.')))return;
+async function scAbandonGame(){   /* async : elle attend la réponse de `scDemander` — voir cette fonction. Personne ne lit sa valeur de retour. */
+  if(!await scDemander({titre:t('accueil.abandon_titre','Abandonner la partie'),
+      texte:t('accueil.confirm_abandon','Abandonner la partie en cours et revenir à l\'écran d\'accueil ? Cette partie sera définitivement perdue.'),
+      ok:t('accueil.abandon_oui','Abandonner'),annuler:t('accueil.abandon_non','Continuer à jouer'),danger:true}))return;
   scClearSave();
   try{if(typeof G==='object'&&G)G.phase='over';}catch(e){}
   location.reload();
@@ -7788,6 +7818,18 @@ let _pendingRouteObj=null;
 function deployerJetonSurRoute(nat, route, opts){
   opts=opts||{};
   if(!nat||!route||(route.tokens||0)>0) return false;
+  /* ⚠️ PARTIE 1E11 (Marc, 26/09) : « depuis que j'ai IA Défensive, le jeu ne me donne plus le choix
+     de mettre ou pas un jeton, et il en met un automatiquement ». Il avait raison sur le fait, et la
+     cause était le télescopage de DEUX technologies : 🌀 Hyperpropulsion pose le jeton d'office et
+     gratuitement, 🛡️ IA Défensive rend les routes protégées SANS jeton. Résultat : un jeton posé
+     d'office qui ne sert plus à rien — `chancePillagePirates` rend 0, `attackEnemyRoute` refuse la
+     cible, `updateConnections` connecte avec ou sans jeton. Il occupait pourtant une place visible
+     dans le bandeau de force et gonflait `armadaCompte` à partir de rien.
+     `routesProtegeesParTech` existait depuis le 09/08 et servait déjà à quatre endroits — mais à
+     aucune des portes qui POSENT un jeton. Le rappel écrit dans `applyCard` (`ia_immune`,
+     `empath_routes`) n'agissait qu'UNE fois, à l'achat : rien n'empêchait les jetons de revenir.
+     C'est ici, la porte commune, que la règle manquait. */
+  if(typeof routesProtegeesParTech==='function'&&routesProtegeesParTech(nat)) return false;
   const gratuit=hasSpec(nat,'route_force_free');
   if(!gratuit&&engageableTokens(nat)<1) return false; // garnison exclue (13/09) — test_raid_garnison.js
   if(opts.ac){ if((nat.acLeft||0)<1) return false; nat.acLeft-=1; nat.spentThisTurn=(nat.spentThisTurn||0)+1; }
@@ -7849,12 +7891,20 @@ function doEstablishRoute(from,to, nation){
   /* ORDINATEUR : pas de fenêtre — la règle de Marc décide du jeton (voir `protegerRouteIA`).
      L'IA de Navigation pose le sien gratuitement, comme pour un humain. */
   if(_n._isAI){
-    if(hasSpec(_n,'route_force_free')){ newRoute.tokens=1; updateConnections(_n); }
+    /* ⚠️ `ordinateurProtegeSesRoutes` REFUSAIT DÉJÀ correctement quand une technologie protège —
+       mais la branche `route_force_free` posait le jeton AVANT de l'appeler. Le garde-fou existait
+       et était court-circuité (partie 1E11). L'ordre compte : la protection par tech d'abord. */
+    if(typeof routesProtegeesParTech==='function'&&routesProtegeesParTech(_n)){ /* rien à poser */ }
+    else if(hasSpec(_n,'route_force_free')){ newRoute.tokens=1; updateConnections(_n); }
     else protegerRouteIA(_n,newRoute);
     return;
   }
   // Popup assignation jeton
-  if(_n.forceTokens>0&&!hasSpec(_n,'route_force_free')){
+  /* Une route que la technologie protège déjà n'a RIEN à demander au joueur : ni fenêtre de choix
+     (il n'y a pas de choix), ni jeton gratuit (il ne servirait à rien). Le journal dit pourquoi —
+     un jeton qui n'apparaît pas sans explication passe pour un oubli. */
+  const _dejaProtegee=(typeof routesProtegeesParTech==='function')&&routesProtegeesParTech(_n);
+  if(!_dejaProtegee&&_n.forceTokens>0&&!hasSpec(_n,'route_force_free')){
     _pendingRouteObj=newRoute;
     document.getElementById('rtm-info').innerHTML=
       (routeAPorteeDesPirates(newRoute)
@@ -7873,10 +7923,15 @@ function doEstablishRoute(from,to, nation){
        jouée 103 à 100.
        Le jeton est maintenant RÉELLEMENT posé, et SANS être prélevé sur la réserve : c'est
        exactement le sens de « gratuit en jetons ». */
-    if(hasSpec(_n,'route_force_free')){
+    if(_dejaProtegee){
+      addLog(J('journal.route_protegee_sans_jeton_tech','🛡️ Route protégée sans jeton ({v}) — aucun jeton posé.',{v:techsProtegeantRoutes(_n).join(', ')}),'dim');
+    }else if(hasSpec(_n,'route_force_free')){
       newRoute.tokens=1;                       // posé pour de vrai…
       updateConnections(_n);             // …donc la route compte pour la connectivité
-      addLog(J('journal.route_protegee_gratuitement_ia_navigatio','🔗 Route protégée gratuitement (IA de Navigation) — jeton posé sans puiser dans la réserve.'),'dim');
+      /* ⚠️ LA TECHNOLOGIE S'APPELLE 🌀 HYPERPROPULSION (`hyper3`, spec `route_force_free`).
+         « IA de Navigation » est `nav2` (spec `nav2_war`, coût de guerre ÷2) : deux cartes
+         différentes. Ce message nommait la mauvaise depuis le 07/08. */
+      addLog(J('journal.route_protegee_gratuitement_hyperpropulsion','🔗 Route protégée gratuitement (Hyperpropulsion) — jeton posé sans puiser dans la réserve.'),'dim');
     }
     if(_estLocal(_n))scArmConfirm(t('confirme.route','🛤️ Route'),[{kind:'pt',icon:rEmoji('materials'),val:1}]);
     render();
@@ -7908,12 +7963,13 @@ function showRouteManageModal(idx){
   const fn=NODES[r.from],tn=NODES[r.to];
   const hasToken=(r.tokens||0)>0;
   const isFree=hasSpec(p,'route_force_free');
+  const _techProt=(typeof routesProtegeesParTech==='function')&&routesProtegeesParTech(p);
   document.getElementById('rmm-title').textContent='🛤️ '+fn.name+' → '+tn.name;
   const warnConn=hasToken?' <span style="color:#ff8844;font-size:.9em">'+t('routegere.avert_couper','⚠️ Rappeler peut couper des colonies !')+'</span>':'';
   document.getElementById('rmm-info').innerHTML=
     t('routegere.jeton','Jeton :')+' <strong style="color:'+(hasToken?'#66cc66':'#ff8844')+'">'+(hasToken?t('routegere.deploye','⚔️ Déployé'):t('routegere.aucun','Aucun (route non protégée)'))+'</strong>'+warnConn+
     '<br>'+t('routegere.dispo','Jetons disponibles : <strong>{j}</strong> | AC restants : <strong>{ac}</strong>',{j:p.forceTokens,ac:p.acLeft})+
-    (isFree?'<br><span style="color:#66cc99;font-size:.88em">'+t('routegere.nav_gratuit','IA Navigation : déploiement gratuit en jetons.')+'</span>':'')+
+    (_techProt?'<br><span style="color:#9fd0b0;font-size:.88em">'+t('routegere.tech_protege','Routes protégées sans jeton ({v}) : un jeton n\'y servirait à rien.',{v:techsProtegeantRoutes(p).join(', ')})+'</span>':(isFree?'<br><span style="color:#66cc99;font-size:.88em">'+t('routegere.hyper_gratuit','Hyperpropulsion : déploiement gratuit en jetons.')+'</span>':''))+
     '<br><span style="color:#7880a0;font-size:.82em">'+(chancePillagePirates(p,{from:r.from,to:r.to,tokens:0})>0?t('routegere.pirates_portee','À portée des pirates : 70 % de risque de pillage par tour sans jeton, 30 % avec (1 ressource volée) ; la route connecte avec ou sans jeton.'):t('routegere.pirates_hors','Hors de portée des pirates (ou routes immunisées) ; la route connecte avec ou sans jeton.'))+'</span>';
   const deployBtn=document.getElementById('rmm-deploy-btn');
   const recallBtn=document.getElementById('rmm-recall-btn');
@@ -7923,6 +7979,11 @@ function showRouteManageModal(idx){
     recallBtn.textContent=t('routegere.rappeler','↩️ Rappeler jeton')+(isFree?' '+t('routegere.gratuit_1ac','(gratuit, 1 AC)'):' (1 '+t('commun.ac','AC')+')');
     recallBtn.disabled=(p.acLeft<1);
     recallBtn.style.opacity=p.acLeft<1?.5:1;
+  }else if(_techProt){
+    /* Rien à déployer : la technologie protège la route sans jeton (partie 1E11). Le bouton
+       disparaît plutôt que d'être grisé sans raison — l'explication est dans la ligne au-dessus. */
+    recallBtn.classList.add('hidden');
+    deployBtn.classList.add('hidden');
   }else{
     recallBtn.classList.add('hidden');
     deployBtn.classList.remove('hidden');
@@ -7937,6 +7998,13 @@ function routeManageDeploy(){
   const p=G.player;
   const r=p.routes[_routeManageIdx];
   if(!r||p.acLeft<1){addLog(J('journal.ac_insuffisants','⚠️ AC insuffisants.'),'red');routeManageClose();return;}
+  /* Le bouton est masqué dans ce cas (voir `showRouteManageModal`), mais la fonction reste
+     appelable — en ligne, par un raccourci, par un banc. On refuse AVANT de prélever l'AC : la
+     partie 1E11 montre ce que coûte une action qui ne fait rien. */
+  if(typeof routesProtegeesParTech==='function'&&routesProtegeesParTech(p)){
+    addLog(J('journal.route_deja_protegee_tech','🛡️ Routes déjà protégées ({v}) — un jeton n\'y servirait à rien.',{v:techsProtegeantRoutes(p).join(', ')}),'dim');
+    routeManageClose();return;
+  }
   const isFree=hasSpec(p,'route_force_free');
   if(!isFree&&engageableTokens(p)<1){addLog(J('journal.aucun_jeton_engageable_garnison_compte','⚠️ Aucun jeton engageable (la garnison ne compte pas).'),'red');routeManageClose();return;}
   undoStack=[];
@@ -13381,7 +13449,27 @@ function calcVP(p){
      Banc : test_vp_revenus_agenda. */
   let rptVP=0;
   let _brut={}; try{ _brut=revenusBruts(p)||{}; }catch(e){ _brut=p.rpt||{}; }
-  for(const r of['energy','materials','science','morale']){const v=_brut[r]||0;const _g=v>10?5:v>5?2:0;rptVP+=_g;
+  /* ⚠️ LE MORAL NE PAIE PAS QUAND ON NE PEUT PAS LE THÉSAURISER (règle de Marc, 26/09, partie B285).
+     Les Terriens avaient adopté 👑 Tyrannie au tour 2, qui plafonne leur moral à 6. Leur revenu de
+     moral valait 12/tour : ils n'en gardaient que 6, le reste était perdu À LA SOURCE chaque tour
+     (`doRevenues` plafonne le moral à l'entrée, règle du 04/09) — et ce calcul leur comptait quand
+     même « Moral : 12/tour → +5 VP », le maximum, pour un revenu dont ils jetaient la moitié.
+     Marc : « pas de bonus de moral pour une nation dont le maximum est 6 ou 7 ». Adopter une forme
+     de gouvernement qui bride le moral fait donc renoncer à ce poste de points.
+     ⚠️ LA CAUSE DE FOND : ce calcul lit `revenusBruts`, le revenu AVANT plafonnement, alors que le
+     moral est la SEULE ressource dont le plafond s'applique à l'entrée. Les trois autres n'ont pas
+     ce décalage — leur plafond tombe à la frontière de tour, après que le revenu soit entré en
+     entier. La règle ci-dessous ne touche donc que le moral, et c'est voulu.
+     ⚠️ ON L'ÉCRIT DANS LE RAPPORT. Un poste qui disparaît sans un mot passe pour un oubli : c'est
+     exactement ce qui avait trompé Marc au §159.3 avec le pacte refusé en silence. */
+  const _plafMoral=(typeof realResCap==='function')?((realResCap(p)||{}).morale||10):10;
+  const MORAL_PLAFOND_MIN_POUR_BONUS=8;   // 6 et 7 sont exclus ; 8 et au-delà comptent normalement
+  for(const r of['energy','materials','science','morale']){const v=_brut[r]||0;
+    if(r==='morale'&&_plafMoral<MORAL_PLAFOND_MIN_POUR_BONUS){
+      if(v>5)det.rpt.push(J('vp.det_revenu_moral_bride','Moral : {v}/tour → +0 (plafond de {cap} : ce revenu ne peut pas être thésaurisé)',{v:v,cap:_plafMoral}));
+      continue;
+    }
+    const _g=v>10?5:v>5?2:0;rptVP+=_g;
     /* ⚠️ `rEmoji` rend une BALISE HTML, que le rapport texte supprime : la ligne s'affichait
        « · 6/tour → +2 », sans dire de quelle ressource il s'agissait. On écrit le nom en clair —
        un rapport lisible ne doit rien devoir au CSS. */
@@ -14005,7 +14093,18 @@ function renderSystemMap(){
        connectée »). L'opacité à 0,3 disait « pas reliée » en rendant la colonie invisible. Le tiret
        porte maintenant l'information ; l'opacité monte de 0,3 à 0,6 (joueur) et de 0,2 à 0,45 (autres). */
     if(pCol)rings+=`<circle cx="${node.x}" cy="${node.y}" r="${br+3+pCol.level*3}" fill="none" stroke="${G.player.civ.color}" stroke-width="${pCol.level+1}" stroke-opacity="${pCol.connected?.85:.6}"${pCol.connected?'':' stroke-dasharray="6,4"'}/>`;
-    _occ.forEach((o,i)=>{ rings+=`<circle cx="${node.x}" cy="${node.y}" r="${br+1+o.col.level*2+i*2}" fill="none" stroke="${o.ai.civ.color}" stroke-width="${o.col.level}" stroke-opacity="${o.col.connected?.65:.45}"${(i||!o.col.connected)?' stroke-dasharray="3,3"':''}/>`; });
+    /* ⚠️ ET L'ÉPAISSEUR, QU'ON AVAIT OUBLIÉE (Marc, 26/09 : « la couleur des colonies possédées par
+       les autres nations mais pas encore connectée est toujours trop faible. À faible luminosité
+       d'écran, on ne voit rien »).
+       Le 18/09 on avait remonté les opacités et posé la bonne règle — le tiret porte l'information,
+       pas la pâleur — mais on n'avait touché qu'à l'opacité. Or l'épaisseur valait `o.col.level`
+       ici contre `pCol.level+1` juste au-dessus : une colonie adverse de niveau 1 était un cercle
+       d'UN pixel, tireté, à 45 %. Moitié moins épais que celui du joueur, et plus pâle. C'est le
+       cumul des deux qui la faisait disparaître, et remonter l'opacité seule ne pouvait pas suffire.
+       Épaisseur alignée sur celle du joueur, plancher à 2 px ; opacités 0,85 / 0,75.
+       La hiérarchie tient toujours : rayon plus grand pour le joueur, tiret 6,4 contre 3,3, et sa
+       couleur de nation. Banc : server/test_anneaux_colonies_lisibles.js */
+    _occ.forEach((o,i)=>{ rings+=`<circle cx="${node.x}" cy="${node.y}" r="${br+1+o.col.level*2+i*2}" fill="none" stroke="${o.ai.civ.color}" stroke-width="${Math.max(2,o.col.level+1)}" stroke-opacity="${o.col.connected?.85:.75}"${(i||!o.col.connected)?' stroke-dasharray="3,3"':''}/>`; });
     // v10.70 : lunes et naines en VECTEUR (disque dégradé à la couleur du nœud), plus de photo — le
     // rendu « Système » retenu par Marc sur maquette. Les anneaux joviens décoratifs ne sont pas dessinés.
     const body=node.decorative?'':_vecLune(id,node,ir);
@@ -14388,7 +14487,18 @@ function renderTechTree(){
           :_cornee?'<span class="al-res">🔒</span>':undefined;
         _lignesTech.push(_ligneAction({
           emoji:card.emoji, nom:card.name, badge:'T'+tier, couleur:branch.color,
-          onclick:onclick, bloque:_cornee||exclusiveTaken, mien:playerOwned,
+          /* ⚠️ « À MOI » L'EMPORTE SUR « PRISE » (Marc, captures du 26/09 : « la tech
+             hyperpropulsion est grisée alors qu'elle est à moi »). `isTechExclusive` rend vrai dès
+             `tier >= 3` : quand le joueur achète une T3, c'est SON PROPRE ACHAT qui remplit
+             `G.techTaken`, donc `exclusiveTaken` devient vrai pour une carte qui est à lui. La ligne
+             recevait alors `.al-bloc` (opacity .55) EN MÊME TEMPS que `.al-mien` — et l'atténuation
+             gagnait. Les sept technologies de rang 3 étaient concernées, jamais les rangs 1 et 2 :
+             d'où l'écart de luminosité qu'il décrit entre ses propres cartes.
+             La règle est celle déjà écrite plus haut dans cette fonction (08/08) : « une technologie
+             déjà acquise garde ses propres marques (✓ et ⛔) — deux signalétiques sur la même carte
+             se neutralisent ». Le prix et `compactStatus` testaient déjà `playerOwned` d'abord ;
+             seul ce drapeau avait été écrit sans cette précédence. */
+          onclick:onclick, bloque:_cornee||(exclusiveTaken&&!playerOwned), mien:playerOwned,
           prix:_prix, ac:(card.tier===3?2:1), cout:costStr,
           effet:(_cornee?'🔒 '+_raisonLock:card.effect) }));
       } else {
@@ -14540,8 +14650,22 @@ function renderTechTree(){
   try{ body.classList.toggle('tech-compact',!!compact); }catch(e){}
   _appliquerRiviere(false);   // ⚠️ après chaque rendu : sinon on retombe sur les trois rivières visibles
   if(_scrollAvant) body.scrollTop=_scrollAvant;   // même page, même endroit
-  const unlocked=Object.values(G.branchTiers).filter(t=>t>0).length;
-  document.getElementById('branch-progress-summary').textContent=t('techs.branches','{n}/6 branches',{n:unlocked});
+  /* ⚠️ « 7/6 BRANCHES » (Marc, captures du 26/09). Le dénominateur était écrit en dur à 6, alors que
+     `TECH_BRANCHES` en compte SEPT : la septième, 🔮 Empathes, ne s'ouvre qu'après l'Union Sacrée
+     (`isEmpathesAvailableFor`). Tant qu'elle reste fermée, 6 est juste — c'est pourquoi le défaut est
+     resté longtemps invisible ; dès qu'elle ouvre et qu'on y prend une carte, le numérateur dépassait
+     son total. On compte donc les branches RÉELLEMENT ouvertes à ce joueur, et le numérateur sur le
+     MÊME ensemble : les deux chiffres ne peuvent plus se contredire. La branche Empathes entre dans
+     le compte si elle est ouverte OU si le joueur y a déjà un rang (l'accès ne se perd pas, mais on
+     ne veut dépendre de personne pour cette garantie — une sauvegarde d'avant ce jour, une carte
+     prise par espionnage). */
+  const _branchesOuvertes=Object.keys(TECH_BRANCHES).filter(function(b){
+    if(b!=='empathes')return true;
+    if((G.branchTiers.empathes||0)>0)return true;
+    return (typeof isEmpathesAvailableFor==='function')&&isEmpathesAvailableFor(G.player);
+  });
+  const unlocked=_branchesOuvertes.filter(function(b){return (G.branchTiers[b]||0)>0;}).length;
+  document.getElementById('branch-progress-summary').textContent=t('techs.branches_sur','{n}/{total} branches',{n:unlocked,total:_branchesOuvertes.length});
 }
 function renderRight(){
   const p=G.player;
@@ -14723,7 +14847,7 @@ function showNodePopup(nodeId){
   const revStr=revenusParNiveau(nodeId,G.player);
   /* LE défaut signalé par Marc : c'est MON accord qui compte, pas celui du voisin d'en face. */
   const accord=accordAvecMoi(nodeId,G.player);
-  document.getElementById('npop-info').innerHTML=`VP: ${node.baseVP} | ${resStr}<br>${revStr}<br>${t('noeud.type','Type :')} ${({moon:t('noeud.t_lune','Lune'),dwarf_planet:t('noeud.t_naine','Planète naine'),asteroid:t('noeud.t_asteroide','Astéroïde'),orbital_station:t('noeud.t_station','Station orbitale'),planet:t('noeud.t_planete','Planète'),gas_giant:t('noeud.t_geante','Géante gazeuse')})[node.type]||node.type}${pCol?`<br>✅ <b style="color:${G.player.civ.color}">${G.player.civ.emoji} ${G.player.civ.name} (${t('commun.toi','toi')})</b> — Nv.${pCol.level}${pCol.connected?' ✓':' ✗ '+t('noeud.deconnectee','déconnectée')}`:''}${_occupants.map(o=>`<br>🏴 ${t('noeud.colonie_de','Colonie de')} <b style="color:${o.nat.civ.color}">${o.nat.civ.emoji} ${o.nat.civ.name}</b> — Nv.${o.col.level}${(o.nat===aColAI&&accord)?' 🤝 '+t('noeud.accord','accord'):''}${(_occupants.length>1&&o.nat===aColAI)?' <span style="color:#ffcc88">'+t('noeud.cible','← cible de tes actions')+'</span>':''}`).join('')}${(_occupants.length>1||(pCol&&_occupants.length))?'<br><span style="color:#ffcc88;font-size:.9em">'+t('noeud.partage','⚠️ Nœud PARTAGÉ — les occupants se défendent ensemble contre un tiers ; entre eux, l\'un peut chasser l\'autre.')+'</span>':''}${!pCol&&!aCol?'<br><span style="color:#7a8aa0">'+t('noeud.inoccupe','Inoccupé')+'</span>':''}${REPAIRES_PIRATES.includes(nodeId)?'<br><span style="color:#ff8888">'+t('noeud.repaire_pirates','☠️ Repaire de pirates — ils pillent les routes non protégées, sauf celles des Ceinturiens, à qui ils vendent leur contrebande.')+'</span>':''}`;
+  document.getElementById('npop-info').innerHTML=`VP: ${node.baseVP} | ${resStr}<br>${revStr}<br>${t('noeud.type','Type :')} ${({moon:t('noeud.t_lune','Lune'),dwarf_planet:t('noeud.t_naine','Planète naine'),asteroid:t('noeud.t_asteroide','Astéroïde'),orbital_station:t('noeud.t_station','Station orbitale'),planet:t('noeud.t_planete','Planète'),gas_giant:t('noeud.t_geante','Géante gazeuse')})[node.type]||node.type}${pCol?`<br>✅ <b style="color:${G.player.civ.color}">${G.player.civ.emoji} ${G.player.civ.name} (${t('commun.toi','toi')})</b> — Nv.${pCol.level}${pCol.connected?' ✓':' ✗ '+t('noeud.deconnectee','déconnectée')}`:''}${_occupants.map(o=>`<br>🏴 ${t('noeud.colonie_de','Colonie de')} <b style="color:${o.nat.civ.color}">${o.nat.civ.emoji} ${o.nat.civ.name}</b> — Nv.${o.col.level}${(o.nat===aColAI&&accord)?' 🤝 '+t('noeud.accord','accord'):''}${(_occupants.length>1&&o.nat===aColAI)?' <span style="color:#ffcc88">'+t('noeud.cible','← cible de tes actions')+'</span>':''}`).join('')}${(_occupants.length>1||(pCol&&_occupants.length))?'<br><span style="color:#ffcc88;font-size:.9em">'+t('noeud.partage','⚠️ Nœud PARTAGÉ — les occupants se défendent ensemble contre un tiers ; entre eux, l\'un peut chasser l\'autre.')+'</span>':''}${!pCol&&!aCol?'<br><span style="color:#7a8aa0">'+t('noeud.inoccupe','Inoccupé')+'</span>':''}${REPAIRES_PIRATES.includes(nodeId)?'<br><span style="color:#ff8888">'+t('noeud.risque_pirate','☠️ Risque pirate ++')+'</span>':''}`;
   const acts=document.getElementById('npop-acts');acts.innerHTML='';
   if(!pCol){
     const{ac,mat,en}=colonizeCost(G.player);
@@ -16483,6 +16607,87 @@ function _nomCible(target){
 }
 /* `genre` (facultatif) : 'colonisation' pour une bonne nouvelle — la fenêtre prend alors le ton
    vert de la paix, pas le médaillon ⚔️ et le bandeau « GUERRE » (Marc, 22/09). */
+/* ═══ UNE SEULE FENÊTRE DE CONFIRMATION, ET C'EST CELLE DU JEU ═══
+   ⚠️ Marc, captures du 26/09 : « boutons à cliquer toujours pas bon, pas de formattage, et la
+   fenêtre n'est pas réductible ce qui est un problème ». Ce sont les TROIS symptômes d'un
+   `confirm()` natif, et ils tombaient ensemble :
+     · les boutons sont ceux du système — « OK » et « Annuler » ne disent pas ce qu'ils font, et
+       on ne peut pas les colorer pour distinguer un abandon définitif d'un simple retour ;
+     · aucun formatage : le texte est du brut, avec des `\n\n` en guise de paragraphes et pas un
+       gras pour la phrase qui compte ;
+     · la boîte n'est ni redimensionnable ni défilable : sur un téléphone en mode standard
+       Samsung, un texte de six lignes est coupé sans recours.
+   Sept `confirm()` traînaient encore — six dans `online.js`, un ici. Ils passent tous par cette
+   fenêtre : les couleurs du jeu, le texte formaté (les retours à la ligne deviennent de vrais
+   paragraphes), des boutons NOMMÉS par ce qu'ils font et hauts de 44 px pour le doigt, et un
+   corps qui DÉFILE au lieu d'être coupé.
+   Elle rend une PROMESSE. Tous les appelants sont des gestionnaires de clic dont personne ne lit
+   la valeur de retour : les passer en `async` ne change rien pour le reste du code.
+   ⚠️ Échap et un clic hors de la fenêtre valent NON. Une action irréversible — quitter, concéder,
+   supprimer un compte — ne doit jamais partir sur une fermeture accidentelle. */
+function scDemander(o){
+  o=o||{};
+  /* ⚠️ ON APPELLE `t()` DIRECTEMENT, PAS UN ALIAS. `scripts/i18n_extract.js` repère les textes en
+     lisant les appels à `t(` : passer par une variable les rendrait INVISIBLES à l'extracteur, et
+     ces trois libellés de repli ne seraient jamais traduits. */
+  const titre=o.titre||t('demande.titre_defaut','Confirmer');
+  const oui=o.ok||t('demande.oui','Confirmer');
+  const non=o.annuler||t('demande.non','Annuler');
+  /* Le texte arrive déjà traduit, avec ses `\n`. On échappe, puis on en fait des paragraphes :
+     c'est exactement ce que le `confirm()` natif ne savait pas faire. */
+  const paras=String(o.texte==null?'':o.texte).split(/\n{2,}/).map(function(bout){
+    return '<p style="margin:0 0 10px">'+_esc(bout).replace(/\n/g,'<br>')+'</p>';
+  }).join('');
+  const colOk=o.danger?'#7a2430':'#16401a', bordOk=o.danger?'#c2576a':'#2f6b34', texteOk=o.danger?'#ffd6dc':'#bff3cf';
+  /* ⚠️ LE BALISAGE EST CONSTRUIT À PART, ET C'EST VOULU. Le `document` des bancs est un décor qui
+     ne sait pas analyser du HTML (voir `game-core.js`) : si la fenêtre se construisait au moment de
+     l'insertion, aucun banc ne pourrait vérifier ce qu'elle contient — ni le défilement, ni la
+     hauteur des boutons, ni le découpage en paragraphes. Une fonction pure les rend mesurables. */
+  const balisage=
+      '<div id="sc-ask" style="position:fixed;inset:0;background:rgba(4,4,18,.86);z-index:900;display:flex;align-items:center;justify-content:center;padding:14px">'
+      +'<div role="dialog" aria-modal="true" aria-labelledby="sc-ask-t" style="background:#0d1128;border:2px solid #39569c;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.7);max-width:440px;width:100%;max-height:calc(100dvh - 28px);display:flex;flex-direction:column">'
+        +'<div id="sc-ask-t" style="font-family:var(--font-titre);font-size:.82em;letter-spacing:.06em;color:#cfe0ff;padding:14px 16px 8px">'+_esc(titre)+'</div>'
+        /* ⚠️ C'EST CE `overflow:auto`, AVEC LE `max-height` AU-DESSUS, QUI RÉPOND À « la fenêtre
+           n'est pas réductible » : le corps défile, la fenêtre ne dépasse jamais l'écran, et rien
+           n'est coupé — pas même un texte de six lignes sur un téléphone en mode standard. */
+        +'<div style="padding:0 16px;overflow:auto;font-size:.94em;color:#c3cde6;line-height:1.5">'+paras+'</div>'
+        +'<div style="display:flex;gap:8px;padding:12px 16px 14px">'
+          +'<button type="button" id="sc-ask-non" style="flex:1;min-height:44px;background:#141a36;border:1px solid #39569c;color:#cfe0ff;border-radius:9px;font-weight:700;font-size:.95em;cursor:pointer">'+_esc(non)+'</button>'
+          +'<button type="button" id="sc-ask-oui" style="flex:1;min-height:44px;background:'+colOk+';border:1px solid '+bordOk+';color:'+texteOk+';border-radius:9px;font-weight:700;font-size:.95em;cursor:pointer">'+_esc(oui)+'</button>'
+        +'</div>'
+      +'</div></div>';
+  if(o.__balisageSeulement) return balisage;
+  return new Promise(function(resolve){
+    try{
+      const vieux=document.getElementById('sc-ask'); if(vieux)vieux.remove();
+      document.body.insertAdjacentHTML('beforeend',balisage);
+    }catch(e){
+      /* Sans écran, il n'y a personne pour répondre. On rend NON : une décision irréversible ne
+         se prend pas faute d'interlocuteur. Aucun appelant n'est dans ce cas — ce sont tous des
+         gestionnaires de clic — mais la promesse ne doit jamais rester en suspens. */
+      resolve(false); return;
+    }
+    const boite=document.getElementById('sc-ask');
+    let fini=false;
+    const fermer=function(rep){
+      if(fini)return; fini=true;
+      document.removeEventListener('keydown',auClavier,true);
+      if(boite)boite.remove();
+      resolve(rep);
+    };
+    function auClavier(e){
+      if(e.key==='Escape'){ e.preventDefault(); fermer(false); }
+      else if(e.key==='Enter'){ e.preventDefault(); fermer(true); }
+    }
+    document.addEventListener('keydown',auClavier,true);
+    const bOui=document.getElementById('sc-ask-oui'), bNon=document.getElementById('sc-ask-non');
+    if(bOui)bOui.onclick=function(){ fermer(true); };
+    if(bNon)bNon.onclick=function(){ fermer(false); };
+    /* Un clic sur le voile, hors de la fenêtre : non. */
+    if(boite)boite.onclick=function(e){ if(e.target===boite) fermer(false); };
+    try{ if(bNon)bNon.focus(); }catch(e){}   // le doigt part sur « ne rien faire », jamais sur l'irréversible
+  });
+}
 function notifyNationHit(victim,title,body,genre){
   if(typeof G!=='undefined'&&G&&G._simulationIA)return;   // coup simulé (tacticien) : rien à l'écran — voir `simulerCoup`
   try{
@@ -16568,8 +16773,31 @@ function drawConnections(){
      coin haut-gauche du quart de disque) et court vers la droite : `startOffset` au début du
      chemin, ancre à gauche. Ils partent avec le ⤳, comme les distances et les astéroïdes. */
   if(!off){
-    const arcLab=(id,ua,t,c)=>{const r=MAP_UA(ua);const P=deg=>{const q=deg*Math.PI/180;return f1(MAP_SUN.x+r*Math.cos(q))+' '+f1(MAP_SUN.y-r*Math.sin(q));};return `<defs><path id="${id}" d="M ${P(88)} A ${f1(r)} ${f1(r)} 0 0 1 ${P(8)}"/></defs><text font-size="${MT(14)}" fill="${c}" font-family="Michroma,'Exo 2',sans-serif" letter-spacing="${MT(3)}" opacity=".8"><textPath href="#${id}" startOffset="2%" text-anchor="start">${t}</textPath></text>`;};
-    s+=arcLab('mapLab1',3.45,t('carte.ceinture_principale',"CEINTURE AST. PRINCIP."),'#d8c08a')+arcLab('mapLab2',44,t('carte.ceinture_kuiper','CEINTURE DE KUIPER'),'#a9cbe6');
+    /* ⚠️ LE DÉPART EST CALCULÉ, PLUS DEVINÉ — ET LE NOM TIENT SUR DEUX LIGNES (Marc, 26/09).
+       Deux demandes, répétées le 22 puis le 26 : « le texte ceinture d'astéroïde principale est
+       toujours pas aligné à gauche de l'écran » et « je t'avais demandé de le mettre sur deux
+       lignes ». Les deux tenaient au même choix : un `textPath` ne porte qu'UNE ligne, d'où
+       l'abréviation « CEINTURE AST. PRINCIP. » ; et l'arc commençait à 88° avec un `startOffset`
+       de 2 %, ce qui posait le premier caractère là où l'arc voulait bien, soit x ≈ 83.
+       On écrit donc DEUX arcs concentriques, une ligne chacun, et on RÉSOUT l'angle de départ :
+       pour un rayon r, l'arc croise l'abscisse voulue à `acos((x − Soleil.x) / r)` — un peu au-delà
+       de la verticale, puisque la cible est à gauche du Soleil, lui-même dans le coin.
+       ⚠️ CHAQUE RAYON A SON PROPRE ANGLE : c'est exactement ce qui garde les deux lignes alignées
+       l'une sur l'autre. Un angle commun les décalerait d'autant que les rayons diffèrent.
+       `startOffset` revient à 0 : le chemin commence désormais où le texte doit commencer.
+       Choix de Marc sur maquette : « la solution B mais à 24 pixels du bord gauche ».
+       La ceinture de Kuiper garde son arc unique — son nom tient sur une ligne, il n'a jamais posé
+       de problème, et on ne touche pas à ce qui n'était pas en cause. */
+    const ARC_LAB_X=24;                       // abscisse du premier caractère, en unités de plateau
+    const arcLab=(id,r,txt,c,taille,inter)=>{
+      const P=deg=>{const q=deg*Math.PI/180;return f1(MAP_SUN.x+r*Math.cos(q))+' '+f1(MAP_SUN.y-r*Math.sin(q));};
+      const dep=Math.acos(Math.max(-1,Math.min(1,(ARC_LAB_X-MAP_SUN.x)/r)))*180/Math.PI;
+      return `<defs><path id="${id}" d="M ${P(dep)} A ${f1(r)} ${f1(r)} 0 0 1 ${P(8)}"/></defs><text font-size="${taille}" fill="${c}" font-family="Michroma,'Exo 2',sans-serif" letter-spacing="${inter}" opacity=".8"><textPath href="#${id}" startOffset="0" text-anchor="start">${txt}</textPath></text>`;
+    };
+    const _rPrinc=MAP_UA(3.45);
+    s+=arcLab('mapLab1a',_rPrinc+14,t('carte.ceinture_principale_l1',"CEINTURE D'ASTÉROÏDES"),'#d8c08a',MT(13),MT(2.5))
+      +arcLab('mapLab1b',_rPrinc-24,t('carte.ceinture_principale_l2',"PRINCIPALE"),'#d8c08a',MT(13),MT(2.5))
+      +arcLab('mapLab2',MAP_UA(44),t('carte.ceinture_kuiper','CEINTURE DE KUIPER'),'#a9cbe6',MT(14),MT(3));
   }
   // planètes-décor, encarts de lunes, étiquettes
   /* Les fanions des planètes se reconnaissent par l'ID de nation (`nation:'terriens'`), plus par le nom :
@@ -16728,11 +16956,17 @@ try{ i18nTraduireDonnees(); }catch(e){}
 (function(){
   document.getElementById('civ-cards').innerHTML=Object.values(CIVS).map(civ=>{
     const tb=TECH_BRANCHES[civ.techBonus];
-    return`<div class="civ-card" id="cc-${civ.id}" onclick="selectCiv('${civ.id}')">
-      <div class="civ-emoji">${civ.emoji}</div><h3>${civ.name}</h3>
+    /* ⚠️ `.civ-corps` EXISTE POUR UN SEUL ÉCRAN : celui de moins de 360 px (maquette validée par
+       Marc le 23/09). Au-dessus, il est en `display:contents` — il disparaît de la mise en page, et
+       tout se comporte exactement comme avant. En dessous, la carte devient une grille de deux
+       colonnes (emblème | corps) et ce bloc est la seconde colonne ; sans lui, chaque ligne de la
+       carte serait une rangée de grille et les chiffres ne pourraient pas tenir sur une ligne.
+       C'est la seule raison de cette balise : ne pas la retirer en croyant simplifier. */
+    return`<div class="civ-card" id="cc-${civ.id}" onclick="selectCiv('${civ.id}')" style="--civ-col:${civ.color}">
+      <div class="civ-emoji">${civ.emoji}</div><div class="civ-corps"><h3>${civ.name}</h3>
       <div class="civ-bar" style="background:${civ.color}"></div>
       ${[['<i class=ri-energy></i>','energy'],['<i class=ri-materials></i>','materials'],['<i class=ri-science></i>','science'],['<i class=ri-morale></i>','morale'],['⚔️ '+t('civ.force','Force'),'startForce']].map(([e,k])=>`<div class="civ-stat"><span>${e}</span><span>${k==='startForce'?civ[k]:(civ.start?.[k]??'—')}</span></div>`).join('')}
-      <div class="civ-passive">${civ.passive}<br><em style="color:#6070a0">${civ.active.name} : ${civ.active.desc}</em>${tb?`<br><span class="civ-bonus-tag">${tb.emoji} ${t('civ.bonus','Bonus :')} ${tb.label} −1<i class=ri-science></i></span>`:''}</div>
+      <div class="civ-passive">${civ.passive}<br><em style="color:#6070a0">${civ.active.name} : ${civ.active.desc}</em>${tb?`<br><span class="civ-bonus-tag">${tb.emoji} ${t('civ.bonus','Bonus :')} ${tb.label} −1<i class=ri-science></i></span>`:''}</div></div>
     </div>`;}).join('');
 })();
 function setDifficulty(level){
