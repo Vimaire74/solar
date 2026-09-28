@@ -1,4 +1,4 @@
-LOT 17 — À UPLOADER  ·  26/09/2026  ·  v11.01 / sw v222
+LOT 17 — À UPLOADER  ·  28/09/2026  ·  v11.03 / sw v224
 
 CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas encore en ligne).
 
@@ -16,6 +16,10 @@ CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas enc
    server/server.js    → langues chargées au démarrage + rapport de fin traduit (v10.87)
 
 Redéploie les DEUX ressources dans Coolify (site + serveur).
+
+v11.03 — RAPPORT DE DIAGNOSTIC DEPUIS L'APPLI (§168) — serveur à redéployer : diagnostic.js, server/diagnostic-serveur.js, server/server.js, server/Dockerfile, confidentialite(.en).html, lang/en.js
+
+v11.02 — ESPIONNAGE EN SOLO LOCAL, CHIEN DE GARDE RÉSERVÉ AU MULTIJOUEUR (§167)
 
 v11.01 — LE MORAL BRIDÉ NE RAPPORTE PLUS DE POINTS, ET LE README DIT SA VERSION (§166)
    · Partie B285 : les Terriens sous Tyrannie (moral plafonné à 6) avaient un revenu de moral de

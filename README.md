@@ -3,17 +3,35 @@
 <!-- BANDEAU-VERSION : monté par le même mouvement que les estampilles du code, et VÉRIFIÉ par
      server/test_versions.js. Ne pas l'éditer à la main : un README qui annonce une version
      fausse est pire que pas de README — c'est ce qui a fait croire à Marc, le 26/09, qu'il
-     jouait la dernière version alors que le site servait la v10.95. -->
+     jouait la dernière version alors que le site servait la v10.95.
 
-## 📦 CE LOT EST EN **v11.01** · cache `sw.js` **v222** · 2026-09-26
+     ⚠️ FORME DE CE FICHIER — RÈGLE DE MARC, 27/09 : « inutile de mettre autant de texte. Tu mets
+     le numéro de la nouvelle version avec une liste des changements effectués, une ligne par
+     changement. » Donc, à chaque livraison : le bandeau, puis la version et SA LISTE — une ligne
+     par changement, pas de paragraphe, pas de récit. Le détail va dans docs/REPRISE.md, qui est
+     fait pour ça. Les blocs de prose ci-dessous sont l'ancien format : à remplacer au fur et à
+     mesure, pas à imiter. -->
+
+## 📦 CE LOT EST EN **v11.03** · cache `sw.js` **v224** · 2026-09-28
 
 > Pour savoir ce qui est EN LIGNE : ouvre solar-game.com, la version est écrite sur l'écran de
-> connexion (en rouge si les fichiers ne concordent pas). Si elle ne dit pas **v11.01**, l'envoi ou
+> connexion (en rouge si les fichiers ne concordent pas). Si elle ne dit pas **v11.03**, l'envoi ou
 > le redéploiement n'a pas pris.
 > ⚠️ **Les DEUX ressources Coolify** doivent être redéployées : le site ET le serveur. L'IA
 > tourne sur le serveur — redéployer le seul site laisse l'adversaire jouer avec l'ancien moteur.
 
 Dossier prêt à envoyer. Le détail des livraisons suit, du plus récent au plus ancien ; la version de CE lot est dans le bandeau ci-dessus, c'est la seule qui fait foi.
+
+**v11.03 — 28/09/2026** — `docs/REPRISE.md` §168
+- Rapport de diagnostic (`diagnostic.js`) : erreurs, figeages, état de la partie et journal gardés sur l'appareil, envoyés seulement si le joueur appuie sur Envoyer.
+- Bandeau à l'ouverture de l'appli si un plantage ou un figeage attend ; bouton « Signaler un problème » à l'accueil de l'appli et dans Réglages.
+- Serveur : `POST /api/diagnostic` reçoit les rapports (`/data/diagnostics/`), `/diagnostics?key=` les liste — REDÉPLOYER LE SERVEUR.
+- Confidentialité (fr + en) : paragraphe « Rapports de diagnostic ».
+
+**v11.02 — 28/09/2026** — `docs/REPRISE.md` §167
+- Appli (solo local) : la fenêtre d'espionnage s'ouvre à la fin des tours 3-5 — la partie ne se fige plus au tour 3.
+- Solo : plus de fenêtre « ⚠️ Tu sembles bloqué » après 5 s d'inactivité ; réservée au multijoueur (délai à revalider).
+- Solo : le cas « plus aucune ressource » reste signalé immédiatement.
 
 **v11.01 — 26/09/2026** — voir `docs/REPRISE.md` §160 à §166 : anneaux des colonies adverses, jeton de route inutile supprimé, « 7/6 branches », nom de la ceinture sur deux lignes, rang 3 possédé plus grisé, plus aucune fenêtre du navigateur, cartes de nation horizontales sous 360 px, liste des sièges, lignes de pacte, bonus de moral exclu quand le moral est bridé.
 

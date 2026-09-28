@@ -23,6 +23,7 @@ const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 const { GameDriver } = require('./driver.js');
+const diagnostic = require('./diagnostic-serveur.js');   // rapports de diagnostic envoyés par l'appli (28/09)
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const HTML = process.env.GAME_HTML || path.join(__dirname, '..', 'index.html');
@@ -1367,7 +1368,10 @@ function refuser(res) {   // 404 volontaire : on ne confirme pas l'existence de 
 const server = http.createServer((req, res) => {
   if (req.url === '/health') { res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); res.end('{"ok":true,"games":' + games.size + '}'); return; }
   // Toute page de service exige la clé, AVANT d'exécuter quoi que ce soit.
-  if (req.url && /^\/(bot|admin|mailtest|stats|debug)\b/.test(req.url) && !cleValide(req.url)) return refuser(res);
+  if (req.url && /^\/(bot|admin|mailtest|stats|debug|diagnostics)\b/.test(req.url) && !cleValide(req.url)) return refuser(res);
+  /* Rapports de diagnostic : `POST /api/diagnostic` (ouvert, sans rien de personnel, choisi par le
+     joueur) et `/diagnostics?key=` (lecture, protégée ci-dessus). Voir diagnostic-serveur.js. */
+  if (diagnostic.traiter(req, res, path.join(DATA, 'diagnostics'), cleValide)) return;
   if (req.url && req.url.indexOf('/bot') === 0) { // inviter le bot « Claude » : /bot?code=XXXX[&civ=martiens]&key=…
     let code = '', civId;
     let fast = false;
@@ -1713,7 +1717,8 @@ const server = http.createServer((req, res) => {
     + '  /health    état du serveur\n'
     + '  /stats     tableau des parties (début, fin, joueurs, scores, debug à copier)\n'
     + '  /stats-mail état de l\'envoi des emails\n'
-    + '  /mailtest  diagnostic de l\'envoi d\'emails\n\n'
+    + '  /mailtest  diagnostic de l\'envoi d\'emails\n'
+    + '  /diagnostics  rapports de diagnostic envoyés depuis l\'appli (?f=<fichier> pour en lire un)\n\n'
     + 'Version : ' + SERVER_BUILD + '\n'
     + "Si /mailtest renvoie cette page, c'est que cette version n'est pas encore déployée.\n");
 });

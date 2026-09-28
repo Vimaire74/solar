@@ -12,7 +12,7 @@
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const RACINE = path.join(__dirname, '..');
-const FICHIERS = ['index.html', 'moteur.js', 'online.js', 'tutorial.js', 'server/server.js', 'server/driver.js'];   // server.js : K(...) et tL(lang, ...) — voir moteur.js `J` et server.js `tL`
+const FICHIERS = ['index.html', 'moteur.js', 'online.js', 'diagnostic.js', 'tutorial.js', 'server/server.js', 'server/driver.js'];   // server.js : K(...) et tL(lang, ...) — voir moteur.js `J` et server.js `tL`
 const strict = process.argv.includes('--strict');
 
 const cles = {};          // cle → français

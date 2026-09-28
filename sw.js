@@ -9,7 +9,7 @@
      interceptées, elles passent directement. Rien n'est mis en cache du serveur de jeu.
    - HORS-LIGNE : le solo reste jouable ; en navigation hors-ligne on sert index.html depuis le cache.
    Le numéro de version ci-dessous purge les anciens caches à chaque mise à jour du SW. */
-const VERSION = 'v222-2026-09-26';
+const VERSION = 'v224-2026-09-28';
 const HTML_CACHE = 'sc-html-' + VERSION;     // documents + scripts (network-first)
 const ASSET_CACHE = 'sc-assets-' + VERSION;  // images, icônes, PDF (cache-first)
 
@@ -19,7 +19,7 @@ const SHELL = [
      hors ligne ne démarrerait pas : index.html ne serait plus qu'une coquille. Il était auparavant
      collé dans index.html, donc mis en cache « gratuitement » — l'extraction en fichier séparé rend
      cette ligne INDISPENSABLE. */
-  './', './index.html', './moteur.js', './online.js', './regles.html', './confidentialite.html',
+  './', './index.html', './moteur.js', './online.js', './diagnostic.js', './regles.html', './confidentialite.html',
   /* Langues (18/09) : i18n.js choisit la langue AVANT moteur.js ; lang/<code>.js est le dictionnaire.
      Hors ligne sans ces deux-là, le jeu retomberait en français — pas cassé, mais pas dans la langue choisie. */
   './i18n.js', './lang/en.js',

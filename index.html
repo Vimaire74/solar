@@ -6,7 +6,9 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-09-26 · v11.01';</script>
+<script>window.SOLAR_BUILD_HTML='2026-09-28 · v11.03';</script>
+<!-- Tampon des erreurs survenues AVANT diagnostic.js (chargé après moteur.js) : il les ramasse au démarrage. -->
+<script>window.__scErreursPrecoces=[];window.addEventListener('error',function(e){try{if(window.scDiagNoterErreur)return;window.__scErreursPrecoces.push({type:'erreur',msg:e.message||String(e),pile:(e.error&&e.error.stack)||'',ou:(e.filename||'').split('/').pop()+':'+e.lineno});}catch(x){}});</script>
 <!-- i18n.js EN TÊTE, avant tout script du corps : il choisit la langue et charge lang/<code>.js (synchrone).
      Les écrans d'accueil (scripts inline plus bas) et moteur.js (qui porte t()) le trouvent déjà là. -->
 <script src="i18n.js"></script>
@@ -1400,6 +1402,7 @@ body{font-size:var(--sc-fs,16px);}
         <a href="tutorial.html" data-i18n="lien.tutoriel">🎓 Tutoriel</a>
         <a href="regles.html" data-i18n="lien.regles">📖 Règles</a>
       </div>
+      <div class="lv-aides"><a href="#" onclick="scDiagOuvrir(false);return false" data-i18n="diag.signaler">🐞 Signaler un problème</a></div>
     </div>
     <div class="lv-pied"><a class="lv-confid" href="confidentialite.html" data-i18n="lien.confidentialite">🔒 Confidentialité</a><span class="lv-confid"> · </span><span id="lv-build"></span> <a class="lv-pdf" href="Solar_Conquest_Livret.pdf" target="_blank" rel="noopener" data-i18n="lien.livret">📖 Livret PDF</a></div>
   </div>
@@ -1578,6 +1581,7 @@ function lvAppNouvelle(){
       </div>
       <div class="jr-row jr-row2">
         <button class="jr-btn" type="button" onclick="copyLogText()" data-i18n="ui.copier_le_log">📋 Copier le log</button>
+        <button class="jr-btn" type="button" onclick="scDiagOuvrir(false)" data-i18n="diag.signaler">🐞 Signaler un problème</button>
         <button class="jr-btn danger" id="recommencer-btn" type="button" onclick="scAbandonGame()" data-i18n="ui.recommencer_la_partie">🔄 Recommencer la partie</button>
         <button class="jr-btn danger" id="conceder-btn" type="button" style="display:none" onclick="scConcede()" data-i18n="ui.admettre_sa_defaite">🏳️ Admettre sa défaite</button>
         <button class="jr-btn danger" id="renoncer-btn" type="button" style="display:none" title="Une IA reprend mon rôle" onclick="scRenoncer()" data-i18n="ui.renoncer_a_jouer" data-i18n-title="ui.title_une_ia_reprend_mon_role">🤖 Renoncer à jouer</button>
@@ -2013,6 +2017,8 @@ function lvAppNouvelle(){
   </div></div>
 </div>
 <script src="moteur.js"></script>
+<!-- diagnostic.js : rapport de plantage/figeage gardé sur l'appareil, envoyé seulement si le joueur le décide (28/09). -->
+<script src="diagnostic.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════════════════
    FENÊTRES « BLASON » — l'assembleur commun (affichage pur, aucune règle ici).

@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-09-26 · v11.01';
+const SOLAR_BUILD_MOTEUR = '2026-09-28 · v11.03';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -4418,8 +4418,17 @@ function stEspionnage(){
     const charge={tour:G.turn, options:opts, deja:espDejaPossedees(p)};
     /* ⚠️ AUCUN ADAPTATEUR (5e argument à `null`). C'est un adaptateur qui a fait échouer la
        validation dans la partie 321D : il rendait une chaîne, alors que la suite lit un objet. */
-    if(p.civ.id===local) _emitDecision('espionage', p, charge, 'stEspionnageRecu', null);
-    else _emitRemote('espionage', p, charge, 'stEspionnageRecu', null);
+    if(p.civ.id!==local){ _emitRemote('espionage', p, charge, 'stEspionnageRecu', null); continue; }
+    /* ═══ SOLO LOCAL : LA FENÊTRE DU JEU, PAS UNE QUESTION (Marc, appli, 28/09) ═══
+       C'était la SEULE question du moteur émise sans le schéma « en ligne : router au client ;
+       sinon : ouvrir la fenêtre ». En solo local (l'appli, sans serveur) personne n'affichait la
+       question : `G._pending` restait posé et le chien de garde de 8 s se taisait — la partie
+       s'arrêtait net à la fin du tour 3, sans message. Sur le site, le solo passe par le serveur
+       (lot 17) et online.js affichait la fenêtre : le défaut n'existait que dans l'appli.
+       En simulation (tacticien), on continue d'ÉMETTRE : c'est ce qui déclare le coup non
+       simulable (voir `_emitDecision`) au lieu d'ouvrir une vraie fenêtre (leçon de §148.6). */
+    if(_decisionActive()||(G&&G._simulationIA)) _emitDecision('espionage', p, charge, 'stEspionnageRecu', null);
+    else showEspionageChoiceModal();
   }
   if(!d.espRestants.length){ stBilanDeTour(); return; }
 }
@@ -6312,9 +6321,21 @@ function _scTutorialActive(){
   try{ return !!(typeof window!=='undefined' && (window.SC_TUTO || document.getElementById('tuto-coach'))); }
   catch(e){ return false; }
 }
+/* ═══ RÉSERVÉ AU MULTIJOUEUR (Marc, 28/09) ═══
+   « Si on joue tout seul contre les IA, ce message n'a pas de sens, il doit être réservé au
+   multijoueur. » En solo, 5 s de réflexion ouvraient « ⚠️ Tu sembles bloqué » à chaque passage.
+   Hors ligne, le joueur a toujours sa sortie (Passer / Fin de tour) et la pénurie réelle reste
+   signalée immédiatement par `_scMaybeStuck`. En ligne, le délai est conservé tel quel — Marc :
+   « même en multijoueur, 5 secondes ne suffiraient pas, on avait mis un délai bien plus long ;
+   à revalider quand on fera l'application en multijoueur ». */
+function _scEnLigne(){
+  try{ return _decisionActive() || !!(typeof window!=='undefined'&&window.SC_ONLINE&&window.SC_ONLINE.STATE&&window.SC_ONLINE.STATE.started); }
+  catch(e){ return false; }
+}
 function _armPlayerStuckWatch(){
   try{
     clearTimeout(G._playerStuckWatch);
+    if(!_scEnLigne())return;                                  // solo : pas de « Tu sembles bloqué » sur simple inactivité
     if(_scTutorialActive())return;                            // pas de chien de garde pendant le tutoriel
     const t=G.turn, idx=G._ilIdx;
     G._playerStuckWatch=setTimeout(function(){

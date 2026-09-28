@@ -20,7 +20,7 @@ COPY index.html moteur.js ./
 # v10.84 il le dit au démarrage (« Langues chargées : … »).
 COPY lang ./lang
 
-COPY server/server.js server/driver.js server/game-core.js server/bot.js server/
+COPY server/server.js server/driver.js server/game-core.js server/bot.js server/diagnostic-serveur.js server/
 ENV GAME_HTML=/app/index.html \
     DATA_DIR=/data \
     PORT=8080
