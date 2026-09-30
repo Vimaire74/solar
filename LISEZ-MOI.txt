@@ -1,4 +1,4 @@
-LOT 17 — À UPLOADER  ·  28/09/2026  ·  v11.03 / sw v224
+LOT 17 — À UPLOADER  ·  30/09/2026  ·  v11.06 / sw v227
 
 CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas encore en ligne).
 
@@ -16,6 +16,12 @@ CE DOSSIER NE CONTIENT QUE CE QUI RESTE À ENVOYER (il inclut la v10.84, pas enc
    server/server.js    → langues chargées au démarrage + rapport de fin traduit (v10.87)
 
 Redéploie les DEUX ressources dans Coolify (site + serveur).
+
+v11.06 — TITRES DES FENÊTRES D'AVIS ET DU MORAL (§171)
+
+v11.05 — ACCORDS À PLUSIEURS, PILOTE LOCAL DE L'APPLI, ESPIONNAGE SANS CASES NATIVES (§170) — serveur à redéployer (server.js)
+
+v11.04 — BANDEAU D'ACTION APRÈS VALIDATION, BOUTON « PASSER » DES ACCORDS (§169)
 
 v11.03 — RAPPORT DE DIAGNOSTIC DEPUIS L'APPLI (§168) — serveur à redéployer : diagnostic.js, server/diagnostic-serveur.js, server/server.js, server/Dockerfile, confidentialite(.en).html, lang/en.js
 

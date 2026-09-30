@@ -1054,7 +1054,10 @@ function assainirReponse(g, pending, ans) {
          client bricolé pourrait voler une technologie qu'on ne lui a jamais offerte.
          Quand aucune liste n'est proposée, on laisse passer — comportement d'origine. */
       const liste = v.slice(0, 12).filter(x => typeof x === 'string').map(x => x.slice(0, 64));
-      out[k] = (k === 'ids' && contenusProposes.size) ? liste.filter(x => contenusProposes.has(x)) : liste;
+      /* `aiIds` (accords commerciaux à plusieurs partenaires, 30/09) : chaque nation doit venir des
+         candidats proposés, comme l'`aiId` unique d'avant. */
+      out[k] = (k === 'ids' && contenusProposes.size) ? liste.filter(x => contenusProposes.has(x))
+             : (k === 'aiIds' && idsProposes.size) ? liste.filter(x => idsProposes.has(x)) : liste;
       if (Array.isArray(out[k]) && !out[k].length && liste.length) delete out[k];
     }
     else if (v && typeof v === 'object') { // une seule profondeur (ex. offre de paix {materials,energy,science})

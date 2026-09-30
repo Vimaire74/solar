@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-09-28 · v11.03';</script>
+<script>window.SOLAR_BUILD_HTML='2026-09-30 · v11.06';</script>
 <!-- Tampon des erreurs survenues AVANT diagnostic.js (chargé après moteur.js) : il les ramasse au démarrage. -->
 <script>window.__scErreursPrecoces=[];window.addEventListener('error',function(e){try{if(window.scDiagNoterErreur)return;window.__scErreursPrecoces.push({type:'erreur',msg:e.message||String(e),pile:(e.error&&e.error.stack)||'',ou:(e.filename||'').split('/').pop()+':'+e.lineno});}catch(x){}});</script>
 <!-- i18n.js EN TÊTE, avant tout script du corps : il choisit la langue et charge lang/<code>.js (synchrone).
@@ -45,7 +45,7 @@ body{background:#070718;color:#c8d8f8;font-family:var(--font-corps);font-size:va
    petite que le gras Segoe qu'elle remplace pour tenir dans les mêmes largeurs. */
 .font-titre,#civ-sel h1,.gtitle,#turn-disp,#tech-hdr>span:first-child,.tb-label,.tc-name,.gc-name,.mtab label,
 .eot-title,.evm-name,.war-title,.strat-title,.disc-name,.agsel-title,.inv-title,.fw-title,.atk-title,.rtm-title,.rmm-title,
-.ea-name,.td-name,.toast-title,.dip-hdr,.lv-h3,#sc-ov h2,#sc-decision h2{font-family:var(--font-titre);font-weight:400;letter-spacing:.02em}
+.ea-name,.td-name,.dip-hdr,.lv-h3,#sc-ov h2,#sc-decision h2{font-family:var(--font-titre);font-weight:400;letter-spacing:.02em}
 .evm-name,.war-title,.disc-name{font-size:1.2em}
 .eot-title,.strat-title,.agsel-title,.inv-title,.fw-title,.ea-name,.td-name{font-size:1em}
 #civ-sel h1{font-size:1.35em;letter-spacing:.12em}
@@ -379,12 +379,6 @@ body{background:#070718;color:#c8d8f8;font-family:var(--font-corps);font-size:va
 ::-webkit-scrollbar{width:3px}
 ::-webkit-scrollbar-track{background:#0a0a1a}
 ::-webkit-scrollbar-thumb{background:#2a2a5a;border-radius:2px}
-#action-toast{position:fixed;top:46px;left:50%;transform:translateX(-50%) translateY(-8px);z-index:450;background:#0d1128;border:2px solid #4a9eff;border-radius:10px;padding:10px 20px;min-width:260px;max-width:380px;text-align:center;opacity:0;pointer-events:none;transition:opacity .22s,transform .22s;box-shadow:0 6px 28px rgba(0,0,0,.85);font-size:.84em}
-#action-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-.toast-title{font-weight:700;font-size:1.05em;margin-bottom:4px;color:#e0ecff}
-.toast-row{display:flex;justify-content:center;gap:14px;margin-top:3px;font-size:.82em}
-.toast-paid{color:#ff8888}
-.toast-gain{color:#88e888}
 /* Resource colors */
 .res-energy{color:#FFD700;font-weight:700}
 .res-materials{color:#FFA040;font-weight:700}
@@ -916,7 +910,6 @@ body.vue-carte #bottom-bar{border-radius:0;}
 .mtab{padding:6px 2px 5px;min-width:0;}
 
 /* ---------- Toast ---------- */
-#action-toast{top:auto;bottom:96px;width:90%;max-width:440px;}
 
 /* ---------- Modales génériques : confort tactile ---------- */
 .npop-btn,.eot-btn,.war-btn,.evm-btn,.ea-btn,.disc-btn,.strat-opt,.inv-opt,.agsel-ag,.fw-choice{min-height:40px;}
@@ -1728,7 +1721,7 @@ function lvAppNouvelle(){
   <button class="scc-btn scc-undo" onclick="scConfirmCancel()" title="Annuler / revenir en arrière" aria-label="Annuler" data-i18n-title="ui.title_annuler_revenir_en_arriere">ANN</button>
   <button class="scc-btn scc-ok" onclick="scConfirmValidate()" aria-label="Valider">OK</button>
 </div>
-<div id="action-toast"></div>
+
 <div id="eot-modal" class="hidden">
   <div class="fen-wrap fen-large"><div class="fen fen-info eot-card">
     <div class="fen-medal" aria-hidden="true">📊</div>
@@ -1887,7 +1880,7 @@ function lvAppNouvelle(){
 <div id="dyson-modal" class="hidden">
   <div class="fen-wrap fen-large"><div class="fen fen-event inv-card">
     <div class="fen-medal" aria-hidden="true">⚡</div>
-    <div class="fen-kicker" data-i18n="ui.sphere_de_dyson">Sphère de Dyson</div>
+    <div class="fen-kicker" id="dyson-kicker" data-i18n="ui.sphere_de_dyson">Sphère de Dyson</div>
     <div class="fen-nation inv-title" id="dyson-title" data-i18n="ui.sphere_de_dyson_construite">Sphère de Dyson construite !</div>
     <div class="inv-sub" id="dyson-sub" style="color:#ffe080;margin-bottom:14px" data-i18n="ui.votre_empire_monopolise_l_energie_solair">Votre empire monopolise l'énergie solaire (+5<i class=ri-energy></i>/tour).<br>Les autres nations doivent <strong>accepter</strong> ou c'est <strong>la guerre immédiate</strong>.</div>
     <div id="dyson-nations" style="margin-bottom:8px;text-align:left"></div>
@@ -2110,7 +2103,14 @@ function fenDepechesFermer(){ var p=document.getElementById('sc-depeches'); if(!
 function fenAttaques(hits, opts){
   var o=opts||{}, esc=function(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
   var noms=(typeof CIVS!=='undefined')?Object.keys(CIVS).map(function(k){return CIVS[k];}):[];
-  var nats=[]; (hits||[]).forEach(function(h){ var t=String(h.title||''); for(var i=0;i<noms.length;i++){ if(t.indexOf(noms[i].name)>=0&&nats.indexOf(noms[i])<0){ nats.push(noms[i]); break; } } });
+  /* ⚠️ UN COUP SE DÉCLARE, IL NE SE DEVINE PAS (REPRISE §7.2, motif 4 ; banc de partie, 30/09).
+     Le choix se faisait par mots-clés sur le titre ET le corps : « Martiens et Terriens sont en guerre…
+     leurs routes TOMBENT » (une nouvelle qui ne te vise pas) devenait « attaqué par TERRIENS », ton
+     PROPRE « Espionnage réussi » et « Aucun assaut contre toi » devenaient « On t'attaque ».
+     C'est celui qui écrit l'avis qui sait : `notifyNationHit(…, 'coup')`. Seuls ces avis-là donnent
+     le rouge et « attaqué par », et seul leur titre sert à désigner l'assaillant. */
+  var coups=(hits||[]).filter(function(h){ return h&&h.genre==='coup'; });
+  var nats=[]; coups.forEach(function(h){ var t=String(h.title||''); for(var i=0;i<noms.length;i++){ if(t.indexOf(noms[i].name)>=0&&nats.indexOf(noms[i])<0){ nats.push(noms[i]); break; } } });
   var une=(nats.length===1)?nats[0]:null;
   var corps='<div class="fen-dep">'+(hits||[]).map(function(h){
     var t=String(h.title||'').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu,'').trim();
@@ -2118,11 +2118,11 @@ function fenAttaques(hits, opts){
   }).join('')+'</div>';
   /* Cette fenêtre reçoit aussi des NOUVELLES qui ne sont pas des coups (accord signé, ordre du tour, pacte) :
      le rouge et « attaqué par » ne valent que si un titre parle d'attaque, de pillage, de prise ou d'espionnage. */
-  var coup=(hits||[]).some(function(h){ return /pill|attaq|prend |détruit|espionn|assaill|tombe|capital/i.test(String(h.title||'')+' '+String(h.body||'')); });
+  var coup=coups.length>0;
   if(!coup) return fenBlason({ton:'info', emoji:'📡', kicker:t('fen.nouvelles','Nouvelles'), nation:t('fen.pour_toi','Pour toi'), verbe:o.verbe||t('fen.pendant_attente','Pendant ton attente'),
     milieu:corps, boutons:[{k:t('fen.compris','Compris'), cls:'go', onclick:o.onclick||''}]});
   return fenBlason({ton:'war', emoji:une?une.emoji:'⚔️', kicker:une?t('fen.attaque_par','attaqué par'):t('fen.guerre','Guerre'), prep:!!une,
-    nation:une?esc(une.name):t('fen.on_t_attaque','On t\'attaque'), verbe:o.verbe||((hits||[]).length>1?t('fen.plusieurs_coups','Plusieurs coups portés contre toi'):t('fen.un_coup','Un coup porté contre toi')),
+    nation:une?esc(une.name):t('fen.on_t_attaque','On t\'attaque'), verbe:o.verbe||(coups.length>1?t('fen.plusieurs_coups','Plusieurs coups portés contre toi'):t('fen.un_coup','Un coup porté contre toi')),
     milieu:corps, boutons:[{k:t('fen.compris','Compris'), cls:'go', onclick:o.onclick||''}]});
 }
 function fenAdversaire(prefix, nat){

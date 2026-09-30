@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-28 · v11.03';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-09-30 · v11.06';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -1283,6 +1283,10 @@ function installIntercepts(){
     // Leurs fonctions d'application sont overridées → en ligne elles ENVOIENT la réponse au lieu d'appliquer localement.
     if(typeof window._evCommPick==='function' && !window._evCommPick._scOff){ const o=window._evCommPick;
       window._evCommPick=function(aiId){ if(STATE.started&&STATE._realDecide){ try{if(window._evCloseOverlay)_evCloseOverlay();}catch(e){} const f=STATE._realDecide;STATE._realDecide=null;f({aiId:aiId||null}); return; } return o.apply(this,arguments); }; window._evCommPick._scOff=true; }
+    /* Accords à PLUSIEURS partenaires (30/09) : en ligne, le bouton « Proposer N accords » envoie la
+       liste lue dans la fenêtre (`_evCommChoisies`, la même lecture qu'en solo). */
+    if(typeof window._evCommConfirm==='function' && !window._evCommConfirm._scOff){ const o=window._evCommConfirm;
+      window._evCommConfirm=function(){ if(STATE.started&&STATE._realDecide){ const ids=(typeof window._evCommChoisies==='function')?window._evCommChoisies():[]; try{if(window._evCloseOverlay)_evCloseOverlay();}catch(e){} const f=STATE._realDecide;STATE._realDecide=null;f({aiIds:ids}); return; } return o.apply(this,arguments); }; window._evCommConfirm._scOff=true; }
     if(typeof window._evDiploToggle==='function' && !window._evDiploToggle._scOff){ const o=window._evDiploToggle;
       window._evDiploToggle=function(id,on){ if(STATE.started){ window._scDiploSel=window._scDiploSel||{}; window._scDiploSel[id]=on; } return o.apply(this,arguments); }; window._evDiploToggle._scOff=true; }
     if(typeof window._evDiploConfirm==='function' && !window._evDiploConfirm._scOff){ const o=window._evDiploConfirm;
@@ -2508,6 +2512,9 @@ function init(){
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
 
 window.SC_ONLINE = { STATE, send, reqState }; // debug console
+/* Le panneau générique de décision, prêté au PILOTE LOCAL du moteur (solo de l'appli, 30/09) :
+   une question posée au joueur sans fenêtre dédiée (l'initiative de fin de tour) s'affiche ici. */
+window.scAskLocalDecision = askLocalDecision;
 /* Banc VISUEL (captures Playwright, `scratchpad/shot3.js`) : ouvrir les fenêtres de décision avec une
    charge utile fabriquée, sans serveur. Exposé seulement si l'adresse porte `?sc_test=1`. */
 try{ if(/[?&]sc_test=1/.test(location.search)) window.SC_TEST = { askLocalDecision, showPeaceReal, closeDecision, decisionPanel, STATE, installIntercepts, screenAuth, screenLobby, screenCreate, renderWait }; }catch(e){}

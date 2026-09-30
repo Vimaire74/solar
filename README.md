@@ -12,15 +12,34 @@
      fait pour ça. Les blocs de prose ci-dessous sont l'ancien format : à remplacer au fur et à
      mesure, pas à imiter. -->
 
-## 📦 CE LOT EST EN **v11.03** · cache `sw.js` **v224** · 2026-09-28
+## 📦 CE LOT EST EN **v11.06** · cache `sw.js` **v227** · 2026-09-30
 
 > Pour savoir ce qui est EN LIGNE : ouvre solar-game.com, la version est écrite sur l'écran de
-> connexion (en rouge si les fichiers ne concordent pas). Si elle ne dit pas **v11.03**, l'envoi ou
+> connexion (en rouge si les fichiers ne concordent pas). Si elle ne dit pas **v11.06**, l'envoi ou
 > le redéploiement n'a pas pris.
 > ⚠️ **Les DEUX ressources Coolify** doivent être redéployées : le site ET le serveur. L'IA
 > tourne sur le serveur — redéployer le seul site laisse l'adversaire jouer avec l'ancien moteur.
 
 Dossier prêt à envoyer. Le détail des livraisons suit, du plus récent au plus ancien ; la version de CE lot est dans le bandeau ci-dessus, c'est la seule qui fait foi.
+
+**v11.06 — 30/09/2026** — `docs/REPRISE.md` §171
+- Fenêtre des avis : « attaqué par » / « On t'attaque » seulement pour une vraie attaque contre toi ; sinon « Nouvelles ».
+- Fenêtre « Moral à 0 » : sur-titre « Moral de la population » au lieu de « Sphère de Dyson ».
+- Combat : « choisis ta cible » (tutoiement).
+
+**v11.05 — 30/09/2026** — `docs/REPRISE.md` §170 — REDÉPLOYER AUSSI LE SERVEUR
+- Bandeau « action faite » supprimé entièrement.
+- Accords commerciaux : proposables à plusieurs nations à la fois (règles fr + en mises à jour).
+- Espionnage : lignes à toucher au lieu de cases à cocher du navigateur.
+- Fenêtre de paix : plus de « undefined » quand l'ordinateur déclare la guerre.
+- Appli (solo local) : les questions posées aux nations de l'ordinateur reçoivent une réponse — fin des figeages en guerre.
+- Appli (solo local) : le choix d'initiative de fin de tour s'affiche enfin au joueur.
+- Nouveau banc `server/pw_partie_appli.js` : une partie complète dans l'appli émulée, chaque fenêtre contrôlée et photographiée.
+
+**v11.04 — 30/09/2026** — `docs/REPRISE.md` §169
+- Plus de bandeau « action faite » tant que ✓/↩ attend la validation, ni par-dessus la fenêtre des jetons de route.
+- Accords commerciaux : le bouton « Passer (aucun accord) » a le style du jeu (il s'affichait en bouton blanc du navigateur).
+- Nouveau banc `server/pw_parcours_appli.js` : l'appli émulée dans Chromium (écran 360 px tactile), fenêtre par fenêtre.
 
 **v11.03 — 28/09/2026** — `docs/REPRISE.md` §168
 - Rapport de diagnostic (`diagnostic.js`) : erreurs, figeages, état de la partie et journal gardés sur l'appareil, envoyés seulement si le joueur appuie sur Envoyer.

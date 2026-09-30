@@ -263,7 +263,7 @@ window.SOLAR_LANG_DICT = {
   "evenement.attract.nom": "Most Attractive Civilisation",
   "evenement.attract.apercu": "The nation with the highest morale gains +2<i class=ri-materials></i> +2<i class=ri-science></i> +3 VP. Tied for first: both; more ties: nobody.",
   "evenement.comm.nom": "Trade Agreements",
-  "evenement.comm.apercu": "A chance to sign a free trade agreement (+3 VP per nation; ends a war).",
+  "evenement.comm.apercu": "A chance to sign free trade agreements, with one or more nations (+3 VP per nation and per agreement; ends a war).",
   "evenement.diplo.nom": "Diplomatic Agreements",
   "evenement.diplo.apercu": "A chance for non-aggression pacts (pact length: 4 turns, cost per nation 6<i class=ri-materials></i>, +4 VP for each signatory; tension to 0 between the signatories). Ends a war.",
   "evenement.final.nom": "Final Judgement",
@@ -2305,4 +2305,9 @@ window.SOLAR_LANG_DICT = {
   "diag.copie": "✅ Report copied — paste it into a message.",
   "diag.copie_impossible": "⚠️ Copying is not possible on this device.",
   "diag.signaler": "🐞 Report a problem",
+  "evt.aucun_accord_choisi": "No agreement selected",
+  "evt.proposer_un_accord": "Propose 1 agreement",
+  "evt.proposer_n_accords": "Propose {n} agreements",
+  "moral.kicker": "Population morale",
+  "extrasol.kicker": "Exploration",
 };
