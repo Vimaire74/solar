@@ -16,11 +16,32 @@
      Le 01/10 il a été ramené de 84 Mo à 3,5 Mo (36 fichiers). Un fichier identique à ce qui est déjà
      en ligne n'a rien à faire ici ; une image ou un banc nouveau ou modifié, oui. -->
 
-## 📦 CE LOT EST EN **v11.11** · cache `sw.js` **v232** · 2026-10-01
+## 📦 CE LOT EST EN **v11.16** · cache `sw.js` **v237** · 2026-10-01
 
 > Pour savoir ce qui est EN LIGNE : ouvre solar-game.com, la version est écrite sur l'écran de
-> connexion. Si elle ne dit pas **v11.11**, l'envoi ou le redéploiement n'a pas pris.
+> connexion. Si elle ne dit pas **v11.16**, l'envoi ou le redéploiement n'a pas pris.
 > ⚠️ **Les DEUX ressources Coolify** doivent être redéployées : le site ET le serveur.
+
+**v11.16 — 01/10/2026** — `docs/REPRISE.md` §183
+- « Envoyer par email » : le log part entier, en pièce jointe, par la feuille de partage du téléphone (Gmail, WhatsApp…) — plus de courriel coupé au tour 2.
+
+**v11.15 — 01/10/2026** — `docs/REPRISE.md` §182
+- Fin de partie : le décompte n'est plus coupé par la barre du haut (titre et première nation visibles).
+- Fin de partie : le gagnant en premier, puis par score décroissant.
+
+**v11.14 — 01/10/2026** — `docs/REPRISE.md` §181
+- Empire : un emblème devant le score de chaque adversaire (plus de « ~3/3/4 » sous trois émojis), et dans la section « Adversaire IA ».
+- Empire : les quatre cases de ressources restent alignées aux grandes tailles de texte (le libellé ne passe plus sur deux lignes).
+
+**v11.13 — 01/10/2026** — `docs/REPRISE.md` §180
+- Cartes détaillées : plus de « ✓ Toi / Yours », ni « ∞ / GOV / 1× / Militaire » en grand sur l'illustration ; le rang T1/T2/T3 reste, petit, en haut à gauche.
+- Cartes détaillées : l'illustration remplit son cadre (format 1184×864), plus de bande ni de coupe.
+- Onglets du bas : plus de libellé coupé (« EMPI… », « JOURN… ») aux grandes tailles de texte.
+- Diplomatie : l'étiquette Paix / Tensions / En guerre passe sous le nom de la nation.
+- Anglais : « Military » sous les cartes militaires, « /turn » dans la tension.
+
+**v11.12 — 01/10/2026** — `docs/REPRISE.md` §179
+- Solo (appli) : le rappel du pouvoir gratuit arrive au dernier AC, une fois par tour, comme sur le site — plus à 0 AC.
 
 **v11.11 — 01/10/2026** — `docs/REPRISE.md` §178
 - Nouvelle icône du jeu (orbite en S autour du soleil) : site, appli et écran de démarrage.

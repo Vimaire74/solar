@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-10-01 · v11.11';</script>
+<script>window.SOLAR_BUILD_HTML='2026-10-01 · v11.16';</script>
 <!-- Tampon des erreurs survenues AVANT diagnostic.js (chargé après moteur.js) : il les ramasse au démarrage. -->
 <script>window.__scErreursPrecoces=[];window.addEventListener('error',function(e){try{if(window.scDiagNoterErreur)return;window.__scErreursPrecoces.push({type:'erreur',msg:e.message||String(e),pile:(e.error&&e.error.stack)||'',ou:(e.filename||'').split('/').pop()+':'+e.lineno});}catch(x){}});</script>
 <!-- i18n.js EN TÊTE, avant tout script du corps : il choisit la langue et charge lang/<code>.js (synchrone).
@@ -1285,6 +1285,28 @@ body{font-size:var(--sc-fs,16px);}
 /* Choix à valider (30/09) : l'option touchée est SÉLECTIONNÉE, pas appliquée — voir `_exigerValidation`. */
 .choix-opt{cursor:pointer}
 .choix-opt.choix-sel,.choix-opt[aria-pressed="true"]{outline:2px solid #ffd700;outline-offset:1px;box-shadow:0 0 0 4px rgba(255,215,0,.18)}
+/* Cartes détaillées (Marc, 01/10) : le cadre de l'illustration prend le format des images (1184 × 864) ;
+   le badge de rang est en PIXELS — en « em » il héritait des 64 px prévus pour l'émoji et sortait à 37 px. */
+.td-art.td-art-img{height:auto!important;aspect-ratio:1184/864}
+.td-tier-badge{font-size:11px!important;line-height:1.2;top:6px;left:8px;padding:2px 6px;letter-spacing:.08em}
+/* Onglets du bas : « EMPIRE » en Michroma dépassait 65 px au réglage Aa 18-20 sur 344 px (« EMPI… ») —
+   le libellé est plafonné par la largeur de l'écran. */
+.mtab label{font-size:min(.5em,2.55vw)}
+/* Diplomatie : l'étiquette (Paix / Tensions / En guerre) passe SOUS le nom de la nation, plus à côté
+   — elle recouvrait les noms longs. */
+.dip-hdr{flex-direction:column;align-items:flex-start;gap:5px}
+/* Empire (Marc, 01/10) : score des adversaires = emblème + score, chacun ; cases de ressources : le libellé
+   ne passe JAMAIS sur deux lignes (à Aa 20 « Savoir » / « Énergie » se repliaient et poussaient leur chiffre,
+   la case « Mat. » restait seule alignée en haut). */
+#score-a{white-space:nowrap;font-size:min(.95em,3.4vw)}
+.sc-adv{display:inline-flex;align-items:center;gap:2px;margin-right:6px;white-space:nowrap}
+.sc-adv .nat-e img.nat-emb-i{width:1.15em;height:1.15em;vertical-align:-.22em;margin:0}
+.sc-vp-unit{font-size:.7em;opacity:.8}
+.rbox .rn{white-space:nowrap;font-size:min(.62em,2.75vw)}
+/* Fin de partie (Marc, 30/09 et 01/10 : « le haut du décompte est tronqué ») : l'écran de fin est un calque
+   plein écran à z-index 100, SOUS la barre du haut — le titre et la première boîte passaient derrière elle.
+   Comme les autres fenêtres (l.928), il commence sous la barre du haut et s'arrête au-dessus des onglets. */
+#end-scr{top:var(--topband,0)!important;bottom:var(--botband,0)!important}
 /* Fenêtres d'information RÉDUCTIBLES (01/10) — voir `fenReductible` : le « – » replie, la pastille rend. */
 .fen-reduire{position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;background:#1a2444;color:#9fb4d8;border:1px solid #45557a;font:800 20px/1 system-ui;cursor:pointer;z-index:2;padding:0}
 .fen-replie{display:none!important}

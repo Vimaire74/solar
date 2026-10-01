@@ -265,6 +265,96 @@ const SONDE = `(function(root){
   }
   await p.screenshot({ path: path.join(OUT, 'investissement.png') });
 
+  console.log('\nJ. CARTES DÉTAILLÉES, ONGLET EMPIRE, ÉTIQUETTES DIPLO (01/10)');
+  /* Marc, appli v11.12 : « texte en très grand sur les images », « YOURS en énorme », « T3 inutile »,
+     images « tronquées » / « ne prennent pas toute la place », « EMPI… », étiquettes Paix sur le nom. */
+  await fermer();
+  const j = await p.evaluate(async () => {
+    const r = {}; const att = ms => new Promise(x => setTimeout(x, ms));
+    const art = () => document.getElementById('td-art');
+    const mesure = () => { const a = art(); const b = a.querySelector('.td-tier-badge'); const rc = a.getBoundingClientRect();
+      return { texte: (a.textContent || '').trim(), badge: b ? b.textContent.trim() : null, badgePx: b ? parseFloat(getComputedStyle(b).fontSize) : 0,
+               ratio: rc.height ? +(rc.width / rc.height).toFixed(2) : 0, cover: getComputedStyle(a).backgroundSize === 'cover', h: Math.round(rc.height) }; };
+    G.phase = 'actions'; G._humanActive = true;
+    const t3 = CARDS_POOL.find(c => c.tier === 3 && c.branch); G.player.cards.push(Object.assign({}, t3));
+    showTechDetail(t3.id); await att(150); r.tech = mesure(); document.getElementById('tech-detail-modal').classList.add('hidden');
+    showMarketDetail('cm_forages'); await att(150); r.civ = mesure(); document.getElementById('tech-detail-modal').classList.add('hidden');
+    showMarketDetail('gov_senat'); await att(150); r.gov = mesure(); document.getElementById('tech-detail-modal').classList.add('hidden');
+    const mil = CARDS_POOL.find(c => c.type === 'militaire'); showGeneralDetail(mil.id); await att(150); r.mil = mesure();
+    r.milBranche = (document.getElementById('td-branch').textContent || '').trim(); document.getElementById('tech-detail-modal').classList.add('hidden');
+    /* Diplomatie : l'étiquette sous le nom. */
+    uiTab('diplo'); G.ais.forEach(a => setTens(G.player.civ.id, a.civ.id, 8)); render(); await att(100);
+    const hdr = document.querySelector('.dip-hdr'); const nom = hdr && hdr.querySelector('.dip-nom'), st = hdr && hdr.querySelector('.dip-status');
+    r.diplo = (nom && st) ? { sous: st.getBoundingClientRect().top >= nom.getBoundingClientRect().bottom - 1, status: st.textContent.trim() } : null;
+    r.tour = /\/tour/.test((document.querySelector('.dip-moral') || {}).innerHTML || '') && (window.SOLAR_LANG === 'fr');
+    uiTab('map');
+    return r;
+  });
+  const okImg = m => m && m.cover && Math.abs(m.ratio - 1.37) < 0.03;
+  if (j.tech.badge === 'T3' && j.tech.badgePx <= 12) ok('tech : rang « T3 » en ' + j.tech.badgePx + ' px'); else ko('tech : badge « ' + j.tech.badge + ' » ' + j.tech.badgePx + ' px');
+  if (!/toi|yours/i.test(j.tech.texte)) ok('tech : plus de « ✓ Toi / Yours » sur l\'illustration'); else ko('tech : « ' + j.tech.texte + ' » encore sur l\'illustration');
+  if (j.civ.badge === null && j.gov.badge === null && j.mil.badge === null && !/∞|GOV|1×|MILIT/i.test(j.civ.texte + j.gov.texte + j.mil.texte)) ok('civique / gouvernement / militaire : plus aucun texte sur l\'illustration'); else ko('texte sur l\'illustration : ' + JSON.stringify([j.civ.badge, j.gov.badge, j.mil.badge]));
+  if (okImg(j.tech) && okImg(j.civ) && okImg(j.gov) && okImg(j.mil)) ok('illustrations au format 1184×864, pleines (ratios ' + [j.tech, j.civ, j.gov, j.mil].map(m => m.ratio).join(', ') + ')'); else ko('cadre d\'illustration : ' + JSON.stringify([j.tech, j.civ, j.gov, j.mil].map(m => [m.ratio, m.cover, m.h])));
+  if (j.milBranche && j.milBranche !== 'militaire') ok('carte militaire : sous-titre traduit « ' + j.milBranche + ' »'); else ko('carte militaire : sous-titre brut « ' + j.milBranche + ' »');
+  if (j.diplo && j.diplo.sous) ok('diplomatie : étiquette « ' + j.diplo.status + ' » sous le nom'); else ko('diplomatie : étiquette à côté du nom ' + JSON.stringify(j.diplo));
+  /* « EMPI… » : 344 px (Flip 6) avec le réglage Aa 20. */
+  await p.setViewportSize({ width: 344, height: 800 });
+  const e2 = await p.evaluate(async () => { try { scTaille(20); } catch (e) {} await new Promise(x => setTimeout(x, 200));
+    return [...document.querySelectorAll('.mtab label')].map(l => ({ t: l.textContent, deb: l.scrollWidth > l.clientWidth + 1, px: +getComputedStyle(l).fontSize.replace('px', '') })); });
+  await p.evaluate(() => { try { scTaille(16); } catch (e) {} }); await p.setViewportSize({ width: 360, height: 800 });
+  const deb = e2.filter(x => x.deb);
+  if (!deb.length) ok('onglets à 344 px / Aa 20 : aucun libellé coupé (' + e2.map(x => x.t + ' ' + x.px + 'px').join(', ') + ')'); else ko('libellé(s) coupé(s) : ' + deb.map(x => x.t).join(', '));
+  await p.screenshot({ path: path.join(OUT, 'cartes.png') });
+  /* Empire (Marc, 01/10) : emblèmes devant les scores adverses et dans « Adversaire IA » ; cases de ressources
+     alignées même à Aa 20 sur 344 px (les libellés se repliaient sur deux lignes). */
+  await p.setViewportSize({ width: 344, height: 800 });
+  const k = await p.evaluate(async () => { try { scTaille(20); } catch (e) {} uiTab('empire'); render(); await new Promise(x => setTimeout(x, 400));
+    const r = {};
+    r.scoreEmb = document.querySelectorAll('#score-a .nat-e img').length; r.nations = G.ais.length;
+    r.aiEmb = document.querySelectorAll('#r-ai .nat-e img').length;
+    r.tops = [...document.querySelectorAll('#r-res .rbox .rv')].map(v => Math.round(v.getBoundingClientRect().top));
+    r.labs = [...document.querySelectorAll('#r-res .rbox .rn')].map(l => l.scrollWidth <= l.clientWidth + 1);
+    try { scTaille(16); } catch (e) {} uiTab('map'); return r; });
+  await p.setViewportSize({ width: 360, height: 800 });
+  if (k.scoreEmb === k.nations && k.aiEmb === k.nations) ok('Empire : un emblème par adversaire dans le score (' + k.scoreEmb + ') et dans « Adversaire IA » (' + k.aiEmb + ')'); else ko('Empire : emblèmes score=' + k.scoreEmb + ', adversaires=' + k.aiEmb + ' pour ' + k.nations + ' nations');
+  if (new Set(k.tops).size === 1 && k.labs.every(Boolean)) ok('Empire : les 4 chiffres de ressources alignés à Aa 20 / 344 px (' + k.tops.join(',') + ')'); else ko('Empire : chiffres désalignés ' + JSON.stringify(k.tops) + ' / libellés coupés ' + JSON.stringify(k.labs));
+
+  /* Fin de partie (Marc, 01/10) : rien sous la barre du haut, le gagnant en premier. */
+  const fin = await p.evaluate(async () => {
+    G.turn = 10; G.phase = 'actions';
+    try { G.ais[G.ais.length - 1].tempVP = (G.ais[G.ais.length - 1].tempVP || 0) + 50; } catch (e) {}   // la DERNIÈRE IA gagne : elle doit remonter en tête
+    const ev = { total: 0 }; let f = null;
+    try { doEndGame(); } catch (e) { f = 'doEndGame : ' + e.message; }
+    await new Promise(x => setTimeout(x, 1200));
+    const scr = document.getElementById('end-scr'); const top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--topband')) || 0;
+    const r = { erreur: f, visible: scr && !scr.classList.contains('hidden'), haut: scr ? Math.round(scr.getBoundingClientRect().top) : -1, bande: Math.round(top) };
+    const boites = [...document.querySelectorAll('#vp-wrap .vp-box')];
+    r.totaux = boites.map(b => parseInt((b.querySelector('.vp-total') || {}).textContent || '0', 10));
+    r.premierGagnant = boites.length ? boites[0].classList.contains('winner') : false;
+    const t1 = document.getElementById('end-title'); r.titreVisible = t1 ? t1.getBoundingClientRect().top >= top - 1 : false;
+    scr.classList.add('hidden'); return r; });
+  if (fin.erreur) ko(fin.erreur);
+  else {
+    if (fin.visible && fin.haut >= fin.bande - 1 && fin.titreVisible) ok('fin de partie : l\'écran commence sous la barre du haut (' + fin.haut + ' ≥ ' + fin.bande + '), titre visible'); else ko('fin de partie : écran à ' + fin.haut + ' px, barre ' + fin.bande + ' px, titre visible=' + fin.titreVisible);
+    const tri = fin.totaux.every((v, i, a) => i === 0 || a[i - 1] >= v);
+    if (tri && fin.premierGagnant) ok('fin de partie : boîtes par score décroissant, le gagnant en premier (' + fin.totaux.join(' ≥ ') + ')'); else ko('fin de partie : ordre ' + JSON.stringify(fin.totaux) + ', premier=gagnant ' + fin.premierGagnant);
+  }
+
+  /* « Envoyer par email » : feuille de partage du système, log COMPLET, jamais un mailto tronqué (01/10). */
+  const em = await p.evaluate(async () => {
+    const r = { appels: [] };
+    const sauv = { share: navigator.share, canShare: navigator.canShare };
+    navigator.share = async d => { const fl = (d.files && d.files[0]) ? (await d.files[0].text()).length : 0; r.appels.push({ files: (d.files || []).length, fileLen: fl, title: d.title }); };
+    navigator.canShare = d => !!(d && d.files && d.files.length);
+    let href0 = location.href; for (let i = 0; i < 40; i++) addLog('ligne de remplissage numéro ' + i + ' pour dépasser la limite d\'un mailto', 'dim');
+    const full = buildFullLog(); r.longueur = full.length;
+    if (r.appels.length === 0) { emailLog(); await new Promise(x => setTimeout(x, 100)); }
+    r.mailto = location.href !== href0; const f = r.appels[0];
+    if (f && f.files === 1) { /* taille du fichier partagé = le log entier */ }
+    navigator.share = sauv.share; navigator.canShare = sauv.canShare;
+    return r; });
+  if (em.appels.length === 1 && em.appels[0].files === 1 && em.appels[0].fileLen === em.longueur && !em.mailto) ok('« Envoyer par email » : partage système, log entier en pièce jointe (' + em.longueur + ' caractères), aucun mailto'); else ko('« Envoyer par email » : ' + JSON.stringify(em));
+
   console.log('\nA. FENÊTRES NATIVES DU NAVIGATEUR');
   const nat = await p.evaluate(() => window.__natifs);
   if (!nat.length) ok('aucun confirm()/alert() pendant le parcours'); else nat.forEach(x => ko('fenêtre native : ' + x));

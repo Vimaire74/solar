@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-01 · v11.11';
+const SOLAR_BUILD_MOTEUR = '2026-10-01 · v11.16';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -6598,8 +6598,18 @@ function interleaveStep(){
       G._humanActive=true;
       // Action par action : quand tes actions sont finies (0 AC) et aucune confirmation en attente →
       // rappel du pouvoir gratuit s'il n'est pas utilisé, sinon on passe automatiquement au tour suivant (plus besoin de « Fin de Tour »).
+      /* LE RAPPEL DU POUVOIR GRATUIT ARRIVE AU DERNIER AC, UNE FOIS PAR TOUR — comme sur le site
+         (online.js, « uniquement au dernier AC »). Marc, 01/10 : « le rappel arrive maintenant à 0 action
+         au lieu de l'avant-dernière, rétablis comme avant ». Le solo ne l'avait jamais proposé qu'à 0 AC
+         (témoin v9.69) ; l'appli joue en solo, d'où l'écart. `_rappelPouvoirTour` = tour où il a été
+         proposé. À 0 AC on ne redemande pas s'il l'a déjà été ; sinon (pouvoir devenu disponible entre
+         temps) le filet d'origine reste. Banc : test_rappel_pouvoir_solo.js. */
+      if(G.player.acLeft===1 && !_scConfirmArmed && !_scAbilityReminderOpen() && G.player._rappelPouvoirTour!==G.turn && _scAbilityAvailable()){
+        G.player._rappelPouvoirTour=G.turn;
+        clearTimeout(G._ilHideTimer); _ilHide(); render(); _scShowAbilityReminder(); _armPlayerStuckWatch(); return;
+      }
       if(G.player.acLeft<=0 && !_scConfirmArmed && !_scAbilityReminderOpen()){
-        if(_scAbilityAvailable()){ render(); _scShowAbilityReminder(); _armPlayerStuckWatch(); return; }
+        if(_scAbilityAvailable() && G.player._rappelPouvoirTour!==G.turn){ G.player._rappelPouvoirTour=G.turn; render(); _scShowAbilityReminder(); _armPlayerStuckWatch(); return; }
         return passTurnIL();
       }
       clearTimeout(G._ilHideTimer); G._ilHideTimer=setTimeout(_ilHide,(typeof fenDepechesDuree==='function')?fenDepechesDuree(2000):2000); render(); _scMaybeStuck(); _armPlayerStuckWatch(); return;   // 2 s, +3 s à 4 nations (Marc, 15/09)
@@ -7811,15 +7821,10 @@ function showMarketDetail(cardId){
   const border=isGov?'#4a90e8':'#66cc88';
   document.getElementById('td-card').style.borderTop=`4px solid ${border}`;
   const artEl=document.getElementById('td-art');
-  if(CARD_ART.has(cardId)){artEl.style.background=`#0a0a18 url('assets/cards/${cardId}.png') center/contain no-repeat`;artEl.style.height='300px';
-    /* Les illustrations des actions sociales (He3, Recherche, Calmer…) sont CARRÉES (1024×1024) alors que
-       la fenêtre est large : en `contain`, elles s'affichaient réduites avec du vide de chaque côté
-       (Marc, 19/09). Pour une image carrée on passe en `cover` : pleine largeur, un peu rognée en haut
-       et en bas. Les illustrations larges (1184×864) gardent `contain`. */
-    try{ const _im=new Image(); _im.onload=function(){ if(_im.naturalHeight&&_im.naturalWidth/_im.naturalHeight<1.15&&artEl.style.backgroundImage.indexOf(cardId+'.png')>=0)artEl.style.backgroundSize='cover'; }; _im.src='assets/cards/'+cardId+'.png'; }catch(e){}
-  }
-  else{artEl.style.background=border+'22';artEl.style.height='';}
-  artEl.innerHTML=`<span class="td-tier-badge">${isRepeat?'∞':isGov?'GOV':'1×'}</span>${CARD_ART.has(cardId)?'':`<span id="td-emoji">${card.emoji}</span>`}<span class="td-taken-badge hidden"></span>`;
+  _tdArt(artEl,cardId,border+'22');
+  /* Marc, 01/10 : plus de « ∞ / GOV / 1× » en gros sur l'illustration — « autant moche qu'inutile ».
+     La ligne sous le nom (« répétable chaque tour », « 1× par partie ») dit déjà tout. */
+  artEl.innerHTML=`${CARD_ART.has(cardId)?'':`<span id="td-emoji">${card.emoji}</span>`}`;
   document.getElementById('td-name').textContent=card.name;
   document.getElementById('td-branch').textContent=isGov?t('marche.gouv','🏛️ Gouvernement (GOV) · forme — remplace l\'actuelle'):card.govPts?t('marche.civique_gouv','🏛️ Civique · points de gouvernement permanents · 1× par partie'):(isRepeat?t('marche.social_repetable','🌿 Social · répétable chaque tour'):t('marche.social_unique','🌿 Social · 1× par partie'));
   document.getElementById('td-effect').innerHTML=card.effect;
@@ -14097,9 +14102,29 @@ function copyLogText(){
   else fallback();
   const el=document.getElementById('end-log-confirm');if(el){el.style.display='block';setTimeout(()=>el.style.display='none',3000);}
 }
+/* « ENVOYER PAR EMAIL » : LE LOG ARRIVAIT COUPÉ AU TOUR 2 (Marc, 01/10 : « c'est tout ce que j'ai reçu »).
+   Cause : un lien `mailto:` porte tout le texte dans son adresse, et Gmail/Android en tronquent le corps
+   (quelques milliers de caractères) — le code le savait (« l'email peut être tronqué ») sans y remédier.
+   Désormais, dans l'appli et sur tout téléphone récent, on passe par la feuille de PARTAGE du système
+   (`navigator.share`) : d'abord le log en PIÈCE JOINTE `.txt` (complet quoi qu'il arrive), sinon en texte ;
+   l'utilisateur choisit Gmail, WhatsApp, Drive… `mailto:` ne reste que pour les navigateurs sans partage
+   (ordinateur), avec l'avertissement d'avant. Banc : pw_parcours_appli (§ fin). */
 function emailLog(){
   const full=buildFullLog();
-  const href='mailto:?subject='+encodeURIComponent(t('log.sujet_email','Solar — log de partie'))+'&body='+encodeURIComponent(full);
+  const sujet=t('log.sujet_email','Solar — log de partie');
+  try{
+    if(typeof navigator!=='undefined'&&navigator.share){
+      let fichiers=null;
+      try{ const f=new File([full],'solar-log-'+(G&&G.turn?'T'+G.turn+'-':'')+new Date().toISOString().slice(0,10)+'.txt',{type:'text/plain'}); if(navigator.canShare&&navigator.canShare({files:[f]}))fichiers=[f]; }catch(e){}
+      const p=fichiers?navigator.share({title:sujet,text:sujet,files:fichiers}):navigator.share({title:sujet,text:full});
+      p.catch(function(e){ if(!e||e.name!=='AbortError')_emailLogMailto(full,sujet); });
+      return;
+    }
+  }catch(e){}
+  _emailLogMailto(full,sujet);
+}
+function _emailLogMailto(full,sujet){
+  const href='mailto:?subject='+encodeURIComponent(sujet)+'&body='+encodeURIComponent(full);
   if(href.length>1900)_logToast(t('log.long','ℹ️ Log long : l\'email peut être tronqué — préfère « Copier » si besoin.'));
   try{location.href=href;}catch(e){_logToast('⚠️ Impossible d\'ouvrir l\'email');}
 }
@@ -14193,7 +14218,11 @@ function doEndGame(){
       <div class="vp-line"><span>${t('fin.bonus_speciaux','Bonus spéciaux')}</span><span>+${vp.extraVP}</span></div>
       ${_reg((vp.extraDetail&&vp.extraDetail.length)?vp.extraDetail.map(x=>String(_i18nTexte(x))).join('<br>'):t('fin.aucun','aucun'))}
       <div class="vp-total">${vp.total} VP</div></div>`;
-    document.getElementById('vp-wrap').innerHTML=mkBox(G.player.civ.name,pVP,win,G.player.civ.emoji)+aiVPs.map(x=>mkBox(x.ai.civ.name,x.vp,!win&&x.vp.total===aVP.total,x.ai.civ.emoji)).join('');
+    /* LE GAGNANT EN PREMIER (Marc, 01/10 : « là c'est le jupitérien qui est plus bas »), puis par score
+       décroissant ; à égalité le joueur passe devant (il a gagné l'égalité, règle `win`). */
+    const _boites=[{nom:G.player.civ.name,vp:pVP,w:win,em:G.player.civ.emoji,moi:1}].concat(aiVPs.map(x=>({nom:x.ai.civ.name,vp:x.vp,w:!win&&x.vp.total===aVP.total,em:x.ai.civ.emoji,moi:0})));
+    _boites.sort((a,b)=>(b.vp.total-a.vp.total)||(b.moi-a.moi));
+    document.getElementById('vp-wrap').innerHTML=_boites.map(b=>mkBox(b.nom,b.vp,b.w,b.em)).join('');
     document.getElementById('end-scr').classList.remove('hidden');
   },700);
 }
@@ -14203,11 +14232,15 @@ function render(){
   try{ if(typeof i18nRafraichirEtat==='function')i18nRafraichirEtat(G); }catch(e){}   // copies dans G (cartes, nation…) dans la langue du joueur — une fois par état
   renderTopBar();renderWarRisk();renderEvents();renderMap();renderTechTree();renderRight();renderActions();
   document.getElementById('score-p').textContent='~'+vpAffiche(G.player)+' VP';
-  document.getElementById('score-a').textContent='~'+G.ais.map(ai=>vpAffiche(ai)).join('/') +' VP';
-  // Label adverse : pseudo si connu (multijoueur, fourni par online.js via window._scPseudo), sinon nom de civ.
-  // (Avant : « IA » en dur dès qu'il n'y avait qu'un adversaire → faux en multijoueur humain.)
-  {const _lbl=(a)=>{try{if(window._scPseudo&&window._scPseudo[a.civ.id])return a.civ.emoji+' '+window._scPseudo[a.civ.id];}catch(e){}return a.civ.emoji+(G.ais.length===1?(' '+a.civ.name):'');};
-   document.getElementById('score-a-label').textContent=G.ais.map(_lbl).join(' · ');}
+  /* ADVERSAIRES : UN EMBLÈME DEVANT CHAQUE SCORE (Marc, 01/10 : « ~3/3/4 VP » sous trois émojis, « c'est pas
+     clair qui est qui »). Chaque nation = sa pastille (`.nat-e`, remplacée par l'emblème par `natEmblemes`)
+     suivie de son score. Label : pseudo si connu (multijoueur, `window._scPseudo`), sinon le nom quand il
+     n'y a qu'un adversaire, sinon « Adversaires ». */
+  {const _esc=v=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+   document.getElementById('score-a').innerHTML=G.ais.map(ai=>'<span class="sc-adv"><span class="nat-e">'+ai.civ.emoji+'</span>~'+vpAffiche(ai)+'</span>').join('')+' <span class="sc-vp-unit">VP</span>';
+   const _lbl=(a)=>{try{if(window._scPseudo&&window._scPseudo[a.civ.id])return _esc(window._scPseudo[a.civ.id]);}catch(e){}return _esc(_i18nParam(_i18nRef(a.civ,'name')));};
+   let _pseudos=false; try{ _pseudos=!!(window._scPseudo&&G.ais.some(a=>window._scPseudo[a.civ.id])); }catch(e){}
+   document.getElementById('score-a-label').innerHTML=(G.ais.length===1||_pseudos)?G.ais.map(_lbl).join(' · '):t('ui.adversaires','Adversaires');}
 }
 function renderTopBar(){
   const p=G.player;
@@ -14280,7 +14313,7 @@ function renderWarRisk(){
        est DÉJÀ en guerre. Le moteur, lui, ne facture pas la manifestation pendant une guerre (pas
        de double peine avec l'usure) et une guerre en cours n'est pas « imminente ». L'écran doit
        dire ce que le moteur fait. */
-    const moralWarn=(pt>=6&&!atWar)?'<span class="dip-moral">−1<i class=ri-morale></i>/tour</span>':'';
+    const moralWarn=(pt>=6&&!atWar)?'<span class="dip-moral">'+t('diplo.moins_un_moral_tour','−1<i class=ri-morale></i>/tour')+'</span>':'';
     const warWarn=atWar?'':at>=10?'<span class="dip-moral" style="color:#ff4444">'+t('diplo.guerre_excl','guerre !')+'</span>':at>=8?'<span class="dip-moral" style="color:#ff7744">'+t('diplo.imminent','imminent')+'</span>':'';
     // Estimation des jetons Force : exacte avec renseignement (intel niv.2), sinon ±3 (stable sur le tour)
     const _intel=(typeof getIntelLevel==='function')?getIntelLevel(G.player):0;
@@ -15061,7 +15094,7 @@ function renderRight(){
      +'</div>').join('');}
   /* ⚠️ « ~VP estimés » montrait le total RÉEL de l'ordinateur, agenda secret compris (même fuite que
      l'ordre du tirage, Marc 22/09). On affiche le score visible, comme partout ailleurs. */
-  document.getElementById('r-ai').innerHTML=G.ais.map(ai=>{const aiVP={total:vpAffiche(ai)};const aiCd=ai.forceCooldown.reduce((s,fc)=>s+fc.count,0);const _int=getIntelLevel(G.player);const pf=perceivedForce(G.player,ai);const forceTxt=pf.exact?('⚔️'+pf.val+(aiCd>0?'(+'+aiCd+'cd)':'')+' <span style="color:#5a7a66">'+t('empire.renseignement','(renseignement)')+'</span>'):('⚔️~'+pf.val+' <span style="color:#5a6a8a">'+t('empire.sans_renseignement','(±3, sans renseignement)')+'</span>');const eco=_int>=2?('<i class=ri-energy></i>'+(ai.res.energy||0)+' <i class=ri-materials></i>'+(ai.res.materials||0)+' <i class=ri-science></i>'+(ai.res.science||0)+' <i class=ri-morale></i>'+(ai.res.morale||0)):'<span style="color:#5a6a8a">'+t('empire.eco_inconnus','éco &amp; moral : inconnus (tech Renseignement)')+'</span>';const cru=croiseurLigne(ai);return`${ai.civ.emoji} <strong>${ai.civ.name}</strong> · Nv.${ai.gov_level}<br>${eco}<br>${forceTxt} · ${t('empire.cols_routes','Cols:{c} Routes:{r}',{c:ai.colonies.length,r:ai.routes.length})}${cru?'<br>'+cru:''}<br><strong style="color:#ffd700">${t('empire.vp_estimes','~{vp} VP estimés',{vp:aiVP.total})}</strong>`;}).join('<hr style="border-color:#1a1a3a;margin:4px 0">');
+  document.getElementById('r-ai').innerHTML=G.ais.map(ai=>{const aiVP={total:vpAffiche(ai)};const aiCd=ai.forceCooldown.reduce((s,fc)=>s+fc.count,0);const _int=getIntelLevel(G.player);const pf=perceivedForce(G.player,ai);const forceTxt=pf.exact?('⚔️'+pf.val+(aiCd>0?'(+'+aiCd+'cd)':'')+' <span style="color:#5a7a66">'+t('empire.renseignement','(renseignement)')+'</span>'):('⚔️~'+pf.val+' <span style="color:#5a6a8a">'+t('empire.sans_renseignement','(±3, sans renseignement)')+'</span>');const eco=_int>=2?('<i class=ri-energy></i>'+(ai.res.energy||0)+' <i class=ri-materials></i>'+(ai.res.materials||0)+' <i class=ri-science></i>'+(ai.res.science||0)+' <i class=ri-morale></i>'+(ai.res.morale||0)):'<span style="color:#5a6a8a">'+t('empire.eco_inconnus','éco &amp; moral : inconnus (tech Renseignement)')+'</span>';const cru=croiseurLigne(ai);return`<span class="nat-e">${ai.civ.emoji}</span> <strong>${ai.civ.name}</strong> · Nv.${ai.gov_level}<br>${eco}<br>${forceTxt} · ${t('empire.cols_routes','Cols:{c} Routes:{r}',{c:ai.colonies.length,r:ai.routes.length})}${cru?'<br>'+cru:''}<br><strong style="color:#ffd700">${t('empire.vp_estimes','~{vp} VP estimés',{vp:aiVP.total})}</strong>`;}).join('<hr style="border-color:#1a1a3a;margin:4px 0">');
 }
 function renderActions(){
   const active=G.phase==='actions';
@@ -16390,6 +16423,17 @@ function showEventModal(ev,msg){
 function dismissEventModal(){document.getElementById('event-modal').classList.add('hidden');const d=fluxDonnees();if(d.suiteEvenement){_evSuiteJouer();}else render();}
 /* ============================================================ TECH DETAIL MODAL ============================================================ */
 let _techDetailId=null;
+/* L'ILLUSTRATION D'UNE CARTE DÉTAILLÉE REMPLIT SON CADRE, SANS BANDE NI COUPE (Marc, 01/10 : « tronquée »,
+   « ne prend pas toute la place »). Les illustrations sont au format 1184 × 864 ; le cadre prend CES
+   proportions (`aspect-ratio`, classe `td-art-img`) et l'image est en `cover` : exacte pour les 32 cartes
+   larges, rognée en haut et en bas pour les 6 carrées (He3, Culture, Exploration, Recherche, Social,
+   Université — accepté par Marc le 19/09). Plus de hauteur fixe (300 / 230 px selon la fenêtre : c'est
+   ce qui donnait des bandes ici et une coupe là), plus de détection du carré au chargement. */
+function _tdArt(el,cardId,fond){
+  if(!el)return;
+  if(CARD_ART.has(cardId)){ el.style.background=`#0a0a18 url('assets/cards/${cardId}.png') center/cover no-repeat`; el.style.height=''; el.classList.add('td-art-img'); }
+  else{ el.style.background=fond; el.style.height=''; el.classList.remove('td-art-img'); }
+}
 function showTechDetail(cardId){
   const card=CARDS_POOL.find(c=>c.id===cardId);if(!card)return;
   _techDetailId=cardId;
@@ -16406,20 +16450,11 @@ function showTechDetail(cardId){
   const border=branch?branch.color:'#2a2a5a';
   document.getElementById('td-card').style.borderTop=`4px solid ${border}`;
   const artEl=document.getElementById('td-art');
-  if(CARD_ART.has(cardId)){artEl.style.background=`#0a0a18 url('assets/cards/${cardId}.png') center/contain no-repeat`;artEl.style.height='300px';
-    /* Les illustrations des actions sociales (He3, Recherche, Calmer…) sont CARRÉES (1024×1024) alors que
-       la fenêtre est large : en `contain`, elles s'affichaient réduites avec du vide de chaque côté
-       (Marc, 19/09). Pour une image carrée on passe en `cover` : pleine largeur, un peu rognée en haut
-       et en bas. Les illustrations larges (1184×864) gardent `contain`. */
-    try{ const _im=new Image(); _im.onload=function(){ if(_im.naturalHeight&&_im.naturalWidth/_im.naturalHeight<1.15&&artEl.style.backgroundImage.indexOf(cardId+'.png')>=0)artEl.style.backgroundSize='cover'; }; _im.src='assets/cards/'+cardId+'.png'; }catch(e){}
-  }
-  else{artEl.style.background=artBg;artEl.style.height='';}
-  let takenBadgeHtml='<span class="td-taken-badge hidden" id="td-taken"></span>';
-  /* Marc, 19/09 : plus de badge « IA » / « IA aussi » en gros sur l'illustration — « inutile et moche, le
-     message en bas en petit texte est suffisant ». Seul « ✓ Toi » reste. */
-  if(playerOwned)takenBadgeHtml=`<span class="td-taken-badge" id="td-taken">${t('techs.badge_toi','✓ Toi')}</span>`;
-  const lockOverlay='';   // carte détaillée : plus de cadenas non plus (voir la rivière)
-  artEl.innerHTML=`<span class="td-tier-badge" id="td-tier">${card.tier?'T'+card.tier:t('techs.general','Général')}</span>${CARD_ART.has(cardId)?'':`<span id="td-emoji">${card.emoji}</span>`}${takenBadgeHtml}${lockOverlay}`;
+  _tdArt(artEl,cardId,artBg);
+  /* Marc, 19/09 : plus de badge « IA » / « IA aussi » sur l'illustration. Marc, 01/10 : plus de « ✓ Toi »
+     non plus (« le texte en bas "déjà dans ta collection" est suffisant »). Reste le rang T1/T2/T3, en
+     PETIT en haut à gauche (11 px, voir `.td-tier-badge`) — un calque, il ne rogne ni ne réduit l'image. */
+  artEl.innerHTML=`${card.tier?`<span class="td-tier-badge" id="td-tier">T${card.tier}</span>`:''}${CARD_ART.has(cardId)?'':`<span id="td-emoji">${card.emoji}</span>`}`;
   document.getElementById('td-name').textContent=card.name;
   document.getElementById('td-branch').innerHTML=(branch?branch.emoji+' '+branch.label+(G.player.civ.techBonus===card.branch?t('techs.bonus_nation',' — ★ Bonus nation -1<i class=ri-science></i>'):''):card.type||'');
   document.getElementById('td-effect').innerHTML=card.effect;
@@ -16474,12 +16509,11 @@ function showGeneralDetail(cardId){
   const typeColor=couleurCarte(card);
   document.getElementById('td-card').style.borderTop=`4px solid ${typeColor}`;
   const artEl2=document.getElementById('td-art');
-  if(CARD_ART.has(cardId)){artEl2.style.background=`#0a0a18 url('assets/cards/${cardId}.png') center/cover no-repeat`;artEl2.style.height='230px';}
-  else{artEl2.style.background=typeColor+'22';artEl2.style.height='';}
-  const genLabel=(card.type==='militaire'?t('ui.militaire','Militaire'):t('ui.general','Général'));
-  artEl2.innerHTML=`<span class="td-tier-badge" id="td-tier">${genLabel}</span>${CARD_ART.has(cardId)?'':`<span id="td-emoji">${card.emoji}</span>`}<span class="td-taken-badge hidden" id="td-taken"></span>`;
+  _tdArt(artEl2,cardId,typeColor+'22');
+  artEl2.innerHTML=`${CARD_ART.has(cardId)?'':`<span id="td-emoji">${card.emoji}</span>`}`;   // plus de « MILITARY » en gros (Marc, 01/10)
   document.getElementById('td-name').textContent=card.name;
-  document.getElementById('td-branch').textContent=card.type||'';
+  /* « militaire » sortait brut, donc en français sous une carte anglaise (Marc, 01/10). */
+  document.getElementById('td-branch').textContent=(card.type==='militaire'?t('ui.militaire','Militaire'):card.type==='general'?t('ui.general','Général'):(card.type||''));
   document.getElementById('td-effect').innerHTML=card.effect;
   const costRow=document.getElementById('td-cost');
   if(taken){costRow.innerHTML='<span style="color:#7880a0">'+(_milThisTurn?t('techs.deja_achetee_tour','Déjà achetée ce tour (1×/tour)'):t('techs.deja_achetee','Déjà achetée'))+'</span>';}
