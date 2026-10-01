@@ -22,8 +22,9 @@
 > connexion. Si elle ne dit pas **v11.16**, l'envoi ou le redéploiement n'a pas pris.
 > ⚠️ **Les DEUX ressources Coolify** doivent être redéployées : le site ET le serveur.
 
-**v11.16 — 01/10/2026** — `docs/REPRISE.md` §183
+**v11.16 — 01/10/2026** — `docs/REPRISE.md` §183-184 — REDÉPLOYER AUSSI LE SERVEUR
 - « Envoyer par email » : le log part entier, en pièce jointe, par la feuille de partage du téléphone (Gmail, WhatsApp…) — plus de courriel coupé au tour 2.
+- Serveur : le courriel de diagnostic contient TOUT (commentaire, erreurs, journal entier) avec le rapport joint ; la page /stats liste les rapports avec leur contenu et un bouton Copier — plus d'adresse à composer avec la clé. REDÉPLOYER LE SERVEUR.
 
 **v11.15 — 01/10/2026** — `docs/REPRISE.md` §182
 - Fin de partie : le décompte n'est plus coupé par la barre du haut (titre et première nation visibles).

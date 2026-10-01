@@ -60,32 +60,40 @@ function enTeteCors(res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
-/* Le courriel qui prévient Marc (01/10 : « j'aimerais être prévenu qu'un rapport a été envoyé »).
-   Fonction PURE : {sujet, texte}. La page des rapports est donnée SANS la clé — un courriel se
-   transfère, une clé ne se transfère pas. */
+/* LE COURRIEL PORTE TOUT LE RAPPORT (Marc, 01/10 soir : « archi pénible […] que je colle à chaque fois la clé
+   pour débloquer, faut faire beaucoup plus simple : les rapports me sont envoyés directement par email »).
+   Première version du jour = résumé + lien protégé par la clé : c'était une erreur. Désormais : en-tête,
+   commentaire, figeages, erreurs (message, où, pile courte), état de la partie, puis le JOURNAL ENTIER ; le
+   rapport brut (.json) en pièce jointe. Fonction PURE : {sujet, texte, pieces}. */
 function courriel(r, id, base) {
   r = r || {}; const ap = r.appareil || {}, v = r.versions || {}, pa = r.partie || {};
-  const nE = (r.erreurs || []).length, nF = (r.figeages || []).length;
+  const err = r.erreurs || [], fig = r.figeages || [];
   const modele = ap.modele || '?';
-  const sujet = 'Solar — rapport de diagnostic reçu (' + modele + (pa.tour ? ', tour ' + pa.tour : '') + ')';
-  const lignes = [
-    'Un joueur vient d\'envoyer un rapport de diagnostic depuis l\'application.',
-    '',
-    'Identifiant : ' + id,
-    'Reçu le     : ' + (r.recu || new Date().toISOString()),
-    'Appareil    : ' + modele + ' · ' + (ap.os || '?'),
-    'Versions    : ' + Object.keys(v).map(k => k + ' ' + v[k]).join(' · '),
-    'Partie      : ' + (pa.tour ? 'tour ' + pa.tour : 'aucune partie en cours') + (pa.civ ? ' · ' + pa.civ : ''),
-    'Erreurs     : ' + nE + ' erreur' + (nE > 1 ? 's' : '') + ' · ' + nF + ' figeage' + (nF > 1 ? 's' : ''),
-    '',
-    'Commentaire du joueur :',
-    (r.commentaire && String(r.commentaire).trim()) ? String(r.commentaire).trim() : '(aucun)',
-    '',
-    'Lire le rapport complet (ajoute ta clé d\'administration après key=) :',
-    (base || '') + '/diagnostics?key=&f=' + id + '.json',
-    'Tous les rapports : ' + (base || '') + '/diagnostics?key=',
-  ];
-  return { sujet, texte: lignes.join('\n') };
+  const sujet = 'Solar — rapport de diagnostic (' + modele + (pa.tour ? ', tour ' + pa.tour : '') + (err.length ? ', ' + err.length + ' erreur' + (err.length > 1 ? 's' : '') : '') + ')';
+  const L = [];
+  L.push('Un joueur vient d\'envoyer un rapport de diagnostic depuis l\'application.', '');
+  L.push('Identifiant : ' + id, 'Reçu le     : ' + (r.recu || new Date().toISOString()), 'Appareil    : ' + modele + ' · ' + (ap.os || '?') + (ap.ecran ? ' · ' + ap.ecran : ''),
+         'Versions    : ' + Object.keys(v).map(k => k + ' ' + v[k]).join(' · '),
+         'Partie      : ' + (pa.partie === false || !pa.tour ? 'aucune partie en cours' : 'tour ' + pa.tour + (pa.civ ? ' · ' + pa.civ : '') + (pa.phase ? ' · ' + pa.phase : '')),
+         'Rapports déjà envoyés par cet appareil : ' + (r.dejaEnvoyes || 0), '');
+  L.push('── COMMENTAIRE DU JOUEUR ──', (r.commentaire && String(r.commentaire).trim()) ? String(r.commentaire).trim() : '(aucun)', '');
+  L.push('── FIGEAGES (' + fig.length + ') ──');
+  fig.forEach((f, i) => { L.push((i + 1) + '. ' + (f.quand || '') + ' — ' + (f.raison || '') + (f.detail ? ' : ' + f.detail : '')); });
+  if (!fig.length) L.push('aucun');
+  L.push('', '── ERREURS (' + err.length + ') ──');
+  err.forEach((e, i) => { L.push((i + 1) + '. ' + (e.quand || '') + ' [' + (e.type || 'erreur') + '] ' + (e.msg || '') + (e.ou ? '   @ ' + e.ou : ''));
+    if (e.pile) L.push('   ' + String(e.pile).split('\n').slice(0, 4).join('\n   ')); });
+  if (!err.length) L.push('aucune');
+  if (r.fil && r.fil.length) L.push('', '── DERNIÈRES ACTIONS DE L\'INTERFACE ──', r.fil.slice(-30).join(' · '));
+  L.push('', '── JOURNAL DE LA PARTIE ──', (r.journal && String(r.journal).trim()) ? String(r.journal) : '(aucun journal : rapport envoyé hors partie)');
+  L.push('', 'Tous les rapports, avec leur contenu : ' + (base || '') + '/stats (section « Rapports de diagnostic »).');
+  const pieces = [{ filename: id + '.json', content: JSON.stringify(r, null, 1), contentType: 'application/json' }];
+  return { sujet, texte: L.join('\n'), pieces };
+}
+/* Le contenu complet d'un rapport, pour /stats (lecture seule, HTML échappé par l'appelant). */
+function lire(dossier, fichier) {
+  if (!/^[\w-]+\.json$/.test(String(fichier || ''))) return null;
+  try { return JSON.parse(fs.readFileSync(path.join(dossier, fichier), 'utf8')); } catch (e) { return null; }
 }
 /* `surRapport(rapport, id)` : appelé APRÈS l'enregistrement d'un rapport valide, jamais sur un refus
    ni sur OPTIONS. Optionnel : les anciens appelants n'en passent pas. */
@@ -123,4 +131,4 @@ function traiter(req, res, dossier, cleValide, surRapport) {
   }
   return false;
 }
-module.exports = { verifier, enregistrer, lister, traiter, courriel, MAX_OCTETS, MAX_FICHIERS };
+module.exports = { verifier, enregistrer, lister, lire, traiter, courriel, MAX_OCTETS, MAX_FICHIERS };

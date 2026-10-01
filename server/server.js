@@ -214,14 +214,15 @@ function noteMailError(msg) { _mailErrors.unshift(frDate(Date.now()) + ' — ' +
 function memeAdresse(a, b) {
   return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
 }
-function sendMail(to, subject, text) {
-  const line = '\n===== ' + frDate(Date.now()) + ' — À: ' + to + ' — ' + subject + ' =====\n' + text + '\n';
+function sendMail(to, subject, text, attachments) {
+  /* `attachments` (facultatif) : [{filename, content, contentType}] au format nodemailer — rapports de diagnostic. */
+  const line = '\n===== ' + frDate(Date.now()) + ' — À: ' + to + ' — ' + subject + (attachments && attachments.length ? ' — ' + attachments.length + ' pièce(s) jointe(s) : ' + attachments.map(a => a.filename).join(', ') : '') + ' =====\n' + text + '\n';
   try { fs.appendFileSync(OUTBOX, line); } catch (e) {}
   // Destinataire qui n'est PAS une adresse email (ancien compte créé avec un simple pseudo, avant que
   // l'email devienne obligatoire) → on n'essaie même pas : l'envoi échouerait silencieusement.
   if (!isEmail(to)) { noteMailError('NON ENVOYÉ à « ' + to + ' » : ce compte a un pseudo, pas une adresse email. Le joueur doit créer un compte avec son email.'); return; }
   if (!_transport) { noteMailError('NON ENVOYÉ à ' + to + ' : SMTP non configuré (variables SMTP_* absentes).'); return; }
-  _transport.sendMail({ from: MAIL_FROM, to, subject, text })
+  _transport.sendMail(Object.assign({ from: MAIL_FROM, to, subject, text }, (attachments && attachments.length) ? { attachments } : {}))
     .then(() => {})
     .catch(e => { console.error('sendMail:', e.message); noteMailError('ÉCHEC vers ' + to + ' : ' + e.message); });
 }
@@ -1382,7 +1383,7 @@ const server = http.createServer((req, res) => {
   if (diagnostic.traiter(req, res, path.join(DATA, 'diagnostics'), cleValide, (r, id) => {
     if (!DIAG_MAIL) return;
     const m = diagnostic.courriel(r, id, PUBLIC_BASE_URL);
-    sendMail(DIAG_MAIL, m.sujet, m.texte);   // échec → noteMailError, visible dans /stats
+    sendMail(DIAG_MAIL, m.sujet, m.texte, m.pieces);   // tout le rapport dans le courriel + .json joint ; échec → noteMailError, visible dans /stats
   })) return;
   if (req.url && req.url.indexOf('/bot') === 0) { // inviter le bot « Claude » : /bot?code=XXXX[&civ=martiens]&key=…
     let code = '', civId;
@@ -1547,6 +1548,27 @@ const server = http.createServer((req, res) => {
       });
     return;
   }
+  /* RAPPORTS DE DIAGNOSTIC DANS /stats (Marc, 01/10 : « tout est sauvegardé sur le fichier stats qui sert à
+     ça ») — la liste, et pour chacun son contenu complet repliable (commentaire, erreurs, journal), plus un
+     bouton pour le copier. Plus jamais une adresse à composer avec la clé. */
+  function diagStatsHtml() {
+    const esc = v => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const dossier = path.join(DATA, 'diagnostics');
+    let liste = []; try { liste = diagnostic.lister(dossier); } catch (e) {}
+    let h = '<h2 style="margin-top:28px">🐞 Rapports de diagnostic (application) — ' + liste.length + '</h2>';
+    if (!liste.length) return h + '<p style="color:#8898b8">Aucun rapport reçu.</p>';
+    h += '<p style="color:#8898b8;font-size:.9em">Chaque rapport est aussi envoyé par courriel à ' + esc(DIAG_MAIL || '(courriel désactivé)') + ' au moment de sa réception.</p>';
+    for (const l of liste.slice(0, 50)) {
+      const r = diagnostic.lire(dossier, l.fichier) || {};
+      const m = diagnostic.courriel(r, l.fichier.replace(/\.json$/, ''), PUBLIC_BASE_URL);
+      const titre = esc((l.recu || '').replace('T', ' ').slice(0, 16)) + ' · ' + esc(l.appareil) + ' · ' + esc(l.versions || '') + (l.tour ? ' · tour ' + l.tour : ' · hors partie')
+        + ' · ' + (l.erreurs || 0) + ' erreur(s), ' + (l.figeages || 0) + ' figeage(s)' + (l.commentaire ? ' · « ' + esc(l.commentaire) + ' »' : '');
+      h += '<details style="margin:6px 0;border:1px solid #232750;border-radius:8px;padding:6px 10px"><summary style="cursor:pointer">' + titre + '</summary>'
+        + '<div class="barre" style="margin:8px 0"><button onclick="navigator.clipboard.writeText(this.nextElementSibling.textContent).then(()=>{this.textContent=\'✓ Copié\';})">📋 Copier ce rapport</button>'
+        + '<pre style="white-space:pre-wrap;font-size:.85em;background:#070818;padding:10px;border-radius:6px;max-height:70vh;overflow:auto">' + esc(m.texte) + '</pre></div></details>';
+    }
+    return h;
+  }
   if (req.url === '/stats' || req.url.indexOf('/stats?') === 0) {
     /* ═══════════════════════════════════════════════════════════════════════════════════════
        STATS — UN TABLEAU, UNE LIGNE PAR PARTIE
@@ -1642,6 +1664,7 @@ const server = http.createServer((req, res) => {
       + '<h1>Parties — ' + lignes.length + '</h1>'
       + '<div class="sub">Généré le ' + frDate(Date.now()) + ' · fond ambré = partie sans heure de fin (en cours, en attente ou abandonnée)</div>'
       + '<div class="barre"><button id="csv">📋 Copier le tableau (CSV)</button></div>'
+      + diagStatsHtml()
       + '<table><thead><tr><th>Partie</th><th>Début</th><th>Fin / durée</th><th>Initiant</th><th>Humains</th><th>IA</th><th>Tour</th><th>Scores</th><th>Bugs</th><th>Debug</th></tr></thead>'
       + '<tbody>' + tr + '</tbody></table>'
       + '<script>var D=' + donnees + ';var CSV=' + csv + ';'

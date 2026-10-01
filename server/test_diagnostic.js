@@ -160,7 +160,7 @@ console.log('\n6 bis. MARC EST PRÉVENU PAR COURRIEL (01/10)');
     if (h.data && corps !== undefined) h.data(corps); if (h.end) h.end();
     return { traite: t, res };
   };
-  const bon = JSON.stringify({ v: 1, appareil: { modele: 'SM-F741B', os: 'Android 14' }, versions: { moteur: 'v11.10' }, erreurs: [{ msg: 'x' }], figeages: [], partie: { tour: 5 }, commentaire: 'Le jeu a figé.' });
+  const bon = JSON.stringify({ v: 1, appareil: { modele: 'SM-F741B', os: 'Android 14' }, versions: { moteur: 'v11.10' }, erreurs: [{ quand: '2026-10-01T20:00:00Z', type: 'erreur', msg: 'TypeError: boum', ou: 'moteur.js:42', pile: 'at f (moteur.js:42)\nat g' }], figeages: [], partie: { tour: 5, civ: 'Ceinturiens' }, commentaire: 'Le jeu a figé.', journal: 'TOUR 1\n[Terriens] Achète Ordinateur Quantique\nTOUR 2\n[Ceinturiens] Coloniser Triton' });
   const a = faux('POST', bon);
   if (a.traite && a.res.code === 200 && recus.length === 1 && recus[0].r.appareil.modele === 'SM-F741B' && /^\d{4}-/.test(recus[0].id)) ok('rapport valide → rappel appelé une fois, avec le rapport et son identifiant');
   else ko('rappel non appelé sur un rapport valide (code ' + a.res.code + ', appels ' + recus.length + ')');
@@ -175,12 +175,16 @@ console.log('\n6 bis. MARC EST PRÉVENU PAR COURRIEL (01/10)');
   if (!casse) ok('sans rappel : rien ne casse'); else ko('traiter sans rappel lève une exception');
   /* Le courriel lui-même : une fonction pure, testable. */
   const m = diag.courriel(recus[0].r, recus[0].id, 'https://live.solar-game.com');
-  if (m && /SM-F741B/.test(m.texte) && /v11\.10/.test(m.texte) && /tour 5/i.test(m.texte) && /1 erreur/.test(m.texte) && /Le jeu a figé/.test(m.texte)) ok('courriel : appareil, version, tour, erreurs, commentaire'); else ko('courriel incomplet : ' + JSON.stringify(m));
-  if (m && /\/diagnostics\?key=/.test(m.texte) && !/key=[A-Za-z0-9]/.test(m.texte)) ok('courriel : adresse de la page des rapports, SANS la clé'); else ko('courriel : lien absent ou clé en clair');
+  if (m && /SM-F741B/.test(m.texte) && /v11\.10/.test(m.texte) && /tour 5/i.test(m.texte) && /Le jeu a figé/.test(m.texte)) ok('courriel : appareil, version, tour, commentaire'); else ko('courriel incomplet : ' + JSON.stringify(m));
+  /* Marc, 01/10 soir : TOUT dans le courriel — l'erreur avec son emplacement, et le journal ENTIER. */
+  if (m && /TypeError: boum/.test(m.texte) && /moteur\.js:42/.test(m.texte) && /Coloniser Triton/.test(m.texte) && /TOUR 1/.test(m.texte)) ok('courriel : l\'erreur (message + emplacement) et le journal entier y sont'); else ko('courriel sans le détail des erreurs ou sans le journal');
+  if (m && m.pieces && m.pieces.length === 1 && /\.json$/.test(m.pieces[0].filename) && JSON.parse(m.pieces[0].content).journal) ok('courriel : le rapport brut en pièce jointe (' + m.pieces[0].filename + ')'); else ko('courriel : pièce jointe absente');
+  if (m && !/key=/.test(m.texte) && /\/stats/.test(m.texte)) ok('courriel : renvoie à /stats, aucune clé à composer'); else ko('courriel : lien avec clé ou sans /stats');
   if (m && /diagnostic/i.test(m.sujet) && /SM-F741B/.test(m.sujet)) ok('sujet : « ' + m.sujet + ' »'); else ko('sujet : ' + (m && m.sujet));
   /* server.js branche bien le rappel sur l'envoi. */
   const srv = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
-  if (/DIAG_MAIL/.test(srv) && /diagnostic\.traiter\(req, res,[\s\S]{0,120}?\(r, id\)\s*=>/.test(srv) && /contact@solar-game\.com/.test(srv)) ok('server.js : DIAG_MAIL (contact@solar-game.com par défaut) et rappel branché sur sendMail'); else ko('server.js ne branche pas le courriel de diagnostic');
+  if (/DIAG_MAIL/.test(srv) && /diagnostic\.traiter\(req, res,[\s\S]{0,120}?\(r, id\)\s*=>/.test(srv) && /contact@solar-game\.com/.test(srv) && /sendMail\(DIAG_MAIL, m\.sujet, m\.texte, m\.pieces\)/.test(srv)) ok('server.js : DIAG_MAIL (contact@solar-game.com par défaut), rappel branché sur sendMail AVEC la pièce jointe'); else ko('server.js ne branche pas le courriel de diagnostic (avec pièce jointe)');
+  if (/diagStatsHtml\(\)/.test(srv) && /Rapports de diagnostic/.test(srv) && /diagnostic\.lire\(/.test(srv)) ok('server.js : /stats liste les rapports avec leur contenu'); else ko('server.js : /stats sans la section des rapports');
   fs.rmSync(dossier, { recursive: true, force: true });
 }
 
