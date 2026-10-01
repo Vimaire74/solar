@@ -60,7 +60,36 @@ function enTeteCors(res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
-function traiter(req, res, dossier, cleValide) {
+/* Le courriel qui prévient Marc (01/10 : « j'aimerais être prévenu qu'un rapport a été envoyé »).
+   Fonction PURE : {sujet, texte}. La page des rapports est donnée SANS la clé — un courriel se
+   transfère, une clé ne se transfère pas. */
+function courriel(r, id, base) {
+  r = r || {}; const ap = r.appareil || {}, v = r.versions || {}, pa = r.partie || {};
+  const nE = (r.erreurs || []).length, nF = (r.figeages || []).length;
+  const modele = ap.modele || '?';
+  const sujet = 'Solar — rapport de diagnostic reçu (' + modele + (pa.tour ? ', tour ' + pa.tour : '') + ')';
+  const lignes = [
+    'Un joueur vient d\'envoyer un rapport de diagnostic depuis l\'application.',
+    '',
+    'Identifiant : ' + id,
+    'Reçu le     : ' + (r.recu || new Date().toISOString()),
+    'Appareil    : ' + modele + ' · ' + (ap.os || '?'),
+    'Versions    : ' + Object.keys(v).map(k => k + ' ' + v[k]).join(' · '),
+    'Partie      : ' + (pa.tour ? 'tour ' + pa.tour : 'aucune partie en cours') + (pa.civ ? ' · ' + pa.civ : ''),
+    'Erreurs     : ' + nE + ' erreur' + (nE > 1 ? 's' : '') + ' · ' + nF + ' figeage' + (nF > 1 ? 's' : ''),
+    '',
+    'Commentaire du joueur :',
+    (r.commentaire && String(r.commentaire).trim()) ? String(r.commentaire).trim() : '(aucun)',
+    '',
+    'Lire le rapport complet (ajoute ta clé d\'administration après key=) :',
+    (base || '') + '/diagnostics?key=&f=' + id + '.json',
+    'Tous les rapports : ' + (base || '') + '/diagnostics?key=',
+  ];
+  return { sujet, texte: lignes.join('\n') };
+}
+/* `surRapport(rapport, id)` : appelé APRÈS l'enregistrement d'un rapport valide, jamais sur un refus
+   ni sur OPTIONS. Optionnel : les anciens appelants n'en passent pas. */
+function traiter(req, res, dossier, cleValide, surRapport) {
   const url = req.url || '';
   if (url === '/api/diagnostic' || url.indexOf('/api/diagnostic?') === 0) {
     enTeteCors(res);
@@ -72,7 +101,10 @@ function traiter(req, res, dossier, cleValide) {
       const r = trop ? { ok: false, statut: 413, raison: 'rapport trop volumineux' } : enregistrer(corps, dossier);
       res.writeHead(r.ok ? 200 : r.statut, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify(r.ok ? { ok: true, id: r.id } : { ok: false, raison: r.raison }));
-      if (r.ok) console.log('[diagnostic] rapport reçu : ' + r.id);
+      if (r.ok) {
+        console.log('[diagnostic] rapport reçu : ' + r.id);
+        if (typeof surRapport === 'function') { try { surRapport(JSON.parse(fs.readFileSync(r.fichier, 'utf8')), r.id); } catch (e) { console.error('[diagnostic] rappel :', e.message); } }
+      }
     });
     return true;
   }
@@ -91,4 +123,4 @@ function traiter(req, res, dossier, cleValide) {
   }
   return false;
 }
-module.exports = { verifier, enregistrer, lister, traiter, MAX_OCTETS, MAX_FICHIERS };
+module.exports = { verifier, enregistrer, lister, traiter, courriel, MAX_OCTETS, MAX_FICHIERS };

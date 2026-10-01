@@ -140,6 +140,131 @@ const SONDE = `(function(root){
   if (/attaqué par/i.test(e.coup) && /Terriens/.test(e.coup)) ok('coup déclaré : « attaqué par Terriens » (contre-épreuve)'); else ko('coup déclaré non reconnu : ' + e.coup.slice(0, 90));
   if (e.moral && !/Dyson/i.test(e.moral)) ok('fenêtre « Moral à 0 » : sur-titre « ' + e.moral.trim() + ' »'); else ko('fenêtre « Moral à 0 » : sur-titre « ' + e.moral + ' »');
 
+  console.log('\nF. FENÊTRES RÉDUCTIBLES, ET ✓/↩ QUI ARRIVE SEUL (01/10)');
+  /* Marc, 01/10 : « les fenêtres d'informations ne sont pas toutes réductibles […] j'aurais voulu
+     aller voir dans le journal » ; « la fenêtre pour valider ou annuler une action doit arriver juste
+     après l'action, directement après ». */
+  await fermer();
+  const f = await p.evaluate(async () => {
+    const r = {}; const att = ms => new Promise(x => setTimeout(x, ms));
+    const visible = e => !!(e && getComputedStyle(e).display !== 'none' && e.getClientRects().length);
+    const eot = document.getElementById('eot-modal'); eot.classList.remove('hidden'); await att(50);
+    const btn = eot.querySelector('.fen-reduire'); r.bouton = visible(btn); r.boutonH = btn ? Math.round(btn.getBoundingClientRect().height) : 0;
+    if (btn) btn.click(); await att(50);
+    const past = document.getElementById('sc-pastille');
+    r.replie = !visible(eot); r.pastille = visible(past); r.pastilleTexte = past ? (past.textContent || '').trim() : '';
+    /* Le journal est-il atteignable ? l'onglet du bas doit être l'élément touché à son centre. */
+    const tab = document.querySelector('.mtab[data-tab="journal"]'); let touche = null;
+    if (tab) { const b = tab.getBoundingClientRect(); const e = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); touche = e && (e === tab || tab.contains(e)); }
+    r.journalAtteignable = touche; try { uiTab("journal"); } catch (e) {} await att(50);
+    r.journalActif = !!document.querySelector('#mp-journal.active');
+    if (past) past.click(); await att(50);
+    r.revenue = visible(eot) && !visible(past);
+    if (btn) btn.click(); await att(50); eot.classList.add('hidden'); await att(900);   // fermée par le jeu pendant le repli
+    r.pastilleEffacee = !visible(past); r.classeRetiree = !eot.classList.contains('fen-replie');
+    try { uiTab('map'); } catch (e) {}
+    /* ✓/↩ ferme les dépêches ; hors tour, l'action est refusée. */
+    G.phase = 'actions'; G._il = true; G._humanActive = true; G.player.acLeft = 3; G.player.res = { materials: 20, energy: 20, science: 20, morale: 5 };
+    fenDepechesMontrer(['Martiens achète Biosphère'], { kicker: 'Tour des autres nations' }); await att(50);
+    r.depAvant = visible(document.getElementById('sc-depeches'));
+    const carte = CARDS_POOL.find(c => c.tier === 1 && c.branch && isTechAvailable(c, G.player) && !possedeCarte(G.player, c.id));
+    if (carte) buyTech(carte.id); await att(100);
+    r.arme = _scConfirmArmed; r.depApres = visible(document.getElementById('sc-depeches'));
+    try { scConfirmCancel(); } catch (e) {} await att(100);
+    G._humanActive = false; const n = G.player.cards.length;
+    const carte2 = CARDS_POOL.find(c => c.tier === 1 && c.branch && isTechAvailable(c, G.player) && !possedeCarte(G.player, c.id));
+    if (carte2) buyTech(carte2.id); await att(50);
+    r.horsTourRefuse = G.player.cards.length === n && !_scConfirmArmed; r.hint = (document.getElementById('hint') || {}).textContent || '';
+    G._humanActive = true;
+    return r;
+  });
+  if (f.bouton && f.boutonH >= 36) ok('bilan de fin de tour : bouton « – » présent (' + f.boutonH + ' px)'); else ko('bouton « – » absent ou trop petit (' + f.boutonH + ' px)');
+  if (f.replie && f.pastille) ok('repliée : fenêtre masquée, pastille « ' + f.pastilleTexte.slice(0, 40) + ' »'); else ko('repli : fenêtre masquée=' + f.replie + ', pastille=' + f.pastille);
+  if (f.journalAtteignable && f.journalActif) ok('le journal est atteignable pendant le repli'); else ko('journal inatteignable pendant le repli (touché=' + f.journalAtteignable + ', actif=' + f.journalActif + ')');
+  if (f.revenue) ok('la pastille rend la fenêtre'); else ko('la pastille ne rend pas la fenêtre');
+  if (f.pastilleEffacee && f.classeRetiree) ok('fermée par le jeu pendant le repli : pastille effacée, classe retirée (contre-épreuve)'); else ko('fermeture pendant le repli : pastille=' + !f.pastilleEffacee + ', classe=' + !f.classeRetiree);
+  if (f.depAvant && f.arme && !f.depApres) ok('✓/↩ armé → les dépêches se ferment'); else ko('dépêches : avant=' + f.depAvant + ', armé=' + f.arme + ', après=' + f.depApres);
+  if (f.horsTourRefuse && /autres nations/i.test(f.hint)) ok('hors tour : achat refusé, indication « ' + f.hint.slice(0, 50) + ' »'); else ko('hors tour : refusé=' + f.horsTourRefuse + ', indication=« ' + f.hint + ' »');
+  await p.screenshot({ path: path.join(OUT, 'reduite.png') });
+
+  /* ⚠️ Les trois sections qui suivent REMPLACENT les §F/§G/§H annoncés en REPRISE §172.6 : elles avaient
+     été écrites dans la copie du conteneur et jamais rapportées sur le Mac (constat du 01/10, §176.5).
+     Réécrites le 01/10 (GO de Marc), vérifiées rouges sur la v11.06 (lot17) et vertes sur la v11.10. */
+  console.log('\nG. ACTION REFUSÉE → FENÊTRE « ACTION IMPOSSIBLE » (§172.2)');
+  await fermer();
+  const g = await p.evaluate(async () => {
+    const r = {}; const att = ms => new Promise(x => setTimeout(x, ms));
+    const visible = e => !!(e && getComputedStyle(e).display !== 'none' && e.getClientRects().length);
+    G.phase = 'actions'; G._il = true; G._humanActive = true; G.player.acLeft = 3;
+    const carte = CARDS_POOL.find(c => c.tier === 1 && c.branch && isTechAvailable(c, G.player) && !possedeCarte(G.player, c.id));
+    if (!carte) return { erreur: 'aucune technologie de rang 1 achetable' };
+    G.player.res = { materials: 0, energy: 0, science: 0, morale: 5 };   // trop pauvre : refus de règle
+    buyTech(carte.id); await att(150);
+    const f = document.getElementById('sc-refus'); r.fenetre = visible(f); r.texte = f ? (f.textContent || '').replace(/\s+/g, ' ').trim() : '';
+    const b = document.getElementById('sc-refus-ok'); r.boutonH = b ? Math.round(b.getBoundingClientRect().height) : 0;
+    if (b) b.click(); await att(100); r.fermee = !document.getElementById('sc-refus');
+    G.player.res = { materials: 20, energy: 20, science: 20, morale: 5 };   // contre-épreuve : achat valide → aucune fenêtre
+    const n = G.player.cards.length; buyTech(carte.id); await att(150);
+    r.valideSansFenetre = !document.getElementById('sc-refus') && G.player.cards.length === n + 1;
+    try { scConfirmCancel(); } catch (e) {}
+    return r;
+  });
+  if (g.erreur) ko(g.erreur);
+  else {
+    if (g.fenetre && /Action impossible/i.test(g.texte)) ok('fenêtre « Action impossible » après un achat trop cher'); else ko('pas de fenêtre de refus (visible=' + g.fenetre + ') : ' + g.texte.slice(0, 80));
+    if (/Rien n.a été prélevé/i.test(g.texte) && /manque|Pas assez|insuffisant/i.test(g.texte)) ok('la raison et « Rien n\'a été prélevé » y sont'); else ko('texte du refus incomplet : ' + g.texte.slice(0, 120));
+    if (g.boutonH >= 44) ok('bouton « Compris » ' + g.boutonH + ' px, et il ferme (' + g.fermee + ')'); else ko('bouton « Compris » ' + g.boutonH + ' px');
+    if (g.valideSansFenetre) ok('contre-épreuve : un achat valide n\'ouvre aucune fenêtre'); else ko('un achat valide ouvre la fenêtre de refus, ou n\'a pas eu lieu');
+  }
+
+  console.log('\nH. PLUS AUCUNE FENÊTRE VERTE « X A FAIT Y » (§172.1)');
+  const h = await p.evaluate(async () => {
+    const r = {}; const att = ms => new Promise(x => setTimeout(x, ms));
+    const visible = e => !!(e && getComputedStyle(e).display !== 'none' && e.getClientRects().length);
+    G.phase = 'actions'; G._il = true; G._humanActive = true; G.player.acLeft = 3; G.player.abilityUsed = false;
+    G.player.res = { materials: 20, energy: 20, science: 20, morale: 5 };
+    r.gainToastAvant = typeof gainToast === 'function';          // la fonction du moteur a été retirée
+    useAbility(); let vu = false;
+    for (let i = 0; i < 8; i++) { await att(100); if (visible(document.getElementById('sc-gaintoast')) || visible(document.getElementById('action-toast'))) vu = true; }
+    r.vu = vu; r.utilise = !!G.player.abilityUsed;
+    try { scConfirmCancel(); } catch (e) {}
+    return r;
+  });
+  if (!h.utilise) ko('le pouvoir national n\'a pas été joué — mesure impossible');
+  else if (h.vu || h.gainToastAvant) ko('fenêtre verte encore là (affichée : ' + h.vu + ', gainToast existe : ' + h.gainToastAvant + ')');
+  else ok('pouvoir national joué : aucune fenêtre verte, `gainToast` n\'existe plus');
+
+  console.log('\nI. TOUT CHOIX SE VALIDE — INVESTISSEMENT NIV.1 (§172.3, §172.4)');
+  /* En dernier : valider l'investissement avance le tour (strategy draft). */
+  await fermer();
+  const i = await p.evaluate(async () => {
+    const r = {}; const att = ms => new Promise(x => setTimeout(x, ms));
+    const visible = e => !!(e && getComputedStyle(e).display !== 'none' && e.getClientRects().length);
+    G.player.res = { materials: 20, energy: 20, science: 20, morale: 5 };
+    showInvestmentModal(); await att(100);
+    const m = document.getElementById('invest-modal'); r.ouverte = visible(m);
+    const opts = [...document.querySelectorAll('#inv-opts .inv-opt:not(.inv-nope)')];
+    r.options = opts.length; r.directes = opts.filter(o => o.getAttribute('onclick')).length;   // 0 attendu : un toucher ne doit plus appliquer
+    const go = m.querySelector('.choix-valider button'); r.valider = !!go; r.desactiveAvant = !!(go && go.disabled);
+    const pick = (document.getElementById('inv-ai-pick') || {}).textContent || '';
+    r.adversesCaches = !INVESTMENT_CARDS.some(c => pick.indexOf(c.name) >= 0) && !/IA aussi/i.test(document.getElementById('inv-opts').textContent || '');
+    const avant = G.player._inv1 || null;
+    if (opts[0]) opts[0].click(); await att(50);
+    r.selectionne = opts[0] ? opts[0].getAttribute('aria-pressed') === 'true' : false; r.activeApres = !!(go && !go.disabled);
+    r.pasAppliqueAuToucher = (G.player._inv1 || null) === avant;
+    if (go) go.click(); await att(100);
+    r.applique = !!G.player._inv1 && G.player._inv1 !== avant; r.fermee = !visible(m);
+    return r;
+  });
+  if (!i.ouverte || !i.options) ko('fenêtre d\'investissement absente ou sans option (' + i.options + ')');
+  else {
+    if (i.directes === 0 && i.valider && i.desactiveAvant) ok('un toucher SÉLECTIONNE : aucune option à action directe, « Valider ce choix » présent et inactif'); else ko('options à action directe : ' + i.directes + ', bouton : ' + i.valider + ', inactif avant : ' + i.desactiveAvant);
+    if (i.selectionne && i.activeApres && i.pasAppliqueAuToucher) ok('option touchée : sélectionnée, bouton actif, rien d\'appliqué'); else ko('toucher : sélectionnée=' + i.selectionne + ', bouton actif=' + i.activeApres + ', non appliqué=' + i.pasAppliqueAuToucher);
+    if (i.applique && i.fermee) ok('« Valider ce choix » applique l\'investissement et ferme'); else ko('validation : appliqué=' + i.applique + ', fermée=' + i.fermee);
+    if (i.adversesCaches) ok('investissements adverses cachés avant ton choix'); else ko('les investissements adverses se voient avant le choix');
+  }
+  await p.screenshot({ path: path.join(OUT, 'investissement.png') });
+
   console.log('\nA. FENÊTRES NATIVES DU NAVIGATEUR');
   const nat = await p.evaluate(() => window.__natifs);
   if (!nat.length) ok('aucun confirm()/alert() pendant le parcours'); else nat.forEach(x => ko('fenêtre native : ' + x));

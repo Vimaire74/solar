@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-09-30 · v11.06';</script>
+<script>window.SOLAR_BUILD_HTML='2026-10-01 · v11.11';</script>
 <!-- Tampon des erreurs survenues AVANT diagnostic.js (chargé après moteur.js) : il les ramasse au démarrage. -->
 <script>window.__scErreursPrecoces=[];window.addEventListener('error',function(e){try{if(window.scDiagNoterErreur)return;window.__scErreursPrecoces.push({type:'erreur',msg:e.message||String(e),pile:(e.error&&e.error.stack)||'',ou:(e.filename||'').split('/').pop()+':'+e.lineno});}catch(x){}});</script>
 <!-- i18n.js EN TÊTE, avant tout script du corps : il choisit la langue et charge lang/<code>.js (synchrone).
@@ -1282,6 +1282,24 @@ body{font-size:var(--sc-fs,16px);}
      rangées deux par ligne (voir #riv-tech), donc leurs rangs restent empilés dans l'ordre T1→T3. */
   #tech-body.tech-compact #riv-civ .act-liste,#tech-body.tech-compact #riv-mil .act-liste{display:grid;grid-template-columns:1fr 1fr;gap:5px}
 }
+/* Choix à valider (30/09) : l'option touchée est SÉLECTIONNÉE, pas appliquée — voir `_exigerValidation`. */
+.choix-opt{cursor:pointer}
+.choix-opt.choix-sel,.choix-opt[aria-pressed="true"]{outline:2px solid #ffd700;outline-offset:1px;box-shadow:0 0 0 4px rgba(255,215,0,.18)}
+/* Fenêtres d'information RÉDUCTIBLES (01/10) — voir `fenReductible` : le « – » replie, la pastille rend. */
+.fen-reduire{position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;background:#1a2444;color:#9fb4d8;border:1px solid #45557a;font:800 20px/1 system-ui;cursor:pointer;z-index:2;padding:0}
+.fen-replie{display:none!important}
+#sc-pastille{position:fixed;right:14px;bottom:calc(var(--botband,84px) + 12px);z-index:8200;display:none;align-items:center;gap:8px;max-width:min(92vw,420px);min-height:40px;background:rgba(24,30,44,.97);border:1px solid #45557a;border-radius:20px;padding:6px 10px 6px 14px;color:#dbe6ff;font:600 .82em system-ui;box-shadow:0 8px 28px rgba(0,0,0,.5);cursor:pointer;text-align:left}
+#sc-pastille .pk{color:#9fb4d8;font-size:.9em;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+#sc-pastille .pn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#sc-pastille .pp{flex:none;width:28px;height:28px;border-radius:50%;background:#1a2444;border:1px solid #45557a;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;line-height:1}
+/* EMBLÈMES DES NATIONS (01/10, v11.11 — GO de Marc : « repères d'identité » seulement). Les médailles
+   qui affichent l'émoji d'une nation (🌍 🔴 🟠 ☠️) reçoivent l'emblème `assets/nations/<id>_128.png` ;
+   c'est le script `natEmblemes` (bas de page) qui le pose. Le texte du journal, des avis et des courriels
+   garde les émojis : ces chaînes servent aussi au serveur et aux courriels, où une image ne s'affiche pas. */
+.nat-emb-on{padding:0!important;overflow:hidden;font-size:0!important;line-height:0!important}
+img.nat-emb{display:block;width:100%;height:100%;object-fit:contain;border-radius:50%}
+.civ-emoji.nat-emb-on{width:64px;height:64px;margin:0 auto 6px;border-radius:50%}
+img.nat-emb-i{display:inline-block;width:1.4em;height:1.4em;vertical-align:-.35em;margin:0 .08em}
 </style>
 </head>
 <body>
@@ -2125,6 +2143,65 @@ function fenAttaques(hits, opts){
     nation:une?esc(une.name):t('fen.on_t_attaque','On t\'attaque'), verbe:o.verbe||(coups.length>1?t('fen.plusieurs_coups','Plusieurs coups portés contre toi'):t('fen.un_coup','Un coup porté contre toi')),
     milieu:corps, boutons:[{k:t('fen.compris','Compris'), cls:'go', onclick:o.onclick||''}]});
 }
+/* ═══ RÉDUIRE UNE FENÊTRE D'INFORMATION (Marc, 01/10) ═══
+   « Les fenêtres d'informations ne sont pas toutes réductibles, or dans ce cas précis j'aurais voulu
+   aller voir dans le journal ce qui se passe au moment de la fin de tour. » Même mécanisme que le
+   bandeau « joueur absent » d'online.js (`absenceBanner`) : un « – » replie, une pastille rend.
+   Ne vaut que pour les fenêtres qui n'ont QU'UN bouton de fermeture (bilan, événement, découverte,
+   investissements activés, guerre déclarée, avis « attaqué par ») : rien n'est validé tant qu'elle
+   est repliée, le jeu reste en pause exactement comme si elle était ouverte — seule la pastille la
+   fait revenir. Une fenêtre fermée par le jeu pendant qu'elle est repliée efface la pastille
+   (veille toutes les 400 ms). Les fenêtres qui attendent une décision ne sont pas touchées.
+   La pastille vit en bas à droite, au-dessus de la barre des onglets (là où ✓/↩ s'affiche) : en haut,
+   elle recouvrait le titre du panneau ouvert. */
+var FEN_REDUCTIBLES=['eot-modal','event-modal','event-announce-modal','discovery-modal','invest-active-modal','war-modal','sc-attack-notice'];
+function fenReductible(id){
+  try{
+    var el=document.getElementById(id); if(!el||typeof el.querySelector!=='function')return;
+    var fen=el.querySelector('.fen'); if(!fen)return;
+    var p=document.getElementById('sc-pastille');
+    if(!(p&&p._pour===id)&&el.classList&&el.classList.contains('fen-replie'))el.classList.remove('fen-replie');   // rouverte sans pastille : visible
+    if(fen.querySelector('.fen-reduire'))return;
+    var b=document.createElement('button'); b.type='button'; b.className='fen-reduire'; b.textContent='–';
+    b.title=t('fen.reduire','Réduire'); b.setAttribute('aria-label',t('fen.reduire','Réduire'));
+    b.onclick=function(ev){ if(ev&&ev.stopPropagation)ev.stopPropagation(); fenReduire(id); };
+    fen.appendChild(b);
+  }catch(e){}
+}
+function fenReduire(id){
+  try{
+    var el=document.getElementById(id); if(!el)return;
+    var esc=function(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+    var fen=el.querySelector('.fen'), k=fen&&fen.querySelector('.fen-kicker'), n=fen&&fen.querySelector('.fen-nation');
+    var p=document.getElementById('sc-pastille');
+    if(!p){ p=document.createElement('button'); p.id='sc-pastille'; p.type='button'; document.body.appendChild(p); }
+    var kt=(k&&k.textContent||'').trim(), nt=(n&&n.textContent||'').trim();
+    p.innerHTML='<span class="pk">'+esc(kt||t('fen.fenetre','Fenêtre'))+'</span>'+(nt?'<span class="pn">'+esc(nt)+'</span>':'')+'<span class="pp" aria-hidden="true">+</span>';
+    p.title=t('fen.deplier','Déplier'); p.setAttribute('aria-label',t('fen.deplier','Déplier'));
+    p.onclick=function(){ fenDeplier(id); };
+    p._pour=id; p.style.display='flex';
+    el.classList.add('fen-replie');
+    clearInterval(p._veille);
+    p._veille=setInterval(function(){ try{ var e=document.getElementById(id); if(!e||(e.classList&&e.classList.contains('hidden'))||e.style.display==='none')fenDeplier(id); }catch(err){} },400);
+  }catch(e){}
+}
+function fenDeplier(id){
+  try{
+    var el=id?document.getElementById(id):null; if(el&&el.classList)el.classList.remove('fen-replie');
+    var p=document.getElementById('sc-pastille');
+    if(p&&(!id||p._pour===id)){ clearInterval(p._veille); p._veille=null; p.style.display='none'; p._pour=null; }
+  }catch(e){}
+}
+/* Les fenêtres fixes de la page reçoivent leur « – » à chaque ouverture (changement de classe) ;
+   `sc-attack-notice`, créée à la volée, l'appelle elle-même (`_showPlayerHitModal`). */
+(function(){ try{
+  if(!window.MutationObserver)return;
+  FEN_REDUCTIBLES.forEach(function(id){
+    var el=document.getElementById(id); if(!el)return;
+    fenReductible(id);
+    new MutationObserver(function(){ if(!el.classList.contains('hidden'))fenReductible(id); }).observe(el,{attributes:true,attributeFilter:['class']});
+  });
+}catch(e){} })();
 function fenAdversaire(prefix, nat){
   try{
     if(!nat){ var id=(typeof guerreAdverseId==='function')?guerreAdverseId():null; if(!id&&typeof G!=='undefined'&&G&&G.warWith) id=G.warWith;
@@ -2434,6 +2511,33 @@ if ('serviceWorker' in navigator && !_natif) {
     // que le joueur touche quand il le veut (ex. entre deux parties).
   });
 }
+</script>
+<script>
+/* ═══ EMBLÈMES DES NATIONS (01/10, v11.11) ═══
+   Un seul point de passage, AFFICHAGE PUR (aucune règle) : toute médaille dont le texte est exactement
+   l'émoji d'une nation reçoit l'emblème de cette nation. On ne touche pas aux ~370 endroits du code qui
+   écrivent ces émojis (moteur.js, online.js, index.html) : ils continuent d'écrire l'émoji, et c'est ici,
+   après coup, qu'il devient une image. Hors navigateur (serveur), ce script n'existe pas : rien ne change.
+   ⚠️ Une médaille qui repasse à un émoji ordinaire (🤝, ⚔️…) perd la classe `nat-emb-on`, sinon sa
+   police à 0 la rendrait invisible. `.nat-e` = petite pastille dans une ligne (score, classement). */
+(function(){
+  var EMB={'\u{1F30D}':'terriens','\u{1F534}':'martiens','\u{1F7E0}':'jupiteriens','\u2620':'ceinturiens'};
+  var SEL='.fen-medal,.cbt-medal,.dip-medal,.civ-hdr .ce,.medal2,.fen-dep .m,.civ-emoji,#sc-pastille .pp,.nat-e';
+  function nation(txt){ return EMB[String(txt||'').replace(/\uFE0F/g,'').trim()]||null; }
+  function traiter(el){
+    var n=nation(el.textContent);
+    if(!n){ if(!el.querySelector('img.nat-emb,img.nat-emb-i')) el.classList.remove('nat-emb-on'); return; }
+    var inl=el.classList.contains('nat-e'), alt=el.textContent.trim();
+    el.innerHTML='<img class="'+(inl?'nat-emb-i':'nat-emb')+'" src="assets/nations/'+n+'_'+(inl?64:128)+'.png" alt="'+alt+'" draggable="false">';
+    if(!inl) el.classList.add('nat-emb-on');
+  }
+  var prevu=false;
+  function passe(){ prevu=false; try{ document.querySelectorAll(SEL).forEach(traiter); }catch(e){} }
+  function planifier(){ if(prevu) return; prevu=true; (window.requestAnimationFrame||setTimeout)(passe); }
+  window.natEmblemes=passe;
+  function demarrer(){ passe(); try{ new MutationObserver(planifier).observe(document.body,{childList:true,subtree:true,characterData:true}); }catch(e){} }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',demarrer); else demarrer();
+})();
 </script>
 <!-- Couche EN LIGNE (mode multijoueur). Optionnelle : si online.js est absent, le solo fonctionne normalement. -->
 <script src="online.js"></script>

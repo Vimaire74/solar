@@ -9,7 +9,7 @@
      interceptées, elles passent directement. Rien n'est mis en cache du serveur de jeu.
    - HORS-LIGNE : le solo reste jouable ; en navigation hors-ligne on sert index.html depuis le cache.
    Le numéro de version ci-dessous purge les anciens caches à chaque mise à jour du SW. */
-const VERSION = 'v227-2026-09-30';
+const VERSION = 'v232-2026-10-01';
 const HTML_CACHE = 'sc-html-' + VERSION;     // documents + scripts (network-first)
 const ASSET_CACHE = 'sc-assets-' + VERSION;  // images, icônes, PDF (cache-first)
 
@@ -29,7 +29,12 @@ const SHELL = [
   './assets/pwa/icon-192.png', './assets/pwa/icon-512.png', './assets/pwa/icon-maskable-512.png',
   /* Polices embarquées (§112) : sans elles hors ligne, le jeu retomberait sur la police système. */
   './assets/fonts/Exo2.woff2', './assets/fonts/Exo2-Italic.woff2', './assets/fonts/Michroma.woff2',
-  './assets/fond_accueil_phone.jpg', './assets/fond_accueil_desk.jpg'
+  './assets/fond_accueil_phone.jpg', './assets/fond_accueil_desk.jpg',
+  /* Emblèmes des nations (01/10, v11.11) : les médailles les affichent ; hors ligne sans eux, image cassée. */
+  './assets/nations/terriens_64.png', './assets/nations/terriens_128.png',
+  './assets/nations/martiens_64.png', './assets/nations/martiens_128.png',
+  './assets/nations/jupiteriens_64.png', './assets/nations/jupiteriens_128.png',
+  './assets/nations/ceinturiens_64.png', './assets/nations/ceinturiens_128.png'
 ];
 
 self.addEventListener('install', (e) => {

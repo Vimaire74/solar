@@ -520,6 +520,12 @@ class GameDriver {
     if(action && action.type && action.type!=='pass'){ this.engine.apply(action); }
     this._emitLog(before);
     this._lastActionLog = (G.log && G.log.length>before) ? G.log.slice(0, G.log.length-before).map(e=>String((e&&e.msg)||e)) : [];
+    /* Action refusée : le joueur reçoit une FENÊTRE avec la raison, pas seulement une ligne de journal
+       (Marc, 30/09). Le moteur a retenu les refus dans `G._refusRecents` (voir `_noterRefus`). */
+    if(!nat._isAI && Array.isArray(G._refusRecents) && G._refusRecents.length){
+      const _l=[...new Set(G._refusRecents)]; G._refusRecents=[];
+      try{ this.sb._emitNotice('action_refusee', nat, {title:this.sb.t('refus.titre','⚠️ Action impossible'), body:_l.join('<br>')+'<br><br>'+this.sb.t('refus.rien_preleve','Rien n\'a été prélevé.')}, 'stRien'); }catch(e){}
+    }
     // Action REJETÉE (sans effet : pas assez de ressources/AC, déjà pris, impossible…) → on GARDE la main du
     // joueur : une action ratée ne doit NI passer le tour NI faire tourner la main vers l'autre joueur.
     if(action && action.type && action.type!=='pass' && !nat._isAI){

@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-09-30 · v11.06';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-10-01 · v11.11';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -672,7 +672,8 @@ function showOptsReal(pending, modalId, contId, key, allowNone){
            correctif du 25/08 : on ne renvoie que ce que le moteur a proposé, comme la Télépathie
            renvoie son `cardId`. La nation et la catégorie s'en déduisent côté moteur — plus besoin
            de les fabriquer ici, donc plus personne pour les perdre en route. */
-        h+='<label class="esp-tech"><input type="checkbox" data-cle="'+esc(cle)+'" value="'+esc(t.id)+'"> <span>'+(t.name||'')+'</span></label>';
+        /* Lignes à toucher, plus de case native (30/09) — même composant qu'en solo (`.pacte-l esp-l`). */
+        h+='<button type="button" class="pacte-l esp-l" aria-pressed="false" data-cle="'+esc(cle)+'" data-v="'+esc(t.id)+'"><span class="pacte-case">\u2713</span><span class="pacte-txt">'+(t.name||'')+'</span></button>';
       for(const t of b.deja) h+='<div class="esp-tech esp-deja" style="opacity:.5">✓ <span>'+(t.name||'')+'</span></div>';
       h+='<div class="esp-cat-pied"></div></div>';
     }
@@ -680,21 +681,23 @@ function showOptsReal(pending, modalId, contId, key, allowNone){
     if(att) h+='<button class="inv-opt" id="sc-esp-att" style="cursor:pointer;width:100%;text-align:left;white-space:normal;margin-top:10px">'
       +'<div class="inv-opt-name">'+(att.name||'')+'</div><div class="inv-opt-benefit" style="white-space:normal">'+(att.desc||'')+'</div></button>';
     cont.innerHTML=h;
-    const cases=[...cont.querySelectorAll('input[type=checkbox]')];
+    const cases=[...cont.querySelectorAll('.esp-l')];
+    const on=x=>x.getAttribute('aria-pressed')==='true';
     const maj=()=>{
       cont.querySelectorAll('.esp-cat').forEach(div=>{
         const c=div.getAttribute('data-cle');
-        const pris=cases.filter(x=>x.getAttribute('data-cle')===c&&x.checked);
+        const pris=cases.filter(x=>x.getAttribute('data-cle')===c&&on(x));
         const pied=div.querySelector('.esp-cat-pied');
         if(!pied)return;
         pied.innerHTML=pris.length?('<button class="opt esp-go">🕵️ Voler '+pris.length+' technologie'+(pris.length>1?'s':'')+'</button>'):'';
         const b2=pied.querySelector('.esp-go');
-        if(b2)b2.onclick=()=>{ go({ids:pris.map(x=>x.value)}); };
+        if(b2)b2.onclick=()=>{ go({ids:pris.map(x=>x.getAttribute('data-v'))}); };
       });
     };
     // Une seule catégorie à la fois : cocher ailleurs décoche le bloc précédent.
-    cases.forEach(x=>x.onchange=()=>{ if(x.checked)cases.forEach(y=>{ if(y.getAttribute('data-cle')!==x.getAttribute('data-cle'))y.checked=false; }); maj(); });
+    cases.forEach(x=>x.onclick=()=>{ const v=!on(x); x.setAttribute('aria-pressed',v?'true':'false'); if(v)cases.forEach(y=>{ if(y.getAttribute('data-cle')!==x.getAttribute('data-cle'))y.setAttribute('aria-pressed','false'); }); maj(); });
     const ba=document.getElementById('sc-esp-att'); if(ba)ba.onclick=()=>go({id:'attendre'});
+    if(typeof window._exigerValidation==='function') window._exigerValidation(cont,'#sc-esp-att');   // « attendre » se valide aussi (30/09)
     maj();
     m.classList.remove('hidden');
     return true;
@@ -706,6 +709,7 @@ function showOptsReal(pending, modalId, contId, key, allowNone){
     return tete+'<button class="inv-opt" data-i="'+i+'" style="cursor:pointer;width:100%;text-align:left;white-space:normal"><div class="inv-opt-name">'+(op.emoji||'')+' '+(op.name||op.id||op.branch)+'</div>'+(op.desc?'<div class="inv-opt-benefit" style="white-space:normal">'+op.desc+'</div>':'')+'</button>';
   }).join('');
   cont.querySelectorAll('.inv-opt[data-i]').forEach(b=>{ b.onclick=()=>{ const op=opts[parseInt(b.getAttribute('data-i'))]; const ans={}; ans[key]=(op[key]!==undefined?op[key]:(op.id!==undefined?op.id:op.branch)); go(ans); }; });
+  if(typeof window._exigerValidation==='function') window._exigerValidation(cont,'.inv-opt[data-i]');   // tout choix se valide (30/09)
   m.classList.remove('hidden');
   return true;
 }
@@ -823,15 +827,8 @@ function showInvestReal(pending, lvl){
   optsEl.innerHTML=opts.map(c=>{
     const ok=(c.payable!==false);
     return t('web.ligne_8','<div class="inv-opt{v}"{v2}><div class="inv-opt-emoji">{v3}</div><div class="inv-opt-name">{v4}</div><div class="inv-opt-benefit">✅ {v5}</div><div class="inv-opt-cost">⚠️ {v6}</div>{cout}</div>',{v:(ok?'':' inv-nope'),v2:(ok?' onclick="'+selFn+'(\''+c.id+'\')"':''),v3:c.emoji||'',v4:c.name||c.id,v5:c.benefit||'',v6:c.contrepartie||'',cout:(ok?'':t('web.te_manque','<div class="inv-opt-cost" style="color:#ff8a8a;font-weight:700">🚫 Il te manque {v}</div>',{v:c.manque||''}))});}).join('');
-  const aiEl=document.getElementById(two?'inv2-ai-pick':'inv-ai-pick');
-  if(aiEl && Array.isArray(o.ai) && o.ai.length){
-    /* ⚠️ `a.civ` est un IDENTIFIANT ('terriens'), pas un nom : il s'affichait tel quel (capture du
-       20/09). Le nom vient de NOS tables, traduites au chargement — donc dans la langue du lecteur. */
-    const nm=(id)=>{ const x=opts.find(y=>y.id===id); return x?((x.emoji||'')+' '+x.name):id; };
-    const civNom=(id)=>{ const c=(typeof CIVS!=='undefined')&&CIVS[id]; return c?((c.emoji||'')+' '+c.name):id; };
-    aiEl.innerHTML=o.ai.map(a=>'🤖 '+civNom(a.civ)+' : '+nm(a.pick)).join('<br>');
-    aiEl.classList.remove('hidden');
-  }
+  /* Les choix adverses ne s'affichent plus avant le tien (Marc, 30/09) : le moteur ne les envoie plus. */
+  if(typeof window._exigerValidation==='function') window._exigerValidation(optsEl,'.inv-opt');   // tout choix se valide (30/09)
   modal.classList.remove('hidden');
   return true;
 }
@@ -2334,11 +2331,6 @@ function askLocalDecision(pending){
        (journal du 16/08). `driver.js` utilisait déjà `id` de son côté : les deux chemins
        divergeaient en silence. */
     const key = k==='agenda'?'agendaId' : (k==='strategy'?'cardId' : (k==='invest1'||k==='invest2'?'cardId' : (k==='espionage'?'id' : (k==='extrasolar'?'node' : (k==='empath_copy'?'cardId':'value')))));
-    // Pour les investissements : montrer ce que les IA/adversaires ont choisi (comme la vraie modale)
-    if((k==='invest1'||k==='invest2') && Array.isArray(o.ai) && o.ai.length){
-      const optName=(id)=>{ const op=opts.find(x=>x.id===id); return op?((op.emoji||'')+' '+op.name):id; };
-      body += '<div class="muted" style="margin:2px 0 8px">Choix adverses : '+o.ai.map(a=>a.civ+' → '+optName(a.pick)).join(' · ')+'</div>';
-    }
     /* La phrase vient du MOTEUR (`payload.phrase`) : solo et en ligne ne peuvent donc pas dire deux
        choses différentes. Et « rang d'initiative » était faux de toute façon — l'ordre du draft va du
        plus faible au plus fort, il n'a rien à voir avec l'initiative du tour. */
@@ -2374,6 +2366,7 @@ function askLocalDecision(pending){
       }).join('');
       decisionPanel(body);
       document.querySelectorAll('#sc-decision .opt').forEach(function(b){ b.onclick=function(){ done({targetId:opts[parseInt(b.getAttribute('data-i'))].id}); }; });
+      if(typeof window._exigerValidation==='function') window._exigerValidation('sc-decision','.opt');   // tout choix se valide (30/09)
       return;
     }
     if(k==='empath_copy') body+=t('web.aucune_copie','<button class="opt" data-skip="1">Aucune copie</button>');
@@ -2385,6 +2378,8 @@ function askLocalDecision(pending){
       if(k==='strategy_calm') ans.targetId=op.id;
       done(ans);
     }; });
+    /* Tout choix se valide (Marc, 30/09) : un toucher sélectionne, « Valider ce choix » envoie. */
+    if(typeof window._exigerValidation==='function') window._exigerValidation('sc-decision','.opt');
   });
 }
 

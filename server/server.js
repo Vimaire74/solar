@@ -114,6 +114,11 @@ function J(obj) { return JSON.stringify(safeEncode(obj)); }
    MAIL_FROM). Sinon on n'échoue PAS : tout message est écrit dans data/outbox.log et reste visible dans
    /stats → aucune information perdue, et l'envoi démarre dès que les identifiants sont configurés. */
 const ADMIN_MAIL = process.env.ADMIN_MAIL || 'marc@guerir.ch';
+/* Rapports de diagnostic de l'appli : Marc veut être prévenu « sur l'email contact » (01/10).
+   Réglable dans Coolify par DIAG_MAIL ; vide = aucun courriel (le fichier est toujours écrit). */
+const DIAG_MAIL = (process.env.DIAG_MAIL === undefined) ? 'contact@solar-game.com' : String(process.env.DIAG_MAIL).trim();
+/* Adresse publique du serveur, pour les liens dans les courriels (réglable : PUBLIC_BASE_URL). */
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || 'https://live.solar-game.com').replace(/\/+$/, '');
 const OUTBOX = path.join(DATA, 'outbox.log');
 let _transport = null;
 let _smtpChargementErreur = null;   // ex. « nodemailer » absent : cause TRÈS différente d'une mauvaise config
@@ -1374,7 +1379,11 @@ const server = http.createServer((req, res) => {
   if (req.url && /^\/(bot|admin|mailtest|stats|debug|diagnostics)\b/.test(req.url) && !cleValide(req.url)) return refuser(res);
   /* Rapports de diagnostic : `POST /api/diagnostic` (ouvert, sans rien de personnel, choisi par le
      joueur) et `/diagnostics?key=` (lecture, protégée ci-dessus). Voir diagnostic-serveur.js. */
-  if (diagnostic.traiter(req, res, path.join(DATA, 'diagnostics'), cleValide)) return;
+  if (diagnostic.traiter(req, res, path.join(DATA, 'diagnostics'), cleValide, (r, id) => {
+    if (!DIAG_MAIL) return;
+    const m = diagnostic.courriel(r, id, PUBLIC_BASE_URL);
+    sendMail(DIAG_MAIL, m.sujet, m.texte);   // échec → noteMailError, visible dans /stats
+  })) return;
   if (req.url && req.url.indexOf('/bot') === 0) { // inviter le bot « Claude » : /bot?code=XXXX[&civ=martiens]&key=…
     let code = '', civId;
     let fast = false;
@@ -1460,6 +1469,7 @@ const server = http.createServer((req, res) => {
     if (_pw) out.push('                c\'est Coolify qui l\'a tronqué, pas OVH qui te refuse.');
     out.push('  MAIL_FROM   : ' + MAIL_FROM);
     out.push('  ADMIN_MAIL  : ' + ADMIN_MAIL);
+    out.push('  DIAG_MAIL   : ' + (DIAG_MAIL || '(vide : aucun courriel de diagnostic)'));
     out.push('');
     const av = smtpAvertissements();
     out.push('INCOHÉRENCES DÉTECTÉES SANS ENVOYER');

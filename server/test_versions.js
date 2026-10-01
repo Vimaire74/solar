@@ -104,12 +104,12 @@ console.log('\n4. Le lot de livraison porte les mêmes estampilles que les sourc
 {
   /* Le message d'erreur de Marc dit « renvoie les fichiers manquants » : le cas où l'on met à jour
      les sources mais où le lot uploadé garde les anciens fichiers est exactement celui-ci. */
-  const lot = f => { try { return fs.readFileSync(path.join(RACINE, 'Pour uploader', 'lot17', f), 'utf8'); } catch (e) { return null; } };
+  const lot = f => { try { return fs.readFileSync(path.join(RACINE, 'Pour uploader', 'lot18', f), 'utf8'); } catch (e) { return null; } };
   const lHtml = estampille(lot('index.html'), /window\.SOLAR_BUILD_HTML\s*=\s*'([^']+)'/);
   const lJs   = estampille(lot('online.js'),  /const\s+SOLAR_BUILD_JS\s*=\s*'([^']+)'/);
   const lMot  = estampille(lot('moteur.js'),  /const\s+SOLAR_BUILD_MOTEUR\s*=\s*'([^']+)'/);
   if (lHtml === null && lJs === null && lMot === null) {
-    note('pas de lot17 dans cette copie — point ignoré');
+    note('pas de lot18 dans cette copie — point ignoré');
     ok('rien à vérifier ici');
   } else {
     note('lot : page ' + lHtml + ' · en ligne ' + lJs + ' · moteur ' + lMot);
@@ -128,9 +128,8 @@ console.log('\n5. Les notices des lots annoncent la même version que le code');
      commentaire d'en-tête, et son historique cite toutes les versions passées. On exige une LIGNE
      DE DÉCLARATION nommée (« CE LOT EST EN » ou « À UPLOADER »), et on lit la version dedans. */
   const NOTICES = [
-    path.join('Pour uploader', 'lot17', 'README.md'),
-    path.join('Pour uploader', 'lot17_maj', 'README.md'),
-    path.join('Pour uploader', 'lot17_maj', 'LISEZ-MOI.txt')
+    /* Lot 18 depuis le 30/09 : lot17 et lot17_maj sont des archives figées en v11.06, non vérifiées. */
+    path.join('Pour uploader', 'lot18', 'README.md')
   ];
   const attenduV = (mot || '').split('·').pop().trim();
   const attenduSw = (sw || '').split('-')[0];

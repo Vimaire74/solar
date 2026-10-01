@@ -145,6 +145,45 @@ console.log('\n6. LE SERVEUR');
   if (/diagnostic-serveur\.js/.test(dk)) ok('Dockerfile copie diagnostic-serveur.js'); else ko('Dockerfile ne copie PAS diagnostic-serveur.js : le serveur déployé tomberait au démarrage');
 }
 
+console.log('\n6 bis. MARC EST PRÉVENU PAR COURRIEL (01/10)');
+/* Marc : « j'aimerais être prévenu qu'un rapport a été envoyé par quelqu'un depuis notre serveur sur
+   l'email contact… ». `traiter` reçoit un rappel `surRapport(rapport, id)` ; server.js y branche
+   `sendMail(DIAG_MAIL, …)`. Le courriel résume (appareil, versions, tour, erreurs, commentaire) et
+   donne l'adresse de la page des rapports SANS la clé. */
+{
+  const dossier = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-diag-'));
+  const recus = [];
+  const faux = (methode, corps) => {
+    const h = {}; const req = { url: '/api/diagnostic', method: methode, on(ev, fn) { h[ev] = fn; return req; } };
+    const res = { setHeader() {}, writeHead(c) { res.code = c; }, end(t) { res.corps = t; } };
+    const t = diag.traiter(req, res, dossier, () => true, (r, id) => recus.push({ r, id }));
+    if (h.data && corps !== undefined) h.data(corps); if (h.end) h.end();
+    return { traite: t, res };
+  };
+  const bon = JSON.stringify({ v: 1, appareil: { modele: 'SM-F741B', os: 'Android 14' }, versions: { moteur: 'v11.10' }, erreurs: [{ msg: 'x' }], figeages: [], partie: { tour: 5 }, commentaire: 'Le jeu a figé.' });
+  const a = faux('POST', bon);
+  if (a.traite && a.res.code === 200 && recus.length === 1 && recus[0].r.appareil.modele === 'SM-F741B' && /^\d{4}-/.test(recus[0].id)) ok('rapport valide → rappel appelé une fois, avec le rapport et son identifiant');
+  else ko('rappel non appelé sur un rapport valide (code ' + a.res.code + ', appels ' + recus.length + ')');
+  const b = faux('POST', '{"v":1');
+  if (b.res.code === 400 && recus.length === 1) ok('rapport invalide → aucun rappel (contre-épreuve)'); else ko('rappel appelé sur un rapport invalide');
+  const c = faux('OPTIONS');
+  if (c.res.code === 204 && recus.length === 1) ok('OPTIONS → aucun rappel'); else ko('rappel appelé sur OPTIONS');
+  /* Sans rappel, rien ne casse (anciens appelants). */
+  const req2 = { url: '/api/diagnostic', method: 'POST', on(ev, fn) { if (ev === 'end') fn(); return req2; } };
+  const res2 = { setHeader() {}, writeHead(c) { res2.code = c; }, end() {} };
+  let casse = false; try { diag.traiter(req2, res2, dossier, () => true); } catch (e) { casse = true; }
+  if (!casse) ok('sans rappel : rien ne casse'); else ko('traiter sans rappel lève une exception');
+  /* Le courriel lui-même : une fonction pure, testable. */
+  const m = diag.courriel(recus[0].r, recus[0].id, 'https://live.solar-game.com');
+  if (m && /SM-F741B/.test(m.texte) && /v11\.10/.test(m.texte) && /tour 5/i.test(m.texte) && /1 erreur/.test(m.texte) && /Le jeu a figé/.test(m.texte)) ok('courriel : appareil, version, tour, erreurs, commentaire'); else ko('courriel incomplet : ' + JSON.stringify(m));
+  if (m && /\/diagnostics\?key=/.test(m.texte) && !/key=[A-Za-z0-9]/.test(m.texte)) ok('courriel : adresse de la page des rapports, SANS la clé'); else ko('courriel : lien absent ou clé en clair');
+  if (m && /diagnostic/i.test(m.sujet) && /SM-F741B/.test(m.sujet)) ok('sujet : « ' + m.sujet + ' »'); else ko('sujet : ' + (m && m.sujet));
+  /* server.js branche bien le rappel sur l'envoi. */
+  const srv = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+  if (/DIAG_MAIL/.test(srv) && /diagnostic\.traiter\(req, res,[\s\S]{0,120}?\(r, id\)\s*=>/.test(srv) && /contact@solar-game\.com/.test(srv)) ok('server.js : DIAG_MAIL (contact@solar-game.com par défaut) et rappel branché sur sendMail'); else ko('server.js ne branche pas le courriel de diagnostic');
+  fs.rmSync(dossier, { recursive: true, force: true });
+}
+
 console.log('\n7. LA FENÊTRE');
 {
   const { sb } = montage();
