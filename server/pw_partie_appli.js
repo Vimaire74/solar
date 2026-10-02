@@ -71,7 +71,8 @@ const REPONDRE = `((id) => {
   if (choix && ok(choix) && !root.dataset.__pwChoisi) { root.dataset.__pwChoisi = '1'; choix.click(); }
   /* .fw-choice : les choix de la guerre populaire sont des blocs cliquables, pas des <button>. */
   const prio = ['.fw-choice', '.fen-btn.ok', '.fen-btn.go', '#ev-pactes-go', '#ev-accords-go', '.esp-go', '.eot-btn', '.agsel-go', '.btn-go', '.fen-btn', '.war-btn', '.evm-btn', '.disc-btn', '.npop-btn', '.inv-opt', '.strat-opt', 'button'];
-  for (const s of prio) for (const b of root.querySelectorAll(s)) if (ok(b) && !DANGER.test(b.textContent || '')) return clic(b);
+  /* 02/10 : le bouton de repli (.fen-reduire, REPRISE 176.2 et 188) est un <button> : un joueur ne répond pas avec. */
+  for (const s of prio) for (const b of root.querySelectorAll(s)) if (ok(b) && !b.classList.contains('fen-reduire') && !DANGER.test(b.textContent || '')) return clic(b);
   return 'rien à cliquer';
 })`;
 

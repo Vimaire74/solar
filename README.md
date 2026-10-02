@@ -16,11 +16,26 @@
      Le 01/10 il a été ramené de 84 Mo à 3,5 Mo (36 fichiers). Un fichier identique à ce qui est déjà
      en ligne n'a rien à faire ici ; une image ou un banc nouveau ou modifié, oui. -->
 
-## 📦 CE LOT EST EN **v11.16** · cache `sw.js` **v237** · 2026-10-01
+## 📦 CE LOT EST EN **v11.20** · cache `sw.js` **v241** · 2026-10-02
 
 > Pour savoir ce qui est EN LIGNE : ouvre solar-game.com, la version est écrite sur l'écran de
-> connexion. Si elle ne dit pas **v11.16**, l'envoi ou le redéploiement n'a pas pris.
+> connexion. Si elle ne dit pas **v11.20**, l'envoi ou le redéploiement n'a pas pris.
 > ⚠️ **Les DEUX ressources Coolify** doivent être redéployées : le site ET le serveur.
+
+**v11.20 — 02/10/2026** — `docs/REPRISE.md` §189
+- Guerre en solo : plus de « défense fantôme » (fenêtre « Défense de 🏙️ Colonie … — choisis tes jetons », sans Supercroiseur, sans écran de résultat) ; la seule fenêtre de défense est celle du vrai assaut (force annoncée, garnison, Empathes, Supercroiseur proposé).
+- Fenêtre de défense : « ta capitale » quand c'est la capitale, Empathes « sans coût », la règle exacte (égalité, victoire, défaite) à la place du conseil.
+- Règle d'égalité au combat, identique par tous les chemins (joueur ou ordinateur, attaque ou défense) : le défenseur garde la place, la moitié des jetons de chacun part en récupération, rien n'est perdu, −1 moral chacun, aucun VP. Avant, un assaut d'ordinateur à égalité valait victoire du défenseur (+2 VP). Règles (fr/en) §14.5 mises à jour.
+- Fenêtre d'assaut : ses boutons Annuler / Engager sont remis en place à chaque ouverture (la vieille fenêtre de défense les remplaçait par « Défendre », d'où « puissance DEFEND:2000 — égalité » à chaque attaque) ; un engagement reçu sous forme de texte est lu comme un nombre.
+
+**v11.19 — 02/10/2026** — `docs/REPRISE.md` §188
+- TOUTES les fenêtres du jeu sont réductibles (décisions comprises : agenda, stratégie, pactes, accords, paix, combat, défense, espionnage, Dyson, routes, Forge…) ; replier ne répond à rien, la pastille rend la fenêtre intacte.
+
+**v11.18 — 02/10/2026** — `docs/REPRISE.md` §187
+- Les fenêtres de choix d'investissement (niveaux 1 et 2) sont réductibles : « – » pour aller voir son empire, la pastille ramène la fenêtre sans rien avoir choisi.
+
+**v11.17 — 02/10/2026** — `docs/REPRISE.md` §186
+- Sonde : si un assaut d'ordinateur est résolu chez toi sans fenêtre de défense, une ligne rouge le dit au journal et le rapport de diagnostic note le chemin pris (non reproduit, partie Terriens/Ceinturiens du 01/10).
 
 **v11.16 — 01/10/2026** — `docs/REPRISE.md` §183-184 — REDÉPLOYER AUSSI LE SERVEUR
 - « Envoyer par email » : le log part entier, en pièce jointe, par la feuille de partage du téléphone (Gmail, WhatsApp…) — plus de courriel coupé au tour 2.

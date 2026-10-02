@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-10-01 · v11.16';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-10-02 · v11.20';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -2060,6 +2060,7 @@ function scRendreReductible(m){
     if(!m)return;
     const card=m.firstElementChild||m;
     if(card.querySelector('.sc-min-btn'))return;                    // déjà posé
+    if(card.querySelector('.fen-reduire')||m.querySelector('.fen-reduire'))return;   // 02/10 : index.html (`fenReductible`) a déjà posé son « – » — un seul bouton
     try{ if(getComputedStyle(card).position==='static')card.style.position='relative'; }catch(e){ card.style.position='relative'; }
     const b=el('<button class="sc-min-btn" title="Réduire — va consulter Empire, Diplo ou les Techs ; la question reste en attente" style="position:absolute;top:6px;right:8px;width:32px;height:32px;border-radius:9px;border:1px solid #3a3a6a;background:#161a2e;color:#c8d8f8;font:700 1.2em system-ui;line-height:1;cursor:pointer;z-index:20">−</button>');
     card.appendChild(b);

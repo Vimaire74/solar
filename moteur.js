@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-01 · v11.16';
+const SOLAR_BUILD_MOTEUR = '2026-10-02 · v11.20';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -6240,7 +6240,7 @@ function guerreCombatClassiqueChoisi(playerCommitted){
     const defTokens=parseInt(playerCommitted.split(':')[1])||0;
     const aiAtt=G._aiWarCommitted||1;const _cib=G._aiWarTarget;G._aiWarTarget=null;
     const pDef=defTokens;
-    const _defGagne=(pDef>=aiAtt);
+    const _defGagne=(pDef>=aiAtt), _egal=(pDef===aiAtt);   // égalité : rien de perdu, −1 moral chacun, pas de victoire (Marc, 02/10)
     /* ⚠️ UNE SEULE COMPTABILITÉ POUR L'ATTAQUE ET POUR LA DÉFENSE.
        Ces quatre lignes étaient écrites à la main et divergeaient de `applyCombatEngage`, le calcul
        utilisé partout ailleurs. Trois écarts, tous au détriment du défenseur ou de la cohérence :
@@ -6259,7 +6259,10 @@ function guerreCombatClassiqueChoisi(playerCommitted){
       addLog(J('journal.cout_defense_jeton_engage','⚔️ Coût défense : −{dm}<i class=ri-materials></i> −{de}<i class=ri-energy></i> ({jetons} jeton(s) engagé(s){v})',{dm:_dm,de:_de,jetons:defTokens,v:(_defGagne?J('journal.moitie_revient_tout_suite',", la moitié revient tout de suite"):J('journal.moitie_perdue',", la moitié perdue"))}),'dim');
     }
     let txt,cls;
-    if(_defGagne){
+    if(_egal){
+      G.player.res.morale=Math.max(0,(G.player.res.morale||0)-1); if(warEnemy)warEnemy.res.morale=Math.max(0,(warEnemy.res.morale||0)-1);
+      txt=J('combat.egalite_defense','⚖️ Égalité {pdef}🛡️ vs {aiatt}⚔️ — tu tiens, −1<i class=ri-morale></i> pour les deux.',{pdef:pDef,aiatt:aiAtt});cls='draw';addLog(J('journal.egalite','⚔️ Égalité'),'dim');
+    }else if(_defGagne){
       if(warEnemy)warEnemy.forceTokens=Math.max(0,warEnemy.forceTokens-Math.ceil(aiAtt*0.5));
       war.wins.player++;G.warWins.player++;
       txt=J('combat.defense_reussie_vs','🛡️ Défense réussie ! {pdef}🛡️ vs {aiatt}⚔️ — {v}',{pdef:pDef,aiatt:aiAtt,v:(_cib?J('combat.tient','La {nom} tient !',{nom:(_cib.type==='colony'?J('combat.colonie','colonie {nom}',{nom:_i18nRef(_cib,'name')}):J('combat.route','route {nom}',{nom:_i18nRef(_cib,'name')}))}):J('combat.positions_tiennent','Tes positions tiennent !'))});cls='win';
@@ -8890,8 +8893,8 @@ function resolveAiAssault(ai,targetId,commit){
   if(_aiCru){const _cc=cruiserPay(ai);addLog(J('journal.deploie_supercroiseur','⚓ {emoji} {nation} déploie son Supercroiseur (+{v}⚔️, {cc}).',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),v:ai.cruiserPower||5,cc:_cc}),'dim');}
   const aPow=commit+aEmpath+((ai.stratBonus&&ai.stratBonus.combatBonus)||0)+(_aiCru?(ai.cruiserPower||5):0);
   ai.acLeft=Math.max(0,ai.acLeft-1);ai.spentThisTurn+=1+commit;
-  const _aiWins=aPow>pDef;
-  applyCombatEngage(ai,commit,_aiWins); // l'attaquant paie TOUJOURS ses jetons engagés (coût + récupération), même si le défenseur n'engage rien — sinon reprise quasi GRATUITE en boucle (bug Marc : colonie rendue sans frais)
+  const _aiWins=aPow>pDef, _egalite=(aPow===pDef);   // égalité : règle de Marc (02/10), voir resolveAiAssaultOnPlayer — rien de perdu, −1 moral chacun
+  applyCombatEngage(ai,commit,_aiWins||_egalite); // l'attaquant paie TOUJOURS ses jetons engagés (coût + récupération), même si le défenseur n'engage rien — sinon reprise quasi GRATUITE en boucle (bug Marc : colonie rendue sans frais)
   applyCombatEngage(p,dCommit,!_aiWins);             // défenseur joueur : coût + récupération de ce qu'il engage
   if(dCommit>0)addLog(J('journal.defense_jeton_engage','🛡️ Défense : {jetons} jeton(s) engagé(s) (−{jetons2}<i class=ri-materials></i> −{jetons3}<i class=ri-energy></i>).',{jetons:dCommit,jetons2:dCommit,jetons3:dCommit}),'dim');
   const node=NODES[targetId];
@@ -8910,6 +8913,11 @@ function resolveAiAssault(ai,targetId,commit){
     addLog(J('journal.reprend_vs_nv_perds_colonie_1','🏴 {emoji} {nation} REPREND {v} à {emoji2} {nation2} ! ({apow}⚔️ vs {pdef}🛡️, Nv.{newlvl}) — colonie perdue, −1<i class=ri-morale></i>',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),emoji2:p.civ.emoji,nation2:_i18nRef(p.civ,'name'),v:(node?_i18nRef(node,'name'):targetId),apow:aPow,pdef:pDef,newlvl:newLvl}),'red');
     G.aiActions.push(_i18nAplatir({emoji:'🏴',name:J('action.reprend','Reprend {v}',{v:(node?_i18nRef(node,'name'):targetId)}),desc:J('action.vs','{apow}⚔️ vs {pdef}🛡️',{apow:aPow,pdef:pDef})}));
     notifyNationHit(p,J('avis.prend','{nation} prend {v}',{nation:_i18nRef(ai.civ,'name'),v:(node?_i18nRef(node,'name'):targetId)}),J('avis.colonie_tombe_nv_combat_contre_perds_1_m','Ta colonie tombe (Nv.{newlvl}) — combat {apow} contre {pdef}. Tu perds 1 moral.',{newlvl:newLvl,apow:aPow,pdef:pDef}),'coup');
+  }else if(_egalite){
+    ai.res.morale=Math.max(0,(ai.res.morale||0)-1);p.res.morale=Math.max(0,(p.res.morale||0)-1);
+    addLog(J('journal.egalite_reprise','⚖️ {emoji} {nation} contre {v} : égalité ({apow}⚔️ vs {pdef}🛡️) — la colonie tient, −1<i class=ri-morale></i> chacun.',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),v:(node?_i18nRef(node,'name'):targetId),apow:aPow,pdef:pDef}),'dim');
+    G.aiActions.push(_i18nAplatir({emoji:'⚖️',name:J('action.egalite','Égalité : {v}',{v:(node?_i18nRef(node,'name'):targetId)}),desc:J('action.vs','{apow}⚔️ vs {pdef}🛡️',{apow:aPow,pdef:pDef})}));
+    notifyNationHit(p,J('avis.attaque','{nation} attaque {v}',{nation:_i18nRef(ai.civ,'name'),v:(node?_i18nRef(node,'name'):targetId)}),J('avis.egalite_tient','Égalité — combat {apow} contre {pdef}. Ta colonie tient, la moitié de tes jetons part en récupération, −1 moral.',{apow:aPow,pdef:pDef}));
   }else{
     war.winsBy[p.civ.id]=(war.winsBy[p.civ.id]||0)+1;ai.res.morale=Math.max(0,(ai.res.morale||0)-1);
     if(_aiCru)croiseurEnReparation(ai); // croiseur IA en réparation suite à la défaite
@@ -9041,6 +9049,7 @@ function showAiAssaultDefenseModal(ai,target,aiCommit,done,defender){
      pour des raids simulés. Ici, on répond comme en ligne : la défense estimée par `defenseIA`,
      et le combat se résout sans toucher à l'écran. */
   if(G._simulationIA&&!_isRemote(p)&&!_decisionActive()){
+    _traceAssaut('simu',p);
     let _n=null;
     try{ if(typeof defenseIA==='function') _n=defenseIA(p,ai,(target.type==='colony'&&target.obj)?target.obj.nodeId:null); }catch(e){ _n=null; }
     if(_n===null||_n===undefined||isNaN(_n)) _n=Math.min(2,maxDef);
@@ -9049,6 +9058,7 @@ function showAiAssaultDefenseModal(ai,target,aiCommit,done,defender){
     return;
   }
   if(_isRemote(p)||_decisionActive()){ // en ligne : router la défense vers le joueur (éventuellement DISTANT) assailli
+    _traceAssaut(_isRemote(p)?'distant':'emetteur',p);
     // CHOIX TACTIQUE (Marc) : le défenseur voit la cible et décide combien de jetons engager — et s'il déploie
     // son SUPERCROISEUR (s'il le possède et peut le payer ; demi-tarif avec l'IA de Navigation : 2🪨 +3⚡).
     const _cruOk=(typeof cruiserAvailable==='function'&&cruiserAvailable(p)&&typeof cruiserAfford==='function'&&cruiserAfford(p));
@@ -9066,6 +9076,7 @@ function showAiAssaultDefenseModal(ai,target,aiCommit,done,defender){
       null, 'adDefenseContreIA');
     return;
   }
+  _traceAssaut('fenetre',p); G._aadFenetreVue=true;
   const pEmp=bonusCombatCartes(p);
   const cruAvail=cruiserAvailable(p)&&cruiserAfford(p);
   G._aiAssaultCtx={aiId:ai.civ.id,target,aiCommit,done,aiCru:_aiCruAtt};
@@ -9074,7 +9085,9 @@ function showAiAssaultDefenseModal(ai,target,aiCommit,done,defender){
      Même fenêtre qu'en ligne (online.js, `defense`), assemblée par `fenBlason` (index.html). */
   if(typeof fenBlason==='function'){
     const _who=(typeof fenNation==='function')?fenNation(ai):{emoji:ai.civ.emoji,nom:ai.civ.name};
-    const _cible=target.type==='colony'?('<b>'+target.name+'</b> ('+t('commun.nv','Nv.')+(target.obj.level||1)+')'):(t('assaut.la_route','la route')+' <b>'+target.name+'</b>');
+    /* « Tu mets capitale quand c'est la capitale ? » (Marc, 02/10) — oui : on nomme la capitale. */
+    const _estCapitale=(target.type==='colony'&&target.obj&&target.obj.nodeId===p.civ.home);
+    const _cible=target.type==='colony'?((_estCapitale?t('assaut.ta_capitale','ta capitale')+' ':'')+'<b>'+target.name+'</b> ('+t('commun.nv','Nv.')+(target.obj.level||1)+')'):(t('assaut.la_route','la route')+' <b>'+target.name+'</b>');
     const _cout=(typeof hasSpec==='function'&&hasSpec(p,'nav2_war'))?t('assaut.cout_nav','½🪨 ½⚡ par jeton (IA de Navigation)'):t('assaut.cout','1🪨 1⚡ par jeton');
     const _milieu='<div class="fen-vs">'
       +'<div><div class="n them">'+((getIntelLevel(p)>=2)?_menace:('≈'+_menace))+'</div><div class="l">'+t('assaut.leur_force','Leur force')+'</div></div>'
@@ -9084,7 +9097,9 @@ function showAiAssaultDefenseModal(ai,target,aiCommit,done,defender){
       +'<div class="row"><span>'+t('assaut.jetons_engages','Jetons engagés')+'</span><b><span id="aad-val">0</span> / '+maxDef+'</b></div>'
       +'<input type="range" id="aad-slider" min="0" max="'+maxDef+'" value="0" oninput="_aadUpd(this.value)" aria-label="'+t('assaut.jetons_engages_def','Jetons engagés en défense')+'">'
       +'<div class="row"><span>'+t('commun.cout','Coût')+' <span id="aad-cost">−0🪨 −0⚡</span> · '+_cout+'</span></div>'
-      +'<div class="row"><span>🏛️ '+t('assaut.garnison','Garnison')+' <b>'+_garn+'</b> ('+_garnLabel+')'+(pEmp?' · 🔮 +'+pEmp+' '+t('guerre.empathes','Empathes'):'')+'</span></div>'
+      +'<div class="row"><span>🏛️ '+t('assaut.garnison','Garnison')+' <b>'+_garn+'</b> ('+_garnLabel+')'+(pEmp?' · 🔮 +'+pEmp+' '+t('guerre.empathes','Empathes')+' ('+t('assaut.sans_cout','sans coût')+')':'')+'</span></div>'
+      /* La règle, précise, à la place d'un conseil (Marc, 02/10 : « on va éviter le b-a-ba »). */
+      +'<div class="row"><span style="color:#9aa3c7;font-size:.88em">'+t('assaut.regle','Victoire : il perd la moitié de ses jetons, la moitié des tiens revient tout de suite, l\'autre part en récupération. Égalité : tu tiens, la moitié des jetons de chacun part en récupération, rien n\'est perdu, −1 moral chacun. Défaite : la moitié des tiens est perdue, le reste part en récupération, et la cible est prise.')+'</span></div>'
       +(cruAvail?'<div class="row"><label style="cursor:pointer"><input type="checkbox" id="aad-cru" onchange="_aadUpd(document.getElementById(\'aad-slider\').value)"> '+t('assaut.croiseur_case','⚓ Déployer le Supercroiseur +{n}⚔️ ({m}🪨 {e}⚡) — avec ou sans jeton',{n:(p.cruiserPower||5),m:cruiserCost(p).materials,e:cruiserCost(p).energy})+'</label></div>':'')
       +'</div>';
     const html='<div id="aad-overlay" style="position:fixed;inset:0;background:rgba(4,4,18,.9);z-index:620;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:10px">'
@@ -9133,8 +9148,24 @@ function confirmAiAssaultDefense(){
    pour une colonie qui n'était pas la sienne, et le rapport porte « 🛡️ Défense : 2 jeton(s) »
    signé Terriens. Le filtre « aux deux belligérants » (#104) marchait : on lui donnait le mauvais
    propriétaire. `logAuteur(p)` signe le journal ; `showWarModal(…, p)` adresse la fenêtre. */
+/* ═══ SONDE (Marc, 02/10 : « ils ont pris Io mais je n'ai pas pu défendre, aucune fenêtre ») ═══
+   Non reproduit dans l'appli émulée (assaut direct, tacticien, partie entière : la fenêtre s'ouvre). On
+   note donc, dans le fil du rapport de diagnostic, PAR QUEL CHEMIN chaque assaut d'ordinateur sur un
+   humain a été routé (simu / émetteur / distant / fenêtre), et la résolution écrit une ligne rouge au
+   journal si elle arrive chez un humain local sans qu'une fenêtre ait été ouverte. Le prochain rapport
+   dira lequel des chemins a pris la décision à la place de Marc. */
+function _traceAssaut(chemin,p){
+  try{ if(typeof window!=='undefined'&&typeof window.scDiagTrace==='function')window.scDiagTrace('assaut:'+chemin+':'+((p&&p.civ&&p.civ.id)||'?')+(G._simulationIA?':S':'')+(_decisionActive()?':D':'')+(G._humanActive?':H':'')); }catch(e){}
+}
 function resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,defender){
   const p=defender||G.player;
+  try{
+    if(G&&!G._simulationIA&&p&&!p._isAI&&!_decisionActive()&&!_isRemote(p)&&!G._aadFenetreVue){
+      addLog(J('journal.defense_sans_fenetre','⚠️ Défense résolue SANS fenêtre de choix ({v} jeton(s) engagés) — défaut connu, signale-le avec « Signaler un problème ».',{v:defTokens|0}),'red');
+      _traceAssaut('SANS-FENETRE',p);
+    }
+    if(!G._simulationIA)G._aadFenetreVue=false;
+  }catch(e){}
   return logAuteur(p, function(){ return _resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,p); });
 }
 function _resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,p){
@@ -9166,7 +9197,13 @@ function _resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,p){
   if(_aiCru){const _cc=cruiserPay(ai);addLog(J('journal.deploie_supercroiseur','⚓ {emoji} {nation} déploie son Supercroiseur (+{v}⚔️, {cc}).',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),v:ai.cruiserPower||5,cc:_cc}),'dim');}
   const aPow=aiCommit+aEmp+((ai.stratBonus&&ai.stratBonus.combatBonus)||0)+(_aiCru?(ai.cruiserPower||5):0);
   // Coût + récupération SYMÉTRIQUES : l'attaquant IA paie/récupération ses jetons ; si tu repousses l'assaut, l'IA en perd la MOITIÉ définitivement (défendre fait perdre des jetons à l'ennemi). Le défenseur paie ce qu'il engage.
-  applyCombatEngage(ai,aiCommit,aPow>pDef); // l'attaquant paie TOUJOURS ses jetons engagés (même si tu ne défends pas) — sinon capture GRATUITE
+  /* ═══ ÉGALITÉ (règle de Marc, 02/10) : le défenseur garde la place, les deux camps mettent la moitié de
+     leurs jetons en récupération sans rien perdre, −1 moral chacun, aucun VP, aucune victoire comptée.
+     Avant, l'égalité valait ici VICTOIRE du défenseur (+2 VP, l'assaillant perdait la moitié de ses
+     jetons pour de bon) alors que `resolveWarCombat` — le joueur qui attaque — la traitait déjà en match
+     nul : deux règles pour un même combat. Banc : server/test_egalite_combat.js. */
+  const _egalite=(aPow===pDef);
+  applyCombatEngage(ai,aiCommit,aPow>=pDef); // l'attaquant paie TOUJOURS ses jetons engagés (même si tu ne défends pas) — sinon capture GRATUITE ; à égalité rien n'est perdu
   applyCombatEngage(p,defTokens,pDef>=aPow);
   for(const _r of _renforts) if(_r.j>0)applyCombatEngage(_r.co,_r.j,pDef>=aPow);
   /* Le prix annoncé est celui que `applyCombatEngage` prélève : IA de Navigation ÷2 (5B38 : Marc a lu
@@ -9181,7 +9218,11 @@ function _resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,p){
      feuille de score annonce. Banc : test_combat_vp_equitable.js. */
   /* Une ROUTE n'est pas un combat (Marc, 14/09 : « c'est un peu facile ») : aucun VP, dans les deux sens. */
   const _vpCombat=(target&&target.type!=='route');
-  if(pDef>=aPow){
+  if(_egalite){
+    p.res.morale=Math.max(0,(p.res.morale||0)-1); ai.res.morale=Math.max(0,(ai.res.morale||0)-1);
+    resultTxt=J('ui.egalite_defense','⚖️ Égalité ! {pdef}🛡️ vs {apow}⚔️ — {v} Les deux camps mettent la moitié de leurs jetons en récupération, −1<i class=ri-morale></i> chacun.',{pdef:pDef,apow:aPow,v:(target.type==='colony'?J('ui.colonie_tient','Colonie {nom} tient.',{nom:_nomCible(target)}):J('ui.route_tient','Route {nom} tient.',{nom:_nomCible(target)}))});cls='draw';
+    addLog(J('journal.egalite_vs','⚖️ Égalité contre {emoji} {nation} ({pdef}🛡️ vs {apow}⚔️) — {v} tient, −1<i class=ri-morale></i> chacun.',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),pdef:pDef,apow:aPow,v:_nomCible(target)}),'dim');
+  }else if(pDef>aPow){
     if(war)war.winsBy[p.civ.id]=(war.winsBy[p.civ.id]||0)+1;
     if(_vpCombat&&typeof gagnerVP==='function')gagnerVP(p,2,J('vp.combat_gagne_contre','Combat gagné contre {nation}',{nation:_i18nRef(ai.civ,'name')}));
     if(_aiCru)croiseurEnReparation(ai); // croiseur IA en réparation suite à l'échec de l'assaut
@@ -9222,7 +9263,7 @@ function _resolveAiAssaultOnPlayer(ai,target,aiCommit,defTokens,done,p){
   const _act=_i18nAplatir({emoji:'⚔️',name:J('action.assaut','Assaut sur {nom}',{nom:_nomCible(target)}),desc:J('action.vs','{apow}⚔️ vs {pdef}🛡️',{apow:aPow,pdef:pDef})});
   if(ai._turnActions)ai._turnActions.push(_act);else ai._turnActions=[_act];
   render();
-  showWarModal(J('combat.attaque','⚔️ {emoji} {nation} attaque',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name')}),resultTxt,{txt:(cls==='win'?J('ui.positions_tiennent','Tes positions tiennent.'):J('ui.subi_pertes','Tu as subi des pertes.')),cls},ai.civ.id,p);
+  showWarModal(J('combat.attaque','⚔️ {emoji} {nation} attaque',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name')}),resultTxt,{txt:(cls==='win'?J('ui.positions_tiennent','Tes positions tiennent.'):cls==='draw'?J('ui.egalite_tiens','Égalité — tu tiens.'):J('ui.subi_pertes','Tu as subi des pertes.')),cls},ai.civ.id,p);
   _warSuite(typeof done==='string'?done:null); // `done` est désormais un NOM (voir _warSuite)
 }
 /* ============================================================ CONNECTION LOGIC ============================================================ */
@@ -10497,6 +10538,10 @@ function _decompterTourDeGuerre(){
    ═══════════════════════════════════════════════════════════════════════ */
 function resolveWarCombat(playerCommitted, attaquant){
   const _atk=attaquant||G.player;
+  /* Un engagement est un NOMBRE. « DEFEND:2 » est arrivé ici (02/10) et s'est concaténé en puissance
+     « DEFEND:2000 » : on lit le nombre qu'une chaîne contient, et rien d'autre. */
+  if(typeof playerCommitted==='string'){ const _m=/(\d+)/.exec(playerCommitted); playerCommitted=_m?parseInt(_m[1],10):0; }
+  else if(playerCommitted!==undefined&&playerCommitted!==null) playerCommitted=Math.max(0,playerCommitted|0);
   /* L'adversaire se déduit de l'ATTAQUANT, plus de `G.ais` — une liste qui dépend elle aussi de qui
      est « actif ». On retombe sur `G.warWith` seulement si cette nation n'a pas de guerre connue. */
   const warEnemy=(function(){
@@ -15823,7 +15868,19 @@ function showWarCombatModal(cb){
   document.getElementById('wcm-sub').textContent=t('guerre.tour_cible','Tour de guerre {n}/2 — choisis ta cible :',{n:(warTourNum==='1'?'1':'2')});
   // Pré-décision IA : attaquer ou tenir ? (caché du joueur)
   const _keepStance=!!G._warKeepStance;G._warKeepStance=false; // "Annuler" → garder la posture (pas de re-tirage)
-  if(!_keepStance)G._aiWarStance=(aiTok>=2&&Math.random()>0.35)?'attack':'hold';
+  /* ═══ PLUS DE DÉFENSE FANTÔME EN SOLO NON PLUS (Marc, 02/10 — appli, guerre contre les Jupitériens) ═══
+     Le même fantôme que celui retiré EN LIGNE le 05/09 (partie 09A0, voir le bloc `_decisionActive`
+     plus haut) vivait encore ici : posture « attack » tirée au hasard, cible tirée au hasard, bouton
+     « Répondre à l'attaque », et « Tenir position » ouvrait `warDefendTarget` — la vieille fenêtre
+     « Défense de 🏙️ Colonie … — choisis tes jetons » sans garnison, sans Empathes, sans Supercroiseur
+     (Marc en avait un, payable : « on me propose pas »). Sa réponse « DEFEND:n » tombait dans
+     `guerreCombatLiveChoisi`, qui la lit comme « tenir » : rien résolu, AUCUN écran de résultat, fin de
+     tour. Le vrai assaut de l'ordinateur se décide après (`maybeAiAssaultPlayer`) avec SA fenêtre
+     (`showAiAssaultDefenseModal`), qui annonce tout. Guerre `live` (toutes le sont) : pas de posture,
+     pas de cible, pas de bouton. Banc : server/test_defense_fantome_solo.js. */
+  const _warLiveSolo=(function(){ try{ const w=_warBetween(_moiId(),G.warWith); return !!(w&&w.live); }catch(e){ return true; } })();
+  if(_warLiveSolo){ G._aiWarStance='hold'; G._aiWarTarget=null; }
+  else if(!_keepStance)G._aiWarStance=(aiTok>=2&&Math.random()>0.35)?'attack':'hold';
   // Choix du type d'attaque
   const routeOpts=aiRoutes.length>0
     ?aiRoutes.map((r,i)=>{const prot=(r.tokens||0)>=1;const need=prot?2:1;const can=(p.forceTokens||0)>=need;
@@ -15840,7 +15897,8 @@ function showWarCombatModal(cb){
   const aiTargetRoutes=G.player.routes.filter(r=>(r.tokens||0)>0);
   const allTargets=[...aiTargetCols.map(c=>({type:'colony',name:NODES[c.nodeId]?.name||c.nodeId,obj:c})),...aiTargetRoutes.map(r=>({type:'route',name:(NODES[r.from]?.name||r.from)+'→'+(NODES[r.to]?.name||r.to),obj:r}))];
   let rndTarget;
-  if(_keepStance){rndTarget=G._aiWarTarget;}
+  if(_warLiveSolo){rndTarget=null;}
+  else if(_keepStance){rndTarget=G._aiWarTarget;}
   else{rndTarget=allTargets.length>0?allTargets[Math.floor(Math.random()*allTargets.length)]:null;G._aiWarTarget=rndTarget;}
   const defendBtn=(rndTarget?t('ui.repondre_attaque_ia_menace_choisis_combi','<div style="margin-top:10px;padding-top:10px;border-top:1px solid #2a3a5a"><strong style="color:#ff8844">🛡️ Répondre à l\'attaque</strong><br><span style="color:#cc8866;font-size:.82em">L\'IA menace : <strong style="color:#ffaa77">{nom}</strong>. Choisis combien de jetons tu engages en défense.</span><br><button onclick="warDefendTarget()" style="margin-top:6px;padding:6px 14px;background:#2a1200;border:1px solid #cc6622;color:#ffaa66;border-radius:6px;cursor:pointer;font-weight:700">🛡️ Défendre (choisir jetons)</button></div>',{nom:(rndTarget.type==='colony'?'🏙️ Colonie '+rndTarget.name:'🛤️ Route '+rndTarget.name)}):'');
   // Assaut direct sur la colonie pour laquelle on fait la guerre (memo #11)
@@ -16034,6 +16092,18 @@ function _warShowAttackSlider(){
     else _cru='<button id="cru-btn" onclick="toggleCruiser()" style="margin-top:6px;padding:6px 10px;background:#0a1a2a;border:1px solid #4488cc;color:#88bbee;border-radius:6px;cursor:pointer;font-size:.82em">'+t('croiseur.deployer','⚓ Déployer le Supercroiseur (+{n}⚔️, coût 5<i class=ri-materials></i> 5<i class=ri-energy></i>)',{n:(p.cruiserPower||5)})+'</button>';
     document.getElementById('wcm-info').innerHTML+='<br>'+_cru;
   }
+  /* ═══ LES BOUTONS D'ASSAUT SONT REMIS EN PLACE (Marc, 02/10 : « quand j'attaque, la fenêtre donne un
+     bouton Défendre en bas au lieu d'Attaquer ») ═══
+     `warDefendTarget` remplace les boutons de `.atk-btns` par « Défendre avec ces jetons » et personne
+     ne les rendait : tout assaut suivant partait par `confirmWarDefense` avec « DEFEND:n » — une chaîne
+     que `resolveWarCombat` additionnait (« puissance DEFEND:2000 contre 3 — égalité », trois fois dans
+     la partie de Marc). Ici, et pas seulement en réparant la fenêtre fantôme (§189) : ce que cette
+     fenêtre propose doit être ce qu'elle fait. Banc : test_defense_fantome_solo.js §4. */
+  try{ const _b=document.getElementById('war-combat-modal').querySelector('.atk-btns');
+    if(_b&&!/confirmWarCombat/.test(_b.innerHTML||'')) _b.innerHTML=
+      '<button type="button" class="fen-btn ghost" onclick="cancelWarCombat()"><span class="k">'+t('ui.annuler','Annuler')+'</span><span class="s">'+t('ui.revenir_au_choix','revenir au choix')+'</span></button>'
+     +'<button type="button" class="fen-btn no" onclick="confirmWarCombat()"><span class="k">'+t('ui.engager','Engager')+'</span><span class="s">'+t('ui.ces_jetons','ces jetons')+'</span></button>';
+  }catch(e){}
   _warSliderMode='attack';
   updateWarCombatSlider();
 }

@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-10-01 · v11.16';</script>
+<script>window.SOLAR_BUILD_HTML='2026-10-02 · v11.20';</script>
 <!-- Tampon des erreurs survenues AVANT diagnostic.js (chargé après moteur.js) : il les ramasse au démarrage. -->
 <script>window.__scErreursPrecoces=[];window.addEventListener('error',function(e){try{if(window.scDiagNoterErreur)return;window.__scErreursPrecoces.push({type:'erreur',msg:e.message||String(e),pile:(e.error&&e.error.stack)||'',ou:(e.filename||'').split('/').pop()+':'+e.lineno});}catch(x){}});</script>
 <!-- i18n.js EN TÊTE, avant tout script du corps : il choisit la langue et charge lang/<code>.js (synchrone).
@@ -2176,14 +2176,23 @@ function fenAttaques(hits, opts){
    (veille toutes les 400 ms). Les fenêtres qui attendent une décision ne sont pas touchées.
    La pastille vit en bas à droite, au-dessus de la barre des onglets (là où ✓/↩ s'affiche) : en haut,
    elle recouvrait le titre du panneau ouvert. */
-var FEN_REDUCTIBLES=['eot-modal','event-modal','event-announce-modal','discovery-modal','invest-active-modal','war-modal','sc-attack-notice'];
+/* 02/10 (Marc) : « je t'avais demandé ça pour TOUTES les fenêtres ». Il avait raison (05/09, en ligne :
+   « tu peux mettre un − pour minimiser la fenêtre ? », déjà fait pour le site dans online.js, `scRendreReductible`).
+   Donc TOUTES les fenêtres du solo, décisions comprises : replier ne répond à rien, la pastille rend la
+   fenêtre intacte — on ne peut pas valider par mégarde en repliant. Seule exception : la fenêtre de débogage. */
+var FEN_REDUCTIBLES=['eot-modal','event-modal','event-announce-modal','discovery-modal','invest-active-modal','war-modal','sc-attack-notice',
+  'invest-modal','invest2-modal','agenda-sel-modal','strategy-modal','espionage-modal','empath-copy-modal','dyson-modal','war-combat-modal',
+  'peace-modal','forced-war-modal','route-token-modal','route-manage-modal','route-capture-modal','forge-modal','accord-modal','tech-detail-modal',
+  'event-choice-modal','aad-overlay','calm-overlay','sc-decision'];
+function _fenHote(el){ return el.querySelector('.fen, .ea-card, .card, .inv-card') || el.firstElementChild; }
 function fenReductible(id){
   try{
     var el=document.getElementById(id); if(!el||typeof el.querySelector!=='function')return;
-    var fen=el.querySelector('.fen'); if(!fen)return;
+    var fen=_fenHote(el); if(!fen)return;
     var p=document.getElementById('sc-pastille');
     if(!(p&&p._pour===id)&&el.classList&&el.classList.contains('fen-replie'))el.classList.remove('fen-replie');   // rouverte sans pastille : visible
-    if(fen.querySelector('.fen-reduire'))return;
+    if(fen.querySelector(':scope > .fen-reduire'))return;
+    try{ if(getComputedStyle(fen).position==='static')fen.style.position='relative'; }catch(e){}
     var b=document.createElement('button'); b.type='button'; b.className='fen-reduire'; b.textContent='–';
     b.title=t('fen.reduire','Réduire'); b.setAttribute('aria-label',t('fen.reduire','Réduire'));
     b.onclick=function(ev){ if(ev&&ev.stopPropagation)ev.stopPropagation(); fenReduire(id); };
@@ -2194,7 +2203,7 @@ function fenReduire(id){
   try{
     var el=document.getElementById(id); if(!el)return;
     var esc=function(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
-    var fen=el.querySelector('.fen'), k=fen&&fen.querySelector('.fen-kicker'), n=fen&&fen.querySelector('.fen-nation');
+    var fen=_fenHote(el), k=fen&&fen.querySelector('.fen-kicker'), n=fen&&(fen.querySelector('.fen-nation')||fen.querySelector('h2,h3,.fen-verb'));
     var p=document.getElementById('sc-pastille');
     if(!p){ p=document.createElement('button'); p.id='sc-pastille'; p.type='button'; document.body.appendChild(p); }
     var kt=(k&&k.textContent||'').trim(), nt=(n&&n.textContent||'').trim();
@@ -2214,15 +2223,23 @@ function fenDeplier(id){
     if(p&&(!id||p._pour===id)){ clearInterval(p._veille); p._veille=null; p.style.display='none'; p._pour=null; }
   }catch(e){}
 }
-/* Les fenêtres fixes de la page reçoivent leur « – » à chaque ouverture (changement de classe) ;
-   `sc-attack-notice`, créée à la volée, l'appelle elle-même (`_showPlayerHitModal`). */
+/* Chaque fenêtre reçoit son « – » quand elle apparaît : les fixes par un observateur de leurs attributs
+   (`class` pour `.hidden`, `style` pour `event-choice-modal` / `sc-decision`), les créées à la volée
+   (`sc-attack-notice`, `aad-overlay`, `calm-overlay`, `sc-decision`…) par un observateur des enfants de <body>,
+   qui leur pose aussi l'observateur d'attributs à leur première apparition. */
 (function(){ try{
   if(!window.MutationObserver)return;
-  FEN_REDUCTIBLES.forEach(function(id){
-    var el=document.getElementById(id); if(!el)return;
+  var vus={};
+  function armer(id){
+    var el=document.getElementById(id); if(!el||vus[id]===el)return; vus[id]=el;
     fenReductible(id);
-    new MutationObserver(function(){ if(!el.classList.contains('hidden'))fenReductible(id); }).observe(el,{attributes:true,attributeFilter:['class']});
-  });
+    new MutationObserver(function(){ if(!el.classList.contains('hidden')&&el.style.display!=='none')fenReductible(id); }).observe(el,{attributes:true,attributeFilter:['class','style']});
+  }
+  var prevu=false;
+  function passe(){ prevu=false; FEN_REDUCTIBLES.forEach(armer); }
+  function planifier(){ if(prevu)return; prevu=true; (window.requestAnimationFrame||setTimeout)(passe); }
+  function demarrer(){ passe(); new MutationObserver(planifier).observe(document.body,{childList:true}); }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',demarrer); else demarrer();
 }catch(e){} })();
 function fenAdversaire(prefix, nat){
   try{

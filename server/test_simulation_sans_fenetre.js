@@ -82,7 +82,8 @@ console.log('\n2. Le même assaut HORS simulation ouvre bien la fenêtre (le cor
 console.log('\n3. Les autres fonctions d\'écran se taisent en simulation (garde en tête de fonction)');
 {
   const src = fs.readFileSync(path.join(__dirname, '..', 'moteur.js'), 'utf8');
-  for (const f of ['gainToast', 'notifyNationHit', 'showWarModal', 'showDiscoveryModal', 'showEventModal', 'render']) {
+  /* `gainToast` retiré le 30/09 (§172.1) : plus de fenêtre verte, donc plus rien à garder. */
+  for (const f of ['notifyNationHit', 'showWarModal', 'showDiscoveryModal', 'showEventModal', 'render']) {
     const i = src.indexOf('function ' + f + '(');
     const tete = i >= 0 ? src.slice(i, i + 400) : '';
     if (/G\._simulationIA\)return;/.test(tete)) ok(f + ' : garde présente');

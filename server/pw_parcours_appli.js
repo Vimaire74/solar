@@ -185,6 +185,26 @@ const SONDE = `(function(root){
   if (f.pastilleEffacee && f.classeRetiree) ok('fermée par le jeu pendant le repli : pastille effacée, classe retirée (contre-épreuve)'); else ko('fermeture pendant le repli : pastille=' + !f.pastilleEffacee + ', classe=' + !f.classeRetiree);
   if (f.depAvant && f.arme && !f.depApres) ok('✓/↩ armé → les dépêches se ferment'); else ko('dépêches : avant=' + f.depAvant + ', armé=' + f.arme + ', après=' + f.depApres);
   if (f.horsTourRefuse && /autres nations/i.test(f.hint)) ok('hors tour : achat refusé, indication « ' + f.hint.slice(0, 50) + ' »'); else ko('hors tour : refusé=' + f.horsTourRefuse + ', indication=« ' + f.hint + ' »');
+  /* 02/10 : le choix d'investissement est réductible lui aussi, et replier ne choisit rien. */
+  const fi = await p.evaluate(async () => { const att = ms => new Promise(x => setTimeout(x, ms)); const visible = e => !!(e && getComputedStyle(e).display !== 'none' && e.getClientRects().length);
+    G.player.res = { materials: 20, energy: 20, science: 20, morale: 5 }; const avant = G.player._inv1 || null; showInvestmentModal(); await att(100);
+    const m = document.getElementById('invest-modal'); const b = m.querySelector('.fen-reduire'); const r = { bouton: visible(b) };
+    if (b) b.click(); await att(50); const past = document.getElementById('sc-pastille'); r.replie = !visible(m) && visible(past); r.rienChoisi = (G.player._inv1 || null) === avant;
+    if (past) past.click(); await att(50); r.revenue = visible(m) && !!m.querySelector('#inv-opts .inv-opt'); m.classList.add('hidden'); fenDeplier('invest-modal'); return r; });
+  if (fi.bouton && fi.replie && fi.rienChoisi && fi.revenue) ok('investissement : réductible, rien choisi pendant le repli, revient avec ses options'); else ko('investissement réductible : ' + JSON.stringify(fi));
+  /* 02/10 : TOUTES les fenêtres (Marc) — un échantillon de fenêtres de décision, fixes et créées à la volée. */
+  const ft = await p.evaluate(async () => { const att = ms => new Promise(x => setTimeout(x, ms)); const visible = e => !!(e && getComputedStyle(e).display !== 'none' && e.getClientRects().length);
+    const res = {}; const essai = async (id, ouvrir, fermer) => { try { ouvrir(); await att(120); const el = document.getElementById(id); const b = el && el.querySelector('.fen-reduire');
+        if (!b || !visible(b)) { res[id] = 'pas de bouton'; } else { b.click(); await att(50); const past = document.getElementById('sc-pastille'); const ok1 = !visible(el) && visible(past); past.click(); await att(50); res[id] = (ok1 && visible(el)) ? 'ok' : 'repli/retour KO'; }
+        fermer(); fenDeplier(id); } catch (e) { res[id] = 'erreur ' + e.message; } };
+    await essai('strategy-modal', () => document.getElementById('strategy-modal').classList.remove('hidden'), () => document.getElementById('strategy-modal').classList.add('hidden'));
+    await essai('peace-modal', () => document.getElementById('peace-modal').classList.remove('hidden'), () => document.getElementById('peace-modal').classList.add('hidden'));
+    await essai('agenda-sel-modal', () => document.getElementById('agenda-sel-modal').classList.remove('hidden'), () => document.getElementById('agenda-sel-modal').classList.add('hidden'));
+    await essai('event-choice-modal', () => _evOverlay('<div class="fen"><div class="fen-kicker">Test</div><div class="fen-nation">Choix</div></div>'), () => _evCloseOverlay());
+    await essai('aad-overlay', () => { G.phase = 'actions'; const ai = G.ais[0]; ai.forceTokens = 6; ai.res.materials = 20; ai.res.energy = 20; ai.res.morale = 8; if (!G.player.colonies.some(c => c.nodeId === 'ceres')) G.player.colonies.push({ nodeId: 'ceres', level: 1, connected: true }); appliquerCoup(ai, { type: 'assaut', node: 'ceres' }); }, () => { try { document.getElementById('aad-slider').value = 0; confirmAiAssaultDefense(); } catch (e) {} });
+    return res; });
+  const ko2 = Object.keys(ft).filter(k => ft[k] !== 'ok');
+  if (!ko2.length) ok('toutes les fenêtres de décision testées sont réductibles (' + Object.keys(ft).join(', ') + ')'); else ko('fenêtres non réductibles : ' + ko2.map(k => k + ' → ' + ft[k]).join(' ; '));
   await p.screenshot({ path: path.join(OUT, 'reduite.png') });
 
   /* ⚠️ Les trois sections qui suivent REMPLACENT les §F/§G/§H annoncés en REPRISE §172.6 : elles avaient
