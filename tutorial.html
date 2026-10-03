@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-10-03 · v11.30';</script>
+<script>window.SOLAR_BUILD_HTML='2026-10-03 · v11.32';</script>
 <!-- Tampon des erreurs survenues AVANT diagnostic.js (chargé après moteur.js) : il les ramasse au démarrage. -->
 <script>window.__scErreursPrecoces=[];window.addEventListener('error',function(e){try{if(window.scDiagNoterErreur)return;window.__scErreursPrecoces.push({type:'erreur',msg:e.message||String(e),pile:(e.error&&e.error.stack)||'',ou:(e.filename||'').split('/').pop()+':'+e.lineno});}catch(x){}});</script>
 <!-- i18n.js EN TÊTE, avant tout script du corps : il choisit la langue et charge lang/<code>.js (synchrone).
@@ -1324,12 +1324,24 @@ img.nat-emb{display:block;width:100%;height:100%;object-fit:contain;border-radiu
 img.nat-emb-i{display:inline-block;width:1.4em;height:1.4em;vertical-align:-.35em;margin:0 .08em}
 /* BARRE DU HAUT SERRÉE quand PASSER est affiché (Marc, 03/10 : « ça sort de l'écran ») : Pouvoir, À TOI et
    Passer rétrécissent pour tenir sur la ligne, au téléphone comme au réglage Aa agrandi. */
+/* Icône ✦ seule UNIQUEMENT sur écran étroit (03/10 : sur le site, la place est là, « POUVOIR » s'affiche). */
+@media (max-width:520px){
 .tb-l3:has(#passer-btn.on) #btn-ability.tb-pouvoir{padding:0 8px;gap:0}
-.tb-l3:has(#passer-btn.on) #btn-ability.tb-pouvoir>span:not(.k){display:none}   /* v11.26 : icône ✦ seule (Marc : « Pouvoir toujours trop grand ») */
+.tb-l3:has(#passer-btn.on) #btn-ability.tb-pouvoir>span:not(.k){display:none}
+}   /* v11.26 : icône ✦ seule (Marc : « Pouvoir toujours trop grand ») */
 .tb-l3:has(#passer-btn.on) #tb-etat{max-width:none;flex:0 0 auto}
 .tb-l3:has(#passer-btn.on) #a-toi-badge{flex:0 0 auto;overflow:visible;text-overflow:clip;font-size:.44em;letter-spacing:.04em;padding:0 6px}   /* jamais « À T… » */
 .tb-l3:has(#passer-btn.on) #passer-btn{font-size:.42em;letter-spacing:.02em;padding:0 6px}
 .tb-l3:has(#passer-btn.on) .tb-puce{flex-shrink:1;min-width:0}
+/* CARTES INVESTISSEMENT EN CARTOUCHES PLEINE LARGEUR, l'une sous l'autre, coût légèrement accentué (Marc, 03/10). */
+#inv-opts,#inv2-opts{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:8px;max-height:none;overflow:visible}
+#inv-opts .inv-opt,#inv2-opts .inv-opt{width:auto;display:grid;grid-template-columns:48px 1fr;column-gap:12px;align-items:center;text-align:left;padding:10px 14px}
+#inv-opts .inv-opt-emoji,#inv2-opts .inv-opt-emoji{grid-row:1 / span 4;font-size:2em;margin:0;text-align:center}
+#inv-opts .inv-opt-name,#inv2-opts .inv-opt-name{font-size:.98em;margin-bottom:2px}
+#inv-opts .inv-opt-benefit,#inv2-opts .inv-opt-benefit{font-size:.86em;margin-bottom:3px}
+#inv-opts .inv-opt-cost,#inv2-opts .inv-opt-cost{font-size:.9em;font-weight:700;color:#ffad7a}
+#inv-opts .inv-opt:hover:not(.inv-taken),#inv2-opts .inv-opt:hover:not(.inv-taken){transform:none}
+.inv-opt-emoji img.inv-art{display:block;width:3.2em;height:3.2em;object-fit:cover;border-radius:12px;margin:0 auto;box-shadow:0 2px 10px rgba(0,0,0,.5)}
 </style>
 </head>
 <body>

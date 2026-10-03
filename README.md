@@ -16,11 +16,21 @@
      Le 01/10 il a été ramené de 84 Mo à 3,5 Mo (36 fichiers). Un fichier identique à ce qui est déjà
      en ligne n'a rien à faire ici ; une image ou un banc nouveau ou modifié, oui. -->
 
-## 📦 CE LOT EST EN **v11.30** · cache `sw.js` **v251** · 2026-10-03
+## 📦 CE LOT EST EN **v11.32** · cache `sw.js` **v253** · 2026-10-03
 
 > Pour savoir ce qui est EN LIGNE : ouvre solar-game.com, la version est écrite sur l'écran de
-> connexion. Si elle ne dit pas **v11.30**, l'envoi ou le redéploiement n'a pas pris.
+> connexion. Si elle ne dit pas **v11.32**, l'envoi ou le redéploiement n'a pas pris.
 > ⚠️ **Les DEUX ressources Coolify** doivent être redéployées : le site ET le serveur.
+
+**v11.32 — 03/10/2026** — site seulement, le serveur n'a pas changé
+- Cartes d'investissement : illustrations à la place des émojis dans les fenêtres de choix.
+- Grandes illustrations des cartes d'investissement (assets/invest/grand/) : archivées en ligne, pas encore affichées.
+
+**v11.31 — 03/10/2026** — `docs/REPRISE.md` §201 — site ET serveur
+- Commerce avec les pirates : le gain s'affiche dans une fenêtre, comme celui d'une colonisation (en ligne : fenêtre verte « Gain »).
+- Barre du haut : « POUVOIR » reste écrit sur grand écran ; l'icône seule ne sert qu'au téléphone.
+- Cartes Investissement : cartouches pleine largeur, l'une sous l'autre, coût mis en avant, sans triangle ⚠️.
+- Bouton « Valider ce choix » → « VALIDER », dans la police des autres boutons.
 
 **v11.30 — 03/10/2026** — `docs/REPRISE.md` §200 — site ET serveur
 - « Copier le log », « Envoyer par email », « Télécharger » : le journal exporté est exactement le journal affiché (mêmes lignes, même ordre).

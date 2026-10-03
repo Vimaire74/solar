@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-10-03 · v11.30';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-10-03 · v11.32';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -523,13 +523,13 @@ function showHitReal(pending){
      de D538. Ici le titre dit tout : médaillon neutre, pas de nom. */
   /* UNE COLONISATION N'EST PAS UNE ATTAQUE (Marc, 22/09) : même fenêtre, mais au ton vert de la paix,
      médaillon 🚩 et bandeau « Colonisation ». La fenêtre est partagée : on remet le ton rouge sinon. */
-  const _colo=(o.genre==='colonisation');
+  const _colo=(o.genre==='colonisation'||o.genre==='gain');   // 'gain' : commerce avec les pirates (03/10)
   try{ const f=document.getElementById('wm-fen'); if(f){ f.classList.toggle('fen-peace',_colo); f.classList.toggle('fen-war',!_colo); } }catch(e){}
   try{ const e=document.getElementById('wm-emoji'), nm=document.getElementById('wm-nation'), kk=document.getElementById('wm-kicker');
     /* Blason B : si le titre nomme la nation qui te frappe → « attaqué par NATION » ; sinon médaillon neutre. */
     let n=null; if(!_colo){ try{ const G=scGetG(); const _tt=String(o.title||''); n=[G.player].concat(G.ais||[]).find(x=>x&&x.civ&&_tt.indexOf(x.civ.name)>=0&&x.civ.id!==STATE.myCiv)||null; }catch(e){} }
-    if(e)e.textContent=_colo?'🚩':(n?n.civ.emoji:'⚔️'); if(nm)nm.textContent=n?n.civ.name:'';
-    if(kk){ kk.textContent=_colo?t('web.colonisation','Colonisation'):(n?t('web.attaque','attaqué par'):t('ui.guerre','Guerre')); kk.classList.toggle('fen-prep',!!n); } }catch(e){}
+    if(e)e.textContent=_colo?(o.genre==='gain'?'💰':'🚩'):(n?n.civ.emoji:'⚔️'); if(nm)nm.textContent=n?n.civ.name:'';
+    if(kk){ kk.textContent=_colo?(o.genre==='gain'?t('web.gain','Gain'):t('web.colonisation','Colonisation')):(n?t('web.attaque','attaqué par'):t('ui.guerre','Guerre')); kk.classList.toggle('fen-prep',!!n); } }catch(e){}
   if(b)b.innerHTML=o.body||'';
   if(r)r.classList.add('hidden');
   const go=()=>{ m.classList.add('hidden'); if(STATE._realDecide)STATE._realDecide({}); };
@@ -826,7 +826,7 @@ function showInvestReal(pending, lvl){
      champ, et tout griser serait pire que ne rien griser. */
   optsEl.innerHTML=opts.map(c=>{
     const ok=(c.payable!==false);
-    return t('web.ligne_8','<div class="inv-opt{v}"{v2}><div class="inv-opt-emoji">{v3}</div><div class="inv-opt-name">{v4}</div><div class="inv-opt-benefit">✅ {v5}</div><div class="inv-opt-cost">⚠️ {v6}</div>{cout}</div>',{v:(ok?'':' inv-nope'),v2:(ok?' onclick="'+selFn+'(\''+c.id+'\')"':''),v3:c.emoji||'',v4:c.name||c.id,v5:c.benefit||'',v6:c.contrepartie||'',cout:(ok?'':t('web.te_manque','<div class="inv-opt-cost" style="color:#ff8a8a;font-weight:700">🚫 Il te manque {v}</div>',{v:c.manque||''}))});}).join('');
+    return t('web.ligne_8','<div class="inv-opt{v}"{v2}><div class="inv-opt-emoji">{v3}</div><div class="inv-opt-name">{v4}</div><div class="inv-opt-benefit">✅ {v5}</div><div class="inv-opt-cost">⚠️ {v6}</div>{cout}</div>',{v:(ok?'':' inv-nope'),v2:(ok?' onclick="'+selFn+'(\''+c.id+'\')"':''),v3:(typeof window.invArt==='function'?window.invArt(c.id,c.emoji):(c.emoji||'')),v4:c.name||c.id,v5:c.benefit||'',v6:c.contrepartie||'',cout:(ok?'':t('web.te_manque','<div class="inv-opt-cost" style="color:#ff8a8a;font-weight:700">🚫 Il te manque {v}</div>',{v:c.manque||''}))});}).join('');
   /* Les choix adverses ne s'affichent plus avant le tien (Marc, 30/09) : le moteur ne les envoie plus. */
   if(typeof window._exigerValidation==='function') window._exigerValidation(optsEl,'.inv-opt');   // tout choix se valide (30/09)
   modal.classList.remove('hidden');

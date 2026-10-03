@@ -2354,7 +2354,7 @@ window.SOLAR_LANG_DICT = {
   "refus.titre": "⚠️ Action not possible",
   "refus.rien_preleve": "Nothing was deducted.",
   "refus.compris": "Got it",
-  "choix.valider": "Confirm this choice",
+  "choix.valider": "Confirm",
   "avis.pillent_colonie": "{nation} raid {col}",
   "avis.perte_prochain_revenu": "You lose {v} from your next income.",
   "avis.rien_a_prendre_colonie": "Nothing to take: {col} produced nothing.",
@@ -2364,4 +2364,8 @@ window.SOLAR_LANG_DICT = {
   "rapport.decouverte": "discovery {nom}{v}",
   "diag.retour": "Back",
   "diag.envoyer_rapport": "Send the report",
+  "avis.commerce_pirates_titre": "Trade with the pirates",
+  "avis.commerce_pirates_gain": "The pirates deliver: <b>{v}</b>",
+  "avis.commerce_pirates_rien": "The pirates had nothing to deliver this turn.",
+  "web.gain": "Gain",
 };

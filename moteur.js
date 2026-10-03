@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.30';
+const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.32';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -450,6 +450,11 @@ const AGENDAS_POOL=[
   {id:'ag13',name:'Empire Énergétique',emoji:'⚡',desc:'Toutes les cartes tech qui génèrent <i class=ri-energy></i> → +12 VP',score(p){const energyCards=CARDS_POOL.filter(c=>c.rGain&&(c.rGain.energy||0)>0).map(c=>c.id);return energyCards.length>0&&energyCards.every(id=>possedeCarte(p,id))?12:0;}},
   {id:'ag14',name:'Opulence Matérielle',emoji:'🪨',desc:'Toutes les cartes tech qui génèrent <i class=ri-materials></i> → +6 VP',score(p){const matCards=CARDS_POOL.filter(c=>c.rGain&&(c.rGain.materials||0)>0).map(c=>c.id);return matCards.length>0&&matCards.every(id=>possedeCarte(p,id))?6:0;}},   // 12 → 6 (Marc, 21/09 : « c'est relativement facile »)
 ];
+/* Illustrations des cartes d'investissement (03/10, v11.32, choix de Marc : style « B ») — AFFICHAGE PUR.
+   Petite version (256 px) dans les fenêtres de choix ; la grande (1024 px) est gardée dans assets/invest/grand/. */
+const INV_ART=new Set(['inv_esp','inv_ind','inv_rec','inv_agr','inv_exp','inv2_war','inv2_comfort','inv2_colonies','inv2_union']);
+function invArt(id,emoji){ return INV_ART.has(id)?'<img class="inv-art" src="assets/invest/'+id+'.jpg" alt="'+(emoji||'')+'">':(emoji||''); }
+try{ window.invArt=invArt; }catch(e){}
 const INVESTMENT_CARDS=[
   {id:'inv_esp',name:'Espionnage',emoji:'🕵️',cout:{},
    benefit:'À la fin des tours 3, 4 et 5 : copie TOUTE une filière technologique des autres nations',
@@ -3984,7 +3989,7 @@ function _exigerValidation(conteneur, selecteur, libelle){
     const parent=opts[0].parentElement;
     const btn=document.createElement('div');
     btn.className='fen-btns fen-col choix-valider'; btn.style.marginTop='10px';
-    btn.innerHTML='<button type="button" class="fen-btn ok" disabled>'+t('choix.valider','Valider ce choix')+'</button>';
+    btn.innerHTML='<button type="button" class="fen-btn ok" disabled><span class="k">'+t('choix.valider','Valider')+'</span></button>';   /* 03/10 : « VALIDER », police des autres boutons */
     if(parent===box){ const v=box.nextElementSibling; if(v&&v.classList&&v.classList.contains('choix-valider'))v.remove(); box.insertAdjacentElement('afterend',btn); }
     else { const v=parent.querySelector(':scope > .choix-valider'); if(v)v.remove(); parent.appendChild(btn); }
     const go=btn.querySelector('button');
@@ -3995,7 +4000,7 @@ function _exigerValidation(conteneur, selecteur, libelle){
       o.addEventListener('click',function(){
         opts.forEach(x=>{ x.setAttribute('aria-pressed','false'); x.classList.remove('choix-sel'); });
         o.setAttribute('aria-pressed','true'); o.classList.add('choix-sel');
-        go.disabled=false; go.textContent=(libelle||t('choix.valider','Valider ce choix'));
+        go.disabled=false; go.innerHTML='<span class="k">'+(libelle||t('choix.valider','Valider'))+'</span>';
       });
     });
     go.onclick=function(){
@@ -4034,10 +4039,10 @@ function showInvestmentModal(){
   opts.innerHTML=INVESTMENT_CARDS.map(c=>{
     const ok=investPayable(c,G.player), manque=investManque(c,G.player).join(' ');
     return`<div class="inv-opt${ok?'':' inv-nope'}"${ok?` onclick="selectInvestment('${c.id}')"`:''}>
-      <div class="inv-opt-emoji">${c.emoji}</div>
+      <div class="inv-opt-emoji">${invArt(c.id,c.emoji)}</div>
       <div class="inv-opt-name">${c.name}</div>
       <div class="inv-opt-benefit">✅ ${c.benefit}</div>
-      <div class="inv-opt-cost">⚠️ ${c.contrepartie}</div>
+      <div class="inv-opt-cost">${c.contrepartie}</div>
       ${ok?'':'<div class="inv-opt-cost" style="color:#ff8a8a;font-weight:700">'+t('invest.manque','🚫 Il te manque {m}',{m:manque})+'</div>'}
     </div>`;
   }).join('');
@@ -4082,10 +4087,10 @@ function showInvestmentModal2(){
     const ok=investPayable(card,G.player), manque=investManque(card,G.player).join(' ');
     return `
     <div class="inv-opt${ok?'':' inv-nope'}"${ok?` onclick="selectInvestment2('${card.id}')"`:''}>
-      <div class="inv-opt-emoji">${card.emoji}</div>
+      <div class="inv-opt-emoji">${invArt(card.id,card.emoji)}</div>
       <div class="inv-opt-name">${card.name}</div>
       <div class="inv-opt-benefit">${card.benefit}</div>
-      <div class="inv-opt-cost">⚠️ ${card.contrepartie}</div>
+      <div class="inv-opt-cost">${card.contrepartie}</div>
       ${ok?'':'<div class="inv-opt-cost" style="color:#ff8a8a;font-weight:700">'+t('invest.manque','🚫 Il te manque {m}',{m:manque})+'</div>'}
     </div>`;}).join('');
   _exigerValidation('inv2-opts','.inv-opt');
@@ -8508,6 +8513,13 @@ function useAbility(nat){
     /*gainToast retiré 30/09*/addAction('💫',J('action.surtension','Surtension'),0,{energy:2},J('action.1_ac','+1 AC'));}
   else if(p.civ.id==='ceinturiens'){
     const got=pirateCommerce(p);
+    /* LE GAIN S'AFFICHE DANS UNE FENÊTRE, comme celui d'une colonisation (Marc, 03/10, site). Joueur seulement. */
+    if(!p._isAI&&typeof notifyNationHit==='function'){
+      const _tal={}; got.forEach(r=>{_tal[r]=(_tal[r]||0)+1;});
+      const _v=Object.keys(_tal).map(r=>'+'+_tal[r]+' '+rEmoji(r)).join('  ');
+      notifyNationHit(p,J('avis.commerce_pirates_titre','Commerce avec les pirates'),
+        got.length?J('avis.commerce_pirates_gain','Les pirates te livrent : <b>{v}</b>',{v:_v}):J('avis.commerce_pirates_rien','Les pirates n\'ont rien pu te livrer ce tour.'),'gain');
+    }
     if(got.length){const em=got.map(rEmoji).join('');addLog(J('journal.commerce_avec_pirates_contrebande','💫 Commerce avec les pirates : contrebande → +{em}',{em:em}),'gold');
       /*gainToast retiré 30/09*/addAction('💫',J('action.commerce_avec_pirates','Commerce avec les pirates'),0,{},'+'+em);}
     else{addLog(J('journal.commerce_avec_pirates_pirates_ont_rien_p','💫 Commerce avec les pirates : les pirates n\'ont rien pu piller ce tour (rien reçu).'),'dim');addAction('💫',J('action.commerce_avec_pirates','Commerce avec les pirates'),0,{},J('action.rien','Rien'));}

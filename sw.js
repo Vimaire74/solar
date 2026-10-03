@@ -9,7 +9,7 @@
      interceptées, elles passent directement. Rien n'est mis en cache du serveur de jeu.
    - HORS-LIGNE : le solo reste jouable ; en navigation hors-ligne on sert index.html depuis le cache.
    Le numéro de version ci-dessous purge les anciens caches à chaque mise à jour du SW. */
-const VERSION = 'v251-2026-10-03';
+const VERSION = 'v253-2026-10-03';
 const HTML_CACHE = 'sc-html-' + VERSION;     // documents + scripts (network-first)
 const ASSET_CACHE = 'sc-assets-' + VERSION;  // images, icônes, PDF (cache-first)
 
@@ -34,7 +34,9 @@ const SHELL = [
   './assets/nations/terriens_64.png', './assets/nations/terriens_128.png',
   './assets/nations/martiens_64.png', './assets/nations/martiens_128.png',
   './assets/nations/jupiteriens_64.png', './assets/nations/jupiteriens_128.png',
-  './assets/nations/ceinturiens_64.png', './assets/nations/ceinturiens_128.png'
+  './assets/nations/ceinturiens_64.png', './assets/nations/ceinturiens_128.png',
+  /* Illustrations des cartes d'investissement (v11.32) — petites versions seulement. */
+  './assets/invest/inv_esp.jpg', './assets/invest/inv_ind.jpg', './assets/invest/inv_rec.jpg', './assets/invest/inv_agr.jpg', './assets/invest/inv_exp.jpg', './assets/invest/inv2_war.jpg', './assets/invest/inv2_comfort.jpg', './assets/invest/inv2_colonies.jpg', './assets/invest/inv2_union.jpg'
 ];
 
 self.addEventListener('install', (e) => {
