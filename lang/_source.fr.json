@@ -953,7 +953,7 @@
   "journal.assaut_annule_retour_choix_paix_guerre": "↩️ Assaut annulé — retour au choix paix/guerre.",
   "journal.assaut_besoin_ac": "⚠️ Assaut : besoin de {ac} AC{v}.",
   "journal.assaut_besoin_moins_jeton_force_engageab": "⚠️ Assaut : besoin d’au moins {tc} jeton(s) Force engageable(s) (la garnison ne compte pas).",
-  "journal.assaut_faut_engager_jetons": "⚠️ Assaut : il faut du <i class=ri-materials></i> et de l’<i class=ri-energy></i> pour engager des jetons.",
+  "journal.assaut_faut_engager_jetons": "⚠️ Assaut : il faut des <i class=ri-materials></i> et de l’<i class=ri-energy></i> pour engager des jetons.",
   "journal.assaut_impossible_aucune_nation_adverse": "⚠️ Assaut impossible : aucune nation adverse sur {v}.",
   "journal.assaut_repousse": "assaut repoussé",
   "journal.assez": "⚠️ Pas assez de {v}.",
@@ -970,6 +970,7 @@
   "journal.assez_savoir_besoin_1": "⚠️ Pas assez de Savoir (besoin 1<i class=ri-science></i>).",
   "journal.attaque_annulee_ac_rendu": "↩️ Attaque annulée — AC rendu.",
   "journal.attaque_annulee_retour_choix_guerre": "↩️ Attaque annulée — retour au choix de guerre.",
+  "journal.attaque_annulee_rien_change": "↩️ Attaque annulée — rien n'a changé (pas de guerre, accords et tensions intacts).",
   "journal.attaque_route_besoin_1_ac": "⚠️ Attaque de route : besoin 1 AC.",
   "journal.attaque_surprise_accord_rompu_agression": "📜 Attaque surprise sur {v} — l'accord est rompu par l'agression.",
   "journal.attaquer_premier": "attaquer en premier.",
@@ -2322,6 +2323,5 @@
   "web.version_jeu_correspond_celle_serveur": "Ta version du jeu ne correspond plus à celle du serveur.",
   "web.vote_complet_remplacement_cours": "Vote complet — remplacement en cours…",
   "web.vote_enregistre": "✓ Ton vote est enregistré",
-  "web.vp_toi_adversaire_offre_ressources_tente": "VP — Toi : <b>{vy}</b> | Adversaire : <b>{ve}</b><br>Offre des ressources pour tenter la paix, ou refuse et combats.",
-  "journal.attaque_annulee_rien_change": "↩️ Attaque annulée — rien n'a changé (pas de guerre, accords et tensions intacts)."
+  "web.vp_toi_adversaire_offre_ressources_tente": "VP — Toi : <b>{vy}</b> | Adversaire : <b>{ve}</b><br>Offre des ressources pour tenter la paix, ou refuse et combats."
 }

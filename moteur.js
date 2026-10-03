@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.37';
+const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.38';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -8923,7 +8923,7 @@ function attackColony(nodeId,attaquant){
     const _d=(typeof detailCoutAssaut==='function')?detailCoutAssaut(p,nodeId):null;
     addLog(J('journal.assaut_besoin_ac','⚠️ Assaut : besoin de {ac} AC{v}.',{ac:_coutAC,v:(_d&&_d.jours!==null?J('journal.jours_voyage_depuis_colonie_connectee_pr'," — {v} jours de voyage depuis ta colonie connectée la plus proche",{v:_d.jours}):'')}),'red');return;}
   if(engageableTokens(p)<tc){addLog(J('journal.assaut_besoin_moins_jeton_force_engageab','⚠️ Assaut : besoin d’au moins {tc} jeton(s) Force engageable(s) (la garnison ne compte pas).',{tc:tc}),'red');return;}
-  if(Math.min(p.res.materials||0,p.res.energy||0)<1){addLog(J('journal.assaut_faut_engager_jetons','⚠️ Assaut : il faut du <i class=ri-materials></i> et de l’<i class=ri-energy></i> pour engager des jetons.'),'red');return;}
+  if(Math.min(p.res.materials||0,p.res.energy||0)<1){addLog(J('journal.assaut_faut_engager_jetons','⚠️ Assaut : il faut des <i class=ri-materials></i> et de l’<i class=ri-energy></i> pour engager des jetons.'),'red');return;}
   // LIMITE DE 2 ATTAQUES/TOUR SUPPRIMÉE (demande de Marc) : le nombre d'assauts n'est plus plafonné —
   // il reste limité naturellement par les AC, les jetons Force et le coût en ressources de chaque combat.
   /* ═══ ASSAILLANT ORDINATEUR : LE COMBAT A LIEU MAINTENANT, PAR LA PORTE UNIQUE ═══
@@ -15615,7 +15615,7 @@ function _journalAdd(civObj,name,ac,cost,gain,opts){
   let _gain=_riToText(gain);
   try{ const _dn=civObj&&civObj._decNote; if(_dn&&_dn.turn===G.turn&&_riToText(name).indexOf(_dn.node)>=0){ _gain=(_gain?_gain+' · ':'')+_dn.txt; civObj._decNote=null; } }catch(e){}
   G._journal.push({turn:G.turn||0,nat:(civObj&&civObj.civ&&civObj.civ.name)||String(civObj||'Système'),
-    name:name,ac:ac||0,cost:_normCost(cost),gain:_gain,war:!!opts.war,auto:!!opts.auto});
+    name:(name&&typeof name==='object')?_i18nTexte(name):name,ac:ac||0,cost:_normCost(cost),gain:_gain,   /* « [object Object] » au rapport pour un accord (03/10) */war:!!opts.war,auto:!!opts.auto});
 }
 // Résolution automatique attribuée à UNE nation (nat = nom de la nation concernée).
 function _journalAuto(nat,name,gain,war){
@@ -17180,7 +17180,10 @@ function _refusDuJoueur(){
 function _noterRefus(msg,cls){
   try{
     if(cls!=='red'||!_refusDuJoueur())return;
-    const txt=String(msg||'').replace(/<[^>]+>/g,'').trim();
+    /* Les icônes de ressource deviennent des MOTS avant qu'on retire le HTML (Marc, 03/10 : « il faut du et de l' »). */
+    const _RI={energy:t('res.energie','énergie'),materials:t('res.materiaux','matériaux'),science:t('res.science','science'),morale:t('res.moral','moral')};
+    const txt=String(_i18nTexte(msg)||'').replace(/<i[^>]*class=["']?ri-(energy|materials|science|morale)["']?[^>]*>\s*<\/i>/g,(m,k)=>' '+_RI[k]+' ')
+      .replace(/<[^>]+>/g,'').replace(/[ \t]{2,}/g,' ').replace(/ ([,.])/g,'$1').replace(/([’']) /g,'$1').trim();
     if(!/^⚠️/.test(txt))return;
     (G._refusRecents=G._refusRecents||[]).push(txt.replace(/^⚠️\s*/,''));
     if(!_decisionActive()&&typeof window!=='undefined'&&typeof document!=='undefined'&&document.body&&!(typeof SOLAR_SANS_ECRAN!=='undefined'&&SOLAR_SANS_ECRAN))

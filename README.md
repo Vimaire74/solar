@@ -16,11 +16,15 @@
      Le 01/10 il a été ramené de 84 Mo à 3,5 Mo (36 fichiers). Un fichier identique à ce qui est déjà
      en ligne n'a rien à faire ici ; une image ou un banc nouveau ou modifié, oui. -->
 
-## 📦 CE LOT EST EN **v11.37** · cache `sw.js` **v258** · 2026-10-03
+## 📦 CE LOT EST EN **v11.38** · cache `sw.js` **v259** · 2026-10-03
 
 > Pour savoir ce qui est EN LIGNE : ouvre solar-game.com, la version est écrite sur l'écran de
-> connexion. Si elle ne dit pas **v11.37**, l'envoi ou le redéploiement n'a pas pris.
+> connexion. Si elle ne dit pas **v11.38**, l'envoi ou le redéploiement n'a pas pris.
 > ⚠️ **Les DEUX ressources Coolify** doivent être redéployées : le site ET le serveur.
+
+**v11.38 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js) — `docs/REPRISE.md` §205
+- Fenêtre « Action impossible » : les ressources manquantes sont écrites en toutes lettres (« il faut des matériaux et de l'énergie ») au lieu d'un blanc.
+- Rapport de partie : un accord commercial proposé par un ordinateur n'apparaît plus comme « [object Object] ».
 
 **v11.37 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js) — `docs/REPRISE.md` §204
 - Attaque lancée puis annulée pendant tes actions : plus de guerre ouverte, accords et tensions intacts, AC rendu — comme si rien n'avait eu lieu.
