@@ -104,7 +104,7 @@ console.log('\n4. LE PLAFOND DE 200 Ko TIENT');
   if (taille <= 200 * 1024) ok('taille stockée ' + taille + ' ≤ 204800'); else ko('plafond dépassé : ' + taille);
   if (d.erreurs.length <= 30 && d.erreurs[d.erreurs.length - 1].msg === 'e399') ok('30 erreurs au plus, les plus RÉCENTES gardées'); else ko('mauvaise coupe : ' + d.erreurs.length + ' / ' + d.erreurs[d.erreurs.length - 1].msg);
   const r = JSON.stringify(sb.scDiagRapport(''));
-  if (r.length <= 300 * 1024) ok('rapport envoyé ' + r.length + ' ≤ 307200 (plafond serveur)'); else ko('rapport trop gros pour le serveur : ' + r.length);
+  if (r.length <= 2 * 1024 * 1024) ok('rapport envoyé ' + r.length + ' ≤ 2 Mo (plafond serveur, 03/10)'); else ko('rapport trop gros pour le serveur : ' + r.length);
 }
 
 console.log('\n5. LA PROPOSITION À L\'OUVERTURE');
@@ -129,7 +129,7 @@ console.log('\n6. LE SERVEUR');
   if (!r2.ok && r2.statut === 400) ok('JSON invalide → 400'); else ko('JSON invalide accepté');
   const r3 = diag.enregistrer(JSON.stringify({ hello: 1 }), dossier);
   if (!r3.ok && r3.statut === 400) ok('rapport incomplet → 400'); else ko('rapport incomplet accepté');
-  const r4 = diag.enregistrer(JSON.stringify({ v: 1, appareil: {}, versions: {}, bourrage: 'x'.repeat(301 * 1024) }), dossier);
+  const r4 = diag.enregistrer(JSON.stringify({ v: 1, appareil: {}, versions: {}, bourrage: 'x'.repeat(2 * 1024 * 1024 + 1024) }), dossier);
   if (!r4.ok && r4.statut === 413) ok('trop volumineux → 413'); else ko('trop volumineux accepté');
   const l = diag.lister(dossier);
   if (l.length === 1 && l[0].appareil === 'SM-F741B · Android 14' && l[0].tour === 3) ok('liste : 1 rapport, appareil et tour résumés'); else ko('liste : ' + JSON.stringify(l));
@@ -192,10 +192,11 @@ console.log('\n7. LA FENÊTRE');
 {
   const { sb } = montage();
   const h = sb.scDiagBalisage(true);
-  for (const id of ['sc-diag-oui', 'sc-diag-non', 'sc-diag-jamais', 'sc-diag-voir', 'sc-diag-copier', 'sc-diag-com']) if (h.indexOf('id="' + id + '"') < 0) ko('bouton/champ manquant : ' + id);
+  /* 03/10 (Marc) : trois boutons seulement — Retour, Copier le rapport, Envoyer le rapport. */
+  for (const id of ['sc-diag-oui', 'sc-diag-non', 'sc-diag-copier', 'sc-diag-com']) if (h.indexOf('id="' + id + '"') < 0) ko('bouton/champ manquant : ' + id);
   if (/ni votre nom, ni votre adresse/.test(h) && /confidentialite\.html/.test(h)) ok('le texte dit ce qui part, ce qui ne part pas, et lie la confidentialité'); else ko('texte incomplet');
-  if ((h.match(/min-height:44px/g) || []).length >= 5) ok('boutons de 44 px'); else ko('boutons trop petits');
-  if (sb.scDiagBalisage(false).indexOf('sc-diag-jamais') < 0) ok('« Ne plus proposer » seulement à l\'ouverture automatique'); else ko('« Ne plus proposer » présent en manuel');
+  if ((h.match(/min-height:44px/g) || []).length >= 3) ok('boutons de 44 px'); else ko('boutons trop petits');
+  if (h.indexOf('sc-diag-jamais') < 0 && h.indexOf('sc-diag-voir') < 0 && sb.scDiagBalisage(true).indexOf('sc-diag-jamais') < 0) ok('ni « Voir » ni « Ne plus proposer » (03/10)'); else ko('bouton retiré encore présent');
   const idx = fs.readFileSync(path.join(RACINE, 'index.html'), 'utf8');
   if ((idx.match(/scDiagOuvrir\(false\)/g) || []).length === 2 && /<script src="diagnostic\.js">/.test(idx) && /__scErreursPrecoces/.test(idx)) ok('index.html : deux boutons, le script, le tampon précoce'); else ko('index.html incomplet');
   const sw = fs.readFileSync(path.join(RACINE, 'sw.js'), 'utf8');

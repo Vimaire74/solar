@@ -16,11 +16,40 @@
      Le 01/10 il a été ramené de 84 Mo à 3,5 Mo (36 fichiers). Un fichier identique à ce qui est déjà
      en ligne n'a rien à faire ici ; une image ou un banc nouveau ou modifié, oui. -->
 
-## 📦 CE LOT EST EN **v11.24** · cache `sw.js` **v245** · 2026-10-03
+## 📦 CE LOT EST EN **v11.30** · cache `sw.js` **v251** · 2026-10-03
 
 > Pour savoir ce qui est EN LIGNE : ouvre solar-game.com, la version est écrite sur l'écran de
-> connexion. Si elle ne dit pas **v11.24**, l'envoi ou le redéploiement n'a pas pris.
+> connexion. Si elle ne dit pas **v11.30**, l'envoi ou le redéploiement n'a pas pris.
 > ⚠️ **Les DEUX ressources Coolify** doivent être redéployées : le site ET le serveur.
+
+**v11.30 — 03/10/2026** — `docs/REPRISE.md` §200 — site ET serveur
+- « Copier le log », « Envoyer par email », « Télécharger » : le journal exporté est exactement le journal affiché (mêmes lignes, même ordre).
+- « Envoyer par email » sans partage disponible (appli Android) : ouvre « Envoyer le rapport » au lieu d'un lien e-mail qui bloquait.
+- Rapport de problème : description en haut, puis trois boutons (Retour, Copier le rapport, Envoyer le rapport), explications ensuite.
+- Rapport envoyé au serveur : journal affiché + rapport de partie + état complet de la partie (plafond 2 Mo, serveur compris).
+- Sphère de Dyson : la ligne « N nation(s) acceptent le monopole (+3/tour chacune) » n'est plus signée par le bâtisseur.
+
+**v11.29 — 03/10/2026** — `docs/REPRISE.md` §199 — site ET serveur
+- Rapport : la route du joueur indique le jeton posé (« 1 jetons Force → 1⚔️ déployé »), comme pour les ordinateurs.
+- Sphère de Dyson : ligne au journal pour le bâtisseur (« +5 énergie/tour ») ; bandeau ✓/↩ avec le gain.
+- Rapport : la ligne de colonisation indique le gain de la découverte (« découverte Gisement Riche : +2 matériaux »).
+
+**v11.28 — 03/10/2026** — `docs/REPRISE.md` §197 — site ET serveur
+- « Ordre du tour » (Initiative) : fenêtre « Nouvelles » à part, avant la première action ; plus jamais dans « On t'attaque ».
+- Les avis du début de tour (ordre du tour, pirates) s'affichent avant que quiconque ne joue.
+- Nouvelles et attaques ne se mélangent plus : une fenêtre par série, dans l'ordre d'arrivée.
+- Une fenêtre d'avis attend que la fenêtre ouverte (investissements activés, bilan…) soit fermée : plus deux fenêtres l'une sur l'autre.
+- Ton espionnage réussi : fenêtre « Nouvelles » juste après ton choix, avant le bilan (plus en rouge au tour suivant).
+- Sphère de Dyson construite par un ordinateur : la partie attend ta réponse avant de continuer.
+
+**v11.27 — 03/10/2026** — `docs/REPRISE.md` §195 — site ET serveur (le texte de l'avis en ligne vient du moteur)
+- Avis de pillage : « Ceinturiens pillent Io — Tu perds +1 énergie sur ton prochain revenu. Tension +3. » (colonie nommée, solo et en ligne).
+
+**v11.26 — 03/10/2026** — site seulement, le serveur n'a pas changé
+- Barre du haut avec PASSER : Pouvoir réduit à son icône ✦, « À TOI » jamais coupé, Passer plus petit.
+
+**v11.25 — 03/10/2026** — site seulement, le serveur n'a pas changé
+- Barre du haut : quand PASSER est affiché, Pouvoir et À TOI rétrécissent pour que tout tienne dans l'écran.
 
 **v11.24 — 03/10/2026** — site seulement, le serveur n'a pas changé — `docs/REPRISE.md` §194
 - Journal : plus aucun émoji décoratif ; restent ☠️ (pirates) et la pastille de chaque nation. Les émojis de ressource deviennent l'icône de ressource.

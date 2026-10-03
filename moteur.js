@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.24';
+const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.30';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -4264,7 +4264,7 @@ function dysonRenounce(){
 }
 function applyDysonClose(){
   document.getElementById('dyson-modal').classList.add('hidden');
-  {const _refusing=G._dysonWarTargets||[];let _acc=0;for(const _ai of G.ais){if(!_refusing.includes(_ai.civ.id)){dysonPartage(_ai);_acc++;}}if(_acc>0)addLog(J('journal.nation_acceptent_monopole_3_tour_chacune','🔋 {acc} nation(s) acceptent le monopole (+3<i class=ri-energy></i>/tour chacune).',{acc:_acc}),'dim');}
+  {const _refusing=G._dysonWarTargets||[];let _acc=0;for(const _ai of G.ais){if(!_refusing.includes(_ai.civ.id)){dysonPartage(_ai);_acc++;}}if(_acc>0)logAuteur('systeme',()=>addLog(J('journal.nation_acceptent_monopole_3_tour_chacune','🔋 {acc} nation(s) acceptent le monopole (+3<i class=ri-energy></i>/tour chacune).',{acc:_acc}),'dim'));}
   if(G._dysonWarTargets&&G._dysonWarTargets.length>0){
     const names=G._dysonWarTargets.map(id=>{const ai=G.ais.find(a=>a.civ.id===id);return ai?ai.civ.emoji+' '+ai.civ.name:id;}).join(', ');
     addLog(J('journal.sphere_dyson_refus_guerre','<i class=ri-energy></i> Sphère de Dyson : {names} refus — Guerre !',{names:names}),'red');
@@ -4284,6 +4284,8 @@ function applyDysonClose(){
     addLog(J('journal.sphere_dyson_toutes_nations_acceptent_mo','<i class=ri-energy></i> Sphère de Dyson : toutes les nations acceptent le monopole énergétique.'),'gold');
   }
   G._dysonWarTargets=null;
+  /* Bandeau ✓/↩ : ce que la Sphère rapporte au bâtisseur (il était vide, audit du 03/10). */
+  try{ const _dc=CARDS_POOL.find(c=>c.id==='dyson3'); if(_dc&&!_decisionActive()) scArmConfirm((_dc.emoji||'')+' '+_dc.name,_scCardGains(_dc)); /* même libellé que buyTech */ }catch(e){}
   render();
 }
 /* ═══ LE SUR-TITRE DE LA FENÊTRE PARTAGÉE `#dyson-modal` (30/09) ═══
@@ -4344,6 +4346,10 @@ function showAiDysonModal(aiId,cb){
       null, (ans)=>{ aiDysonDecide(!!(ans&&ans.war)); });
     return;
   }
+  /* Sphère achetée par un ordinateur PENDANT les actions (solo local) : la partie s'arrête jusqu'à ta réponse.
+     Sans cela les ordinateurs continuaient et la fin de tour ouvrait la paix/guerre PAR-DESSUS cette
+     question (partie lente du 03/10, §197). */
+  if(!cb&&G&&G._il&&G.phase==='actions'){ G._ilPaused=true; cb=function(){ G._ilPaused=false; setTimeout(interleaveStep,40); }; }
   _dysonKicker(t('ui.sphere_de_dyson','Sphère de Dyson'));
   document.getElementById('dyson-title').textContent=t('dyson.adverse_titre','⚡ {n} a construit la Sphère de Dyson !',{n:(ai?ai.civ.emoji+' '+ai.civ.name:J('techs.une_ia','Une IA'))});
   document.getElementById('dyson-sub').innerHTML=t('dyson.adverse_sub','Monopole énergétique adverse. Accepte (+3<i class=ri-energy></i>/tour) ou refuse (= guerre).');
@@ -4725,6 +4731,10 @@ function stEspionnageRecu(ans, civId){
     if(rest.length) return;
   }
   d.espRestants=null;
+  /* Le résultat de TON espionnage s'affiche juste après ton choix, avant le bilan (Marc, 03/10) —
+     il attendait le premier coup d'un ordinateur au tour suivant. Solo local seulement. */
+  if(!_decisionActive()&&_aUnEcran()&&G._ilPlayerHits&&G._ilPlayerHits.length&&typeof document!=='undefined'&&document.body&&typeof document.body.insertAdjacentHTML==='function'){
+    G._hitsSuite=stBilanDeTour; _showPlayerHitModal(); return; }
   stBilanDeTour();
 }
 /* Fenêtre SOLO. En ligne, online.js rend la même charge utile. */
@@ -6691,6 +6701,10 @@ function _rappelPouvoirDiffere(){
 function interleaveStep(){
   if(G._ilPaused) return;
   _perspectiveSoloGarde('pas');
+  /* Les avis arrivés AVANT le prochain coup (début de tour : ordre du tour, pirates ; fin du coup du joueur)
+     s'affichent maintenant, avant que quiconque ne joue — plus « après le premier coup d'un ordinateur ». */
+  if(_aUnEcran()&&G._ilPlayerHits&&G._ilPlayerHits.length&&!(typeof _spectateurSolo==='function'&&_spectateurSolo())&&typeof document!=='undefined'&&document.body&&typeof document.body.insertAdjacentHTML==='function'){
+    G._ilPaused=true; _showPlayerHitModal(); return; }
   try{ clearTimeout(G._playerStuckWatch); }catch(e){}   // ça avance → désarmer le chien de garde
   let guard=0;
   while(guard++ < 60){
@@ -7793,6 +7807,8 @@ function buyTech(cardId, nation){
      savoir. Maintenant la question part au moment de l'achat ; le +3⚡ compte dès le revenu du
      tour même. Le drapeau reste pour l'ancien cerveau (`tryTech`) et pour les simulations, où l'on
      ne pose aucune vraie question (le plateau est remis en place juste après). */
+  /* Le BÂTISSEUR a sa ligne au journal (Marc, 03/10 : il ne lisait que « +3/tour » — la part des autres). */
+  if(card.id==='dyson3') addLog(J('journal.dyson_batisseur','{emoji} {nation} — Sphère de Dyson : +5<i class=ri-energy></i>/tour (bâtisseur)',{emoji:_n.civ.emoji,nation:_i18nRef(_n.civ,'name')}),'gold');
   if(card.id==='dyson3'&&_n._isAI){
     if(G._simulationIA)G._aiDysonBuilt=_n.civ.id;
     else dysonDemanderAuxAutres(_n.civ.id);
@@ -8341,6 +8357,10 @@ function confirmRouteToken(deploy){
   document.getElementById('route-token-modal').classList.add('hidden');
   if(deploy&&_pendingRouteObj&&G.player.forceTokens>0){
     _pendingRouteObj.tokens=1;G.player.forceTokens--;
+    /* Le jeton posé figure sur la ligne de la route au rapport, comme pour l'ordinateur (audit du 03/10, §199). */
+    try{ const _jr=(G._journal||[]).slice().reverse().find(e=>e&&!e.auto&&e.turn===G.turn&&e.nat===G.player.civ.name&&/Route/.test(e.name||''));
+      if(_jr){ _jr.cost=Object.assign({},_jr.cost,{force:1}); _jr.gain=_riToText(J('action.1_deploye','1⚔️ déployé')); }
+      const _ta=(G.turnActions||[])[G.turnActions.length-1]; if(_ta&&_ta.resPaid) _ta.resPaid=Object.assign({},_ta.resPaid,{force:1}); }catch(e){}
     addLog(J('journal.jeton_deploye_route','⚔️ Jeton déployé sur route {nom}→{nom2}',{nom:_i18nRef(NODES[_pendingRouteObj.from],'name'),nom2:_i18nRef(NODES[_pendingRouteObj.to],'name')}),'green');
     updateConnections(G.player);
   }else if(!deploy&&_pendingRouteObj){
@@ -8665,20 +8685,30 @@ function doRaidTarget(aiId,nodeId,pillard){
          avant qu'une partie ne le fasse. On convertit donc en texte AVANT l'envoi (`_riToText`).
          Le pillard, lui, passe par un bandeau qui rend le HTML : il garde ses icônes. */
       if(!target._isAI) _emitNotice('raid_result', target,
-        {title:J('avis.te_pille_2','⚠️ {emoji} {nation} te pille',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name')}),
-         butin:'', perte:true,
-         body:J('avis.tension_envers_monte_2','{v} Ta tension envers {nation} monte de 3.',{v:(stolen.length?J('avis.perds','Tu perds {v}.',{v:_butinEnMots(stolen)}):J('avis.rien_prendre_coffres_etaient_vides','Rien à prendre — tes coffres étaient vides.')),nation:_i18nRef(p.civ,'name')})}, 'stRien');
+        (function(){ const a=_avisPillage(p,_nomCol,stolen,J('avis.tension_plus_3','Tension +3.'));
+          return {title:p.civ.emoji+' '+a.titre, butin:'', perte:true, body:a.corps}; })(), 'stRien');
     }else{ if(p===G.player&&!p._isAI) _raidResultatFenetre(p,target,_nomCol,stolen,tc); }
     if(!_decisionActive()&&!target._isAI&&typeof notifyNationHit==='function'){
       /* SOLO LOCAL (l'appli) : même avis que celui de l'ancienne enveloppe — « X te pille », en
          rouge (« attaqué par »), affiché dès que l'ordinateur a fini son coup. Il manquait ici. */
-      notifyNationHit(target,J('avis.te_pille','{nation} te pille',{nation:_i18nRef(p.civ,'name')}),
-        J('avis.production_pillee','{v} La production de {col} ne rentrera pas ce tour. Tension +3.',{v:(stolen.length?J('avis.perds','Tu perds {v}.',{v:_butinEnMots(stolen)}):J('avis.rien_prendre_coffres_etaient_vides','Rien à prendre — tes coffres étaient vides.')),col:(_nomCol||'?')}),'coup');
+      { const a=_avisPillage(p,_nomCol,stolen,J('avis.tension_plus_3','Tension +3.')); notifyNationHit(target,a.titre,a.corps,'coup'); }
     }
     render();
   }catch(e){console.error('doRaidTarget',e);}
 }
 
+/* ═══ AVIS DE PILLAGE À LA VICTIME (Marc, 03/10 : « ça dit pas quelle colonie est pillée ») ═══
+   Une seule formule pour les trois portes (en ligne, solo local, ancienne voie de l'IA) :
+   titre « Ceinturiens pillent Io », corps « Tu perds +1 énergie sur ton prochain revenu. Tension +3. » */
+function _avisPillage(pillard,nomCol,stolen,suite){
+  const nation=_i18nRef(pillard.civ,'name');
+  const titre=nomCol?J('avis.pillent_colonie','{nation} pillent {col}',{nation:nation,col:nomCol})
+                    :J('avis.te_pille','{nation} te pille',{nation:nation});
+  const perte=(stolen&&stolen.length)?J('avis.perte_prochain_revenu','Tu perds {v} sur ton prochain revenu.',{v:_butinEnMots(stolen)})
+             :(nomCol?J('avis.rien_a_prendre_colonie','Rien à prendre : {col} ne produisait rien.',{col:nomCol})
+                     :J('avis.raid_sans_butin','Raid sans butin.'));
+  return {titre:titre, corps:perte+(suite?' '+suite:'')};
+}
 /* ═══ LE RÉSULTAT DU RAID S'AFFICHE (Marc, 03/10 : « le résultat du raid, qui s'affiche toujours pas ») ═══
    En ligne, la notice `raid_result` le montre ; en solo, depuis le retrait du bandeau de gain (30/09),
    le pillard ne voyait plus rien que le journal. Une fenêtre, réductible, fermée par « Continuer » ;
@@ -13180,8 +13210,10 @@ function _doAITurnInterne(aiPlayer,oneShot){
        il serait resté en arrière du raid humain, qui vient de passer au vol de production. Une même
        règle, un même calcul, pour les deux camps. Le renseignement adverse (`intel_1`) protège
        toujours : il divise le butin par deux, l'IA Défensive l'annule (traité plus haut). */
+    let _ncPille=null;   // nom de la colonie pillée, pour l'avis à la victime (03/10)
     {
       const _b=butinDeRaid(_e,null), _pris={};
+      if(_b.col) _ncPille=(NODES[_b.col.nodeId]&&_i18nRef(NODES[_b.col.nodeId],'name'))||_b.col.nodeId;
       for(const _k in _b.butin){
         const _q=(maxSteal===1)?Math.ceil(_b.butin[_k]/2):_b.butin[_k];   // Drones Surveillance : moitié
         if(_q<=0)continue;
@@ -13206,7 +13238,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
     const _vic=(_e===G.player&&!G.player._isAI?J('ui.perds','Tu perds'):J('ui.nation_perd','{emoji} {nation} perd',{emoji:_e.civ.emoji,nation:_i18nRef(_e.civ,'name')}));
     addLog(J('journal.raid_risque_guerre_2_tension_2','🤖 Raid de {emoji} {nation} ! {vic} {v} (risque guerre +2, tension +2)',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),vic:_vic,v:(stolen.join('')||J('journal.rien_coffres_vides',"rien — coffres vides"))}),'red');
     G.aiActions.push(_i18nAplatir({emoji:'⚔️',name:J('action.raid_2','Raid'),desc:J('action.vole','Vole : {v}',{v:stolen.join('')||'rien'})}));
-    notifyNationHit(_e,J('avis.te_pille','{nation} te pille',{nation:_i18nRef(ai.civ,'name')}),J('avis.risque_guerre_2_tension_2','{v} Risque de guerre +2, tension +2.',{v:(stolen.length?J('avis.ils_volent',"Ils volent {v}.",{v:_riToText(stolen.join(' '))}):J('avis.raid_sans_butin',"Raid sans butin."))}),'coup');
+    { const a=_avisPillage(ai,_ncPille,stolen,J('avis.risque_guerre_2_tension_2_seul','Risque de guerre +2, tension +2.')); notifyNationHit(_e,a.titre,a.corps,'coup'); }
     return true;
   }
 
@@ -14126,7 +14158,31 @@ function buildJournalReport(){
   try{ for(const l of _analyseTexte())L.push(l); }catch(e){}
   return L.join('\n');
 }
-function buildFullLog(){ return buildJournalReport(); }
+/* ═══ LE JOURNAL EXPORTÉ = LE JOURNAL VU (Marc, 03/10) ═══
+   « Copier le log doit copier exactement ce qui est visible dans le journal. » `buildFullLog` rendait le RAPPORT de
+   partie (une ligne par action, VP, analyses) : les lignes de détail du journal (partages, découvertes, avis…) n'y
+   étaient pas. On lit désormais le journal AFFICHÉ (`#log-content`, solo comme en ligne), sinon son rendu
+   `_journalHTML(G.log)` — mêmes lignes, même ordre (le plus récent en haut), mêmes filtres. Le rapport de partie
+   reste `buildJournalReport` (joint au rapport de bug). */
+function journalTexteVisible(){
+  let html='';
+  try{ const el=(typeof document!=='undefined'&&document.getElementById)?document.getElementById('log-content'):null; if(el&&el.innerHTML&&el.innerHTML.trim()) html=el.innerHTML; }catch(e){}
+  if(!html){ try{ html=_journalHTML(G.log||[]); }catch(e){ html=''; } }
+  const RI={energy:t('res.energie','énergie'),materials:t('res.materiaux','matériaux'),science:t('res.science','science'),morale:t('res.moral','moral')};
+  let s=String(html)
+    .replace(/<i[^>]*class=["']?ri-(energy|materials|science|morale)["']?[^>]*>\s*<\/i>/g,(m,k)=>' '+RI[k]+' ')
+    .replace(/<img[^>]*alt="([^"]*)"[^>]*>/g,'$1')
+    .replace(/<div class="log-tour"[^>]*>([\s\S]*?)<\/div>/g,'\n\n=== $1 ===')
+    .replace(/<div class="log-e[^"]*log-sous[^"]*"[^>]*>/g,'\n      ')
+    .replace(/<div class="log-e[^"]*"[^>]*>/g,'\n')
+    .replace(/<br\s*\/?>/g,'\n').replace(/<[^>]+>/g,'')
+    .replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&');
+  s=s.split('\n').map(l=>l.replace(/[ \t]+/g,' ').replace(/\s+$/,'').replace(/^ (?=\S)/,'')).join('\n').replace(/\n{3,}/g,'\n\n').trim();
+  let tete='SOLAR — JOURNAL';
+  try{ tete+=' — '+(G.player?G.player.civ.name+' ('+t('commun.toi','toi')+')':'')+' — '+t('journal.tour','Tour {n}',{n:G.turn})+'/10 — '+new Date().toLocaleString()+(typeof SOLAR_BUILD_MOTEUR!=='undefined'?' — '+SOLAR_BUILD_MOTEUR:''); }catch(e){}
+  return tete+'\n\n'+s+'\n';
+}
+function buildFullLog(){ return journalTexteVisible(); }
 // Couleur fixe d'une nation (même couleur qu'en jeu, via civ.color) à partir de son nom.
 function _natColorByName(name){
   try{for(const p of [G.player,...(G.ais||[])]){if(p&&p.civ&&p.civ.name===name)return p.civ.color;}}catch(e){}
@@ -14333,6 +14389,14 @@ function copyLogText(){
    (ordinateur), avec l'avertissement d'avant. Banc : pw_parcours_appli (§ fin). */
 function emailLog(){
   const full=buildFullLog();
+  /* PAS DE PARTAGE DISPONIBLE (WebView de l'appli Android, certains navigateurs d'ordinateur) : plus JAMAIS de
+     `mailto:` avec tout le journal dans l'adresse — c'est ce qui bloquait l'envoi (Marc, 03/10). Dans l'appli : la
+     fenêtre « Envoyer le rapport » (le serveur reçoit tout et l'envoie par courriel) ; ailleurs : fichier .txt. */
+  if(typeof navigator==='undefined'||!navigator.share){
+    const _app=!!(typeof window!=='undefined'&&window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
+    if(_app&&typeof scDiagOuvrir==='function'){ scDiagOuvrir(false); return; }
+    downloadLog(); return;
+  }
   const sujet=t('log.sujet_email','Solar — log de partie');
   try{
     if(typeof navigator!=='undefined'&&navigator.share){
@@ -15508,8 +15572,10 @@ function _costToText(cost){
 function _journalAdd(civObj,name,ac,cost,gain,opts){
   opts=opts||{};
   if(!G)return;if(!G._journal)G._journal=[];
+  let _gain=_riToText(gain);
+  try{ const _dn=civObj&&civObj._decNote; if(_dn&&_dn.turn===G.turn&&_riToText(name).indexOf(_dn.node)>=0){ _gain=(_gain?_gain+' · ':'')+_dn.txt; civObj._decNote=null; } }catch(e){}
   G._journal.push({turn:G.turn||0,nat:(civObj&&civObj.civ&&civObj.civ.name)||String(civObj||'Système'),
-    name:name,ac:ac||0,cost:_normCost(cost),gain:_riToText(gain),war:!!opts.war,auto:!!opts.auto});
+    name:name,ac:ac||0,cost:_normCost(cost),gain:_gain,war:!!opts.war,auto:!!opts.auto});
 }
 // Résolution automatique attribuée à UNE nation (nat = nom de la nation concernée).
 function _journalAuto(nat,name,gain,war){
@@ -15589,6 +15655,15 @@ function appliquerDecouverte(){
     if(disc.force)p.forceTokens+=disc.force;
     if(disc.vp)gagnerVP(p,disc.vp,J('vp.decouverte','Découverte : {nom}',{nom:_i18nRef(disc,'name')}));
     logAuteur(p,()=>addLog(J('journal.decouverte','🗺️ Découverte : {nom} — {v}',{nom:_i18nRef(disc,'name'),v:_i18nRef(disc,'desc')}),'gold'));
+    /* LE GAIN DE LA DÉCOUVERTE SUR LA LIGNE DE COLONISATION DU RAPPORT (audit du 03/10, §199) : sans lui, une colonisation
+       dont la découverte rend +2 matériaux paraissait « non prélevée ». Joueur : la ligne existe déjà ; ordinateur : elle
+       s'écrit après le coup (`_journalAdd` lit `_decNote`). */
+    try{ const _g=[]; if(disc.res)for(const[r,a]of Object.entries(disc.res))if(a)_g.push('+'+a+' '+(_RESNAME[r]||r)); if(disc.force)_g.push('+'+disc.force+' '+_RESNAME.force);
+      if(disc.rGain)for(const[r,a]of Object.entries(disc.rGain))if(a)_g.push('+'+a+' '+(_RESNAME[r]||r)+'/tour'); if(disc.vp)_g.push('+'+disc.vp+' VP');
+      const _txt=_riToText(J('rapport.decouverte','découverte {nom}{v}',{nom:_i18nRef(disc,'name'),v:(_g.length?' : '+_g.join(' '):'')}));
+      const _nn=(NODES[nodeId]&&NODES[nodeId].name)||nodeId;   // le rapport est écrit avec les noms français (`_nomFr`)
+      const _je=(G._journal||[]).slice().reverse().find(e=>e&&!e.auto&&e.turn===G.turn&&e.nat===p.civ.name&&String(e.name||'').indexOf(_nn)>=0);
+      if(_je) _je.gain=(_je.gain?_je.gain+' · ':'')+_txt; else p._decNote={turn:G.turn,node:_nn,txt:_txt}; }catch(e){}
     if(!_local)return;   // l'ordinateur : ni fenêtre, ni confirmation à armer
     /* ═══ LE COLONISATEUR VOIT CE QU'IL A GAGNÉ (Marc, 21/09) ═══
        En ligne, la fenêtre « Découverte » n'existe que dans le DOM factice du serveur : `_postAction`
@@ -17360,9 +17435,23 @@ function _showPlayerHitModal(){
   /* Sans vrai DOM (bac à sable des bancs, serveur) il n'y a rien à afficher — les pirates frappent
      désormais au début du tour, dans `startInterleaved`, un chemin que les bancs sans écran empruntent. */
   if(typeof document==='undefined'||!document.body||typeof document.body.insertAdjacentHTML!=='function')return;
-  const hits=(G&&G._ilPlayerHits)||[];
-  if(!hits.length){return;}
+  const tous=(G&&G._ilPlayerHits)||[];
+  if(!tous.length){return;}
   const old=document.getElementById('sc-attack-notice');if(old)old.remove();
+  /* ═══ UNE FENÊTRE À LA FOIS, DANS L'ORDRE (Marc, 03/10 — partie lente, §196) ═══
+     1) Si une autre fenêtre est ouverte (investissements activés, bilan, stratégie…), on attend qu'elle
+        soit fermée : plus deux fenêtres l'une sur l'autre.
+     2) On n'affiche que la première SÉRIE de même nature : des nouvelles (ordre du tour, espionnage
+        réussi, accord) ne se mélangent plus aux coups (« On t'attaque ») ; la série suivante s'ouvre
+        après « Compris », dans l'ordre où les choses sont arrivées. */
+  if(typeof _scAnyModalOpen==='function'&&_scAnyModalOpen()){
+    if(!G._hitsAttente){ G._hitsAttente=true; setTimeout(function(){ G._hitsAttente=false; _showPlayerHitModal(); },300); }
+    return;
+  }
+  const _coup=h=>!!(h&&h.genre==='coup');
+  let _n=1; while(_n<tous.length&&_coup(tous[_n])===_coup(tous[0])) _n++;
+  G._hitsAffiches=_n;
+  const hits=tous.slice(0,_n);
   /* Blason B (Marc, 15/09) : « attaqué par NATION » en rouge, même famille que les fenêtres de guerre. */
   if(typeof fenAttaques==='function'){
     document.body.insertAdjacentHTML('beforeend','<div id="sc-attack-notice" style="position:fixed;inset:0;background:rgba(4,4,18,.86);z-index:650;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:48px 10px 10px">'
@@ -17384,7 +17473,9 @@ function _showPlayerHitModal(){
 }
 function _ackPlayerHits(){
   const e=document.getElementById('sc-attack-notice');if(e)e.remove();
-  if(G)G._ilPlayerHits=[];
+  if(G&&G._ilPlayerHits){ G._ilPlayerHits.splice(0,G._hitsAffiches||G._ilPlayerHits.length); G._hitsAffiches=0; }
+  if(G&&G._ilPlayerHits&&G._ilPlayerHits.length){ _showPlayerHitModal(); return; }   // série suivante
+  if(G&&G._hitsSuite){ const f=G._hitsSuite; G._hitsSuite=null; f(); return; }        // suite d'un flux (fin de tour)
   if(G&&G._il){ G._ilPaused=false; if(typeof interleaveStep==='function') setTimeout(interleaveStep,40); }
 }
 /* ============================================================ SVG SETUP ============================================================ */

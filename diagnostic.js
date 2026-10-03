@@ -31,8 +31,8 @@
    ========================================================================== */
 (function(){
   'use strict';
-  const CLE='sc_debug', MAX_OCTETS=200*1024, MAX_ERREURS=30, MAX_FIL=40, MAX_FIGEAGES=10, MAX_JOURNAL=60*1024;
-  const MAX_ENVOI=300*1024;   // même plafond que le serveur : au-delà, il refuse
+  const CLE='sc_debug', MAX_OCTETS=200*1024, MAX_ERREURS=30, MAX_FIL=40, MAX_FIGEAGES=10, MAX_JOURNAL=400*1024;
+  const MAX_ENVOI=2*1024*1024;   // même plafond que le serveur (03/10 : 2 Mo — journal + rapport + état complet de la partie)
   const win=(typeof window!=='undefined')?window:{};
   let _D=null;
 
@@ -166,10 +166,26 @@
     const r={ v:1, envoye:_iso(), commentaire:String(commentaire||'').slice(0,2000),
               appareil:scDiagAppareil(), versions:scDiagVersions(), partie:scDiagEtatPartie(40),
               erreurs:d.erreurs.slice(), figeages:d.figeages.slice(), fil:d.fil.slice(), rapportCree:d.cree, dejaEnvoyes:d.envoyes||0 };
-    try{ if(typeof buildFullLog==='function'&&_g()&&_g().player){ let j=buildFullLog(); if(j.length>MAX_JOURNAL) j=j.slice(0,MAX_JOURNAL)+'\n… (tronqué)'; r.journal=j; } }catch(e){ r.journal='(journal indisponible : '+(e&&e.message)+')'; }
+    /* TOUS LES ÉLÉMENTS DE LA PARTIE (Marc, 03/10) : le journal EXACTEMENT comme affiché, le rapport de partie
+       (actions, VP, analyses) et l'état complet sérialisé (de quoi rejouer la situation). Au-delà du plafond,
+       on retire d'abord l'état, puis on raccourcit le rapport, enfin le journal. */
+    const cap=(x,n)=>{ x=String(x||''); return x.length>n?x.slice(0,n)+'\n… (tronqué)':x; };
+    try{ if(_g()&&_g().player){
+      if(typeof journalTexteVisible==='function') r.journal=cap(journalTexteVisible(),MAX_JOURNAL);
+      if(typeof buildJournalReport==='function') r.rapportPartie=cap(buildJournalReport(),MAX_JOURNAL);
+      if(typeof scSerialize==='function') r.etatPartie=scSerialize();
+    } }catch(e){ r.journal=r.journal||('(journal indisponible : '+(e&&e.message)+')'); }
     let txt=JSON.stringify(r);
-    if(txt.length>MAX_ENVOI){ r.journal=(r.journal||'').slice(0,MAX_JOURNAL/2)+'\n… (tronqué)'; r.erreurs=r.erreurs.slice(-10); txt=JSON.stringify(r); }
+    if(txt.length>MAX_ENVOI){ delete r.etatPartie; txt=JSON.stringify(r); }
+    if(txt.length>MAX_ENVOI){ r.rapportPartie=cap(r.rapportPartie,60*1024); txt=JSON.stringify(r); }
+    if(txt.length>MAX_ENVOI){ r.journal=cap(r.journal,200*1024); r.erreurs=r.erreurs.slice(-10); }
     return r;
+  }
+  function scDiagTexte(r){
+    return ['SOLAR — RAPPORT DE PROBLÈME', 'Commentaire : '+(r.commentaire||'(aucun)'),
+      'Appareil : '+JSON.stringify(r.appareil||{}), 'Versions : '+JSON.stringify(r.versions||{}),
+      'Erreurs : '+(r.erreurs||[]).length+' · Figeages : '+(r.figeages||[]).length, '',
+      r.journal||'(pas de journal)', '', r.rapportPartie||''].join('\n');
   }
   function scDiagUrl(){
     let ws='wss://live.solar-game.com';
@@ -191,7 +207,7 @@
     const intro=auto
       ? t('diag.intro_auto','L\'application semble s\'être arrêtée anormalement lors de la dernière partie.')
       : t('diag.intro_manuel','Un problème dans le jeu ? Décris-le en quelques mots ; le rapport technique est joint.');
-    const texte=t('diag.texte','Ce rapport aide à corriger les défauts du jeu. Il contient : le modèle de votre appareil et la version de son système, la version de l\'application, le journal de la partie en cours et les messages d\'erreur techniques.\n\nIl ne contient ni votre nom, ni votre adresse, ni vos contacts, ni votre position, ni aucun identifiant publicitaire. Il n\'est envoyé que si vous appuyez sur Envoyer, il sert uniquement à corriger le jeu et il est supprimé une fois le défaut traité.');
+    const texte=t('diag.texte','Ce rapport aide à corriger les défauts du jeu. Il contient : le modèle de votre appareil et la version de son système, la version de l\'application, le journal et l\'état complet de la partie en cours, et les messages d\'erreur techniques.\n\nIl ne contient ni votre nom, ni votre adresse, ni vos contacts, ni votre position, ni aucun identifiant publicitaire. Il n\'est envoyé que si vous appuyez sur Envoyer, il sert uniquement à corriger le jeu et il est supprimé une fois le défaut traité.');
     const lien=t('diag.lien_confidentialite','Politique de confidentialité');
     const paras=String(texte).split(/\n{2,}/).map(function(b){ return '<p style="margin:0 0 10px">'+_esc(b).replace(/\n/g,'<br>')+'</p>'; }).join('');
     const btn='min-height:44px;border-radius:9px;font-weight:700;font-size:.93em;cursor:pointer;padding:0 10px';
@@ -199,18 +215,17 @@
       +'<div role="dialog" aria-modal="true" aria-labelledby="sc-diag-t" style="background:#0d1128;border:2px solid #39569c;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.7);max-width:460px;width:100%;max-height:calc(100dvh - 28px);display:flex;flex-direction:column">'
         +'<div id="sc-diag-t" style="font-family:var(--font-titre);font-size:.82em;letter-spacing:.06em;color:#cfe0ff;padding:14px 16px 8px">'+_esc(titre)+'</div>'
         +'<div style="padding:0 16px;overflow:auto;font-size:.92em;color:#c3cde6;line-height:1.5">'
-          +'<p style="margin:0 0 10px;color:#ffd9a8">'+_esc(intro)+'</p>'+paras
-          +'<p style="margin:0 0 10px"><a href="'+_esc(t('diag.url_confidentialite','confidentialite.html'))+'" target="_blank" rel="noopener" style="color:#8fb6ff">'+_esc(lien)+'</a></p>'
-          +'<textarea id="sc-diag-com" rows="3" maxlength="2000" placeholder="'+_esc(t('diag.placeholder','Ce qui s\'est passé (facultatif)'))+'" style="width:100%;box-sizing:border-box;background:#0a0d22;border:1px solid #39569c;border-radius:8px;color:#e6ecff;padding:8px;font-size:16px"></textarea>'
-          +'<div id="sc-diag-apercu" style="display:none;margin-top:8px;max-height:180px;overflow:auto;background:#070a18;border:1px solid #2a3560;border-radius:8px;padding:8px;font:11px/1.35 monospace;color:#9fb0d0;white-space:pre-wrap;word-break:break-all"></div>'
-          +'<div id="sc-diag-etat" style="margin-top:8px;min-height:1.2em;font-size:.9em;color:#9fd0a0"></div>'
-        +'</div>'
-        +'<div style="display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px 14px">'
-          +'<button type="button" id="sc-diag-voir" style="'+btn+';flex:1;background:#141a36;border:1px solid #39569c;color:#cfe0ff">'+_esc(t('diag.voir','Voir ce qui sera envoyé'))+'</button>'
-          +'<button type="button" id="sc-diag-copier" style="'+btn+';flex:1;background:#141a36;border:1px solid #39569c;color:#cfe0ff">'+_esc(t('diag.copier','Copier le rapport'))+'</button>'
-          +'<button type="button" id="sc-diag-non" style="'+btn+';flex:1;background:#141a36;border:1px solid #39569c;color:#cfe0ff">'+_esc(t('diag.pas_maintenant','Pas maintenant'))+'</button>'
-          +(auto?'<button type="button" id="sc-diag-jamais" style="'+btn+';flex:1;background:#141a36;border:1px solid #39569c;color:#9898b8">'+_esc(t('diag.ne_plus_proposer','Ne plus proposer'))+'</button>':'')
-          +'<button type="button" id="sc-diag-oui" style="'+btn+';flex:2;background:#16401a;border:1px solid #2f6b34;color:#bff3cf">'+_esc(t('diag.envoyer','Envoyer'))+'</button>'
+          /* 03/10 (Marc) : la description EN HAUT, puis les trois boutons, puis les explications. */
+          +'<p style="margin:0 0 8px;color:#ffd9a8">'+_esc(intro)+'</p>'
+          +'<textarea id="sc-diag-com" rows="4" maxlength="2000" placeholder="'+_esc(t('diag.placeholder','Ce qui s\'est passé (facultatif)'))+'" style="width:100%;box-sizing:border-box;background:#0a0d22;border:1px solid #39569c;border-radius:8px;color:#e6ecff;padding:8px;font-size:16px"></textarea>'
+          +'<div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px">'
+            +'<button type="button" id="sc-diag-non" style="'+btn+';flex:1;background:#141a36;border:1px solid #39569c;color:#cfe0ff">'+_esc(t('diag.retour','Retour'))+'</button>'
+            +'<button type="button" id="sc-diag-copier" style="'+btn+';flex:1.4;background:#141a36;border:1px solid #39569c;color:#cfe0ff">'+_esc(t('diag.copier','Copier le rapport'))+'</button>'
+            +'<button type="button" id="sc-diag-oui" style="'+btn+';flex:1.6;background:#16401a;border:1px solid #2f6b34;color:#bff3cf">'+_esc(t('diag.envoyer_rapport','Envoyer le rapport'))+'</button>'
+          +'</div>'
+          +'<div id="sc-diag-etat" style="margin:4px 0 10px;min-height:1.2em;font-size:.9em;color:#9fd0a0"></div>'
+          +paras
+          +'<p style="margin:0 0 12px"><a href="'+_esc(t('diag.url_confidentialite','confidentialite.html'))+'" target="_blank" rel="noopener" style="color:#8fb6ff">'+_esc(lien)+'</a></p>'
         +'</div>'
       +'</div></div>';
   }
@@ -222,15 +237,13 @@
     const dire=(m,rouge)=>{ if(etat){ etat.textContent=m; etat.style.color=rouge?'#ff9a8a':'#9fd0a0'; } };
     const b=id=>document.getElementById(id);
     if(b('sc-diag-non')) b('sc-diag-non').onclick=fermer;
-    if(b('sc-diag-jamais')) b('sc-diag-jamais').onclick=function(){ const d=scDiagCharger(); d.nePlusProposer=true; d.nonEnvoye=false; scDiagSauver(); fermer(); };
-    if(b('sc-diag-voir')) b('sc-diag-voir').onclick=function(){ const a=b('sc-diag-apercu'); if(!a)return; a.style.display=a.style.display==='none'?'block':'none'; if(a.style.display==='block'){ try{ a.textContent=JSON.stringify(scDiagRapport(com()),null,1); }catch(e){ a.textContent=String(e); } } };
-    if(b('sc-diag-copier')) b('sc-diag-copier').onclick=async function(){ try{ await navigator.clipboard.writeText(JSON.stringify(scDiagRapport(com()),null,1)); dire(t('diag.copie','✅ Rapport copié — colle-le dans un message.')); }catch(e){ dire(t('diag.copie_impossible','⚠️ Copie impossible sur cet appareil.'),true); } };
+    if(b('sc-diag-copier')) b('sc-diag-copier').onclick=async function(){ try{ await navigator.clipboard.writeText(scDiagTexte(scDiagRapport(com()))); dire(t('diag.copie','✅ Rapport copié — colle-le dans un message.')); }catch(e){ dire(t('diag.copie_impossible','⚠️ Copie impossible sur cet appareil.'),true); } };
     if(b('sc-diag-oui')) b('sc-diag-oui').onclick=async function(){
       const bo=b('sc-diag-oui'); bo.disabled=true; dire(t('diag.envoi','Envoi…'));
       try{ await scDiagEnvoyer(com()); dire(t('diag.envoye','✅ Merci, le rapport est envoyé.')); setTimeout(fermer,1400); }
       catch(e){ bo.disabled=false; dire(t('diag.echec','⚠️ Envoi impossible ({e}). Tu peux copier le rapport et l\'envoyer par message.',{e:(e&&e.message)||'réseau'}),true); }
     };
-    boite.onclick=function(e){ if(e.target===boite) fermer(); };
+    /* « Retour » ferme la fenêtre et rien d'autre ; un toucher hors de la fenêtre ne ferme plus (fausse manœuvre). */
   }
   /* À l'ouverture : proposer si quelque chose d'anormal attend, une fois, et jamais pendant le tutoriel. */
   function scDiagProposerSiBesoin(){

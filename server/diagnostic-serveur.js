@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const MAX_OCTETS = 300 * 1024;   // le client se plafonne au même chiffre
+const MAX_OCTETS = 2 * 1024 * 1024;   // le client se plafonne au même chiffre (03/10 : journal + rapport + état complet)
 const MAX_FICHIERS = 200;        // au-delà : 429, on ne remplit pas le disque
 
 /* Vérifie le corps et rend {ok, rapport} ou {ok:false, statut, raison}. */
@@ -86,6 +86,8 @@ function courriel(r, id, base) {
   if (!err.length) L.push('aucune');
   if (r.fil && r.fil.length) L.push('', '── DERNIÈRES ACTIONS DE L\'INTERFACE ──', r.fil.slice(-30).join(' · '));
   L.push('', '── JOURNAL DE LA PARTIE ──', (r.journal && String(r.journal).trim()) ? String(r.journal) : '(aucun journal : rapport envoyé hors partie)');
+  L.push('', '── RAPPORT DE PARTIE ──', (r.rapportPartie && String(r.rapportPartie).trim()) ? String(r.rapportPartie) : '(aucun)');
+  L.push('', 'État complet de la partie : ' + (r.etatPartie ? 'dans la pièce jointe .json (champ etatPartie)' : 'non joint'));
   L.push('', 'Tous les rapports, avec leur contenu : ' + (base || '') + '/stats (section « Rapports de diagnostic »).');
   const pieces = [{ filename: id + '.json', content: JSON.stringify(r, null, 1), contentType: 'application/json' }];
   return { sujet, texte: L.join('\n'), pieces };
