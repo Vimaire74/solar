@@ -1560,6 +1560,10 @@ window.SOLAR_LANG_DICT = {
   "avis.colo_decouverte": "🗺️ Discovery: <b>{nom}</b> — {v}",
   "avis.colo_titre": "🚩 Colonisation successful",
   "vp.pacte_avec": "Non-aggression pact with {nation}",
+  "avis.capitale_prise_titre": "Well done — capital of the {nation} conquered",
+  "avis.capitale_prise_corps": "You gain +10 VP by conquering {nom}, capital of the {nation}. Careful: if it is retaken, you lose this gain.",
+  "avis.nation_eliminee_titre": "Well done — the {nation} are eliminated",
+  "avis.nation_eliminee_corps": "You took their last colony: the {nation} are out until the end of the game.",
   "vp.capitale_conquise": "Capital of {nation} conquered",
   "vp.capitale_perdue_bonus_repris": "Capital of {de} ({nom}) lost — bonus taken back",
   "vp.combat_gagne_contre": "Combat won against {nation}",
@@ -2370,4 +2374,6 @@ window.SOLAR_LANG_DICT = {
   "web.gain": "Gain",
   "journal.attaque_annulee_retour_choix_guerre": "↩️ Attack cancelled — back to the war choice.",
   "journal.attaque_annulee_rien_change": "↩️ Attack cancelled — nothing changed (no war, agreements and tensions intact).",
+  "fin.agenda_ok_gen": "Secret agenda condition met",
+  "fin.agenda_non_gen": "Secret agenda condition NOT met",
 };

@@ -16,11 +16,38 @@
      Le 01/10 il a été ramené de 84 Mo à 3,5 Mo (36 fichiers). Un fichier identique à ce qui est déjà
      en ligne n'a rien à faire ici ; une image ou un banc nouveau ou modifié, oui. -->
 
-## 📦 CE LOT EST EN **v11.40** · cache `sw.js` **v261** · 2026-10-03
+## 📦 CE LOT EST EN **v11.47** · cache `sw.js` **v268** · 2026-10-03
 
 > Pour savoir ce qui est EN LIGNE : ouvre solar-game.com, la version est écrite sur l'écran de
-> connexion. Si elle ne dit pas **v11.40**, l'envoi ou le redéploiement n'a pas pris.
+> connexion. Si elle ne dit pas **v11.47**, l'envoi ou le redéploiement n'a pas pris.
 > ⚠️ **Les DEUX ressources Coolify** doivent être redéployées : le site ET le serveur.
+
+**v11.47 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (estampille de moteur.js)
+- Fenêtres de combat : nouvelle icône d'attaque (chasseur martien) à la place de ⚔️.
+- Fenêtres de combat : nouvelle icône de défense (bouclier bleu) à la place de 🛡️, et devant « Défense possible ».
+- Nouveaux fichiers : assets/combat/attaque.png et assets/combat/defense.png.
+
+**v11.46 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js)
+- Sommet commercial (solo) : réponse des nations (signé / refusé) affichée tout de suite après l'offre, le tour attend « Compris ».
+- Proposition d'un ordinateur au joueur (accord, pacte) : le jeu s'arrête jusqu'à la réponse, au lieu de la montrer en fin de tour.
+
+**v11.45 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js)
+- Ordinateurs : IA Défensive notée 20 au lieu de 10, pour qu'ils la visent plus tôt.
+
+**v11.44 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js)
+- Fenêtre « Bravo » quand tu conquiers une capitale : +10 VP, perdus si elle est reprise.
+- Fenêtre « Bravo » quand tu élimines une nation (prise de sa dernière colonie).
+
+**v11.43 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js)
+- Coûts et gains toujours dans l'ordre de la barre du haut : énergie, matériaux, science, moral (techs, civiques, journal, rapports).
+
+**v11.42 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js)
+- Bilan de fin de tour : plus d'émojis décoratifs (restent ☠️ pour les pirates et la pastille des nations), titre sans 📊.
+
+**v11.41 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js) — `docs/REPRISE.md` §209
+- Exiger la paix contre un tribut (appli) : la réponse s'affiche tout de suite, avant la suite de la fin de tour.
+- Décompte final : l'agenda secret de chaque nation est écrit à côté de ses points d'agenda.
+- Choix de l'agenda secret : le prochain événement s'affiche en entier (libellé, puis texte dessous).
 
 **v11.40 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js) — `docs/REPRISE.md` §208
 - Ordinateurs : les technologies de rang 3 sont visées selon leur levier (IA Défensive 10, Hyperpropulsion 8, Sphère de Dyson 8, Télépathie 8, Terraformation 6, Éveil Collectif 6, Extra-Solaire 4).

@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-10-03 · v11.40';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-10-03 · v11.47';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -498,12 +498,12 @@ function showEotReal(pending){
     return parts.length?('<div class="eot-item"><span class="eot-name">'+lbl+' : '+parts.join(' ')+'</span></div>'):''; };
   const cout=[]; if(mt.energyCost)cout.push('−'+mt.energyCost+rE('energy')); if(mt.matCost)cout.push('−'+mt.matCost+rE('materials'));
   if(mt.routeEnergyCost)cout.push('routes −'+mt.routeEnergyCost+rE('energy'));
-  const ti=document.getElementById('eot-title'); if(ti)ti.textContent=t('web.bilan_tour','📊 Bilan du Tour {tour}',{tour:o.turn||''});
+  const ti=document.getElementById('eot-title'); if(ti)ti.textContent=String(t('web.bilan_tour','📊 Bilan du Tour {tour}',{tour:o.turn||''})).replace(/^\s*📊\s*/u,'');
   // Le serveur envoie le bilan COMPLET (construit par buildEOTBody dans index.html) : actions du tour,
   // entretien détaillé, revenus, une section par nation, guerre, pillages, pirates. On l'injecte tel quel
   // dans la vraie fenêtre — bilan rigoureusement identique au solo. Le résumé court ci-dessous ne sert
   // que de filet si un serveur plus ancien n'envoie pas le HTML.
-  if(body)body.innerHTML = o.html || (t('web.fin_tour_titre','<div class="eot-section"><h4>📊 Fin du tour {n}</h4>',{n:(o.turn||'')})
+  if(body)body.innerHTML = (o.html&&typeof _journalSansEmoji==='function'?_journalSansEmoji(o.html):o.html) || (t('web.fin_tour_titre','<div class="eot-section"><h4>📊 Fin du tour {n}</h4>',{n:(o.turn||'')})
     +li('Revenus',rv,'+')
     +(cout.length?t('web.entretien','<div class="eot-item"><span class="eot-name">Entretien : {v}</span></div>',{v:cout.join(' ')}):t('web.entretien_aucun','<div class="eot-item"><span class="eot-name">Entretien : aucun</span></div>'))
     +'</div>');
@@ -995,7 +995,7 @@ function showNotice(m){
      ferment simplement leur fenêtre. */
   if(k==='eot'){
     const em=document.getElementById('eot-modal'); if(!em) return;
-    const ti=document.getElementById('eot-title'); if(ti)ti.textContent=t('web.bilan_tour','📊 Bilan du Tour {tour}',{tour:o.turn||''});
+    const ti=document.getElementById('eot-title'); if(ti)ti.textContent=String(t('web.bilan_tour','📊 Bilan du Tour {tour}',{tour:o.turn||''})).replace(/^\s*📊\s*/u,'');
     const body=document.getElementById('eot-body'); if(body)body.innerHTML=o.html||'';
     const go=()=>em.classList.add('hidden');
     const btn=em.querySelector('.eot-btn'); if(btn){ btn.textContent=t('web.fermer','Fermer'); btn.onclick=go; }

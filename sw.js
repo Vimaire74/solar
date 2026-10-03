@@ -9,7 +9,7 @@
      interceptées, elles passent directement. Rien n'est mis en cache du serveur de jeu.
    - HORS-LIGNE : le solo reste jouable ; en navigation hors-ligne on sert index.html depuis le cache.
    Le numéro de version ci-dessous purge les anciens caches à chaque mise à jour du SW. */
-const VERSION = 'v261-2026-10-03';
+const VERSION = 'v268-2026-10-03';
 const HTML_CACHE = 'sc-html-' + VERSION;     // documents + scripts (network-first)
 const ASSET_CACHE = 'sc-assets-' + VERSION;  // images, icônes, PDF (cache-first)
 
@@ -31,6 +31,7 @@ const SHELL = [
   './assets/fonts/Exo2.woff2', './assets/fonts/Exo2-Italic.woff2', './assets/fonts/Michroma.woff2',
   './assets/fond_accueil_phone.jpg', './assets/fond_accueil_desk.jpg',
   /* Emblèmes des nations (01/10, v11.11) : les médailles les affichent ; hors ligne sans eux, image cassée. */
+  './assets/combat/attaque.png', './assets/combat/defense.png',
   './assets/nations/terriens_64.png', './assets/nations/terriens_128.png',
   './assets/nations/martiens_64.png', './assets/nations/martiens_128.png',
   './assets/nations/jupiteriens_64.png', './assets/nations/jupiteriens_128.png',

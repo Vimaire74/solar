@@ -27,6 +27,11 @@
 const fs = require('fs');
 const path = require('path');
 const RACINE = path.join(__dirname, '..');
+/* 03/10 (Marc) : chaque envoi = un dossier neuf (lot18, lot18-1, lot18-2…) — on vérifie le plus récent. */
+/* Le dossier d'envoi a été renommé « A uploader » (03/10) ; l'ancien nom reste accepté. */
+const _DOSSIER_ENVOI = ['A uploader', 'Pour uploader'].find(n => { try { return fs.statSync(path.join(RACINE, n)).isDirectory(); } catch (e) { return false; } }) || 'A uploader';
+const LOT = (() => { try { const d = fs.readdirSync(path.join(RACINE, _DOSSIER_ENVOI)).filter(n => /^lot18(-\d+)?$/.test(n));
+  d.sort((x, y) => (+(x.split('-')[1] || 0)) - (+(y.split('-')[1] || 0))); return d.pop() || 'lot18'; } catch (e) { return 'lot18'; } })();
 
 const ecarts = [];
 const ok = s => console.log('   ✔ ' + s);
@@ -104,7 +109,7 @@ console.log('\n4. Le lot de livraison porte les mêmes estampilles que les sourc
 {
   /* Le message d'erreur de Marc dit « renvoie les fichiers manquants » : le cas où l'on met à jour
      les sources mais où le lot uploadé garde les anciens fichiers est exactement celui-ci. */
-  const lot = f => { try { return fs.readFileSync(path.join(RACINE, 'Pour uploader', 'lot18', f), 'utf8'); } catch (e) { return null; } };
+  const lot = f => { try { return fs.readFileSync(path.join(RACINE, _DOSSIER_ENVOI, LOT, f), 'utf8'); } catch (e) { return null; } };
   const lHtml = estampille(lot('index.html'), /window\.SOLAR_BUILD_HTML\s*=\s*'([^']+)'/);
   const lJs   = estampille(lot('online.js'),  /const\s+SOLAR_BUILD_JS\s*=\s*'([^']+)'/);
   const lMot  = estampille(lot('moteur.js'),  /const\s+SOLAR_BUILD_MOTEUR\s*=\s*'([^']+)'/);
@@ -129,7 +134,7 @@ console.log('\n5. Les notices des lots annoncent la même version que le code');
      DE DÉCLARATION nommée (« CE LOT EST EN » ou « À UPLOADER »), et on lit la version dedans. */
   const NOTICES = [
     /* Lot 18 depuis le 30/09 : lot17 et lot17_maj sont des archives figées en v11.06, non vérifiées. */
-    path.join('Pour uploader', 'lot18', 'README.md')
+    path.join(_DOSSIER_ENVOI, LOT, 'README.md')
   ];
   const attenduV = (mot || '').split('·').pop().trim();
   const attenduSw = (sw || '').split('-')[0];

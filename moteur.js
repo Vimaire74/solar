@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.40';
+const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.47';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -626,6 +626,23 @@ const CIVIC_MARKET=[
    effect:'+1<i class=ri-morale></i>/tour, +10 pts Gouv. Entretien −2<i class=ri-materials></i> −2<i class=ri-energy></i>/tour.', desc:'Vote permanent sur mobile — légitimité forte, coût de communication.',
    govForm:{formPts:10,moralePerTurn:1,upkeep:{materials:2,energy:2}}, cost:{materials:3,energy:2,science:1}},
 ];
+/* ═══ UN SEUL ORDRE DES RESSOURCES, CELUI DE LA BARRE DU HAUT (Marc, 03/10) ═══
+   « Dans les tech, cet ordre change et quand on joue vite ça embrouille. » Les coûts et gains des cartes étaient écrits
+   dans un ordre libre ({materials:6,energy:3,…}) et affichés tels quels. On range ici, une fois, toutes les tables dans
+   l'ordre énergie → matériaux → science → moral (→ jetons), et `trierRes` sert aux objets construits en cours de partie. */
+const ORDRE_RES=['energy','materials','science','morale','force'];
+function trierRes(o){
+  if(!o||typeof o!=='object'||Array.isArray(o))return o;
+  const r={}; for(const k of ORDRE_RES)if(k in o)r[k]=o[k]; for(const k of Object.keys(o))if(!(k in r))r[k]=o[k]; return r;
+}
+(function(){
+  const champs=['cost','rGain','resGain','res','gain','contre'];
+  const ranger=x=>{ if(!x||typeof x!=='object')return; for(const c of champs)if(x[c]&&typeof x[c]==='object'&&!Array.isArray(x[c]))x[c]=trierRes(x[c]); if(x.active&&x.active.cost)x.active.cost=trierRes(x.active.cost); if(x.start)x.start=trierRes(x.start); };
+  try{ [CARDS_POOL,STRATEGY_CARDS,DISCOVERY_TILES,INVESTMENT_CARDS,INVESTMENT_CARDS_2,CIVIC_MARKET].forEach(l=>(l||[]).forEach(ranger)); }catch(e){}
+  try{ Object.keys(CIVS).forEach(k=>ranger(CIVS[k])); }catch(e){}
+  try{ Object.keys(NODES).forEach(k=>ranger(NODES[k])); }catch(e){}
+})();
+
 /* Gagnant d'un événement : meilleur sur la CONDITION ; égalité départagée par VP le plus bas, puis le plus de jetons Force. */
 function _evWinner(statFn){const allP=nationsEnJeu();let w=allP[0];for(const p of allP){const s=statFn(p),bs=statFn(w);if(s>bs)w=p;else if(s===bs&&p!==w){const dv=calcVP(p).total-calcVP(w).total;if(dv<0||(dv===0&&p.forceTokens>w.forceTokens))w=p;}}return w;}
 const EVENTS=[
@@ -1037,7 +1054,9 @@ function _evCommPick(aiId,propId){
      temps, `G.player` ne désigne plus celui dont on traite la réponse : deux réponses arrivant
      coup sur coup auraient été attribuées à la même nation. Il est donc passé explicitement. */
   const prop=(propId&&allPlayers().find(function(n){return n.civ.id===propId;}))||G.player;
-  const _suite=function(){ if(_serie)return; if(_simul)_accordsVerifierFin(); else _appelerSuite(done); };
+  /* Solo : les réponses (signé / refusé) s'affichent TOUT DE SUITE après l'offre, et la suite du tour
+     attend « Compris » (Marc, 03/10 — même remarque que pour le tribut, §209). */
+  const _suite=function(){ if(_serie)return; if(_simul)_accordsVerifierFin(); else _suiteApresAvisLocaux(function(){ _appelerSuite(done); }); };
   if(!aiId){addLog(J('journal.sommet_commercial_aucun_accord_signe','🤝 {emoji} {nation} — sommet commercial : aucun accord signé.',{emoji:prop.civ.emoji,nation:_i18nRef(prop.civ,'name')}),'dim');_suite();return;}
   const ai=(typeof allPlayers==='function'?allPlayers():G.ais).find(function(a){return a&&a.civ&&a.civ.id===aiId;});
   if(!ai){_suite();return;}
@@ -1110,8 +1129,8 @@ function _evCommPick(aiId,propId){
   const avis=accordAcceptable(ai,prop);
   if(!avis.ok){
     addLog(J('journal.refuse_accord','🤝 {emoji} {nation} REFUSE l\'accord de {emoji2} {nation2} — {v}.',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),emoji2:prop.civ.emoji,nation2:_i18nRef(prop.civ,'name'),v:avis.raison}),'red');
-    if(typeof _emitNotice==='function')_emitNotice('accord_result', prop,
-      {title:J('avis.accord_refuse','🤝 Accord refusé'), body:J('avis.refuse','{emoji} {nation} a refusé : {v}.',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),v:avis.raison})}, 'stRien');
+    { const _tt=J('avis.accord_refuse','🤝 Accord refusé'), _cc=J('avis.refuse','{emoji} {nation} a refusé : {v}.',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),v:avis.raison});
+      if(!_avisAccordSolo(prop,_tt,_cc)&&typeof _emitNotice==='function')_emitNotice('accord_result', prop, {title:_tt, body:_cc}, 'stRien'); }
     _suite();return;
   }
   _evAccordConclude(prop,ai);
@@ -2318,6 +2337,9 @@ function capturerNoeud(vainqueur, nodeId){
       if(!vainqueur._vpCapitales)vainqueur._vpCapitales={};
       vainqueur._vpCapitales[nodeId]=_i18nRef(perdant.civ,'name');   // une RÉFÉRENCE : relue dans la langue du lecteur (« capital of Martiens », 29BD)
       addLog(J('journal.empare_capitale_10_vp_tant_qu_tient','👑 {emoji} {nation} s\'empare de {nom}, CAPITALE de {emoji2} {nation2} — +10 VP (tant qu\'il la tient) !',{emoji:vainqueur.civ.emoji,nation:_i18nRef(vainqueur.civ,'name'),nom:nom,emoji2:perdant.civ.emoji,nation2:_i18nRef(perdant.civ,'name')}),'gold');
+      /* Fenêtre au conquérant humain (Marc, 03/10) : le +10 VP n'était dit que dans le journal. */
+      notifyNationHit(vainqueur,J('avis.capitale_prise_titre','Bravo — capitale des {nation} conquise',{nation:_i18nRef(perdant.civ,'name')}),
+        J('avis.capitale_prise_corps','Tu gagnes +10 VP en conquérant {nom}, capitale des {nation}. Attention : si elle est reprise, ton gain est perdu.',{nom:nom,nation:_i18nRef(perdant.civ,'name')}),'gain');
     }
     /* ═══ PRENDRE UNE COLONIE APAISE CELUI QUI LA PREND (Marc, 20/09, partie 2959) ═══
        « Si je prends leur capitale, je devrais descendre ma tension comme si j'avais gagné la
@@ -2346,6 +2368,9 @@ function capturerNoeud(vainqueur, nodeId){
     }
     if(estEliminee(perdant)){
       addLog(J('journal.aucune_colonie_nation_joue','🏳️ {emoji} {nation} n\'a plus aucune colonie : cette nation ne joue plus.',{emoji:perdant.civ.emoji,nation:_i18nRef(perdant.civ,'name')}),'gold');
+      /* Félicitations au joueur humain qui a pris la dernière colonie (Marc, 03/10). */
+      notifyNationHit(vainqueur,J('avis.nation_eliminee_titre','Bravo — les {nation} sont éliminés',{nation:_i18nRef(perdant.civ,'name')}),
+        J('avis.nation_eliminee_corps','Tu as pris leur dernière colonie : les {nation} ne jouent plus jusqu\'à la fin de la partie.',{nation:_i18nRef(perdant.civ,'name')}),'gain');
       /* ⚠️ ELLE REND LA MAIN À L'INSTANT, PAS AU DÉBUT DU TOUR SUIVANT (Marc, 10/09).
          `appliquerEliminations` ne tourne qu'à l'ouverture d'une manche : une nation vidée
          EN COURS de tour gardait ses AC et son `_passedRound=false`, et le tour de table
@@ -2567,7 +2592,7 @@ function getEffCost(card,p){
      annulé » ne fonctionnait donc pas sur Biosphère, Végétalisation ni Exploitations d'Astéroïdes,
      sans que rien ne l'explique au joueur. Corrigé le 26/08 (décision de Marc : compter les 21). */
   if(p.stratBonus&&p.stratBonus.spec==='strat_free_sci'&&card.branch&&c.science)c.science=0;
-  return c;
+  return trierRes(c);
 }
 /* Le plafond de moral n'est plus le même pour tout le monde : une forme de gouvernement autoritaire
    l'abaisse (Tyrannie 6, Domination des Corporations 7). Il est lu ICI plutôt qu'appliqué à
@@ -2628,7 +2653,7 @@ function surproductionVP(){
 function rEmoji(r){return{energy:'<i class=ri-energy></i>',materials:'<i class=ri-materials></i>',science:'<i class=ri-science></i>',morale:'<i class=ri-morale></i>',force:'⚔️'}[r]||r;}
 function rLabel(r){return{energy:t('res.energie','Énergie'),materials:t('res.materiaux','Matériaux'),science:t('res.savoir','Savoir'),morale:t('res.moral','Moral')}[r]||r;}
 function rHtml(r,amt){const cls={energy:'energy',materials:'materials',science:'science',morale:'morale',force:'force'}[r]||'';const e=rEmoji(r);return `<span class="res-tag ${cls}">${amt!=null?amt+' ':''}${e}</span>`;}
-function costHtml(cost){return Object.entries(cost).map(([r,a])=>rHtml(r,'-'+a)).join(' ');}
+function costHtml(cost){return Object.entries(trierRes(cost||{})).map(([r,a])=>rHtml(r,'-'+a)).join(' ');}
 /* ═══════════════════════════════════════════════════════════════════════════════════════════
    DISTANCES DE VOYAGE — UNE RÈGLE, PLUS SEULEMENT UN DESSIN (Marc et Laurent, 16/09)
    -------------------------------------------------------------------------------------------
@@ -3046,7 +3071,7 @@ function lireArbreTechnologique(){
    voit que ce qui se compte (production, VP, jetons) : ni l'immunité, ni l'exclusivité, ni l'avantage tactique, ni la
    pression diplomatique. La note (1-10) devient une prime : pleine sur l'achat du rang 3, partielle sur les rangs 1 et 2
    de la même branche tant que le rang 3 est encore libre (c'est la marche vers lui), décotée par l'horizon. */
-const LEVIER_T3={iadef3:10,hyper3:8,dyson3:8,tele3:8,terra3:6,eveil3:6,extra3:4};
+const LEVIER_T3={iadef3:20,   /* iadef3 doublé (Marc, 03/10 : « la prendre rapidement ») */ hyper3:8,dyson3:8,tele3:8,terra3:6,eveil3:6,extra3:4};
 const LEVIER_POIDS=0.9;                  // VP-équivalent par point de note, au premier tour (×horizon ensuite)
 function levierBranche(branche){
   const c=CARDS_POOL.find(x=>x&&x.tier===3&&x.branch===branche&&LEVIER_T3[x.id]);
@@ -6776,6 +6801,7 @@ function _rappelPouvoirDiffere(){
   };
   setTimeout(essai,300);
 }
+let _attenteQuestionTimer=null;
 function interleaveStep(){
   if(G._ilPaused) return;
   _perspectiveSoloGarde('pas');
@@ -6783,6 +6809,14 @@ function interleaveStep(){
      s'affichent maintenant, avant que quiconque ne joue — plus « après le premier coup d'un ordinateur ». */
   if(_aUnEcran()&&G._ilPlayerHits&&G._ilPlayerHits.length&&!(typeof _spectateurSolo==='function'&&_spectateurSolo())&&typeof document!=='undefined'&&document.body&&typeof document.body.insertAdjacentHTML==='function'){
     G._ilPaused=true; _showPlayerHitModal(); return; }
+  /* UNE PROPOSITION FAITE AU JOUEUR SE RÉPOND AVANT LA SUITE (Marc, 03/10) : un ordinateur lui propose
+     un accord ou un pacte → plus personne ne joue tant que la fenêtre n'a pas reçu sa réponse (le pilote
+     local la montre dès qu'aucune autre fenêtre n'est ouverte). Avant : la question attendait derrière
+     les coups suivants et n'apparaissait souvent qu'en fin de tour. */
+  if(_aUnEcran()&&!_decisionActive()&&Array.isArray(G._pendings)&&typeof window!=='undefined'&&typeof window.scAskLocalDecision==='function'
+     &&G._pendings.some(function(x){ return x&&x.id&&!x.notice&&x.nation&&x.nation===_civLocale(); })){
+    clearTimeout(_attenteQuestionTimer); _attenteQuestionTimer=setTimeout(interleaveStep,700); return;
+  }
   try{ clearTimeout(G._playerStuckWatch); }catch(e){}   // ça avance → désarmer le chien de garde
   let guard=0;
   while(guard++ < 60){
@@ -10278,7 +10312,35 @@ function verserTribut(cible,dem,t){
 /* Le joueur ne voyait RIEN : contre un ordinateur, la décision était appliquée et seule une ligne
    de journal en gardait trace (« je ne reçois pas de réponse »). On lui pose donc une fenêtre
    d'information, comme pour un accord refusé. */
-function _avisTribut(titre,corps){ try{ if(typeof _emitNotice==='function')_emitNotice('accord_result', G.player, {title:titre, body:corps}, 'stRien'); }catch(e){} }
+/* `suite` (03/10, Marc : « la réponse tarde, elle vient après plusieurs fenêtres du tour suivant ») : en solo local la
+   notice attendait le pilote, qui ne la montre que lorsque plus rien n'est ouvert — la fin de tour passait devant. On
+   montre maintenant la réponse TOUT DE SUITE, et la suite du flux attend « Compris ». En ligne : inchangé. */
+/* Avis d'accord au joueur local en solo : dans la file des avis (montrée par `_suiteApresAvisLocaux`),
+   pas dans le pilote local qui ne l'affichait qu'une fois toutes les fenêtres fermées. */
+function _avisAccordSolo(nation,titre,corps){
+  try{ if(nation&&nation===G.player&&!nation._isAI&&!_decisionActive()&&G._il){ _notePlayerHit(_i18nTexte(titre),_i18nTexte(corps),null); return true; } }catch(e){}
+  return false;
+}
+function _suiteApresAvisLocaux(fn){
+  try{
+    if(!_decisionActive()&&_aUnEcran()&&G&&G._il&&G._ilPlayerHits&&G._ilPlayerHits.length
+       &&typeof document!=='undefined'&&document.body&&typeof document.body.insertAdjacentHTML==='function'){
+      G._hitsSuite=fn; _showPlayerHitModal(); return;
+    }
+  }catch(e){}
+  fn();
+}
+function _avisTribut(titre,corps,suite){
+  try{
+    if(!_decisionActive()&&_aUnEcran()&&typeof document!=='undefined'&&document.body&&typeof document.body.insertAdjacentHTML==='function'&&G&&G._il){
+      if(!G._ilPlayerHits)G._ilPlayerHits=[];
+      G._ilPlayerHits.push({title:_i18nTexte(titre),body:_i18nTexte(corps),genre:null});
+      G._hitsSuite=(typeof suite==='function')?suite:null; _showPlayerHitModal(); return;
+    }
+    if(typeof _emitNotice==='function')_emitNotice('accord_result', G.player, {title:titre, body:corps}, 'stRien');
+  }catch(e){}
+  if(typeof suite==='function')suite();
+}
 function forcedWarDemandPeace(){
   document.getElementById('forced-war-modal').classList.add('hidden');
   const ai=G.warWith?G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0]:G.ais[0];
@@ -10294,8 +10356,8 @@ function forcedWarDemandPeace(){
   if(ai._isAI===false&&_decisionActive()){
     if(!t.possible){
       addLog(J('journal.quoi_payer_tribut_ou_guerre_continue','⚔️ {nom} n\'a pas de quoi payer le tribut ({tributpaix} en 🪨 ou ⚡) — la guerre continue.',{nom:nom,tributpaix:TRIBUT_PAIX}),'red');
-      _avisTribut(J('avis.exigence_paix','🕊️ Exigence de paix'), J('avis.ressources_tribut_guerre_continue','{nom} n\'a pas les {tributpaix} ressources du tribut : la guerre continue.',{nom:nom,tributpaix:TRIBUT_PAIX}));
-      fin(); return;
+      _avisTribut(J('avis.exigence_paix','🕊️ Exigence de paix'), J('avis.ressources_tribut_guerre_continue','{nom} n\'a pas les {tributpaix} ressources du tribut : la guerre continue.',{nom:nom,tributpaix:TRIBUT_PAIX}),fin);
+      return;
     }
     const d=fluxDonnees(); d.tributDemandeur=G.player.civ.id; d.tributCible=ai.civ.id;
     addLog(J('journal.exige_paix_contre_tribut_attente_reponse','🕊️ {emoji} {nation} exige la paix de {nom} contre un tribut ({v}) — en attente de sa réponse…',{emoji:G.player.civ.emoji,nation:_i18nRef(G.player.civ,'name'),nom:nom,v:t.texte}),'dim');
@@ -10311,20 +10373,19 @@ function forcedWarDemandPeace(){
   const weak=(ai.forceTokens||0)<=(G.player.forceTokens||0); // l'IA cède si elle n'est pas militairement supérieure
   if(!weak){
     addLog(J('journal.refuse_payer_guerre_continue_combat_tour','⚔️ {nom} refuse de payer — la guerre continue (pas de combat ce tour).',{nom:nom}),'red');
-    _avisTribut(J('avis.exigence_paix','🕊️ Exigence de paix'), J('avis.sait_fort_refuse_payer_guerre_continue','{nom} se sait le plus fort et refuse de payer : la guerre continue.',{nom:nom}));
-    fin(); return;
+    _avisTribut(J('avis.exigence_paix','🕊️ Exigence de paix'), J('avis.sait_fort_refuse_payer_guerre_continue','{nom} se sait le plus fort et refuse de payer : la guerre continue.',{nom:nom}),fin);
+    return;
   }
   if(!t.possible){
     addLog(J('journal.quoi_payer_tribut_ou_guerre_continue','⚔️ {nom} n\'a pas de quoi payer le tribut ({tributpaix} en 🪨 ou ⚡) — la guerre continue.',{nom:nom,tributpaix:TRIBUT_PAIX}),'red');
-    _avisTribut(J('avis.exigence_paix','🕊️ Exigence de paix'), J('avis.trop_pauvre_payer_ressources_tribut_guer','{nom} est trop pauvre pour payer les {tributpaix} ressources du tribut : la guerre continue.',{nom:nom,tributpaix:TRIBUT_PAIX}));
-    fin(); return;
+    _avisTribut(J('avis.exigence_paix','🕊️ Exigence de paix'), J('avis.trop_pauvre_payer_ressources_tribut_guer','{nom} est trop pauvre pour payer les {tributpaix} ressources du tribut : la guerre continue.',{nom:nom,tributpaix:TRIBUT_PAIX}),fin);
+    return;
   }
   verserTribut(ai,G.player,t);
   const _i=_warIndexBetween(_moiId(),ai.civ.id);if(_i>=0)G.wars.splice(_i,1);
   halveTensions('player',ai.civ.id);syncWarState();
   addLog(J('journal.cede_pression_achete_paix_tribut','🕊️ {nom} cède à la pression et achète la paix : tribut {v}.',{nom:nom,v:t.texte}),'gold');
-  _avisTribut(J('avis.paix_achetee','🕊️ Paix achetée'), J('avis.cede_pression_te_verse_guerre_evitee','{nom} cède à la pression et te verse {v}. La guerre est évitée.',{nom:nom,v:t.texte}));
-  fin();
+  _avisTribut(J('avis.paix_achetee','🕊️ Paix achetée'), J('avis.cede_pression_te_verse_guerre_evitee','{nom} cède à la pression et te verse {v}. La guerre est évitée.',{nom:nom,v:t.texte}),fin);
 }
 /* La réponse de l'humain à l'exigence de paix (voir `forcedWarDemandPeace`). Les deux nations sont
    relues dans `G` : la réponse peut arriver quand la perspective a changé. */
@@ -14594,7 +14655,7 @@ function doEndGame(){
        Et les « bonus spéciaux » énumèrent leur provenance, qui était la seule ligne réellement
        indéchiffrable. */
     const _reg=(t)=>`<div style="font-size:.78em;color:#8898b8;margin:-2px 0 4px 2px">${t}</div>`;
-    const mkBox=(lbl,vp,w,em)=>`<div class="vp-box ${w?'winner':''}"><h3><span class="nat-e">${em}</span> ${lbl}</h3>
+    const mkBox=(lbl,vp,w,em,ag)=>`<div class="vp-box ${w?'winner':''}"><h3><span class="nat-e">${em}</span> ${lbl}</h3>
       <div class="vp-line"><span>${t('fin.colonies','Colonies')}</span><span>${vp.colVP}</span></div>
       ${_reg(t('fin.colonies_regle','VP du nœud × niveau, ×1 si connectée, ×0,5 si isolée (+1 par colonie connectée)'))}
       <div class="vp-line"><span>${t('fin.routes','Routes')}</span><span>+${vp.routeVP}</span></div>
@@ -14605,8 +14666,8 @@ function doEndGame(){
       ${_reg(t('fin.bonus_tech_regle','+0,5 VP par technologie, arrondi à l\'inférieur'))}
       <div class="vp-line"><span>${t('fin.bonus_revenus','Bonus revenus/tour')}</span><span>+${vp.rptVP}</span></div>
       ${_reg(t('fin.bonus_revenus_regle','Par ressource : +2 VP au-delà de 5 de revenu, +5 VP au-delà de 10'))}
-      <div class="vp-line"><span>${t('fin.agenda','Agenda')}</span><span>+${vp.agendasVP}</span></div>
-      ${_reg(vp.agendasVP?t('fin.agenda_ok','Condition de ton agenda secret remplie'):t('fin.agenda_non','Condition de ton agenda secret NON remplie'))}
+      <div class="vp-line"><span>${t('fin.agenda','Agenda')}${ag?' : '+(ag.emoji||'')+' '+String(_i18nTexte(ag.name)||''):''}</span><span>+${vp.agendasVP}</span></div>
+      ${_reg(vp.agendasVP?t('fin.agenda_ok_gen','Condition de l\'agenda secret remplie'):t('fin.agenda_non_gen','Condition de l\'agenda secret NON remplie'))}
       <div class="vp-line"><span>${t('fin.evenements','Événements')}</span><span>+${vp.evtVP}</span></div>
       ${_reg(t('fin.evenements_regle','VP gagnés au fil des événements et des victoires de guerre'))}
       <div class="vp-line"><span>${t('fin.bonus_speciaux','Bonus spéciaux')}</span><span>+${vp.extraVP}</span></div>
@@ -14614,9 +14675,10 @@ function doEndGame(){
       <div class="vp-total">${vp.total} VP</div></div>`;
     /* LE GAGNANT EN PREMIER (Marc, 01/10 : « là c'est le jupitérien qui est plus bas »), puis par score
        décroissant ; à égalité le joueur passe devant (il a gagné l'égalité, règle `win`). */
-    const _boites=[{nom:G.player.civ.name,vp:pVP,w:win,em:G.player.civ.emoji,moi:1}].concat(aiVPs.map(x=>({nom:x.ai.civ.name,vp:x.vp,w:!win&&x.vp.total===aVP.total,em:x.ai.civ.emoji,moi:0})));
+    /* L'agenda secret de CHAQUE nation est révélé au décompte (Marc, 03/10). */
+    const _boites=[{nom:G.player.civ.name,vp:pVP,w:win,em:G.player.civ.emoji,moi:1,ag:G.player.agenda}].concat(aiVPs.map(x=>({nom:x.ai.civ.name,vp:x.vp,w:!win&&x.vp.total===aVP.total,em:x.ai.civ.emoji,moi:0,ag:x.ai.agenda})));
     _boites.sort((a,b)=>(b.vp.total-a.vp.total)||(b.moi-a.moi));
-    document.getElementById('vp-wrap').innerHTML=_boites.map(b=>mkBox(b.nom,b.vp,b.w,b.em)).join('');
+    document.getElementById('vp-wrap').innerHTML=_boites.map(b=>mkBox(b.nom,b.vp,b.w,b.em,b.ag)).join('');
     document.getElementById('end-scr').classList.remove('hidden');
   },700);
 }
@@ -15722,6 +15784,7 @@ function addAction(emoji,name,acPaid,resPaid,gainDesc){plafonnerMoral();if(!G.tu
    que `_i18nTexte` relit dans la langue du lecteur. C'est ce que Marc voyait en français dans le
    résumé des actions des autres nations (20/09). */
 const _nomFr=_i18nTexte(name),_gainFr=_i18nTexte(gainDesc);
+resPaid=trierRes(resPaid||{});   // ordre de la barre du haut (03/10)
 const _entry={emoji,name:_nomFr,acPaid:acPaid||0,resPaid:resPaid||{},gainDesc:_gainFr||''};
 _memoJChamp(_entry,'name',name);_memoJChamp(_entry,'gainDesc',gainDesc);
 G.turnActions.push(_entry);/* « ↳ paie » sous l'en-tête de l'action du joueur — même ligne que pour l'ordinateur (22/09). */try{if(G._enteteAction&&!G._entetePayee&&G._enteteAction.civ===(G.player&&G.player.civ&&G.player.civ.id)){const _pp=[];for(const[r,a]of Object.entries(resPaid||{}))if(a>0)_pp.push('−'+a+rEmoji(r));addLogSous(J('journal.paie','   ↳ {emoji} {nation} paie : {v}{suffixe}',{emoji:G.player.civ.emoji,nation:_i18nRef(G.player.civ,'name'),v:((acPaid||0)?J('journal.ac_3',"{acp} AC",{acp:acPaid}):J('journal.0_ac',"0 AC")),suffixe:(_pp.length?J('journal.suffixe_parts',' {v}',{v:_pp.join(' ')}):J('journal.aucune_ressource',' (aucune ressource)'))}),'dim');}}catch(e){}if(G.player){if(!G.player._turnActions)G.player._turnActions=[];G.player._turnActions.push(_entry);}/* journal par nation : indispensable au bilan en multijoueur */if(G){G._scStuckTries=0;try{G._journal=G._journal||[];G._journal.push({turn:G.turn||0,nat:(G.player&&G.player.civ&&G.player.civ.name)||'Toi',name:_nomFr,ac:acPaid||0,cost:_normCost(resPaid),gain:_riToText(_gainFr),war:_isWarAct(_nomFr),auto:false});}catch(e){}}/* (bandeau « action faite » supprimé le 30/09 — voir la note avant `showDiscoveryModal`) *//* ⚠️ LA ROTATION SE COMPTE EN ACTIONS DÉPENSÉES, PAS EN COUPS (Marc, 20/09). Deux règles ici :
@@ -16762,6 +16825,10 @@ function buildEOTBody(maint,revs,warCombat,warEnd){
   }
   // Pirate forecast (masqué si l'une des factions joue Pirates)
   if(npcPiratesActive()){const nxtProb=Math.min(100,Math.round((0.10+(G.turn+1)*0.10)*100));html+=`<div class="eot-section"><h4 style="color:#ff8888">${t('bilan.pirates','☠️ Pirates')}</h4><div class="eot-item" style="color:#ff8888"><span class="eot-icon">☠️</span><span class="eot-name">${t('bilan.pirates_risque','Risque sur les routes non protégées au prochain tour : {p}%',{p:nxtProb})}</span></div></div>`;}
+  /* BILAN SANS ÉMOJIS (Marc, 03/10 : « enlève-les tous sauf celui des pirates ») — même filtre que le journal (§194) :
+     seuls ☠️ et la pastille de chaque nation restent ; ⚡🪨🔬❤️ deviennent les icônes du jeu. Fonction pure : vaut pour
+     le solo et pour le bilan envoyé par le serveur. */
+  try{ if(typeof _journalSansEmoji==='function') html=_journalSansEmoji(html); }catch(e){}
   return html;
 }
 /* ═══ LE BILAN DE FIN DE TOUR, REJOUABLE — ET C'EST TOUT L'INTÉRÊT ═══
@@ -16836,7 +16903,7 @@ function showEOTModal(maint,revs,warCombat,warEnd){
   }
   if(typeof _ilHide==='function')_ilHide();
   if(_spectateurSolo()){ _spectateurBandeau(); setTimeout(continueAfterEOT,0); return; }   // éliminé : pas de bilan à lire
-  document.getElementById('eot-title').textContent=t('bilan.titre','📊 Bilan du Tour {n}',{n:G.turn});
+  document.getElementById('eot-title').textContent=String(t('bilan.titre','📊 Bilan du Tour {n}',{n:G.turn})).replace(/^\s*📊\s*/u,'');
   document.getElementById('eot-body').innerHTML=buildEOTBody(maint,revs,warCombat,warEnd);
   document.getElementById('eot-modal').classList.remove('hidden');
 }

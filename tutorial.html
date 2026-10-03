@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-10-03 · v11.40';</script>
+<script>window.SOLAR_BUILD_HTML='2026-10-03 · v11.47';</script>
 <!-- Tampon des erreurs survenues AVANT diagnostic.js (chargé après moteur.js) : il les ramasse au démarrage. -->
 <script>window.__scErreursPrecoces=[];window.addEventListener('error',function(e){try{if(window.scDiagNoterErreur)return;window.__scErreursPrecoces.push({type:'erreur',msg:e.message||String(e),pile:(e.error&&e.error.stack)||'',ou:(e.filename||'').split('/').pop()+':'+e.lineno});}catch(x){}});</script>
 <!-- i18n.js EN TÊTE, avant tout script du corps : il choisit la langue et charge lang/<code>.js (synchrone).
@@ -1345,6 +1345,15 @@ img.nat-emb-i{display:inline-block;width:1.4em;height:1.4em;vertical-align:-.35e
 #inv-opts .inv-opt,#inv2-opts .inv-opt{grid-template-columns:76px minmax(0,1fr)}
 img.inv-art-i{display:inline-block;width:1.7em;height:1.7em;object-fit:cover;border-radius:6px;vertical-align:-.5em;margin:0 .15em}
 #inv-opts .inv-opt-emoji img.inv-art,#inv2-opts .inv-opt-emoji img.inv-art{width:76px;height:76px}
+/* Agenda secret : le prochain événement EN ENTIER, libellé sur une ligne, texte dessous (Marc, 03/10). */
+#agenda-sel-modal .agsel-ctx-wide{display:block;white-space:normal;overflow:visible}
+#agenda-sel-modal .agsel-ctx-wide .agsel-ctx-label{display:block;margin:0 0 3px}
+#agenda-sel-modal .agsel-ctx-wide .agsel-ctx-val{display:block;overflow:visible;text-overflow:clip;white-space:normal}
+/* Icônes de combat (03/10, v11.47) : chasseur martien = puissance d'attaque, bouclier = défense. Posées par le script `cbtIcones`. */
+img.cbt-ic{display:inline-block;height:1.35em;width:auto;vertical-align:-.32em;margin:0 .08em}
+img.cbt-att{filter:drop-shadow(0 0 1px rgba(255,255,255,.9)) drop-shadow(0 0 3px rgba(255,90,60,.6))}
+.fen-medal img.cbt-ic{height:44px;vertical-align:middle;margin:0}
+.cbt-dp{white-space:normal}
 </style>
 </head>
 <body>
@@ -2619,6 +2628,39 @@ if ('serviceWorker' in navigator && !_natif) {
   function passe(){ prevu=false; try{ document.querySelectorAll(SEL).forEach(ajuster); }catch(e){} }
   function planifier(){ if(prevu) return; prevu=true; (window.requestAnimationFrame||setTimeout)(passe); }
   function demarrer(){ passe(); try{ new MutationObserver(planifier).observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class','hidden']}); }catch(e){} window.addEventListener('resize',planifier); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',demarrer); else demarrer();
+})();
+</script>
+<script>
+/* ═══ ICÔNES DE COMBAT (03/10, v11.47) ═══ AFFICHAGE PUR, même principe que `natEmblemes`.
+   Dans les fenêtres de combat (#war-modal, #war-combat-modal) : ⚔️ → chasseur martien (assets/combat/attaque.png,
+   avec un léger halo pour rester lisible sur fond sombre), 🛡️ → bouclier bleu (assets/combat/defense.png), et un
+   bouclier devant « Défense possible ». Le moteur et le serveur écrivent toujours les émojis : les bancs ne bougent pas. */
+(function(){
+  var ZONES='#war-modal,#war-combat-modal';
+  var RE=/⚔️?|\u{1F6E1}️?|(Défense possible|Possible defence)/gu;
+  function img(k){ var i=document.createElement('img'); i.className='cbt-ic cbt-'+k; i.src='assets/combat/'+(k==='att'?'attaque':'defense')+'.png'; i.alt=(k==='att'?'⚔️':'\u{1F6E1}️'); i.draggable=false; return i; }
+  function traiter(n){
+    var s=n.nodeValue||''; RE.lastIndex=0; if(!RE.test(s)) return; RE.lastIndex=0;
+    var f=document.createDocumentFragment(), last=0, m;
+    while((m=RE.exec(s))){
+      if(m.index>last) f.appendChild(document.createTextNode(s.slice(last,m.index)));
+      if(m[1]){ var sp=document.createElement('span'); sp.className='cbt-dp'; sp.appendChild(img('def')); sp.appendChild(document.createTextNode(' '+m[1])); f.appendChild(sp); }
+      else f.appendChild(img(m[0].charCodeAt(0)===0x2694?'att':'def'));
+      last=RE.lastIndex;
+    }
+    if(last<s.length) f.appendChild(document.createTextNode(s.slice(last)));
+    n.parentNode.replaceChild(f,n);
+  }
+  var prevu=false;
+  function passe(){ prevu=false; try{ document.querySelectorAll(ZONES).forEach(function(z){
+    var w=document.createTreeWalker(z,NodeFilter.SHOW_TEXT,null), l=[], n;
+    while((n=w.nextNode())){ if(!(n.parentNode&&n.parentNode.closest&&n.parentNode.closest('.cbt-dp'))) l.push(n); }
+    l.forEach(traiter);
+  }); }catch(e){} }
+  function planifier(){ if(prevu) return; prevu=true; (window.requestAnimationFrame||setTimeout)(passe); }
+  window.cbtIcones=passe;
+  function demarrer(){ passe(); try{ new MutationObserver(planifier).observe(document.body,{childList:true,subtree:true,characterData:true}); }catch(e){} }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',demarrer); else demarrer();
 })();
 </script>
