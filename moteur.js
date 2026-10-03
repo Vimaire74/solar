@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.47';
+const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.50';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -3189,7 +3189,7 @@ const PROJET_GAIN_MIN=0.5;           // en dessous, ce n'est pas un projet, c'es
 const PROJET_MAX_CIBLES=8;
 /* Le BUT DE JEU du Conquérant (branche IA & Renseignement) : sa prime ne se déduit pas d'une
    évaluation, elle est posée. Réglée par la mesure (`mesure_ia_defensive.js`), pas au jugé. */
-const PROJET_BUT_PRIME=14;      // prime ajoutée au coup qui fait avancer le but
+const PROJET_BUT_PRIME=30;   /* 14 → 30 (Marc, 03/10 : « note-la encore plus haut pour le conquérant ») — sonde_reseau2.js : Réseau Orbital notait 15-20 contre 35-52 pour le coup retenu */      // prime ajoutée au coup qui fait avancer le but
 const PROJET_BUT_GAIN_MIN=6;    // gain plancher, pour que le but survive aux tours où il paraît hors de portée
 
 function _cartesBranche(branche){ return CARDS_POOL.filter(c=>c&&c.branch===branche&&c.tier<=3).sort((a,b)=>a.tier-b.tier); }
@@ -3433,6 +3433,20 @@ function valeurTemperament(coup,nat){
 /* La prime du BUT DE JEU, indépendante du projet : elle ne se divise pas par le nombre d'étapes
    restantes — chacune des trois marches vaut la peine d'être montée, la dernière comme la
    première. `G._butPrime` permet de la régler (ou de l'annuler) depuis un banc de mesure. */
+/* RÉSERVE DU BUT (Marc, 03/10) : tant que la prochaine marche du but (rang 2 ou 3) n'est pas achetée, un coup
+   qui laisse la nation SOUS son coût est pénalisé de 4 par unité manquante (tours ≤6). Un coup qui rapporte la
+   ressource (un raid sur Io, +4⚡) est donc avantagé, un achat qui vide la science ne l'est plus. */
+function penaliteReserveBut(n,coup){
+  try{
+    const b=n&&n._but; if(!b||!b.etapes||!b.etapes.length||!G||(G.turn||1)>6)return 0;
+    const e=b.etapes[0]; if(!e||e.type!=='tech')return 0;
+    if(coup&&coup.type==='tech'&&coup.card===e.card)return 0;
+    const card=CARDS_POOL.find(x=>x&&x.id===e.card); if(!card||card.tier<2)return 0;
+    const cout=(typeof getEffCost==='function')?getEffCost(card,n):(card.cost||{});
+    let manque=0; for(const r in cout){ manque+=Math.max(0,(cout[r]||0)-((n.res&&n.res[r])||0)); }
+    return 4*manque;
+  }catch(err){ return 0; }
+}
 function valeurBut(coup,nat){
   try{
     const b=nat&&nat._but; if(!b||!b.etapes||!b.etapes.length||!coup)return 0;
@@ -3445,7 +3459,7 @@ function valeurBut(coup,nat){
        et le score du Conquérant tombé de 63 à 50 de moyenne. La poussée va donc là où est le but ;
        le rang 1 n'est qu'un passage obligé, il garde une prime symbolique. */
     const c=CARDS_POOL.find(x=>x&&x.id===e.card);
-    const poids=(!c||c.tier>=3)?1:(c.tier===2?0.6:0.15);
+    const poids=(!c||c.tier>=3)?1:(c.tier===2?((G&&G.turn<=4)?2.4:1.2):0.4);   /* rang 2 doublé aux tours ≤4 (Marc, 03/10 : IA Défensive au T5) */   /* rang 2 = le verrou (jamais acheté) : 0.6 → 1.2 ; rang 1 : 0.15 → 0.4 (03/10) */
     return base*poids;
   }catch(err){ return 0; }
 }
@@ -12629,7 +12643,7 @@ enregistrerCerveau('tacticien', function(ctx){
     const r=simulerCoup(ctx.nation, function(){ return ctx.jouer(c); }, function(){
       const n=ctx.nation;
       ruine=enGuerre&&Math.min(n.res.materials||0,n.res.energy||0)<1;
-      return evaluerPositionRelative(n);
+      return evaluerPositionRelative(n)-((typeof penaliteReserveBut==='function')?penaliteReserveBut(n,c):0);
     });
     if(!r.ok)continue;
     evalues++;
@@ -13002,7 +13016,12 @@ function _doAITurnInterne(aiPlayer,oneShot){
          jusqu'au tour 10. Une action de plus au tour 9 ou 10 achète une technologie de fin de
          partie : elle est tout sauf inutile. L'utilité reste gardée par ce qui la mesure vraiment —
          il faut pouvoir payer les 2⚡ ET avoir de quoi dépenser l'AC gagné derrière. */
-      if((ai.res.energy||0)>=3&&(ai.res.materials||0)>=2){ai.res.energy-=2;ai.acLeft+=1;ai.acMax=(ai.acMax||ai.acLeft)+1;ai.abilityUsed=true;
+      /* ⚠️ PLUS AU DÉBUT DU TOUR, PLUS « DÈS QUE POSSIBLE » (Marc, 03/10 : « l'IA martienne utilise
+         systématiquement l'énergie pour faire une action de plus, que ce soit utile ou pas »). Prise en
+         premier coup, elle vidait l'énergie (0-1⚡ restants) et bloquait les achats qui en demandent
+         (Réseau Orbital, améliorations). Désormais : seulement au DERNIER AC, et seulement s'il reste
+         au moins 3⚡ après paiement et 3🪨 — de quoi financer réellement l'action gagnée. */
+      if(ai.acLeft===1&&(ai.res.energy||0)>=5&&(ai.res.materials||0)>=3){ai.res.energy-=2;ai.acLeft+=1;ai.acMax=(ai.acMax||ai.acLeft)+1;ai.abilityUsed=true;
         G.aiActions.push(_i18nAplatir({emoji:'💫',name:J('action.surtension','Surtension'),desc:J('action.1_ac','+1 AC')}));}
     }else if(ai.civ.id==='jupiteriens'){ // Forge Orbitale : améliore une lune joviène 1→2 gratuitement (sans AC ni science)
       const _col=ai.colonies.find(c=>['io','europe','ganymede','callisto'].includes(c.nodeId)&&c.level===1); // reliée ou non (Marc, 15/09)

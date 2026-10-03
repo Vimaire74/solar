@@ -16,11 +16,21 @@
      Le 01/10 il a été ramené de 84 Mo à 3,5 Mo (36 fichiers). Un fichier identique à ce qui est déjà
      en ligne n'a rien à faire ici ; une image ou un banc nouveau ou modifié, oui. -->
 
-## 📦 CE LOT EST EN **v11.47** · cache `sw.js` **v268** · 2026-10-03
+## 📦 CE LOT EST EN **v11.50** · cache `sw.js` **v271** · 2026-10-03
 
 > Pour savoir ce qui est EN LIGNE : ouvre solar-game.com, la version est écrite sur l'écran de
-> connexion. Si elle ne dit pas **v11.47**, l'envoi ou le redéploiement n'a pas pris.
+> connexion. Si elle ne dit pas **v11.50**, l'envoi ou le redéploiement n'a pas pris.
 > ⚠️ **Les DEUX ressources Coolify** doivent être redéployées : le site ET le serveur.
+
+**v11.50 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js)
+- Conquérant : Réseau Orbital noté deux fois plus haut jusqu'au tour 4.
+- Conquérant : garde de quoi payer la prochaine tech de la chaîne IA Défensive (jusqu'au tour 6).
+
+**v11.49 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js)
+- Martiens (ordinateur) : Surtension seulement au dernier AC, et s'il reste 3 énergie et 3 matériaux après paiement.
+
+**v11.48 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js)
+- Conquérant : prime de but 14 → 30 ; Réseau Orbital ×1,2 (au lieu de 0,6), Drones ×0,4 (au lieu de 0,15).
 
 **v11.47 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (estampille de moteur.js)
 - Fenêtres de combat : nouvelle icône d'attaque (chasseur martien) à la place de ⚔️.
