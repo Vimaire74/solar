@@ -2368,4 +2368,6 @@ window.SOLAR_LANG_DICT = {
   "avis.commerce_pirates_gain": "The pirates deliver: <b>{v}</b>",
   "avis.commerce_pirates_rien": "The pirates had nothing to deliver this turn.",
   "web.gain": "Gain",
+  "journal.attaque_annulee_retour_choix_guerre": "↩️ Attack cancelled — back to the war choice.",
+  "journal.attaque_annulee_rien_change": "↩️ Attack cancelled — nothing changed (no war, agreements and tensions intact).",
 };

@@ -27,6 +27,8 @@
     .som ul{columns:2;column-gap:1.4rem;margin:.3rem 0;padding-left:1.1rem}
     .cle{background:#131a2e;border-left:3px solid #2f6fd0;padding:.55rem .8rem;margin:.8rem 0;border-radius:0 .35rem .35rem 0}
     .backtop{position:fixed;right:.9rem;bottom:.9rem;background:#2f6fd0;color:#fff;text-decoration:none;padding:.55rem .8rem;border-radius:.5rem;font-size:.9rem;box-shadow:0 4px 14px rgba(0,0,0,.5)}
+  .rg-nat{width:1.6em;height:1.6em;vertical-align:-.45em;margin-right:.25em}
+  .rg-inv{display:block;width:120px;max-width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;margin:2px 0 6px;box-shadow:0 2px 10px rgba(0,0,0,.45)}
   </style>
 </head>
 <body>
@@ -65,18 +67,18 @@
 <p>Tu choisis ta nation, les autres sont tirées au sort. Sa branche bonus donne <strong>−1🔬</strong> sur les technologies de cette branche.</p>
 <table>
 <tr><th>Nation</th><th>Départ</th><th>Force</th><th>Branche bonus</th><th>Passif et base</th></tr>
-<tr><td>🌍 Terriens</td><td>2⚡ 6🪨 3🔬 4❤️</td><td>5</td><td>Spiritualité &amp; Nature</td><td>Moral ≥ 7 → +1 AC. Base : Lune.</td></tr>
-<tr><td>🔴 Martiens</td><td>4⚡ 4🪨 2🔬 3❤️</td><td>5</td><td>Expansion</td><td>Colonisation −1🪨 −1⚡. Base : Phobos.</td></tr>
-<tr><td>🟠 Jupitériens</td><td>5⚡ 2🪨 3🔬 3❤️</td><td>4</td><td>Mines &amp; Énergie</td><td>Base : Io, 3⚡/tour dès le tour 1.</td></tr>
-<tr><td>🟣 Ceinturiens</td><td>6⚡ 4🪨 1🔬 2❤️</td><td>3</td><td>Navigation &amp; Moteurs</td><td>Immunisés contre les pirates. +1⚡/tour. Base : Éris.</td></tr>
+<tr><td><img class="rg-nat" src="assets/nations/terriens_64.png" alt="">Terriens</td><td>2⚡ 6🪨 3🔬 4❤️</td><td>5</td><td>Spiritualité &amp; Nature</td><td>Moral ≥ 7 → +1 AC. Base : Lune.</td></tr>
+<tr><td><img class="rg-nat" src="assets/nations/martiens_64.png" alt="">Martiens</td><td>4⚡ 4🪨 2🔬 3❤️</td><td>5</td><td>Expansion</td><td>Colonisation −1🪨 −1⚡. Base : Phobos.</td></tr>
+<tr><td><img class="rg-nat" src="assets/nations/jupiteriens_64.png" alt="">Jupitériens</td><td>5⚡ 2🪨 3🔬 3❤️</td><td>4</td><td>Mines &amp; Énergie</td><td>Base : Io, 3⚡/tour dès le tour 1.</td></tr>
+<tr><td><img class="rg-nat" src="assets/nations/ceinturiens_64.png" alt="">Ceinturiens</td><td>6⚡ 4🪨 1🔬 2❤️</td><td>3</td><td>Navigation &amp; Moteurs</td><td>Immunisés contre les pirates. +1⚡/tour. Base : Éris.</td></tr>
 </table>
 <p>Pouvoir de nation (bouton « Pouvoir » de la barre du haut), une fois par tour :</p>
 <table>
 <tr><th>Nation</th><th>Pouvoir</th><th>Coût</th></tr>
-<tr><td>🌍 Terriens</td><td>Diplomatie Verte : +3 pts Gouvernement</td><td>3🪨</td></tr>
-<tr><td>🔴 Martiens</td><td>Surtension : +1 AC ce tour</td><td>2⚡</td></tr>
-<tr><td>🟠 Jupitériens</td><td>Forge Orbitale : une lune de Jupiter passe au niveau 2</td><td>1🪨 1⚡</td></tr>
-<tr><td>🟣 Ceinturiens</td><td>Commerce pirate : 75 % → 2 ressources au hasard, 20 % → 1, 5 % → rien</td><td>gratuit</td></tr>
+<tr><td><img class="rg-nat" src="assets/nations/terriens_64.png" alt="">Terriens</td><td>Diplomatie Verte : +3 pts Gouvernement</td><td>3🪨</td></tr>
+<tr><td><img class="rg-nat" src="assets/nations/martiens_64.png" alt="">Martiens</td><td>Surtension : +1 AC ce tour</td><td>2⚡</td></tr>
+<tr><td><img class="rg-nat" src="assets/nations/jupiteriens_64.png" alt="">Jupitériens</td><td>Forge Orbitale : une lune de Jupiter passe au niveau 2</td><td>1🪨 1⚡</td></tr>
+<tr><td><img class="rg-nat" src="assets/nations/ceinturiens_64.png" alt="">Ceinturiens</td><td>Commerce pirate : 75 % → 2 ressources au hasard, 20 % → 1, 5 % → rien</td><td>gratuit</td></tr>
 </table>
 
 <h3>Tempéraments des nations tenues par l'ordinateur</h3>
@@ -243,19 +245,19 @@
 <p><strong>Niveau 1</strong> — choisi au tour 2, actif des tours 3 à 5.</p>
 <table>
 <tr><th>Carte</th><th>Bénéfice</th><th>Contrepartie</th></tr>
-<tr><td>🕵️ Espionnage</td><td>Une fois aux tours 3, 4 ou 5 (reportable) : tu prends 1 à 3 technologies rivales, dans <strong>une seule catégorie chez une seule nation</strong>.</td><td>Tension victime : +6, +8 ou +10</td></tr>
-<tr><td>🏭 Industrialisation lourde</td><td>+4🪨/tour</td><td>−3❤️</td></tr>
-<tr><td>🔬 Recherche intensive</td><td>+3🔬/tour</td><td>−3🪨 −1⚡</td></tr>
-<tr><td>🌾 Agriculture durable</td><td>+2❤️/tour</td><td>−2🪨 −1🔬</td></tr>
-<tr><td>🚀 Expansion rapide</td><td>1 colonisation et 1 route gratuites</td><td>−1❤️ −1🪨 −1⚡</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv_esp.jpg" alt="" loading="lazy">Espionnage</td><td>Une fois aux tours 3, 4 ou 5 (reportable) : tu prends 1 à 3 technologies rivales, dans <strong>une seule catégorie chez une seule nation</strong>.</td><td>Tension victime : +6, +8 ou +10</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv_ind.jpg" alt="" loading="lazy">Industrialisation lourde</td><td>+4🪨/tour</td><td>−3❤️</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv_rec.jpg" alt="" loading="lazy">Recherche intensive</td><td>+3🔬/tour</td><td>−3🪨 −1⚡</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv_agr.jpg" alt="" loading="lazy">Agriculture durable</td><td>+2❤️/tour</td><td>−2🪨 −1🔬</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv_exp.jpg" alt="" loading="lazy">Expansion rapide</td><td>1 colonisation et 1 route gratuites</td><td>−1❤️ −1🪨 −1⚡</td></tr>
 </table>
 <p><strong>Niveau 2</strong> — choisi au tour 6, actif des tours 7 à 9.</p>
 <table>
 <tr><th>Carte</th><th>Bénéfice</th><th>Contrepartie</th></tr>
-<tr><td>⚔️ Stratégie guerrière</td><td>Les jetons reviennent en 1 tour au lieu de 2</td><td>−4🪨 −2⚡</td></tr>
-<tr><td>🕊️ Confort de la population</td><td>+4❤️/tour</td><td>−4🪨</td></tr>
-<tr><td>🏗️ Colonies avancées</td><td>Tes colonies <em>actuelles</em> passent au niveau maximum gratuitement. Celles acquises ensuite ne sont pas concernées ; l'entretien reste dû.</td><td>🪨 divisés par deux, −3⚡</td></tr>
-<tr><td>🔮 Union sacrée</td><td>Débloque la branche Empathes, 3 tours d'exclusivité</td><td>−3🪨 −4🔬</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv2_war.jpg" alt="" loading="lazy">Stratégie guerrière</td><td>Les jetons reviennent en 1 tour au lieu de 2</td><td>−4🪨 −2⚡</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv2_comfort.jpg" alt="" loading="lazy">Confort de la population</td><td>+4❤️/tour</td><td>−4🪨</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv2_colonies.jpg" alt="" loading="lazy">Colonies avancées</td><td>Tes colonies <em>actuelles</em> passent au niveau maximum gratuitement. Celles acquises ensuite ne sont pas concernées ; l'entretien reste dû.</td><td>🪨 divisés par deux, −3⚡</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv2_union.jpg" alt="" loading="lazy">Union sacrée</td><td>Débloque la branche Empathes, 3 tours d'exclusivité</td><td>−3🪨 −4🔬</td></tr>
 </table>
 
 <h2 id="s9">9. Cartes Stratégie</h2>

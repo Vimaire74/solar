@@ -16,11 +16,27 @@
      Le 01/10 il a été ramené de 84 Mo à 3,5 Mo (36 fichiers). Un fichier identique à ce qui est déjà
      en ligne n'a rien à faire ici ; une image ou un banc nouveau ou modifié, oui. -->
 
-## 📦 CE LOT EST EN **v11.32** · cache `sw.js` **v253** · 2026-10-03
+## 📦 CE LOT EST EN **v11.37** · cache `sw.js` **v258** · 2026-10-03
 
 > Pour savoir ce qui est EN LIGNE : ouvre solar-game.com, la version est écrite sur l'écran de
-> connexion. Si elle ne dit pas **v11.32**, l'envoi ou le redéploiement n'a pas pris.
+> connexion. Si elle ne dit pas **v11.37**, l'envoi ou le redéploiement n'a pas pris.
 > ⚠️ **Les DEUX ressources Coolify** doivent être redéployées : le site ET le serveur.
+
+**v11.37 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js) — `docs/REPRISE.md` §204
+- Attaque lancée puis annulée pendant tes actions : plus de guerre ouverte, accords et tensions intacts, AC rendu — comme si rien n'avait eu lieu.
+- Bouton ↩ (annuler une action) : remet TOUTE la partie en l'état (tensions des autres nations, parts de Sphère de Dyson, journal, rapport), plus seulement ta nation.
+
+**v11.36 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js) — `docs/REPRISE.md` §203
+- Guerre de fin de tour : « Annuler — revenir au choix » sur une attaque ramène au choix de guerre au lieu de clore le combat et de passer à la fin de tour.
+
+**v11.35 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js)
+- Résumé des investissements actifs : petite illustration de la carte à la place de l'émoji, pour toi et les autres nations.
+
+**v11.34 — 03/10/2026** — site seulement
+- Règles (fr + en) : emblèmes des nations à la place des émojis, grandes illustrations des cartes d'investissement.
+
+**v11.33 — 03/10/2026** — site seulement
+- Cartes d'investissement : l'illustration ne chevauche plus le texte au téléphone.
 
 **v11.32 — 03/10/2026** — site seulement, le serveur n'a pas changé
 - Cartes d'investissement : illustrations à la place des émojis dans les fenêtres de choix.

@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.32';
+const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.37';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -453,7 +453,7 @@ const AGENDAS_POOL=[
 /* Illustrations des cartes d'investissement (03/10, v11.32, choix de Marc : style « B ») — AFFICHAGE PUR.
    Petite version (256 px) dans les fenêtres de choix ; la grande (1024 px) est gardée dans assets/invest/grand/. */
 const INV_ART=new Set(['inv_esp','inv_ind','inv_rec','inv_agr','inv_exp','inv2_war','inv2_comfort','inv2_colonies','inv2_union']);
-function invArt(id,emoji){ return INV_ART.has(id)?'<img class="inv-art" src="assets/invest/'+id+'.jpg" alt="'+(emoji||'')+'">':(emoji||''); }
+function invArt(id,emoji,enLigne){ return INV_ART.has(id)?'<img class="'+(enLigne?'inv-art-i':'inv-art')+'" src="assets/invest/'+id+'.jpg" alt="'+(emoji||'')+'">':(emoji||''); }
 try{ window.invArt=invArt; }catch(e){}
 const INVESTMENT_CARDS=[
   {id:'inv_esp',name:'Espionnage',emoji:'🕵️',cout:{},
@@ -3554,19 +3554,28 @@ function initGame(civId,aiCivIds){
   if(!_decisionActive())showAgendaSelModal(); // serveur : le driver lance le draft d'agenda APRÈS avoir fixé les sièges humain/IA
 }
 /* ============================================================ UNDO ============================================================ */
-function saveUndo(){undoStack.push({player:JSON.parse(JSON.stringify(G.player)),generalRiver:JSON.parse(JSON.stringify(G.generalRiver)),branchTiers:{...G.branchTiers},techTaken:new Set(G.techTaken),turnActions:[...G.turnActions],milBought:[...(G.player._milBoughtThisTurn||[])]});}
+/* ═══ L'ANNULATION REMET TOUT EN PLACE (Marc, 03/10 : « c'est normal d'essayer, d'évaluer puis de reculer, ça ne doit
+   rien casser ni lancer pour de bon ») ═══
+   ⚠️ La photo ne gardait que le JOUEUR (et la rivière, les rangs de branches) : tout ce qu'une action change AILLEURS
+   survivait à ↩ — tension des autres nations (Calmer, Mission diplomatique, routes), parts de la Sphère de Dyson,
+   lignes du journal et du rapport de partie. On photographie désormais TOUT l'état (`scSerialize`), et on le
+   restaure EN PLACE comme le fait déjà la simulation du tacticien (`_fusionEnPlace` + `rehydrateState` +
+   `refreshWarViews`, voir `simulerCoup`). Seul le tirage des découvertes est conservé (`_discCache`) : annuler
+   puis recoloniser ne doit pas permettre de retirer une autre tuile. */
+function saveUndo(){undoStack.push({etat:scSerialize()});}
+function _restaurerPhoto(etat){
+  const _disc=JSON.stringify((G&&G._discCache)||{});
+  _fusionEnPlace(G,scDeserialize(etat));
+  try{ G._discCache=JSON.parse(_disc); }catch(e){}
+  if(typeof rehydrateState==='function')rehydrateState(G);
+  if(typeof refreshWarViews==='function')refreshWarViews();
+  try{ for(const p of allPlayers()) updateConnections(p); }catch(e){}
+}
 function undo(){
   if(G.phase!=='actions')return;
   if(!undoStack.length){addLog(J('journal.rien_annuler','⚠️ Rien à annuler.'),'red');return;}
   const snap=undoStack.pop();
-  G.player=snap.player;G.generalRiver=snap.generalRiver;G.branchTiers=snap.branchTiers;G.techTaken=snap.techTaken;G.turnActions=snap.turnActions;
-  // Recalculer la connectivité après restauration (col.connected peut être périmé)
-  updateConnections(G.player);
-  // JSON.parse détruit les Map — restaurer recentLosses en Map
-  if(!(G.player.recentLosses instanceof Map))G.player.recentLosses=new Map();
-  G.player._milBoughtThisTurn=new Set(snap.milBought||[]); // JSON détruit le Set → restaurer (sinon .has plante au rendu)
-  // JSON.parse détruit les méthodes — restaurer la référence agenda depuis AGENDAS_POOL
-  if(G.player.agenda&&typeof G.player.agenda.score!=='function'){const ag=AGENDAS_POOL.find(a=>a.id===G.player.agenda.id);if(ag)G.player.agenda=ag;}
+  if(snap&&snap.etat) _restaurerPhoto(snap.etat);
   mode=null;routeFrom=null;setHint('');closePopup();_scHideConfirm();
   if(typeof _ilHide==='function')_ilHide(); // annulation : referme la fenêtre centrale des autres nations
   addLog(J('journal.action_annulee','↩️ Action annulée.'),'gold');render();
@@ -4857,9 +4866,9 @@ function showInvestmentActiveModal(pCard, aCard){
      Désormais une ligne PAR nation rivale, précédée de son emblème (`.nat-e` → image, script natEmblemes). */
   const lignes=allPlayers().filter(o=>o&&o!==G.player).map(o=>{
     const c=INVESTMENT_CARDS.find(x=>x.id===o._inv1);
-    return `<div style="margin:3px 0"><span class="nat-e" title="${o.civ.name}">${o.civ.emoji}</span> <b>${o.civ.name}</b> — ${c?`${c.emoji} ${c.name} : ${c.benefit}`:'—'}</div>`;
+    return `<div style="margin:3px 0"><span class="nat-e" title="${o.civ.name}">${o.civ.emoji}</span> <b>${o.civ.name}</b> — ${c?`${invArt(c.id,c.emoji,1)} ${c.name} : ${c.benefit}`:'—'}</div>`;
   });
-  document.getElementById('inv-active-your').innerHTML=`<span class="nat-e">${G.player.civ.emoji}</span> ${pCard.emoji} ${pCard.name} : ${pBenef}`;
+  document.getElementById('inv-active-your').innerHTML=`<span class="nat-e">${G.player.civ.emoji}</span> ${invArt(pCard.id,pCard.emoji,1)} ${pCard.name} : ${pBenef}`;
   document.getElementById('inv-active-ai').innerHTML=lignes.length?lignes.join(''):'—';
   el.classList.remove('hidden');
 }
@@ -6610,7 +6619,21 @@ function cancelWarCombat(){
     if(G._warContinueSuite){showPeaceOfferModal(false,G._warContinueSuite);}else{render();}
     return;
   }
+  if(G._warCancelRefund&&_photoAttaque){
+    const _ph=_photoAttaque; _photoAttaque=null; _restaurerPhoto(_ph);
+    G._warCancelRefund=null; if(typeof _warAttackColonyTarget!=='undefined')_warAttackColonyTarget=null;
+    addLog(J('journal.attaque_annulee_rien_change','↩️ Attaque annulée — rien n\'a changé (pas de guerre, accords et tensions intacts).'),'dim'); render(); return;
+  }
   if(G._warCancelRefund){ G.player.acLeft+=(G._warCancelRefund.ac||0); G.player._attacksThisTurn=Math.max(0,(G.player._attacksThisTurn||0)-(G._warCancelRefund.atk||0)); G._warCancelRefund=null; fluxDonnees().suiteCombat=null;G._warChoiceCb=null; if(typeof _warAttackColonyTarget!=='undefined')_warAttackColonyTarget=null; addLog(J('journal.attaque_annulee_ac_rendu','↩️ Attaque annulée — AC rendu.'),'dim'); render(); return; }
+  /* « ANNULER — revenir au choix » PENDANT LA GUERRE DE FIN DE TOUR (rapport de Marc, 03/10, T10 : « en annulant
+     l'attaque ça a amené la fin de tour au lieu de me ramener au menu guerre »). Cette branche rendait « STANDOFF » :
+     l'annulation valait décision de tenir, le combat se soldait et la fin de tour suivait. En ATTAQUE, on revient
+     désormais à l'écran de choix de guerre (`_warBackToChoice`), sans rien résoudre ni dépenser. */
+  if(typeof _warSliderMode!=='undefined'&&_warSliderMode==='attack'&&G._warChoiceCb&&typeof showWarCombatModal==='function'){
+    if(typeof _warAttackColonyTarget!=='undefined')_warAttackColonyTarget=null;
+    addLog(J('journal.attaque_annulee_retour_choix_guerre','↩️ Attaque annulée — retour au choix de guerre.'),'dim');
+    _warBackToChoice(); return;
+  }
   const cb=_combatSuiteLire();
   if(cb){ cb((typeof _warSliderMode!=='undefined'&&_warSliderMode==='defend')?'DEFEND:0':'STANDOFF'); } else render();
 }
@@ -8909,6 +8932,7 @@ function attackColony(nodeId,attaquant){
      guerre et n'affrontait jamais personne (mesuré, §91). `resoudreAssautIA` débite elle-même l'AC
      et les jetons — et si elle RENONCE (défense trop forte), rien n'est dépensé. */
   if(p._isAI){ resoudreAssautIA(p,nodeId,{ouvrirGuerre:true}); return; }
+  _photoAttaque=(p===G.player&&!p._isAI&&_aUnEcran()&&!_decisionActive())?scSerialize():null;   // essai annulable (03/10)
   p.acLeft-=_coutAC;p.spentThisTurn+=_coutAC;closePopup();
   if(_coutAC>1){ const _d=detailCoutAssaut(p,nodeId);
     addLog(J('journal.expedition_longue_jours_voyage_actions','🚀 Expédition longue : {v} jours de voyage → {ac} actions{v2}.',{v:_d.jours,ac:_coutAC,v2:(_d.rabais?J('journal.hyperpropulsion_1'," (🌀 Hyperpropulsion : −1)"):'')}),'dim'); }
@@ -8965,10 +8989,14 @@ function _ouvrirFenetreAssaut(nodeId,attaquant){
   if(typeof fenAdversaire==='function')fenAdversaire('wcm');document.getElementById('war-combat-modal').classList.remove('hidden');
   _warSelectColonyTarget(nodeId);
 }
+let _photoAttaque=null;   // hors de G : une photo ne se photographie pas elle-même
 function playerAssaultColony(nodeId,enemyAI,attaquant){
   const _atk=attaquant||G.player;
   enemyAI=enemyAI||defenseurPrincipal(nodeId,_atk);
   if(!enemyAI){addLog(J('journal.assaut_impossible_aucune_nation_adverse','⚠️ Assaut impossible : aucune nation adverse sur {v}.',{v:(NODES[nodeId]&&_i18nRef(NODES[nodeId],'name'))||nodeId}),'red');return;}
+  /* Une attaque lancée pendant TES actions est un essai tant que tu n'as pas engagé : photo complète, rendue par
+     « Annuler » (guerre ouverte, accords révoqués, tension — tout disparaît). Marc, 03/10. */
+  if(!(_atk===G.player&&!_atk._isAI&&!G._warDecisionAssault&&_aUnEcran()&&!_decisionActive())) _photoAttaque=null;   // la photo est prise par `attackColony`, AVANT l'AC
   _atk._attacksThisTurn=(_atk._attacksThisTurn||0)+1; G._warCancelRefund={ac:1,atk:1};
   let war=_warBetween(_atk.civ.id,enemyAI.civ.id);
   /* ⚠️ LA GUERRE S'OUVRAIT AU NOM DE LA MAUVAISE NATION. L'ancienne ligne appelait la façade
@@ -16505,6 +16533,7 @@ function toggleCruiser(){
   updateWarCombatSlider();
 }
 function confirmWarCombat(){
+  _photoAttaque=null;   // engagé : l'essai devient un coup réel
   /* ⚠️ DEUXIÈME VERROU, ET IL N'EST PAS DE TROP. Le bouton est désactivé quand l'engagement dépasse
      le payable (voir `updateWarCombatSlider`), mais un bouton désactivé se contourne — clavier,
      appel direct, ancienne page en cache. On revérifie donc ICI, avec la même formule que le moteur.

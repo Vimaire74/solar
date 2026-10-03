@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-10-03 · v11.32';</script>
+<script>window.SOLAR_BUILD_HTML='2026-10-03 · v11.37';</script>
 <!-- Tampon des erreurs survenues AVANT diagnostic.js (chargé après moteur.js) : il les ramasse au démarrage. -->
 <script>window.__scErreursPrecoces=[];window.addEventListener('error',function(e){try{if(window.scDiagNoterErreur)return;window.__scErreursPrecoces.push({type:'erreur',msg:e.message||String(e),pile:(e.error&&e.error.stack)||'',ou:(e.filename||'').split('/').pop()+':'+e.lineno});}catch(x){}});</script>
 <!-- i18n.js EN TÊTE, avant tout script du corps : il choisit la langue et charge lang/<code>.js (synchrone).
@@ -1341,7 +1341,10 @@ img.nat-emb-i{display:inline-block;width:1.4em;height:1.4em;vertical-align:-.35e
 #inv-opts .inv-opt-benefit,#inv2-opts .inv-opt-benefit{font-size:.86em;margin-bottom:3px}
 #inv-opts .inv-opt-cost,#inv2-opts .inv-opt-cost{font-size:.9em;font-weight:700;color:#ffad7a}
 #inv-opts .inv-opt:hover:not(.inv-taken),#inv2-opts .inv-opt:hover:not(.inv-taken){transform:none}
-.inv-opt-emoji img.inv-art{display:block;width:3.2em;height:3.2em;object-fit:cover;border-radius:12px;margin:0 auto;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+.inv-opt-emoji img.inv-art{display:block;width:3.2em;height:3.2em;max-width:100%;object-fit:cover;border-radius:12px;margin:0 auto;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+#inv-opts .inv-opt,#inv2-opts .inv-opt{grid-template-columns:76px minmax(0,1fr)}
+img.inv-art-i{display:inline-block;width:1.7em;height:1.7em;object-fit:cover;border-radius:6px;vertical-align:-.5em;margin:0 .15em}
+#inv-opts .inv-opt-emoji img.inv-art,#inv2-opts .inv-opt-emoji img.inv-art{width:76px;height:76px}
 </style>
 </head>
 <body>

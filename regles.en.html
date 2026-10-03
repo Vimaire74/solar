@@ -27,6 +27,8 @@
     .som ul{columns:2;column-gap:1.4rem;margin:.3rem 0;padding-left:1.1rem}
     .cle{background:#131a2e;border-left:3px solid #2f6fd0;padding:.55rem .8rem;margin:.8rem 0;border-radius:0 .35rem .35rem 0}
     .backtop{position:fixed;right:.9rem;bottom:.9rem;background:#2f6fd0;color:#fff;text-decoration:none;padding:.55rem .8rem;border-radius:.5rem;font-size:.9rem;box-shadow:0 4px 14px rgba(0,0,0,.5)}
+  .rg-nat{width:1.6em;height:1.6em;vertical-align:-.45em;margin-right:.25em}
+  .rg-inv{display:block;width:120px;max-width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;margin:2px 0 6px;box-shadow:0 2px 10px rgba(0,0,0,.45)}
   </style>
 </head>
 <body>
@@ -65,18 +67,18 @@
 <p>You choose your nation; the others are drawn at random. Its bonus branch gives <strong>−1🔬</strong> on the technologies of that branch.</p>
 <table>
 <tr><th>Nation</th><th>Start</th><th>Force</th><th>Bonus branch</th><th>Passive and base</th></tr>
-<tr><td>🌍 Terrans</td><td>2⚡ 6🪨 3🔬 4❤️</td><td>5</td><td>Spirituality &amp; Nature</td><td>Morale ≥ 7 → +1 AP. Base: Moon.</td></tr>
-<tr><td>🔴 Martians</td><td>4⚡ 4🪨 2🔬 3❤️</td><td>5</td><td>Expansion</td><td>Colonisation −1🪨 −1⚡. Base: Phobos.</td></tr>
-<tr><td>🟠 Jovians</td><td>5⚡ 2🪨 3🔬 3❤️</td><td>4</td><td>Mining &amp; Energy</td><td>Base: Io, 3⚡/turn from turn 1.</td></tr>
-<tr><td>🟣 Belters</td><td>6⚡ 4🪨 1🔬 2❤️</td><td>3</td><td>Navigation &amp; Drives</td><td>Immune to pirates. +1⚡/turn. Base: Eris.</td></tr>
+<tr><td><img class="rg-nat" src="assets/nations/terriens_64.png" alt="">Terrans</td><td>2⚡ 6🪨 3🔬 4❤️</td><td>5</td><td>Spirituality &amp; Nature</td><td>Morale ≥ 7 → +1 AP. Base: Moon.</td></tr>
+<tr><td><img class="rg-nat" src="assets/nations/martiens_64.png" alt="">Martians</td><td>4⚡ 4🪨 2🔬 3❤️</td><td>5</td><td>Expansion</td><td>Colonisation −1🪨 −1⚡. Base: Phobos.</td></tr>
+<tr><td><img class="rg-nat" src="assets/nations/jupiteriens_64.png" alt="">Jovians</td><td>5⚡ 2🪨 3🔬 3❤️</td><td>4</td><td>Mining &amp; Energy</td><td>Base: Io, 3⚡/turn from turn 1.</td></tr>
+<tr><td><img class="rg-nat" src="assets/nations/ceinturiens_64.png" alt="">Belters</td><td>6⚡ 4🪨 1🔬 2❤️</td><td>3</td><td>Navigation &amp; Drives</td><td>Immune to pirates. +1⚡/turn. Base: Eris.</td></tr>
 </table>
 <p>Nation power (the “Power” button in the top bar), once per turn:</p>
 <table>
 <tr><th>Nation</th><th>Power</th><th>Cost</th></tr>
-<tr><td>🌍 Terrans</td><td>Green Diplomacy: +3 Government pts</td><td>3🪨</td></tr>
-<tr><td>🔴 Martians</td><td>Overdrive: +1 AP this turn</td><td>2⚡</td></tr>
-<tr><td>🟠 Jovians</td><td>Orbital Forge: one moon of Jupiter goes to level 2</td><td>1🪨 1⚡</td></tr>
-<tr><td>🟣 Belters</td><td>Pirate Trade: 75% → 2 random resources, 20% → 1, 5% → nothing</td><td>free</td></tr>
+<tr><td><img class="rg-nat" src="assets/nations/terriens_64.png" alt="">Terrans</td><td>Green Diplomacy: +3 Government pts</td><td>3🪨</td></tr>
+<tr><td><img class="rg-nat" src="assets/nations/martiens_64.png" alt="">Martians</td><td>Overdrive: +1 AP this turn</td><td>2⚡</td></tr>
+<tr><td><img class="rg-nat" src="assets/nations/jupiteriens_64.png" alt="">Jovians</td><td>Orbital Forge: one moon of Jupiter goes to level 2</td><td>1🪨 1⚡</td></tr>
+<tr><td><img class="rg-nat" src="assets/nations/ceinturiens_64.png" alt="">Belters</td><td>Pirate Trade: 75% → 2 random resources, 20% → 1, 5% → nothing</td><td>free</td></tr>
 </table>
 
 <h3>Temperaments of computer-controlled nations</h3>
@@ -243,19 +245,19 @@
 <p><strong>Level 1</strong> — chosen on turn 2, active from turn 3 to 5.</p>
 <table>
 <tr><th>Card</th><th>Benefit</th><th>Price to pay</th></tr>
-<tr><td>🕵️ Espionage</td><td>Once on turn 3, 4 or 5 (can be postponed): you take 1 to 3 rival technologies, in <strong>a single category from a single nation</strong>.</td><td>Victim's tension: +6, +8 or +10</td></tr>
-<tr><td>🏭 Heavy Industrialisation</td><td>+4🪨/turn</td><td>−3❤️</td></tr>
-<tr><td>🔬 Intensive Research</td><td>+3🔬/turn</td><td>−3🪨 −1⚡</td></tr>
-<tr><td>🌾 Sustainable Agriculture</td><td>+2❤️/turn</td><td>−2🪨 −1🔬</td></tr>
-<tr><td>🚀 Rapid Expansion</td><td>1 free colonisation and 1 free route</td><td>−1❤️ −1🪨 −1⚡</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv_esp.jpg" alt="" loading="lazy">Espionage</td><td>Once on turn 3, 4 or 5 (can be postponed): you take 1 to 3 rival technologies, in <strong>a single category from a single nation</strong>.</td><td>Victim's tension: +6, +8 or +10</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv_ind.jpg" alt="" loading="lazy">Heavy Industrialisation</td><td>+4🪨/turn</td><td>−3❤️</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv_rec.jpg" alt="" loading="lazy">Intensive Research</td><td>+3🔬/turn</td><td>−3🪨 −1⚡</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv_agr.jpg" alt="" loading="lazy">Sustainable Agriculture</td><td>+2❤️/turn</td><td>−2🪨 −1🔬</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv_exp.jpg" alt="" loading="lazy">Rapid Expansion</td><td>1 free colonisation and 1 free route</td><td>−1❤️ −1🪨 −1⚡</td></tr>
 </table>
 <p><strong>Level 2</strong> — chosen on turn 6, active from turn 7 to 9.</p>
 <table>
 <tr><th>Card</th><th>Benefit</th><th>Price to pay</th></tr>
-<tr><td>⚔️ War Strategy</td><td>Tokens come back in 1 turn instead of 2</td><td>−4🪨 −2⚡</td></tr>
-<tr><td>🕊️ Comfort of the People</td><td>+4❤️/turn</td><td>−4🪨</td></tr>
-<tr><td>🏗️ Advanced Colonies</td><td>Your <em>current</em> colonies go to the maximum level for free. Those acquired later are not affected; upkeep is still due.</td><td>🪨 halved, −3⚡</td></tr>
-<tr><td>🔮 Sacred Union</td><td>Unlocks the Empaths branch, 3 turns of exclusivity</td><td>−3🪨 −4🔬</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv2_war.jpg" alt="" loading="lazy">War Strategy</td><td>Tokens come back in 1 turn instead of 2</td><td>−4🪨 −2⚡</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv2_comfort.jpg" alt="" loading="lazy">Comfort of the People</td><td>+4❤️/turn</td><td>−4🪨</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv2_colonies.jpg" alt="" loading="lazy">Advanced Colonies</td><td>Your <em>current</em> colonies go to the maximum level for free. Those acquired later are not affected; upkeep is still due.</td><td>🪨 halved, −3⚡</td></tr>
+<tr><td><img class="rg-inv" src="assets/invest/grand/inv2_union.jpg" alt="" loading="lazy">Sacred Union</td><td>Unlocks the Empaths branch, 3 turns of exclusivity</td><td>−3🪨 −4🔬</td></tr>
 </table>
 
 <h2 id="s9">9. Strategy cards</h2>

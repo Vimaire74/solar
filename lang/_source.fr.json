@@ -207,6 +207,9 @@
   "avis.colo_vp": "+{n} VP (colonie)",
   "avis.colonie_nv_tombe_combat_contre_perds_jet": "Ta colonie <b>{noeud}</b> (Nv.{newlvl}) tombe — combat {ppow} contre {apow}. Tu perds le jeton de garnison et 2<i class=ri-morale></i>.",
   "avis.colonie_tombe_nv_combat_contre_perds_1_m": "Ta colonie tombe (Nv.{newlvl}) — combat {apow} contre {pdef}. Tu perds 1 moral.",
+  "avis.commerce_pirates_gain": "Les pirates te livrent : <b>{v}</b>",
+  "avis.commerce_pirates_rien": "Les pirates n'ont rien pu te livrer ce tour.",
+  "avis.commerce_pirates_titre": "Commerce avec les pirates",
   "avis.decouvert_derobe_technologie_gardes_mais": "{nation} a découvert que {emoji} {nation2} a dérobé <b>{pris} de tes technologie{v}</b> :<br>{liste}<br><br>Tu les gardes — mais il les a aussi.<br><span style=\"color:#ff9a8a\">Ta population lui en veut : tension +{t} ({niveau}/10){v2}</span>",
   "avis.detruit_route": "{v} détruit ta route",
   "avis.detruite": "{rn} est détruite{v}.",
@@ -966,6 +969,7 @@
   "journal.assez_materiaux_pacte_avec_6_requis": "🕊️ {emoji} {nation} : pas assez de matériaux pour le pacte avec {nation2} (6 requis).",
   "journal.assez_savoir_besoin_1": "⚠️ Pas assez de Savoir (besoin 1<i class=ri-science></i>).",
   "journal.attaque_annulee_ac_rendu": "↩️ Attaque annulée — AC rendu.",
+  "journal.attaque_annulee_retour_choix_guerre": "↩️ Attaque annulée — retour au choix de guerre.",
   "journal.attaque_route_besoin_1_ac": "⚠️ Attaque de route : besoin 1 AC.",
   "journal.attaque_surprise_accord_rompu_agression": "📜 Attaque surprise sur {v} — l'accord est rompu par l'agression.",
   "journal.attaquer_premier": "attaquer en premier.",
@@ -2191,6 +2195,7 @@
   "web.fin_tour_titre": "<div class=\"eot-section\"><h4>📊 Fin du tour {n}</h4>",
   "web.forcer_guerre_refusants_renoncer": "<button class=\"opt\" id=\"sc-f\">Forcer (guerre aux refusants)</button><button class=\"opt\" id=\"sc-r\">Renoncer</button>",
   "web.forcer_guerre_renoncer": "<div style=\"display:flex;gap:8px;flex-wrap:wrap\"><button class=\"eot-btn\" id=\"scd-f\" style=\"flex:1;margin-top:0;background:linear-gradient(135deg,#8a2222,#5a0a0a);border-color:#cc4444;color:#ffcccc\"><i class=ri-energy></i> Forcer — guerre</button><button class=\"eot-btn\" id=\"scd-r\" style=\"flex:1;margin-top:0;background:#14182e;border-color:#5a6a8a;color:#aab8d8\">↩️ Renoncer</button></div>",
+  "web.gain": "Gain",
   "web.garnison_place_comptes_dans_defense": "<div style=\"background:#0e2a18;border:1px solid #3a8a5a;border-radius:8px;padding:6px 9px;margin-bottom:8px;color:#9fe8b8;font-size:.85em\">🏛️ Garnison sur place : <b>{v}</b>{v2}{v3} — comptés dans ta défense.</div>",
   "web.garnison_seule": "la garnison seule",
   "web.guerre": " <span style=\"color:#ff7766\">⚔️ en guerre</span>",
@@ -2318,8 +2323,5 @@
   "web.vote_complet_remplacement_cours": "Vote complet — remplacement en cours…",
   "web.vote_enregistre": "✓ Ton vote est enregistré",
   "web.vp_toi_adversaire_offre_ressources_tente": "VP — Toi : <b>{vy}</b> | Adversaire : <b>{ve}</b><br>Offre des ressources pour tenter la paix, ou refuse et combats.",
-  "avis.commerce_pirates_titre": "Commerce avec les pirates",
-  "avis.commerce_pirates_gain": "Les pirates te livrent : <b>{v}</b>",
-  "avis.commerce_pirates_rien": "Les pirates n'ont rien pu te livrer ce tour.",
-  "web.gain": "Gain"
+  "journal.attaque_annulee_rien_change": "↩️ Attaque annulée — rien n'a changé (pas de guerre, accords et tensions intacts)."
 }
