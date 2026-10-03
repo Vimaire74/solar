@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.38';
+const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.40';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -3041,6 +3041,53 @@ function lireArbreTechnologique(){
    l'écran de score les affiche et la Télépathie les propose. On ne regarde JAMAIS s'il a de quoi
    payer : son économie est invisible sans 📡 Réseau Orbital (§14.7), et la lire serait la triche que
    `test_brouillard_ia` interdit. */
+/* ═══ LE LEVIER DES TECHNOLOGIES DE RANG 3 — NOTES DE MARC (03/10, §207-208) ═══
+   « On va pondérer ensemble les tech de niveau 3 par rapport à leur effet de levier dans le jeu. » La simulation ne
+   voit que ce qui se compte (production, VP, jetons) : ni l'immunité, ni l'exclusivité, ni l'avantage tactique, ni la
+   pression diplomatique. La note (1-10) devient une prime : pleine sur l'achat du rang 3, partielle sur les rangs 1 et 2
+   de la même branche tant que le rang 3 est encore libre (c'est la marche vers lui), décotée par l'horizon. */
+const LEVIER_T3={iadef3:10,hyper3:8,dyson3:8,tele3:8,terra3:6,eveil3:6,extra3:4};
+const LEVIER_POIDS=0.9;                  // VP-équivalent par point de note, au premier tour (×horizon ensuite)
+function levierBranche(branche){
+  const c=CARDS_POOL.find(x=>x&&x.tier===3&&x.branch===branche&&LEVIER_T3[x.id]);
+  return c?{id:c.id,note:LEVIER_T3[c.id]}:null;
+}
+function valeurLevier(coup,nat){
+  try{
+    if(!coup||coup.type!=='tech'||!G)return 0;
+    const card=CARDS_POOL.find(c=>c&&c.id===coup.card); if(!card||!card.branch)return 0;
+    const l=levierBranche(card.branch); if(!l)return 0;
+    if(G.techTaken&&G.techTaken.has(l.id)&&l.id!==card.id)return 0;      // le rang 3 est déjà pris : la branche ne mène plus à rien
+    const total=G.maxTurns||10, horizon=Math.max(0,total-(G.turn||1)+1)/total;
+    const part=card.tier===3?1:(card.tier===2?0.45:0.2);
+    return LEVIER_POIDS*l.note*part*horizon;
+  }catch(e){ return 0; }
+}
+/* ═══ RELIER UNE COLONIE : COMBIEN DE ROUTES, À TRAVERS QUI ? (Marc, 03/10, §208) ═══
+   « Le choix de coloniser doit venir de sa valeur en ressources au niveau 3, de ses VP, − la distance en routes à
+   construire, + la proximité, − une autre nation en travers du chemin, − deux nations… » Plus court chemin (≤ 6 sauts)
+   de la colonie vers le réseau RELIÉ de la nation ; une route déjà à elle ne coûte rien ; un monde tenu par une autre
+   nation sur le chemin compte comme obstacle. Rend {sauts, etrangers} ou null (aucun chemin). Affichage aucun. */
+function _raccordement(nat,nodeId){
+  try{
+    const reseau=new Set((nat.colonies||[]).filter(c=>c.connected||c.nodeId===nat.civ.home).map(c=>c.nodeId)); reseau.add(nat.civ.home);
+    if(reseau.has(nodeId))return {sauts:0,etrangers:0};
+    const proprio={}; for(const o of allPlayers()){ if(!o||o===nat)continue; for(const c of (o.colonies||[]))proprio[c.nodeId]=o.civ.id; }
+    const aMoi=(a,b)=>(nat.routes||[]).some(r=>(r.from===a&&r.to===b)||(r.from===b&&r.to===a));
+    let meilleur=null; const vus={}; const file=[{n:nodeId,s:0,e:new Set(),d:0}];
+    while(file.length){
+      const x=file.shift(); if(x.d>6)continue;
+      const cle=x.n; const cout=x.s+3*x.e.size; if(vus[cle]!==undefined&&vus[cle]<=cout)continue; vus[cle]=cout;
+      if(reseau.has(x.n)){ if(!meilleur||cout<meilleur.s+3*meilleur.etrangers)meilleur={sauts:x.s,etrangers:x.e.size}; continue; }
+      for(const v of ((NODES[x.n]&&NODES[x.n].conn)||[])){
+        const nd=NODES[v]; if(!nd||nd.decorative)continue;
+        const e=new Set(x.e); if(proprio[v]&&!reseau.has(v))e.add(proprio[v]);
+        file.push({n:v,s:x.s+(aMoi(x.n,v)?0:1),e:e,d:x.d+1});
+      }
+    }
+    return meilleur;
+  }catch(e){ return null; }
+}
 function valeurDeni(cardId,nat){
   try{
     if(!G||!cardId||!nat)return 0;
@@ -3256,7 +3303,10 @@ function evaluerProjet(nat,projet){
   /* La référence : ma position au même tour futur, sans avoir rien fait. */
   let ref=0;
   { const t0=G.turn; G.turn=tourFutur; try{ ref=evaluerPositionRelative(nat); }finally{ G.turn=t0; } }
-  return {gain:r.valeur-ref,tours:tours};
+  /* Projet « rang 3 d'une branche » : la note de levier de Marc, décotée par le temps qui restera pour en profiter. */
+  let _lev=0;
+  try{ if(projet.cible&&projet.cible.type==='tech'){ const l=levierBranche(projet.cible.branche); if(l&&!(G.techTaken&&G.techTaken.has(l.id))) _lev=LEVIER_POIDS*l.note*Math.max(0,restants-tours+1)/total; } }catch(e){}
+  return {gain:r.valeur-ref+_lev,tours:tours};
 }
 function _tracerProjet(nat,acte,projet,gain){
   if(!G||!nat||!nat.civ)return;
@@ -11616,13 +11666,25 @@ function evaluerPosition(nat,observateur){
      pour AVOIR une option, c'est payer pour ne jamais la prendre. Le potentiel d'une colonie reliée
      est désormais le même quel que soit son niveau — coloniser reste récompensé, améliorer n'est
      plus puni. Marc : « des colonies connectées niveau 3, c'est le must pour les ressources ». */
-  let potentiel=0;
+  let potentiel=0, _isolees=0;
   for(const c of (nat.colonies||[])){
     const n=NODES[c.nodeId]; if(!n||n.decorative)continue;
     const marge=Math.max(0,(n.maxLv||3)-1);            // la marge TOTALE du nœud, pas celle qui reste
-    potentiel+=marge*(n.baseVP||1)*0.45*horizon;
-    if(!c.connected)potentiel-=(n.baseVP||1)*0.5;    // isolée : la moitié des VP, et un revenu nul
+    if(c.connected){ potentiel+=marge*(n.baseVP||1)*0.45*horizon; continue; }
+    /* ISOLÉE (Marc, 03/10, §208) : elle ne vaut son potentiel que si on peut la RELIER, et seulement à partir du tour où
+       elle le sera. Avant : plein potentiel, −0,5×VP — Pluton isolée valait ~25 points, d'où les colonies lointaines
+       « à tout va ». Un tour par route manquante ; une nation en travers du chemin divise par deux, deux par cinq ;
+       aucun chemin praticable : rien. Chaque route à poser coûte en plus son action et son matériau. */
+    potentiel-=(n.baseVP||1)*0.5;                     // isolée : la moitié des VP, et un revenu nul
+    _isolees++;
+    const rc=_raccordement(nat,c.nodeId);
+    if(!rc)continue;
+    const delai=rc.sauts, resteApres=Math.max(0,restants-delai);
+    const obstacle=rc.etrangers===0?1:(rc.etrangers===1?0.5:0.2);
+    potentiel+=marge*(n.baseVP||1)*0.45*(resteApres/total)*obstacle - rc.sauts*0.8;
   }
+  /* Au-delà d'UNE colonie isolée, chaque autre pèse : relier d'abord, s'étendre ensuite (§208). */
+  if(_isolees>1)potentiel-=(_isolees-1)*2*horizon;
 
   /* SÉCURITÉ — le moral est une falaise. Et la force sert autant à dissuader qu'à conquérir. */
   const moral=nat.res.morale||0;
@@ -11970,6 +12032,9 @@ function _reponseSimulee(p){
     return {peace:true};
   }
   if(k==='raid_target')return {targetId:opts.length?opts[0].id:null};
+  /* Choisir la nation à calmer (carte Stratégie) : la tension la plus forte, celle qui menace le plus. Repris du pilote du
+     serveur le 03/10 — UNE SEULE COPIE des réponses des ordinateurs, ici ; `server/driver.js` l'appelle. */
+  if(k==='strategy_calm'){ const l=(o.options||[]).slice().sort(function(a,b){return (b.tension||0)-(a.tension||0);}); return {targetId:l.length?l[0].id:null}; }
   if(k==='ai_dyson'||k==='human_dyson')return {war:false};
   if(k==='dyson_build')return {force:false};
   if(k==='event_comm'){const c=o.cands||[];return {aiId:c.length?c[0].id:null};}
@@ -11978,6 +12043,7 @@ function _reponseSimulee(p){
   const cle=k==='agenda'?'agendaId':(k==='strategy'?'cardId':((k==='invest1'||k==='invest2')?'cardId':(k==='espionage'?'id':(k==='extrasolar'?'node':'targetId'))));
   const a={}, op=opts[0];
   a[cle]=(op.id!==undefined)?op.id:(op.node!==undefined?op.node:op.branch);
+  if(cle==='targetId'&&a.value===undefined)a.value=a.targetId;   // le pilote du serveur répondait `value` : les deux clés, sans risque
   return a;
 }
 /* Vide la file des questions en y répondant nous-mêmes. Bornée : une chaîne qui ne se termine pas
@@ -12528,7 +12594,9 @@ enregistrerCerveau('tacticien', function(ctx){
       /* · `valeurTemperament` — ce que le tempérament CHERCHE (Marc : « le tempérament oriente ce
            qu'elle cherche, le cerveau comment elle le calcule »). Le Bâtisseur vise les colonies
            reliées au niveau 3. */
-      +((typeof valeurTemperament==='function')?valeurTemperament(c,ctx.nation):0);
+      +((typeof valeurTemperament==='function')?valeurTemperament(c,ctx.nation):0)
+      /* · `valeurLevier` — la note de levier des rangs 3 fixée par Marc (§207-208). */
+      +((typeof valeurLevier==='function')?valeurLevier(c,ctx.nation):0);
     if(ruine){ ruineux.add(c); continue; }
     if(valeur>meilleureValeur){ second=meilleur; secondeValeur=meilleureValeur;
                                   meilleureValeur=valeur; meilleur=c; }

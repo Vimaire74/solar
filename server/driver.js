@@ -252,7 +252,16 @@ class GameDriver {
     const id = (n && typeof n === 'object') ? (n.civ && n.civ.id) : n;
     return id ? this.nation(id) : null;
   }
+  /* ═══ UNE SEULE COPIE DES RÉPONSES DES ORDINATEURS (Marc, 03/10) ═══
+     Ce pilote tenait sa propre copie de la fonction du moteur `_reponseSimulee` (pilote local de l'appli). Comparées le
+     03/10 : la défense répondait toujours 2 jetons ici (le moteur calcule `defenseIA`), `strategy_calm` n'existait qu'ici,
+     et la clé par défaut différait. Le moteur porte désormais la seule version ; on l'appelle. L'ancienne copie ne reste
+     que pour un moteur qui ne l'aurait pas (témoin figé des bancs). Banc : test_reponses_ia_unifiees.js. */
   _reponseIA(p){
+    if(typeof this.sb._reponseSimulee==='function') return this.sb._reponseSimulee(p);
+    return this._reponseIAAncienne(p);
+  }
+  _reponseIAAncienne(p){
     const o = (p && p.payload) || {}, k = p && p.kind, opts = o.options || [];
     const nat = this._natDe(p), sb = this.sb;
     /* Les décisions de fond sont calculées par le MOTEUR (`iaVeutLaPaix`, `iaChoixDeCombat`) :

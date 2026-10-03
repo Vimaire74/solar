@@ -16,11 +16,19 @@
      Le 01/10 il a été ramené de 84 Mo à 3,5 Mo (36 fichiers). Un fichier identique à ce qui est déjà
      en ligne n'a rien à faire ici ; une image ou un banc nouveau ou modifié, oui. -->
 
-## 📦 CE LOT EST EN **v11.38** · cache `sw.js` **v259** · 2026-10-03
+## 📦 CE LOT EST EN **v11.40** · cache `sw.js` **v261** · 2026-10-03
 
 > Pour savoir ce qui est EN LIGNE : ouvre solar-game.com, la version est écrite sur l'écran de
-> connexion. Si elle ne dit pas **v11.38**, l'envoi ou le redéploiement n'a pas pris.
+> connexion. Si elle ne dit pas **v11.40**, l'envoi ou le redéploiement n'a pas pris.
 > ⚠️ **Les DEUX ressources Coolify** doivent être redéployées : le site ET le serveur.
+
+**v11.40 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js) — `docs/REPRISE.md` §208
+- Ordinateurs : les technologies de rang 3 sont visées selon leur levier (IA Défensive 10, Hyperpropulsion 8, Sphère de Dyson 8, Télépathie 8, Terraformation 6, Éveil Collectif 6, Extra-Solaire 4).
+- Ordinateurs : une colonie isolée ne vaut que ce qu'on pourra en tirer une fois reliée (routes à poser, nations en travers du chemin, tours restants) ; plusieurs colonies isolées sont pénalisées.
+
+**v11.39 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js, server/driver.js) — `docs/REPRISE.md` §206
+- Réponses des ordinateurs (paix, accords, défense, cibles…) : une seule version, la même dans l'appli et sur le serveur.
+- En ligne, un ordinateur qui se défend calcule ses jetons comme dans l'appli (il engageait toujours 2 jetons).
 
 **v11.38 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js) — `docs/REPRISE.md` §205
 - Fenêtre « Action impossible » : les ressources manquantes sont écrites en toutes lettres (« il faut des matériaux et de l'énergie ») au lieu d'un blanc.
