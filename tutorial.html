@@ -6,14 +6,14 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-10-02 · v11.20';</script>
+<script>window.SOLAR_BUILD_HTML='2026-10-03 · v11.22';</script>
 <!-- Tampon des erreurs survenues AVANT diagnostic.js (chargé après moteur.js) : il les ramasse au démarrage. -->
 <script>window.__scErreursPrecoces=[];window.addEventListener('error',function(e){try{if(window.scDiagNoterErreur)return;window.__scErreursPrecoces.push({type:'erreur',msg:e.message||String(e),pile:(e.error&&e.error.stack)||'',ou:(e.filename||'').split('/').pop()+':'+e.lineno});}catch(x){}});</script>
 <!-- i18n.js EN TÊTE, avant tout script du corps : il choisit la langue et charge lang/<code>.js (synchrone).
      Les écrans d'accueil (scripts inline plus bas) et moteur.js (qui porte t()) le trouvent déjà là. -->
 <script src="i18n.js"></script>
 <script>/* Taille du texte mémorisée (menu Journal → Aa) : appliquée avant le premier rendu, sans à-coup. */
-(function(){try{var t=localStorage.getItem('sc_taille');var m={'11':'14','13':'16','15':'18','17':'20'};if(m[t]){t=m[t];localStorage.setItem('sc_taille',t);}if(t&&/^(14|16|18|20)$/.test(t))document.documentElement.style.setProperty('--sc-fs',t+'px');}catch(e){}})();</script><!-- ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE : celle-ci, `SOLAR_BUILD_JS` (tutorial.js) et `SOLAR_BUILD_MOTEUR` (moteur.js). Surveillé par test_versions.js. -->
+(function(){try{var t=localStorage.getItem('sc_taille');var m={'11':'14','13':'16','15':'18','17':'20'};if(m[t]){t=m[t];localStorage.setItem('sc_taille',t);}if(t&&/^(14|16|18|20)$/.test(t))document.documentElement.style.setProperty('--sc-fs',t+'px');}catch(e){}})();</script><!-- ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE : celle-ci, `SOLAR_BUILD_JS` (online.js) et `SOLAR_BUILD_MOTEUR` (moteur.js). Surveillé par test_versions.js. -->
 <!-- PWA : installable + plein écran (sans barre de navigateur) -->
 <meta name="theme-color" content="#070718">
 <link rel="manifest" href="assets/pwa/manifest.webmanifest">
@@ -1001,7 +1001,7 @@ body{font-size:var(--sc-fs,16px);}
    puis seulement le verbe. Marc joue vite et ne lit pas les textes : ce qu'il doit savoir tient dans le
    médaillon, le nom et les deux boutons (rouge à gauche = poursuivre / refuser, vert à droite = accepter /
    proposer). Une seule famille pour toutes les fenêtres, assemblée par `fenBlason()` (couche d'affichage,
-   plus bas) ; le corps du jeu (moteur.js) et le mode en ligne (tutorial.js) l'appellent tous les deux.
+   plus bas) ; le corps du jeu (moteur.js) et le mode en ligne (online.js) l'appellent tous les deux.
    Tons : .fen-war (rouge), .fen-peace (vert), .fen-info (bleu), .fen-event (or), .fen-neutre (gris).
    ═══════════════════════════════════════════════════════════════════════════════════════ */
 .fen-wrap{width:100%;max-width:470px;padding-top:34px;box-sizing:border-box;margin:0 auto}
@@ -1392,13 +1392,13 @@ img.nat-emb-i{display:inline-block;width:1.4em;height:1.4em;vertical-align:-.35e
 </script>
 <div id="civ-sel" class="overlay">
   <!-- ⚠️ CECI est le VRAI écran d'accueil / de connexion, celui que voit le joueur au démarrage.
-       `screenAuth()` dans tutorial.js est un SECOND écran, visible seulement si on annule une partie.
+       `screenAuth()` dans online.js est un SECOND écran, visible seulement si on annule une partie.
        Toute information destinée à l'écran de connexion doit être ajoutée ICI (piège vécu : le
-       numéro de version et le lien tutoriel avaient été mis dans tutorial.js et n'apparaissaient pas).
+       numéro de version et le lien tutoriel avaient été mis dans online.js et n'apparaissaient pas).
        ═══ REFONTE 15/09 (maquette validée par Marc, §124) : image de fond (vaisseau), logo Michroma,
        carte de connexion en verre dépoli poussée EN BAS sur téléphone / À DROITE sur ordinateur.
        Le jeu s'appelle « SOLAR » tout court (Marc). Plus AUCUNE fiche de nation ici : le choix des
-       nations n'a sa place qu'à la création d'une partie (tutorial.js `screenCreate`). -->
+       nations n'a sa place qu'à la création d'une partie (online.js `screenCreate`). -->
   <div id="lv-panel">
     <h1 class="lv-logo">SOLAR</h1>
     <div class="lv-links">
@@ -1478,7 +1478,7 @@ function lvKey(e){
   try{ if(e.target&&e.target.blur)e.target.blur(); }catch(_){} // referme le clavier mobile
   if(typeof lvSubmit==='function') lvSubmit();
 }
-/* Afficher / masquer le mot de passe. Défini ICI (et non injecté par tutorial.js) pour que le bouton
+/* Afficher / masquer le mot de passe. Défini ICI (et non injecté par online.js) pour que le bouton
    existe aussi en solo et dans le tutoriel, et pour qu'il soit positionné par le CSS, pas à la main. */
 function lvEye(){
   const p=document.getElementById('lv-pass'), b=document.getElementById('lv-eye');
@@ -1490,7 +1490,7 @@ function lvEye(){
 }
 /* Numéro de build affiché sur l'écran d'accueil. C'est le SEUL moyen fiable de savoir quelle
    version tourne réellement en ligne (on a perdu deux jours faute de l'avoir). Si index.html et
-   tutorial.js portent des builds différents, on l'affiche en rouge : un seul des deux a été mis en
+   online.js portent des builds différents, on l'affiche en rouge : un seul des deux a été mis en
    ligne (upload partiel ou cache). */
 function lvShowBuild(){
   try{
@@ -1522,7 +1522,7 @@ async function lvTryAutoLogin(){
     }else{ try{localStorage.removeItem('sc_remember');}catch(e){} } // session expirée → on oublie
   }catch(e){}
 }
-/* ⚠️ lvShowBuild est appelé ICI et non dans lvTryAutoLogin : tutorial.js REMPLACE window.lvTryAutoLogin,
+/* ⚠️ lvShowBuild est appelé ICI et non dans lvTryAutoLogin : online.js REMPLACE window.lvTryAutoLogin,
    donc tout appel placé dedans serait du code mort dès que la couche en ligne est chargée. */
 document.addEventListener('DOMContentLoaded',()=>{ lvShowBuild(); lvAppPrep(); setTimeout(()=>{ lvShowBuild(); if(!window.SOLAR_APP&&typeof lvTryAutoLogin==='function')lvTryAutoLogin(); },300); });   // application : jamais de connexion automatique (22/09)
 function lvSolo(){document.getElementById('lv-solo-pick').classList.remove('hidden');document.getElementById('lv-auth').style.display='none';var _a=document.getElementById('lv-app');if(_a)_a.style.display='none';document.getElementById('lv-solo-pick').scrollIntoView({behavior:'smooth'});}
@@ -1554,7 +1554,7 @@ function lvAppNouvelle(){
      Trois lignes FIXES : (1) médaillon + nation, tour, AC, gouvernement ; (2) les quatre ressources en
      quatre tuiles de largeur égale — le moral ne peut plus passer à la ligne (demande §116.5) ; (3) VP et
      jetons à gauche, bouton « Pouvoir » (ex-Capacité) et « À TOI · Passer » à droite. Les ids historiques
-     sont conservés : le moteur (renderTopBar, uiFillIncome) et tutorial.js (badgeTour) les remplissent. -->
+     sont conservés : le moteur (renderTopBar, uiFillIncome) et online.js (badgeTour) les remplissent. -->
 <div id="top-bar" style="display:none">
   <div class="tb-l1">
     <span id="civ-badge-top" class="cbt-wrap"></span>
@@ -1572,7 +1572,7 @@ function lvAppNouvelle(){
     <span class="tb-puce jet" id="tb-jet" title="Jetons Force engageables (net) — utilisables en guerre ou pour un raid. Exclut la garnison des colonies, les jetons posés sur les routes et ceux en récupération." data-i18n-title="ui.title_jetons_force_engageables_net_utilisables">0 <i></i></span>
     <span class="tb-esp"></span>
     <button class="tb-pouvoir" id="btn-ability" type="button" onclick="useAbility()"><span class="k">✦</span><span data-i18n="ui.pouvoir">Pouvoir</span></button>
-    <!-- « À TOI » : DANS la barre du haut (demande de Marc). En ligne, `badgeTour` (tutorial.js) l'allume
+    <!-- « À TOI » : DANS la barre du haut (demande de Marc). En ligne, `badgeTour` (online.js) l'allume
          en vert (à toi) ou en rouge (« LE MARTIEN JOUE ») ; en solo, renderTopBar. PASSER n'apparaît
          que pendant TON tour d'action en ligne (renonce à UNE action, pas à la manche). -->
     <span id="tb-etat"><span id="a-toi-badge" data-i18n="ui.a_toi">À TOI</span><button id="passer-btn" type="button" data-i18n="ui.passer">Passer</button></span>
@@ -1600,7 +1600,7 @@ function lvAppNouvelle(){
     <!-- Carte « Réglages » (v10.62, maquette validée) : Aa, Règles, Copier, et le bouton de fin selon
          la partie — solo : « Recommencer la partie » ; en ligne avec d'autres humains : « Admettre sa
          défaite » (ex-Concéder, vote des autres) et, pour le créateur, « Renoncer à jouer » (une IA
-         reprend son rôle, sans vote). tutorial.js (`concederVisible`) choisit lesquels montrer. -->
+         reprend son rôle, sans vote). online.js (`concederVisible`) choisit lesquels montrer. -->
     <div class="jr-card" id="jr-reglages">
       <div class="jr-kicker" data-i18n="ui.reglages">Réglages</div>
       <div class="jr-row">
@@ -1974,7 +1974,7 @@ function lvAppNouvelle(){
   </div></div>
 </div>
 <!-- ═══ NÉGOCIATION DE PAIX — fenêtre « Blason » (Marc, 14/09) : l'adversaire d'abord. Les ids `pm-*` sont
-     remplis par `showPeaceModal` (solo) et `showPeaceReal` (tutorial.js). Le bloc d'offre de ressources est
+     remplis par `showPeaceModal` (solo) et `showPeaceReal` (online.js). Le bloc d'offre de ressources est
      conservé tel quel dans sa logique (`adjustPeaceOffer`, `_updatePeaceDisplay`). -->
 <style>
 .pm-offre{display:flex;flex-direction:column;gap:6px}
@@ -2060,7 +2060,7 @@ function lvAppNouvelle(){
             corps:'<p>…</p>' (HTML), milieu:'<…>' (HTML libre : curseur, VS…), note:'…',
             boutons:[{k:'Poursuivre', s:'la guerre', cls:'no', onclick:'…', id:'…', disabled:true}, …],
             colonne:true (boutons empilés), id:'…' (id du .fen) }
-   Rend une chaîne HTML. Les appelants (moteur.js en solo, tutorial.js en ligne) s'en servent quand elle
+   Rend une chaîne HTML. Les appelants (moteur.js en solo, online.js en ligne) s'en servent quand elle
    existe et gardent leur ancien rendu sinon — le serveur, lui, n'a pas de document.
    ═══════════════════════════════════════════════════════════════════════════════════════ */
 function fenBlason(spec){
@@ -2168,7 +2168,7 @@ function fenAttaques(hits, opts){
 /* ═══ RÉDUIRE UNE FENÊTRE D'INFORMATION (Marc, 01/10) ═══
    « Les fenêtres d'informations ne sont pas toutes réductibles, or dans ce cas précis j'aurais voulu
    aller voir dans le journal ce qui se passe au moment de la fin de tour. » Même mécanisme que le
-   bandeau « joueur absent » d'tutorial.js (`absenceBanner`) : un « – » replie, une pastille rend.
+   bandeau « joueur absent » d'online.js (`absenceBanner`) : un « – » replie, une pastille rend.
    Ne vaut que pour les fenêtres qui n'ont QU'UN bouton de fermeture (bilan, événement, découverte,
    investissements activés, guerre déclarée, avis « attaqué par ») : rien n'est validé tant qu'elle
    est repliée, le jeu reste en pause exactement comme si elle était ouverte — seule la pastille la
@@ -2177,10 +2177,10 @@ function fenAttaques(hits, opts){
    La pastille vit en bas à droite, au-dessus de la barre des onglets (là où ✓/↩ s'affiche) : en haut,
    elle recouvrait le titre du panneau ouvert. */
 /* 02/10 (Marc) : « je t'avais demandé ça pour TOUTES les fenêtres ». Il avait raison (05/09, en ligne :
-   « tu peux mettre un − pour minimiser la fenêtre ? », déjà fait pour le site dans tutorial.js, `scRendreReductible`).
+   « tu peux mettre un − pour minimiser la fenêtre ? », déjà fait pour le site dans online.js, `scRendreReductible`).
    Donc TOUTES les fenêtres du solo, décisions comprises : replier ne répond à rien, la pastille rend la
    fenêtre intacte — on ne peut pas valider par mégarde en repliant. Seule exception : la fenêtre de débogage. */
-var FEN_REDUCTIBLES=['eot-modal','event-modal','event-announce-modal','discovery-modal','invest-active-modal','war-modal','sc-attack-notice',
+var FEN_REDUCTIBLES=['sc-raid-result','eot-modal','event-modal','event-announce-modal','discovery-modal','invest-active-modal','war-modal','sc-attack-notice',
   'invest-modal','invest2-modal','agenda-sel-modal','strategy-modal','espionage-modal','empath-copy-modal','dyson-modal','war-combat-modal',
   'peace-modal','forced-war-modal','route-token-modal','route-manage-modal','route-capture-modal','forge-modal','accord-modal','tech-detail-modal',
   'event-choice-modal','aad-overlay','calm-overlay','sc-decision'];
@@ -2516,7 +2516,7 @@ setInterval(function(){try{if(typeof scSaveGame==='function')scSaveGame();}catch
    Nécessite HTTPS (ou localhost). Silencieux si non supporté.
    + Détection de MISE À JOUR : quand une nouvelle version est déployée, l'app installée s'actualise
    automatiquement (petit bandeau) au lieu de rester coincée sur une vieille version en cache
-   → garantit que le multijoueur (tutorial.js) et les visuels restent identiques au web. */
+   → garantit que le multijoueur (online.js) et les visuels restent identiques au web. */
 /* ⚠️ PAS DE SERVICE WORKER DANS L'APPLICATION (Capacitor, 13/09) : ses fichiers sont embarqués,
    et un service worker qui tenterait de mettre en cache `https://localhost/…` n'apporterait rien
    sinon des mises à jour fantômes. `window.Capacitor.isNativePlatform()` n'existe que dans l'appli. */
@@ -2555,7 +2555,7 @@ if ('serviceWorker' in navigator && !_natif) {
 /* ═══ EMBLÈMES DES NATIONS (01/10, v11.11) ═══
    Un seul point de passage, AFFICHAGE PUR (aucune règle) : toute médaille dont le texte est exactement
    l'émoji d'une nation reçoit l'emblème de cette nation. On ne touche pas aux ~370 endroits du code qui
-   écrivent ces émojis (moteur.js, tutorial.js, index.html) : ils continuent d'écrire l'émoji, et c'est ici,
+   écrivent ces émojis (moteur.js, online.js, index.html) : ils continuent d'écrire l'émoji, et c'est ici,
    après coup, qu'il devient une image. Hors navigateur (serveur), ce script n'existe pas : rien ne change.
    ⚠️ Une médaille qui repasse à un émoji ordinaire (🤝, ⚔️…) perd la classe `nat-emb-on`, sinon sa
    police à 0 la rendrait invisible. `.nat-e` = petite pastille dans une ligne (score, classement). */
@@ -2578,7 +2578,28 @@ if ('serviceWorker' in navigator && !_natif) {
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',demarrer); else demarrer();
 })();
 </script>
-<!-- Couche EN LIGNE (mode multijoueur). Optionnelle : si tutorial.js est absent, le solo fonctionne normalement. -->
+<script>
+/* ═══ TITRES TROP LONGS POUR L'ÉCRAN (03/10, v11.22) ═══ AFFICHAGE PUR.
+   Michroma est très large : un titre d'un seul long mot (« DÉVELOPPEMENT TECHNOLOGIQUE ») dépassait des
+   fenêtres au téléphone, surtout avec le réglage Aa agrandi. Tout titre qui déborde est réduit pas à pas
+   (jusqu'à 45 %), puis coupé en dernier recours. On n'observe pas l'attribut `style` (celui qu'on modifie). */
+(function(){
+  var SEL='.fen .fen-nation, .fen .fen-kicker, .fen h2, .fen h3, #cn h1, #cn .cn-niv, #cn .cn-titre h2';
+  function ajuster(el){
+    if(!el.clientWidth) return;
+    el.style.removeProperty('font-size'); el.style.removeProperty('overflow-wrap');
+    var base=parseFloat(getComputedStyle(el).fontSize)||16, t=base, n=0;
+    while(el.scrollWidth>el.clientWidth+1 && t>base*0.45 && n<25){ t*=0.93; el.style.setProperty('font-size',t.toFixed(1)+'px','important'); n++; }
+    if(el.scrollWidth>el.clientWidth+1) el.style.setProperty('overflow-wrap','anywhere');
+  }
+  var prevu=false;
+  function passe(){ prevu=false; try{ document.querySelectorAll(SEL).forEach(ajuster); }catch(e){} }
+  function planifier(){ if(prevu) return; prevu=true; (window.requestAnimationFrame||setTimeout)(passe); }
+  function demarrer(){ passe(); try{ new MutationObserver(planifier).observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class','hidden']}); }catch(e){} window.addEventListener('resize',planifier); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',demarrer); else demarrer();
+})();
+</script>
+<!-- Couche EN LIGNE (mode multijoueur). Optionnelle : si online.js est absent, le solo fonctionne normalement. -->
 <script src="tutorial.js"></script>
 </body>
 </html>

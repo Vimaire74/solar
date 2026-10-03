@@ -172,7 +172,7 @@
 </ul>
 
 <h3>6.5 Cohabitation</h3>
-<p>Only Extra-Solar Exploration lets two nations occupy the same node, on Eris, Pluto or Triton.</p>
+<p>Only Extra-Solar Exploration lets two nations occupy the same node, on Pluto or Triton (never Eris). The occupant is notified when a nation settles next to it.</p>
 <ul>
 <li>The original occupant keeps its colony intact.</li>
 <li>The newcomer receives a <strong>level 1, non-upgradable</strong> colony, with a <strong>forced trade agreement</strong> on that node. It counts fully for VP and agendas.</li>
@@ -199,7 +199,7 @@
 <tr><td>T3</td><td>🔍 Defensive AI</td><td>+4 Force tokens; immunity to raids and pirates</td><td>5🔬 2⚡ 2🪨</td><td>5</td></tr>
 <tr><td>T1</td><td>🧪 Quantum Computer</td><td>+3🔬/turn, −1⚡/turn</td><td>2🔬 2🪨</td><td>1</td></tr>
 <tr><td>T2</td><td>🧪 Advanced Robotics</td><td>+2🪨/turn</td><td>3🔬 2🪨 2⚡</td><td>3</td></tr>
-<tr><td>T3</td><td>🧪 Extra-Solar Exploration</td><td>Colonise Eris, Pluto or Triton even if occupied (§6.5). +8 VP if you have 5 technologies or more</td><td>5🔬 3⚡ 2🪨</td><td>5</td></tr>
+<tr><td>T3</td><td>🧪 Extra-Solar Exploration</td><td>Colonise Pluto or Triton even if occupied (§6.5). +8 VP if you have 5 technologies or more</td><td>5🔬 3⚡ 2🪨</td><td>5</td></tr>
 <tr><td>T1</td><td>🕊️ Greening</td><td>+2❤️ at once, +1❤️/turn</td><td>2🪨 1🔬</td><td>1</td></tr>
 <tr><td>T2</td><td>🕊️ Empathic Network</td><td>+1❤️ at once, +2❤️/turn, +1🔬/turn</td><td>2🔬 2🪨 2⚡</td><td>3</td></tr>
 <tr><td>T3</td><td>🕊️ Collective Awakening</td><td>+2🔬/turn; +1 VP per connected colony in the final score</td><td>5🔬 2🪨</td><td>5</td></tr>
@@ -342,7 +342,7 @@
 <table>
 <tr><th>Tension</th><th>Effect</th></tr>
 <tr><td>6 or more</td><td>Demonstrations: −1❤️/turn per nation concerned. Nothing towards a nation you are already at war with.</td></tr>
-<tr><td>10</td><td>Forced popular war: both sides lose 2❤️. The other nations pay nothing.</td></tr>
+<tr><td>10</td><td><strong>Ultimatum</strong>: the people demand war, but it is not declared at once. The nation has <strong>one turn</strong> to bring the tension below 10 (Calm the population, trade agreement, pact, Diplomacy card); during the ultimatum, the passive “no grievance: −1” drop does not apply. If the tension is still at 10 at the end of the following turn: <strong>forced popular war</strong>, both sides lose 2❤️. The other nations pay nothing. Same rule for computer-run nations. The log states the cause of every tension rise.</td></tr>
 </table>
 <p>A trade agreement or a pact is refused above <strong>7</strong> tension, or in case of war.</p>
 
@@ -362,7 +362,7 @@
 
 <h3>14.1 How it starts</h3>
 <p class="cle"><strong>An assault is not a declaration of war.</strong> It is a <strong>surprise strike</strong> — the attacker gives no warning. The assaulted nation learns of it when it comes to resist: it chooses its tokens (and its Supercruiser) and the battle is resolved at once. But <strong>no war opens</strong>: what the aggression leaves behind is the <strong>tension</strong> of the nation attacked.</p>
-<p><strong>Tension is the only road to war.</strong> Each captured colony adds <strong>+8</strong> to the attacked nation's tension, each repelled assault <strong>+6</strong> — a failed attack is not forgiven. It adds up, up to 10: a second captured colony therefore almost always leads to war. The attacker adds nothing to its own. <strong>At 10, at the end of the turn, the people demand war</strong>: that is the forced popular war, and it is the only door — along with refusing a Dyson Sphere and unmasked espionage. At that moment you can still buy or propose peace; the window tells you what the war will cost you.</p>
+<p><strong>Tension is the only road to war.</strong> Each captured colony adds <strong>+8</strong> to the attacked nation's tension, each repelled assault <strong>+6</strong> — a failed attack is not forgiven. It adds up, up to 10: a second captured colony therefore almost always leads to war. The attacker adds nothing to its own. <strong>At 10, at the end of the turn, the people issue an ultimatum; if the tension is still at 10 at the end of the following turn, the people demand war</strong>: that is the forced popular war, and it is the only door — along with refusing a Dyson Sphere and unmasked espionage. At that moment you can still buy or propose peace; the window tells you what the war will cost you.</p>
 <p>Whoever wants war at any price therefore still gets it: it is enough to attack as long as actions remain. It simply does not arrive in the middle of the turn in which you have just lost morale by losing a colony.</p>
 <p>Same sequence whether the assault comes from a player or from the computer. An assault <strong>breaks the trade agreement</strong> that bound the two nations — you do not trade with those you attack — but it breaks neither routes nor cohabitation colonies: that only happens on the declaration of a real war.</p>
 
@@ -452,7 +452,7 @@
 <tr><th>Source</th><th>Calculation</th></tr>
 <tr><td>Colonies</td><td>VP of the node × level, ×1 if connected, ×0.5 if isolated, <strong>+1 per connected colony</strong></td></tr>
 <tr><td>Routes</td><td>+1 VP each</td></tr>
-<tr><td>Cards</td><td>VP written on the card: technologies 1 / 3 / 5 by level; military cards, their own value</td></tr>
+<tr><td>Cards</td><td>VP written on the card: technologies 1 / 3 / 5 by level; military cards, their own value — a repeatable card counts only once</td></tr>
 <tr><td>Technology bonus</td><td>+0.5 VP per card of the technology tree, rounded down</td></tr>
 <tr><td>Income per turn</td><td>Per resource, on your real gross income (colonies, cards, agreements): +2 VP above 5/turn, +5 VP above 10/turn</td></tr>
 <tr><td>Agenda</td><td>Bonus if the condition is met — <strong>revealed and counted at the end only</strong>: the VP shown during the game do not include it</td></tr>

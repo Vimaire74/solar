@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-02 · v11.20';
+const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.22';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -334,7 +334,7 @@ const CARDS_POOL=[
    effect:'+2<i class=ri-materials></i>/tour. Automatisation industrielle — rendement accru.',rGain:{materials:2},
    cost:{science:3,materials:2,energy:2},vp:3},
   {id:'extra3',branch:'sciences_exp',tier:3,type:'sciences_exp',name:'Exploration Extra-Solaire',emoji:'🚀',
-   effect:'+8 VP si ≥5 techs. Colonise Éris/Pluton/Triton.',spec:'extrasolar',spec2:'gas_unlock',
+   effect:'+8 VP si ≥5 techs. Colonise Pluton ou Triton.',spec:'extrasolar',spec2:'gas_unlock',
    cost:{science:5,energy:3,materials:2},vp:5},
   // ── SPIRITUALITÉ & NATURE ────────────────────────────────────────────────────
   {id:'vegetal1',branch:'spiritualite_nature',tier:1,type:'spiritualite_nature',name:'Végétalisation',emoji:'🌿',
@@ -1429,7 +1429,64 @@ function adversaireDeGuerre(nat,w){
 function _tk(x){return x==='player'?((G.player&&G.player.civ&&G.player.civ.id)||'player'):x;}
 function getTens(from,to){from=_tk(from);to=_tk(to);return((G.tensions[from]||{})[to])||0;}
 function setTens(from,to,val){from=_tk(from);to=_tk(to);if(!G.tensions[from])G.tensions[from]={};G.tensions[from][to]=Math.max(0,Math.min(10,val));}
-function addTens(from,to,delta){setTens(from,to,getTens(from,to)+delta);}
+function addTens(from,to,delta,motif){setTens(from,to,getTens(from,to)+delta); if(motif&&delta>0)_griefNoter(from,to,delta,motif);}
+/* ═══ LES GRIEFS GARDENT LEUR CAUSE (Marc, 02/10 : « pourquoi je suis en guerre populaire forcée alors
+   qu'ils m'ont rien fait ? ») ═══ Chaque hausse de tension qui connaît son motif l'écrit ici, par couple,
+   avec le tour. C'est ce que l'ultimatum récapitule. Les douze derniers suffisent. */
+function _griefNoter(from,to,n,motif){
+  try{
+    from=_tk(from); to=_tk(to); if(!G.griefs)G.griefs={};
+    const k=from+'|'+to; const l=(G.griefs[k]=G.griefs[k]||[]);
+    l.push({t:(G.turn||0), n:n|0, m:(typeof _i18nAplatir==='function')?_i18nAplatir(motif):motif});
+    if(l.length>12)l.splice(0,l.length-12);
+  }catch(e){}
+}
+function _griefsTexte(from,to){
+  try{
+    from=_tk(from); to=_tk(to);
+    const l=((G.griefs||{})[from+'|'+to])||[];
+    if(!l.length) return '';
+    return l.map(g=>'T'+g.t+' '+_i18nTexte(g.m)+' +'+g.n).join(' · ');
+  }catch(e){ return ''; }
+}
+/* ═══ ULTIMATUM D'UN TOUR (Marc, 02/10) ═══
+   « Il faudrait avoir le temps de jouer une action qui fait baisser la tension. » À 10/10 en fin de
+   tour, la guerre populaire n'est plus déclarée dans la même passe : un ultimatum est posé (journal
+   avec les griefs, avis aux humains concernés), et la guerre ne vient qu'à la fin du tour SUIVANT si
+   la tension est encore à 10. Pendant l'ultimatum, la baisse passive « aucun grief : −1 » ne joue pas —
+   sinon il se lèverait tout seul ; il faut un acte (Calmer la population, accord, pacte, Diplomatie).
+   Même règle pour tous les couples, ordinateurs compris. Banc : server/test_ultimatum_tension.js.
+   Rend true quand la guerre doit se déclarer MAINTENANT. */
+function _sousUltimatum(a,b){ try{ return !!(G.ultimatums&&G.ultimatums[_tk(a)+'|'+_tk(b)]!==undefined); }catch(e){ return false; } }
+function _ultimatumJuge(offense,offenseur){
+  if(!offense||!offenseur||!offense.civ||!offenseur.civ) return false;
+  if(!G.ultimatums)G.ultimatums={};
+  const a=offense.civ.id, b=offenseur.civ.id, k=a+'|'+b, pose=G.ultimatums[k];
+  const t=tensEff(a,b);
+  if(t<10){
+    if(pose!==undefined){
+      delete G.ultimatums[k];
+      logAuteur(offense,()=>addLog(J('journal.ultimatum_leve','🕊️ {emoji} {nation} — l\'ultimatum à {emoji2} {nation2} est levé : tension retombée à {v}/10.',{emoji:offense.civ.emoji,nation:_i18nRef(offense.civ,'name'),emoji2:offenseur.civ.emoji,nation2:_i18nRef(offenseur.civ,'name'),v:t}),'gold'));
+    }
+    return false;
+  }
+  if(pose===undefined){
+    G.ultimatums[k]=(G.turn||0);
+    const griefs=_griefsTexte(a,b);
+    logAuteur(offense,()=>addLog(J('journal.ultimatum_pose','⏳ {emoji} {nation} — ULTIMATUM à {emoji2} {nation2} : tension 10/10{griefs}. Sans apaisement d\'ici la fin du tour prochain, le peuple déclare la guerre.',{emoji:offense.civ.emoji,nation:_i18nRef(offense.civ,'name'),emoji2:offenseur.civ.emoji,nation2:_i18nRef(offenseur.civ,'name'),griefs:(griefs?J('journal.ultimatum_griefs',' ({v})',{v:griefs}):'')}),'red'));
+    try{
+      if(!offense._isAI) notifyNationHit(offense,
+        J('avis.ultimatum_titre','⏳ Ton peuple exige la guerre contre {nation}',{nation:_i18nRef(offenseur.civ,'name')}),
+        J('avis.ultimatum_corps','Tension 10/10 envers <b>{nation}</b>{griefs}. Tu as <b>un tour</b> pour la ramener sous 10 — 🕊️ Calmer la population (−3), un accord commercial (−3), un pacte, la carte Diplomatie. Sinon la guerre populaire sera déclarée à la fin du tour prochain (−2 moral chacun).',{nation:_i18nRef(offenseur.civ,'name'),griefs:(griefs?J('avis.ultimatum_griefs','<br>Griefs : {v}',{v:griefs}):'')}));
+      if(!offenseur._isAI) notifyNationHit(offenseur,
+        J('avis.ultimatum_recu_titre','⏳ Le peuple de {nation} exige la guerre contre toi',{nation:_i18nRef(offense.civ,'name')}),
+        J('avis.ultimatum_recu_corps','Sa tension envers toi est à 10/10{griefs}. Tu as <b>un tour</b> pour l\'apaiser — 🕊️ Mission diplomatique (−3 à sa tension envers toi), un accord commercial, un pacte, la carte Diplomatie. Sinon il te déclarera la guerre à la fin du tour prochain.',{griefs:(griefs?J('avis.ultimatum_griefs','<br>Griefs : {v}',{v:griefs}):'')}));
+    }catch(e){}
+    return false;
+  }
+  if((G.turn||0)>pose){ delete G.ultimatums[k]; return true; }
+  return false;
+}
 /* ═══════════ LA RANCUNE : CE QU'UNE NATION N'OUBLIE PAS (Marc, 16/09, §134 étape 4) ═══════════
    « Si tu les as raidées ou attaquées au moins une fois et que tu n'as jamais fait l'action
    diplomatie avec eux, ils devraient avoir des réactions plus négatives envers toi quand tu
@@ -4557,7 +4614,7 @@ function espPiller(espion, opt){
   /* LA TENSION VA CHEZ LA VICTIME, envers l'espion — pas l'inverse (règle de Marc). C'est elle
      qui a une raison d'en vouloir. À 10, la guerre populaire devient inévitable. */
   const _tn=espTensionPour(pris);
-  if(typeof addTens==='function') addTens(victime.civ.id, espion.civ.id, _tn);
+  if(typeof addTens==='function') addTens(victime.civ.id, espion.civ.id, _tn, J('grief.espionnage','espionnage subi'));
   const niveau=(typeof getTens==='function')?getTens(victime.civ.id,espion.civ.id):_tn;
   addLog(J('journal.detecte_espionnage_technologie_volee_ten','🕵️ {emoji} {nation} a détecté l\'espionnage de {nation2} — {pris} technologie(s) volée(s), tension +{t} envers lui ({niveau}/10).',{emoji:victime.civ.emoji,nation:_i18nRef(victime.civ,'name'),nation2:_i18nRef(espion.civ,'name'),pris:pris,t:_tn,niveau:niveau}),'red');
   if(niveau>=10) addLog(J('journal.tension_10_population_exige_guerre_contr','🚨 Tension à 10 : la population de {nation} exige la guerre contre {nation2} !',{nation:_i18nRef(victime.civ,'name'),nation2:_i18nRef(espion.civ,'name')}),'red');
@@ -6506,7 +6563,7 @@ function _ilDismiss(){
 }
 function _ilModalOpen(){
   // uniquement les modales d'ACTION (qui s'ouvrent pendant TON tour) — pas les transitions de tour
-  const ids=['war-combat-modal','route-token-modal','dyson-modal','discovery-modal','peace-modal','war-modal','empath-copy-modal','espionage-modal'];
+  const ids=['war-combat-modal','route-token-modal','dyson-modal','discovery-modal','peace-modal','war-modal','empath-copy-modal','espionage-modal','sc-raid-result'];
   for(const id of ids){ const el=document.getElementById(id); if(el && !el.classList.contains('hidden') && el.style.display!=='none') return true; }
   if(document.getElementById('aad-overlay')||document.getElementById('calm-overlay')) return true;
   return false;
@@ -6514,7 +6571,10 @@ function _ilModalOpen(){
 function _ilMaybePass(){
   if(!G._il||!G._humanActive) return;
   if(_scConfirmArmed) return; // action en attente de confirmation → on gèle l'entrelacement (Valider relancera ; ↩ garde la main)
-  if(_ilModalOpen() && (G._ilPassTries||0)<24){ G._ilPassTries=(G._ilPassTries||0)+1; setTimeout(_ilMaybePass,250); return; }
+  /* Plus de plafond à 6 s (Marc, 03/10) : au-delà, les ordinateurs jouaient PENDANT que le joueur
+     choisissait encore son jeton de route ou lisait son résultat de combat. On attend la fenêtre —
+     elle exige une réponse ; filet de sécurité à 10 minutes. */
+  if(_ilModalOpen() && (G._ilPassTries||0)<2400){ G._ilPassTries=(G._ilPassTries||0)+1; setTimeout(_ilMaybePass,250); return; }
   G._ilPassTries=0; playerActed();
 }
 function cancelWarCombat(){
@@ -6586,8 +6646,46 @@ function _armPlayerStuckWatch(){
     }, 5000);
   }catch(e){}
 }
+/* ═══ LA NATION DU JOUEUR N'EST JAMAIS JOUÉE PAR L'ORDINATEUR (Marc, 03/10) ═══
+   Rapport Terrans (03/10) : « T7 terriens → coloniser Deimos » dans les décisions des IA alors que Marc
+   jouait les Terriens, une Campagne Culturelle payée « 11 AC, 17 matériaux », Deimos aux Martiens sans
+   ligne de colonisation. `doAITurn` n'est appelé que pour une nation qui n'est pas `G.player` : la vue
+   (`G.player`) était donc restée sur une autre nation — le mécanisme qui joue une guerre entre deux
+   ordinateurs (`_guerreIAEmetteur`, §175) emprunte la vue et l'émetteur, et quelque chose a interrompu
+   la file avant qu'ils soient rendus. Non reproduit en banc (test_guerre_ia_ia_appli §5–§8 verts) ;
+   donc une GARDE au début de chaque pas de jeu et de chaque fin de manche : hors de la file des
+   guerres, aucun émetteur d'ordinateur ne doit rester installé, et en solo la vue est celle de
+   l'unique nation humaine. Si la garde corrige quelque chose, le rapport de diagnostic le dit
+   (fil « perspective: »). Banc : server/pw_rappel_fenetres.js (sonde doAITurn). */
+function _perspectiveSoloGarde(ou){
+  try{
+    if(_emetteurGuerreIA){ _decisionSink=null; _emetteurGuerreIA=false; _traceVue('emetteur-retire:'+ou); }
+    if(_decisionActive())return;
+    if(typeof _scEnLigne==='function'&&_scEnLigne())return;
+    const humains=allPlayers().filter(function(n){ return n&&n.civ&&!n._isAI&&!n._remoteHuman; });
+    if(humains.length!==1||G.player===humains[0])return;
+    _traceVue('rendue:'+ou+':'+((G.player&&G.player.civ&&G.player.civ.id)||'?')+'>'+humains[0].civ.id);
+    _activateNation(humains[0]);
+  }catch(e){}
+}
+function _traceVue(m){ try{ if(typeof window!=='undefined'&&typeof window.scDiagTrace==='function')window.scDiagTrace('perspective:'+m); }catch(e){} try{ if(typeof console!=='undefined')console.warn('[perspective] '+m); }catch(e){} }
+/* Le rappel attend que plus aucune fenêtre ne soit ouverte, puis repasse par `interleaveStep`, qui
+   décide à nouveau (rappel au dernier AC, ou passage de la main à 0 AC). Un seul guetteur à la fois. */
+let _rappelDiffereArme=false;
+function _rappelPouvoirDiffere(){
+  if(_rappelDiffereArme)return; _rappelDiffereArme=true;
+  const essai=function(){
+    try{
+      if(typeof G==='undefined'||!G||!G._il||G.phase!=='actions'||!G._humanActive){ _rappelDiffereArme=false; return; }
+      if((typeof _scAnyModalOpen==='function'&&_scAnyModalOpen())||_scConfirmArmed||_scAbilityReminderOpen()){ setTimeout(essai,300); return; }
+      _rappelDiffereArme=false; interleaveStep();
+    }catch(e){ _rappelDiffereArme=false; }
+  };
+  setTimeout(essai,300);
+}
 function interleaveStep(){
   if(G._ilPaused) return;
+  _perspectiveSoloGarde('pas');
   try{ clearTimeout(G._playerStuckWatch); }catch(e){}   // ça avance → désarmer le chien de garde
   let guard=0;
   while(guard++ < 60){
@@ -6607,12 +6705,22 @@ function interleaveStep(){
          (témoin v9.69) ; l'appli joue en solo, d'où l'écart. `_rappelPouvoirTour` = tour où il a été
          proposé. À 0 AC on ne redemande pas s'il l'a déjà été ; sinon (pouvoir devenu disponible entre
          temps) le filet d'origine reste. Banc : test_rappel_pouvoir_solo.js. */
+      /* ═══ LE RAPPEL N'INTERROMPT RIEN (Marc, 03/10) ═══ « Le pouvoir peut s'intercaler avec d'autres
+         fenêtres décisionnelles que tu es en train de terminer — entre la route et le jeton, entre un raid
+         et son résultat, entre une conquête et son résultat. » Tant qu'une fenêtre est ouverte (choix du
+         jeton, combat, résultat, avis), le rappel attend qu'elle soit fermée (`_rappelPouvoirDiffere`).
+         Banc : server/pw_rappel_fenetres.js (partie jouée, joueur lent). */
+      const _fenOuverte=(typeof _aUnEcran==='function'&&_aUnEcran())&&(typeof _scAnyModalOpen==='function'&&_scAnyModalOpen());   // décor des bancs : pas d'écran, pas de fenêtre
       if(G.player.acLeft===1 && !_scConfirmArmed && !_scAbilityReminderOpen() && G.player._rappelPouvoirTour!==G.turn && _scAbilityAvailable()){
+        if(_fenOuverte){ _rappelPouvoirDiffere(); clearTimeout(G._ilHideTimer); render(); _armPlayerStuckWatch(); return; }
         G.player._rappelPouvoirTour=G.turn;
         clearTimeout(G._ilHideTimer); _ilHide(); render(); _scShowAbilityReminder(); _armPlayerStuckWatch(); return;
       }
       if(G.player.acLeft<=0 && !_scConfirmArmed && !_scAbilityReminderOpen()){
-        if(_scAbilityAvailable() && G.player._rappelPouvoirTour!==G.turn){ G.player._rappelPouvoirTour=G.turn; render(); _scShowAbilityReminder(); _armPlayerStuckWatch(); return; }
+        if(_scAbilityAvailable() && G.player._rappelPouvoirTour!==G.turn){
+          if(_fenOuverte){ _rappelPouvoirDiffere(); render(); _armPlayerStuckWatch(); return; }
+          G.player._rappelPouvoirTour=G.turn; render(); _scShowAbilityReminder(); _armPlayerStuckWatch(); return; }
+        if(_fenOuverte){ _rappelPouvoirDiffere(); render(); return; }   // on ne passe pas la main sous une fenêtre ouverte
         return passTurnIL();
       }
       clearTimeout(G._ilHideTimer); G._ilHideTimer=setTimeout(_ilHide,(typeof fenDepechesDuree==='function')?fenDepechesDuree(2000):2000); render(); _scMaybeStuck(); _armPlayerStuckWatch(); return;   // 2 s, +3 s à 4 nations (Marc, 15/09)
@@ -6656,6 +6764,7 @@ function playerActed(){ if(!G._il||!G._humanActive) return; _scHideConfirm(); G.
 function passTurnIL(){ if(!G._il) return; _scHideConfirm(); G._ilLines=[]; G._ilMarkEntry=(G.log&&G.log[0])||null; _ilHide(); G._humanActive=false; G.player._passedRound=true; G._ilIdx++; interleaveStep(); }
 function runEndOfRound(){ return logAuteur('systeme', _runEndOfRound); }
 function _runEndOfRound(){
+  _perspectiveSoloGarde('finDeManche');
   // GARDE-FOU ANTI-RÉEXÉCUTION (indexé sur le tour) : évite que la fin de manche tourne DEUX fois
   // (ex. reprise d'une partie sauvée pendant le bilan → interleaveStep revoit « tous ont passé »
   //  et rappelait runEndOfRound → revenus/pirates/événement en double). Bug corrigé 2026-07-26.
@@ -7020,7 +7129,7 @@ function advancePirates(){
     if(ceinturAI){
       /* +1 PAR NATION PILLÉE ET PAR TOUR, quel que soit le nombre de routes (Marc, 21/09) — et
          SEULEMENT la nation pillée (banc test_pirates_tension_pillee.js). La ligne le dit pour ELLE. */
-      for(const v of _pilles){ if(v===ceinturAI)continue; addTens(v.civ.id,ceinturAI.civ.id,1);
+      for(const v of _pilles){ if(v===ceinturAI)continue; addTens(v.civ.id,ceinturAI.civ.id,1,J('grief.pirates','pillage des pirates'));
         lignes.push({p:v,cls:'dim',m:J('journal.pirates_tension','{emoji} {nation} — tension envers {emoji2} {nation2} +1 (soutien secret aux pirates) → {v}/10',{emoji:v.civ.emoji,nation:_i18nRef(v.civ,'name'),emoji2:ceinturAI.civ.emoji,nation2:_i18nRef(ceinturAI.civ,'name'),v:getTens(v.civ.id,ceinturAI.civ.id)})}); }
     }else{
       G.warRisk=Math.min(10,(G.warRisk||0)+1);
@@ -7339,6 +7448,7 @@ function butinDeRaid(cible,nodeId){
   const cols=(cible.colonies||[]).filter(c=>c.connected&&!(NODES[c.nodeId]&&NODES[c.nodeId].decorative)&&!coloniePilleeCeTour(c));
   if(!cols.length) return {col:null,butin:{}};
   let col=nodeId?cols.find(c=>c.nodeId===nodeId):null;
+  if(nodeId&&!col) return {col:null,butin:{}};   // colonie désignée non pillable : jamais de report sur une autre (Marc, 03/10)
   if(!col){
     /* Sans cible désignée, on pille la plus productive — c'est ce que ferait n'importe quel
        pillard, et cela donne aux IA le même discernement qu'au joueur. */
@@ -7869,14 +7979,19 @@ function applyCard(card,p){
     let recalled=0; for(const r of p.routes){if((r.tokens||0)>0){p.forceTokens+=r.tokens;recalled+=r.tokens;r.tokens=0;}}
     if(recalled>0){updateConnections(p);logAuteur(p,()=>addLog(J('journal.jeton_rappele_routes_desormais_protegees','🛡️ {nomtech} : {recalled} jeton(s) rappelé(s) des routes (désormais protégées sans jeton) → rendus à la réserve.',{nomtech:_nomTech,recalled:recalled}),'gold'));}
   }
-  // Exploration Extra-Solaire : choisir UNE planète parmi Éris/Pluton/Triton (≥5 techs)
+  // Exploration Extra-Solaire : choisir UNE planète parmi Pluton/Triton (Éris retirée, Marc 03/10) (≥5 techs)
   if(card.spec==='extrasolar'){
     /* Même correction : « 5 technologies ou plus » compte TOUTE carte de l'arbre technologique.
        Avec `type==='technology'` la condition n'en voyait que 12 sur 21, et le +8 VP promis par les
        règles était donc bien plus dur à obtenir que ce qu'elles annoncent. */
     const techCount=p.cards.filter(c=>!!c.branch).length;
     if(techCount>=5){
-      const cand=['eris','pluto','triton'].filter(nid=>!p.colonies.find(c=>c.nodeId===nid));
+      /* ═══ JAMAIS SUR UNE CAPITALE (Marc, 02/10) ═══ Éris est la capitale des Ceinturiens — la seule
+         nation dont la capitale est une destination Extra-Solaire. Partie du 02/10 : Éris, Pluton et Triton
+         tous à Marc, l'ordinateur a pris « le premier », sa capitale, en accord forcé, sans un mot. Une
+         capitale ne se partage pas. Banc : server/test_extrasolaire_capitale.js. */
+      const _capitales=new Set(allPlayers().map(pl=>pl&&pl.civ&&pl.civ.home).filter(Boolean));
+      const cand=['pluto','triton'].filter(nid=>!p.colonies.find(c=>c.nodeId===nid)&&!_capitales.has(nid));
       if(p===G.player){
         G._pendingExtraSolar=cand; // le joueur choisira (modale après l'achat)
       }else if(cand.length){
@@ -7891,10 +8006,16 @@ function applyCard(card,p){
 function _extraSolarColonize(p,nid){
   if(!nid||p.colonies.find(c=>c.nodeId===nid))return;
   const occupied=allPlayers().some(pl=>pl!==p&&pl.colonies.find(c=>c.nodeId===nid));
-  if(occupied){const _occ=allPlayers().find(function(pl){return pl!==p&&pl.colonies.some(function(c){return c.nodeId===nid;});});_accordEnregistrer(nid,p,_occ);}
+  if(allPlayers().some(pl=>pl&&pl.civ&&pl.civ.home===nid))return;   // une capitale ne se partage pas (Marc, 02/10)
+  let _occ=null;
+  if(occupied){_occ=allPlayers().find(function(pl){return pl!==p&&pl.colonies.some(function(c){return c.nodeId===nid;});});_accordEnregistrer(nid,p,_occ);}
   const connected=(typeof checkConnected==='function')?checkConnected(nid,p):false;
   p.colonies.push({nodeId:nid,level:1,connected,noUpgrade:!!occupied});
   updateConnections(p);
+  /* L'occupant est PRÉVENU (Marc, 02/10 : « aucun message du jeu pour me le dire »). */
+  if(_occ&&_occ!==p){ try{ notifyNationHit(_occ,
+    J('avis.extra_solaire_titre','🚀 {nation} s\'installe sur {noeud}',{nation:_i18nRef(p.civ,'name'),noeud:_i18nRef(NODES[nid],'name')}),
+    J('avis.extra_solaire_corps','Par l\'Exploration Extra-Solaire, <b>{nation}</b> fonde une colonie sur <b>{noeud}</b>, à côté de la tienne : accord commercial forcé entre vous, sa colonie n\'est pas améliorable, la tienne reste intacte.',{nation:_i18nRef(p.civ,'name'),noeud:_i18nRef(NODES[nid],'name')})); }catch(e){} }
   if(p===G.player)addLog(J('journal.extra_solaire_colonises','🚀 Extra-Solaire : colonise {noeud}{v} !',{noeud:_i18nRef(NODES[nid],'name'),v:(occupied?J('journal.accord_commercial_force_non_ameliorable'," (accord commercial forcé — non améliorable)"):'')}),'gold');
   else addLog(J('journal.ia_extra_solaire','🤖 IA Extra-Solaire → {noeud}{v}',{noeud:_i18nRef(NODES[nid],'name'),v:(occupied?J('journal.accord_force'," (accord forcé)"):'')}),'dim');
 }
@@ -8454,6 +8575,9 @@ function doRaidTarget(aiId,nodeId,pillard){
     }
     if(nodeId){
       const _cc=(target.colonies||[]).find(function(c){return c.nodeId===nodeId;});
+      /* Le raid frappe LA colonie choisie, jamais une autre (Marc, 03/10 : « le raid ne doit se faire que sur
+         la colonie choisie par le raideur »). Une colonie non reliée ne produit rien : raid refusé, rien payé. */
+      if(_cc&&!_cc.connected){addLog(J('journal.raid_colonie_non_reliee','⚠️ {v} n\'est pas reliée à sa capitale : elle ne produit rien, il n\'y a rien à piller.',{v:(NODES[nodeId]&&_i18nRef(NODES[nodeId],'name'))||nodeId}),'red');return;}
       if(_cc&&coloniePilleeCeTour(_cc)){addLog(J('journal.deja_ete_pillee_tour_production_partie','⚠️ {v} a déjà été pillée ce tour — sa production est partie.',{v:(NODES[nodeId]&&_i18nRef(NODES[nodeId],'name'))||nodeId}),'red');return;}
     }
     if(p.acLeft<1){addLog(J('journal.raid_besoin_1_ac','⚠️ Raid : besoin 1 AC.'),'red');return;}
@@ -8492,8 +8616,8 @@ function doRaidTarget(aiId,nodeId,pillard){
        chaque tour envoyait sa victime en guerre civile en trois tours. La tension fait déjà tout le
        travail : elle seule monte, et de +3 (retour au réglage d'origine, « moins violent ») — deux
        raids dans le tour font +6, sous le seuil de la guerre populaire. */
-    addTens(target.civ.id,p.civ.id,3);
-    addTens(p.civ.id,target.civ.id,1);
+    addTens(target.civ.id,p.civ.id,3,J('grief.raid','raid subi'));
+    addTens(p.civ.id,target.civ.id,1,J('grief.raid_fait','raid commis'));
     /* On se souvient d'avoir été pillé (§134 étape 4) — la tension redescend, pas la mémoire. */
     if(typeof ajouterRancune==='function') ajouterRancune(target,p);
     if(typeof _marquerCause==='function') _marquerCause(target,p);
@@ -8526,7 +8650,8 @@ function doRaidTarget(aiId,nodeId,pillard){
         {title:J('avis.te_pille_2','⚠️ {emoji} {nation} te pille',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name')}),
          butin:'', perte:true,
          body:J('avis.tension_envers_monte_2','{v} Ta tension envers {nation} monte de 3.',{v:(stolen.length?J('avis.perds','Tu perds {v}.',{v:_butinEnMots(stolen)}):J('avis.rien_prendre_coffres_etaient_vides','Rien à prendre — tes coffres étaient vides.')),nation:_i18nRef(p.civ,'name')})}, 'stRien');
-    }else if(!target._isAI&&typeof notifyNationHit==='function'){
+    }else{ if(p===G.player&&!p._isAI) _raidResultatFenetre(p,target,_nomCol,stolen,tc); }
+    if(!_decisionActive()&&!target._isAI&&typeof notifyNationHit==='function'){
       /* SOLO LOCAL (l'appli) : même avis que celui de l'ancienne enveloppe — « X te pille », en
          rouge (« attaqué par »), affiché dès que l'ordinateur a fini son coup. Il manquait ici. */
       notifyNationHit(target,J('avis.te_pille','{nation} te pille',{nation:_i18nRef(p.civ,'name')}),
@@ -8536,6 +8661,27 @@ function doRaidTarget(aiId,nodeId,pillard){
   }catch(e){console.error('doRaidTarget',e);}
 }
 
+/* ═══ LE RÉSULTAT DU RAID S'AFFICHE (Marc, 03/10 : « le résultat du raid, qui s'affiche toujours pas ») ═══
+   En ligne, la notice `raid_result` le montre ; en solo, depuis le retrait du bandeau de gain (30/09),
+   le pillard ne voyait plus rien que le journal. Une fenêtre, réductible, fermée par « Continuer » ;
+   l'entrelacement attend qu'elle soit fermée (`_ilModalOpen`), le rappel de pouvoir aussi. */
+function _raidResultatFenetre(p,target,nomCol,stolen,tc){
+  try{
+    if(typeof document==='undefined'||!document.body||typeof document.body.insertAdjacentHTML!=='function')return;
+    if(typeof G!=='undefined'&&G&&G._simulationIA)return;
+    if(typeof fenBlason!=='function')return;
+    const old=document.getElementById('sc-raid-result'); if(old)old.remove();
+    const _who=(typeof fenNation==='function')?fenNation(target):{emoji:target.civ.emoji,nom:target.civ.name};
+    const _col=nomCol?_i18nParam(nomCol):'';
+    const _butin=(stolen&&stolen.length)?t('raid.butin','Butin : <b>{v}</b>',{v:stolen.join(' ')}):t('raid.rien','Rien à prendre : cette colonie ne produit rien ce tour.');
+    document.body.insertAdjacentHTML('beforeend','<div id="sc-raid-result" style="position:fixed;inset:0;background:rgba(4,4,18,.86);z-index:640;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:10px">'
+      +fenBlason({ton:'info', emoji:_who.emoji, kicker:t('raid.kicker','raid sur'), prep:true, nation:_who.nom,
+        verbe:(_col?t('raid.colonie','{col} — sa production du tour est à toi',{col:'<b>'+_col+'</b>'}):''),
+        corps:_butin, note:t('raid.note','{n} jetons en récupération · tension +3 chez {nation}',{n:tc,nation:_who.nom}),
+        boutons:[{k:t('raid.continuer','Continuer'), cls:'ok', onclick:"var e=document.getElementById('sc-raid-result');if(e)e.remove();"}]})
+      +'</div>');
+  }catch(e){}
+}
 /* Ancien raid sans cible — CONSERVÉ uniquement pour compatibilité interne (IA/scripts). Ne plus
    l'appeler depuis l'interface : il choisit `G.ais[0]`, ce qui n'a de sens qu'à deux nations. */
 /* ⚠️ `doRaidLegacyFirstTarget` SUPPRIMÉE le 2026-08-24 — elle n'était appelée de NULLE PART.
@@ -9438,7 +9584,7 @@ function griefTechnologique(){
     if(ecart<=0) continue;
     if(!x._techVu)x._techVu={}; x._techVu[y.civ.id]=G.turn;
     const avant=getTens(x.civ.id,y.civ.id);
-    addTens(x.civ.id,y.civ.id,GRIEF_TECH_PAR_RANG3*ecart);
+    addTens(x.civ.id,y.civ.id,GRIEF_TECH_PAR_RANG3*ecart,J('grief.tech','avance technologique'));
     const apres=getTens(x.civ.id,y.civ.id);
     out.push({de:x.civ.id,vers:y.civ.id,ecart,avant,apres});
     /* ⚠️ « jalouse ton avance technologique … +0 → 10/10 » — la tension était DÉJÀ au plafond, le
@@ -9474,19 +9620,26 @@ function updateTension(){
      n'augmente, donc sans jamais risquer la guerre populaire. Un tiers du plateau était inerte.
      `_tensionVers(x,y)` applique maintenant la MÊME règle écrite à n'importe quel couple, et on
      parcourt tous les couples ordonnés. Le calcul est identique — c'est sa portée qui change. */
-  const _tensionVers=(x,y)=>{           // ce que x reproche à y, ce tour-ci
-    let add=0;
+  const _tensionVers=(x,y,det)=>{       // ce que x reproche à y, ce tour-ci (`det` : les causes, pour l'ultimatum)
+    let add=0; det=det||[];
     const colX=new Set(x.colonies.map(c=>c.nodeId));
+    let _routes=0, _part=0;
     for(const r of y.routes){           // +1 par route de y qui touche une colonie de x (hors accord)
       const touche=(colX.has(r.from)||colX.has(r.to));
       const accord=accordConcerne(r.from,x,y)||accordConcerne(r.to,x,y);   // l'accord doit lier CES deux nations
-      if(touche&&!accord)add+=1;
+      if(touche&&!accord){add+=1;_routes++;}
     }
     for(const ry of y.routes){          // +1 par route partagée que y défend d'un jeton
       if((ry.tokens||0)>0)for(const rx of x.routes){
-        if((rx.from===ry.from&&rx.to===ry.to)||(rx.from===ry.to&&rx.to===ry.from))add+=1;
+        if((rx.from===ry.from&&rx.to===ry.to)||(rx.from===ry.to&&rx.to===ry.from)){add+=1;_part++;}
       }
     }
+    if(_routes)det.push({n:_routes,m:J('grief.routes','routes sur tes colonies')});
+    if(_part)det.push({n:_part,m:J('grief.routes_partagees','routes partagées défendues')});
+    { const _d=(_chargesDominance.get(x.civ.id+'|'+y.civ.id)||0); if(_d)det.push({n:_d,m:J('grief.dominance','nation dominante')}); }
+    { const _b=(_chargesBlocage.get(x.civ.id+'|'+y.civ.id)||0); if(_b)det.push({n:_b,m:J('grief.blocage','blocage de chemin')}); }
+    if(x._etouffeDepuis!==undefined&&x._etouffeDepuis!==null&&principalBloqueur(x)===y&&_voisinsPris(x,y)>=1)
+      det.push({n:(_chargesEtouffe.has(x.civ.id)?6:1),m:J('grief.etouffement','étouffement')});
     /* y domine x : +3 à 4 colonies connectées d'avance, +6 à 6 d'avance — CHACUN UNE SEULE FOIS
        par couple et par partie, dès le tour 6 (Marc, 21/09). Avant : +3/+6 à CHAQUE tour. La
        charge est décidée avant les boucles (`_chargesDominance`). */
@@ -9588,13 +9741,13 @@ function updateTension(){
        Tant que cette distinction existe, elle doit rester lisible pour ce qu'elle est. */
     if(x===G.player||y===G.player)continue;      // couples de la nation locale : traités plus bas, avec fenêtre
     if(_warBetween(x.civ.id,y.civ.id))continue;  // déjà en guerre ensemble : la guerre tient la tension à 10
-    const a=_tensionVers(x,y);
-    if(a>0)addTens(x.civ.id,y.civ.id,a);
-    else if(getTens(x.civ.id,y.civ.id)>0)addTens(x.civ.id,y.civ.id,-1);   // paix : −1/tour
+    const _det=[]; const a=_tensionVers(x,y,_det);
+    if(a>0){addTens(x.civ.id,y.civ.id,a); for(const g of _det)_griefNoter(x.civ.id,y.civ.id,g.n,g.m);}
+    else if(getTens(x.civ.id,y.civ.id)>0&&!_sousUltimatum(x.civ.id,y.civ.id))addTens(x.civ.id,y.civ.id,-1);   // paix : −1/tour (pas pendant un ultimatum)
     /* Même seuil, même règle que pour toi : 10 de tension effective, et pas déjà en guerre
        ensemble. La garde regarde CES DEUX nations — pas « suis-je en guerre », qui ne les
        concerne pas. */
-    if(tensEff(x.civ.id,y.civ.id)>=10&&!_warBetween(x.civ.id,y.civ.id)){
+    if(!_warBetween(x.civ.id,y.civ.id)&&_ultimatumJuge(x,y)){
       guerrePopulaireAuto(x,y);   // et on CONTINUE : les autres couples ont le même droit ce tour-ci (FE37)
     }
   }
@@ -9603,12 +9756,13 @@ function updateTension(){
   for(const ai of G.ais){
     if(estEliminee(G.player)||estEliminee(ai))continue;   // hors jeu (29BD : guerre déclarée au joueur éliminé)
     if(_warBetween(_moiId(),ai.civ.id))continue;   // même règle que ci-dessus, couple par couple
-    let addP=_tensionVers(G.player,ai), addA=_tensionVers(ai,G.player);
+    const _detP=[], _detA=[];
+    let addP=_tensionVers(G.player,ai,_detP), addA=_tensionVers(ai,G.player,_detA);
     // Appliquer
-    if(addP>0){addTens('player',ai.civ.id,addP);logAuteur(G.player,()=>addLog(J('journal.tension_envers','😡 {emoji} {nation} — tension envers {emoji2} {nation2} +{addp} → {v}/10',{emoji:G.player.civ.emoji,nation:_i18nRef(G.player.civ,'name'),emoji2:ai.civ.emoji,nation2:_i18nRef(ai.civ,'name'),addp:addP,v:getTens('player',ai.civ.id)}),'dim'));}
-    else if(getTens('player',ai.civ.id)>0)addTens('player',ai.civ.id,-1); // paix : −1/tour
-    if(addA>0)addTens(ai.civ.id,'player',addA);
-    else if(getTens(ai.civ.id,'player')>0)addTens(ai.civ.id,'player',-1); // paix : −1/tour
+    if(addP>0){addTens('player',ai.civ.id,addP);for(const g of _detP)_griefNoter('player',ai.civ.id,g.n,g.m);logAuteur(G.player,()=>addLog(J('journal.tension_envers','😡 {emoji} {nation} — tension envers {emoji2} {nation2} +{addp} → {v}/10',{emoji:G.player.civ.emoji,nation:_i18nRef(G.player.civ,'name'),emoji2:ai.civ.emoji,nation2:_i18nRef(ai.civ,'name'),addp:addP,v:getTens('player',ai.civ.id)}),'dim'));}
+    else if(getTens('player',ai.civ.id)>0&&!_sousUltimatum('player',ai.civ.id))addTens('player',ai.civ.id,-1); // paix : −1/tour (pas pendant un ultimatum)
+    if(addA>0){addTens(ai.civ.id,'player',addA);for(const g of _detA)_griefNoter(ai.civ.id,'player',g.n,g.m);}
+    else if(getTens(ai.civ.id,'player')>0&&!_sousUltimatum(ai.civ.id,'player'))addTens(ai.civ.id,'player',-1); // paix : −1/tour (pas pendant un ultimatum)
     // Effets tension joueur → cette IA (guerre forcée uniquement ici)
     const pt=tensEff('player',ai.civ.id); // tension effective (−6 envers les autres nations si une guerre tourne déjà)
     /* ⚠️ LA TRÊVE DE 3 TOURS EST SUPPRIMÉE (Marc, 2026-08-14 : « y a une trêve de trois tours pour
@@ -9621,10 +9775,10 @@ function updateTension(){
     const _warWithThis=!!(_warBetween(_moiId(),ai.civ.id)); // déjà en guerre avec CETTE nation → pas de guerre populaire en plus
     /* Plus de `return` : voir `_guerrePopDemander`. Le joueur offensé ouvre une fenêtre (une seule à la
        fois, les suivantes attendent) ; l'IA offensée agit tout de suite, sans écran. */
-    if(pt>=10&&!_warWithThis){ _guerrePopDemander('player',ai); continue; }
+    /* Ultimatum d'un tour (Marc, 02/10) : à 10 on pose l'ultimatum ; la guerre vient au tour suivant. */
+    if(!_warWithThis&&_ultimatumJuge(G.player,ai)){ _guerrePopDemander('player',ai); continue; }
     // Effets tension IA → joueur
-    const at=tensEff(ai.civ.id,'player');
-    if(at>=10&&!_warWithThis){ _guerrePopDemander('ai',ai); }
+    if(!_warWithThis&&_ultimatumJuge(ai,G.player)){ _guerrePopDemander('ai',ai); }
   }
   // Compat aliases
   G.playerTension=G.ais.reduce((mx,ai)=>Math.max(mx,getTens('player',ai.civ.id)),0);
@@ -10193,6 +10347,7 @@ function tensionApresAssaut(agresseur, victime, coloniePrise){
   if(avant>=10)return;
   const apres=Math.min(10,avant+seuil);
   setTens(v,a,apres);
+  _griefNoter(v,a,apres-avant,coloniePrise?J('grief.colonie_prise','colonie prise'):J('grief.assaut','assaut subi'));
   addLog(J('journal.tension_10_10_peuple_exige_guerre_fin_to','🔥 {emoji} {nation} — tension envers {emoji2} {nation2} : {avant} → {seuil}/10 ({v}). À 10, le peuple exige la guerre en fin de tour.',{emoji:victime.civ.emoji,nation:_i18nRef(victime.civ,'name'),emoji2:agresseur.civ.emoji,nation2:_i18nRef(agresseur.civ,'name'),avant:avant,seuil:apres,v:(coloniePrise?J('journal.colonie_prise',"colonie prise"):J('journal.assaut_repousse',"assaut repoussé"))}),'red');
 }
 function declarerGuerre(agresseur, cible, raison, declaredBy, opts){
@@ -10204,6 +10359,7 @@ function declarerGuerre(agresseur, cible, raison, declaredBy, opts){
      par cette fonction : agression délibérée, guerre populaire à 10 de tension, refus de la Sphère
      de Dyson. Un seul point de passage, donc une seule garde, donc aucun chemin oublié. */
   if(typeof agressionInterditeEntre==='function'&&agressionInterditeEntre(agresseur,cible,true)) return null;
+  try{ if(G.ultimatums){ delete G.ultimatums[A+'|'+B]; delete G.ultimatums[B+'|'+A]; } }catch(e){}
   const w=_attachWar({a:A,b:B,winsBy:{[A]:0,[B]:0},turnsLeft:99,justDeclared:true,
     reason:_i18nTexte(raison), declaredBy:declaredBy||'other', agresseurCiv:A, live:true, aiRecaptureTarget:null});
   /* ═══ L'ORDRE DES GUERRES EST CELUI DE LEUR CAUSE (Marc, 17/09, partie 66C3) ═══
@@ -12987,7 +13143,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
       if(typeof marquerAgressee==='function')marquerAgressee(_e);   // même bloqué, un pillage se retient
       addLog(J('journal.ia_defensive_raid_bloque_perd_quand_meme','🛡️ IA Défensive de {emoji} {nation} : raid de {emoji2} {nation2} bloqué — il perd quand même 1 AC et {jetons} jeton(s) (récupération).',{emoji:_e.civ.emoji,nation:_i18nRef(_e.civ,'name'),emoji2:ai.civ.emoji,nation2:_i18nRef(ai.civ,'name'),jetons:raidTok}),'gold');
       G.warRisk=Math.min(10,(G.warRisk||0)+1);
-      addTens(_e.civ.id,ai.civ.id,1);
+      addTens(_e.civ.id,ai.civ.id,1,J('grief.raid_bloque','raid bloqué'));
       /* ═══ LE PILLARD DOIT SAVOIR QU'IL SE COGNE À UN MUR ═══
          Marc, 24/08 : « la nation qui constate le blocage devrait pouvoir le savoir par un message
          pour pouvoir arrêter. » Sept raids bloqués d'affilée dans son journal — personne n'avait
@@ -13018,8 +13174,8 @@ function _doAITurnInterne(aiPlayer,oneShot){
       if(_b.col)addLog(J('journal.pille_production_chez','💰 {emoji} {nation} pille la production de {v} chez {emoji2} {nation2}.',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),v:(NODES[_b.col.nodeId]&&_i18nRef(NODES[_b.col.nodeId],'name'))||_b.col.nodeId,emoji2:_e.civ.emoji,nation2:_i18nRef(_e.civ,'name')}),'red');
     }
     G.warRisk=Math.min(10,(G.warRisk||0)+2);
-    addTens(_e.civ.id,ai.civ.id,5); // la victime en veut au pillard — +5 depuis le 2026-08-24
-    addTens(ai.civ.id,_e.civ.id,1);
+    addTens(_e.civ.id,ai.civ.id,5,J('grief.raid','raid subi')); // la victime en veut au pillard — +5 depuis le 2026-08-24
+    addTens(ai.civ.id,_e.civ.id,1,J('grief.raid_fait','raid commis'));
     if(!G._raidsThisTurn)G._raidsThisTurn=[];
     G._raidsThisTurn.push({civ:ai.civ,stolen:[...stolen]});
     if(!_e._raidsThisTurn)_e._raidsThisTurn=[]; // journal propre à la victime (bilan multijoueur)
@@ -13269,7 +13425,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
     if(ai._raidsImmunises&&ai._raidsImmunises[best.civ.id]!==undefined&&hasSpec(best,'ia_immune'))return false;
     ai.acLeft--;ai.forceTokens-=raidTok;ai.forceCooldown.push({count:raidTok,returnTurn:getCooldownTurn(ai)});ai.spentThisTurn+=1+raidTok;
     ai._attacksThisTurn=(ai._attacksThisTurn||0)+1;
-    addTens(best.civ.id,ai.civ.id,5);addTens(ai.civ.id,best.civ.id,1);   // victime +5, pillard +1 (barème unique, 24/08)
+    addTens(best.civ.id,ai.civ.id,5,J('grief.raid','raid subi'));addTens(ai.civ.id,best.civ.id,1,J('grief.raid_fait','raid commis'));   // victime +5, pillard +1 (barème unique, 24/08)
     if(hasSpec(best,'ia_immune')){addLog(J('journal.ia_defensive_bloque_raid_2','🛡️ {emoji} {nation} (IA Défensive) bloque le raid de {nation2}.',{emoji:best.civ.emoji,nation:_i18nRef(best.civ,'name'),nation2:_i18nRef(ai.civ,'name')}),'dim');G.aiActions.push(_i18nAplatir({emoji:'🛡️',name:J('action.raid_bloque','Raid bloqué'),desc:J('action.vs_4','vs {nation}',{nation:_i18nRef(best.civ,'name')})}));return true;}
     const tgts=['energy','materials'].filter(r=>(best.res[r]||0)>0);const stolen=[];
     for(let i=0;i<2&&tgts.length;i++){const r=tgts[Math.floor(Math.random()*tgts.length)];best.res[r]=Math.max(0,(best.res[r]||0)-1);ai.res[r]=(ai.res[r]||0)+1;stolen.push(rEmoji(r));if(best.res[r]===0)tgts.splice(tgts.indexOf(r),1);}
@@ -13762,8 +13918,11 @@ function calcVP(p){
   const _nomR=r=>((NODES[r.from]?_i18nRef(NODES[r.from],'name'):r.from))+'→'+((NODES[r.to]?_i18nRef(NODES[r.to],'name'):r.to));
   if(routeVP)det.routes.push(J('vp.det_routes','{n} route(s) × 1 = {n}   ({liste})',{n:routeVP,liste:_rc.map(_nomR).join(', ')}));
   if(_rx.length)det.routes.push(J('vp.det_routes_etrangeres','{n} route(s) vers une colonie étrangère : 0   ({liste})',{n:_rx.length,liste:_rx.map(_nomR).join(', ')}));
-  const cardsVP=p.cards.reduce((s,c)=>s+(c.vp||0),0);
-  for(const c of p.cards){ if(c&&c.vp) det.cartes.push(J('vp.det_carte','{emoji} {nom} (niveau {niv}) : +{vp}',{emoji:(c.emoji||''),nom:(_i18nRef(c,'name')||c.id),niv:(c.tier||'?'),vp:c.vp})); }
+  /* Une carte répétable (Investissements militaires…) achetée deux fois ne vaut son VP qu'UNE fois
+     (Marc, 02/10 : les Jupitériens l'avaient comptée deux fois). Une fois par identifiant. */
+  const _cartesUniques=[]; { const _vu=new Set(); for(const c of p.cards){ if(!c)continue; const k=c.id||c; if(_vu.has(k))continue; _vu.add(k); _cartesUniques.push(c); } }
+  const cardsVP=_cartesUniques.reduce((s,c)=>s+(c.vp||0),0);
+  for(const c of _cartesUniques){ if(c&&c.vp) det.cartes.push(J('vp.det_carte','{emoji} {nom} (niveau {niv}) : +{vp}',{emoji:(c.emoji||''),nom:(_i18nRef(c,'name')||c.id),niv:(c.tier||'?'),vp:c.vp})); }
   /* ═══ « TECHNOLOGIE » VOULAIT DIRE DEUX CHOSES DIFFÉRENTES ═══
      ⚠️ DÉFAUT VU DANS LA PARTIE 792D. Ce bonus comptait les cartes de `type === 'technology'` :
      douze cartes sur les vingt-et-une que l'arbre technologique propose. Partout ailleurs — agenda
@@ -14394,7 +14553,7 @@ function renderWarRisk(){
       +'<div style="font-size:.72em;color:#8898b8;margin-bottom:3px">'+t('diplo.format_envers_de','format « envers / de » — ⚔️ = guerre ouverte')+'</div>'
       +'<div style="font-size:.74em;line-height:1.6">'+_lignes.join('')+'</div></div>';
   }catch(e){}
-  el.innerHTML='<div class="dip-help">'+t('diplo.aide','Ta tension ≥ 6 → −1<i class=ri-morale></i>/tour · une tension à 10 → guerre forcée')+'</div>'+tensHtml+croiseHtml;
+  el.innerHTML='<div class="dip-help">'+t('diplo.aide','Ta tension ≥ 6 → −1<i class=ri-morale></i>/tour · à 10 : ultimatum, guerre forcée à la fin du tour suivant si rien n\'est fait')+'</div>'+tensHtml+croiseHtml;
   // Pirate status (masqué si l'une des factions joue Pirates)
   const pirateEl=document.getElementById('pirate-status');if(!pirateEl)return;
   if(!npcPiratesActive()){pirateEl.innerHTML='';return;}
@@ -16959,7 +17118,7 @@ function _scMaybeStuck(){ // à appeler quand c'est le tour du joueur
 // (aucune fenêtre ouverte, aucune décision en attente, rien depuis ~8 s), on relance la continuation en attente.
 function _scAnyModalOpen(){
   if(typeof document==='undefined')return false;
-  const ids=['eot-modal','strategy-modal','agenda-sel-modal','invest-modal','invest2-modal','invest-active-modal','event-modal','event-announce-modal','dyson-modal','espionage-modal','empath-copy-modal','war-modal','war-combat-modal','discovery-modal','peace-modal','forced-war-modal','route-token-modal','forge-modal','accord-modal','sc-stuck-modal','sc-ability-reminder','sc-attack-notice','sc-refus'];
+  const ids=['eot-modal','strategy-modal','agenda-sel-modal','invest-modal','invest2-modal','invest-active-modal','event-modal','event-announce-modal','dyson-modal','espionage-modal','empath-copy-modal','war-modal','war-combat-modal','discovery-modal','peace-modal','forced-war-modal','route-token-modal','forge-modal','accord-modal','sc-stuck-modal','sc-ability-reminder','sc-attack-notice','sc-refus','sc-raid-result'];
   for(const id of ids){ const el=document.getElementById(id); if(el && !el.classList.contains('hidden') && el.style.display!=='none') return true; }
   if(document.getElementById('aad-overlay')||document.getElementById('calm-overlay')) return true;
   return false;

@@ -16,11 +16,29 @@
      Le 01/10 il a été ramené de 84 Mo à 3,5 Mo (36 fichiers). Un fichier identique à ce qui est déjà
      en ligne n'a rien à faire ici ; une image ou un banc nouveau ou modifié, oui. -->
 
-## 📦 CE LOT EST EN **v11.20** · cache `sw.js` **v241** · 2026-10-02
+## 📦 CE LOT EST EN **v11.22** · cache `sw.js` **v243** · 2026-10-03
 
 > Pour savoir ce qui est EN LIGNE : ouvre solar-game.com, la version est écrite sur l'écran de
-> connexion. Si elle ne dit pas **v11.20**, l'envoi ou le redéploiement n'a pas pris.
+> connexion. Si elle ne dit pas **v11.22**, l'envoi ou le redéploiement n'a pas pris.
 > ⚠️ **Les DEUX ressources Coolify** doivent être redéployées : le site ET le serveur.
+
+**v11.22 — 03/10/2026** — site seulement, le serveur n'a pas changé
+- Titres de fenêtre trop longs pour le téléphone (« DÉVELOPPEMENT TECHNOLOGIQUE ») : réduits pour tenir dans le cadre.
+
+**v11.21 — 02/10/2026** — `docs/REPRISE.md` §190
+- Ultimatum d'un tour : à 10/10 de tension en fin de tour, la guerre populaire n'est plus déclarée tout de suite ; fenêtre « Ton peuple exige la guerre contre X » avec les griefs, un tour pour ramener la tension sous 10, guerre à la fin du tour suivant si elle y est encore. Même règle pour les ordinateurs (entre eux et envers toi : « Le peuple de X exige la guerre contre toi »).
+- Pendant un ultimatum, la baisse passive « aucun grief : −1 » ne joue pas — il faut un acte (Calmer la population, accord, pacte, Diplomatie).
+- Chaque hausse de tension garde sa cause (espionnage, raid, blocage de chemin, routes, dominance, étouffement, assaut, pirates, avance technologique) ; l'ultimatum les récapitule.
+- Règles fr/en §12.3 (ligne 10 et texte « seul chemin vers la guerre ») et aide de l'onglet Diplomatie mises à jour.
+- Exploration Extra-Solaire : jamais sur une capitale (Éris, capitale des Ceinturiens, ne se partage plus) ; l'occupant d'un nœud partagé reçoit un avis quand une nation s'installe à côté de lui.
+- Points de victoire : une carte répétable (Investissements militaires…) ne compte qu'une fois dans « Cartes ».
+- Règles fr/en §6.5, carte Extra-Solaire et tableau des VP mis à jour.
+- Exploration Extra-Solaire : Éris n'est plus une destination (Pluton ou Triton seulement) — carte, règles fr/en, code.
+- Rappel du pouvoir national : n'apparaît plus par-dessus une fenêtre en cours (jeton de route, combat, résultat) ; il attend qu'elle soit fermée.
+- Les ordinateurs ne jouent plus pendant que le joueur choisit son jeton de route ou lit un résultat (l'ancienne attente s'arrêtait à 6 s).
+- Raid du joueur en solo : fenêtre de résultat (colonie pillée, butin, jetons, tension), réductible.
+- Raid : seule la colonie choisie est pillée, jamais une autre ; une colonie non reliée (qui ne produit rien) ne peut pas être raidée, rien n'est dépensé.
+- Garde : la nation du joueur ne peut plus être jouée par l'ordinateur (vue restée sur une autre nation après une fin de tour) ; le rapport de diagnostic le signale si la garde agit.
 
 **v11.20 — 02/10/2026** — `docs/REPRISE.md` §189
 - Guerre en solo : plus de « défense fantôme » (fenêtre « Défense de 🏙️ Colonie … — choisis tes jetons », sans Supercroiseur, sans écran de résultat) ; la seule fenêtre de défense est celle du vrai assaut (force annoncée, garnison, Empathes, Supercroiseur proposé).

@@ -81,5 +81,45 @@ console.log('\n§4 une guerre IA–IA PUIS la guerre du joueur, dans la même fi
   if (/jupiteriens/.test(c) && moi === 'jupiteriens' && contre === 'terriens' && !em) ok('la guerre du joueur s\'ouvre vue du joueur, fenêtres locales');
   else ko('guerre ' + c + ', vue ' + moi + ', contre ' + contre + ', émetteur ' + em); }
 
+/* ── §5–§8 (03/10) : rapports de Marc — « T7 terriens → coloniser Deimos » alors qu'il jouait les
+   Terriens : la perspective était restée sur une autre nation APRÈS une fin de tour. On rejoue les
+   formes de guerre IA–IA possibles et on regarde l'état laissé derrière : vue du joueur, émetteur. */
+function etatApres(m, nom) {
+  const moi = m.run('G.player.civ.id'), em = m.run('_decisionActive()'), fin = m.run('guerreCourante()===null'), q = m.run('JSON.stringify(__qJoueur)');
+  if (moi === 'jupiteriens' && !em && fin) ok(nom + ' : file finie, vue rendue au joueur, aucun émetteur (questions au joueur : ' + q + ')');
+  else ko(nom + ' : vue ' + moi + ', émetteur ' + em + ', file finie ' + fin + ', questions ' + q);
+}
+console.log('\n§5 guerre IA–IA dont le perdant n\'a plus AUCUNE colonie (Jovians, log du 03/10)');
+{ const m = montage(true, 'terriens', 'martiens');
+  m.run('N_("martiens").colonies=[]; N_("martiens")._sansColonieDit=false;'); derouler(m); etatApres(m, '§5'); }
+console.log('\n§6 guerre IA–IA en cours (pas fraîche) : ordre de bataille, assauts des deux côtés');
+{ const m = montage(true, 'terriens', 'martiens');
+  m.run('const w=_warBetween("terriens","martiens"); w.justDeclared=false; w.live=true; N_("terriens").forceTokens=8; N_("martiens").forceTokens=8; N_("martiens").colonies.push({nodeId:"ceres",level:1,connected:true});');
+  derouler(m); etatApres(m, '§6'); }
+console.log('\n§7 guerre IA–IA sur un nœud où le JOUEUR cohabite (question de renfort au joueur)');
+{ const m = montage(true, 'terriens', 'martiens');
+  m.run('const w=_warBetween("terriens","martiens"); w.justDeclared=false; w.live=true; N_("terriens").forceTokens=8; N_("martiens").colonies.push({nodeId:"titan",level:1,connected:true}); G.player.colonies.push({nodeId:"titan",level:1,connected:true,noUpgrade:true});');
+  derouler(m); etatApres(m, '§7'); }
+console.log('\n§8 deux guerres IA–IA dans la même fin de tour, puis rien');
+{ const m = montage(true, 'terriens', 'martiens');
+  m.run('const ce=N_("martiens"); declarerGuerre(N_("terriens"),N_("martiens"),"x","terriens");');
+  m.run('allPlayers().forEach(n=>{ if(n.civ.id!=="jupiteriens"&&!(n.colonies||[]).length) n.colonies.push({nodeId:"vesta",level:1,connected:true}); });');
+  derouler(m); etatApres(m, '§8'); }
+
+console.log('\n§9 garde : vue restée sur une IA + émetteur oublié → rendus au pas de jeu suivant');
+{ const m = montage(true, 'terriens', 'martiens');
+  m.run('_decisionSink=function(){}; _emetteurGuerreIA=true; _activateNation(N_("martiens"));');
+  const avant = m.run('G.player.civ.id');
+  m.run('_perspectiveSoloGarde("test")');
+  const apres = m.run('G.player.civ.id'), em = m.run('_decisionActive()');
+  if (avant === 'martiens' && apres === 'jupiteriens' && !em) ok('vue martiens → jupiteriens (le joueur), émetteur retiré'); else ko('avant ' + avant + ', après ' + apres + ', émetteur ' + em);
+  const ais = m.run('G.ais.map(a=>a.civ.id).join(",")');
+  if (!/jupiteriens/.test(ais)) ok('le joueur n\'est plus dans la liste des ordinateurs (' + ais + ')'); else ko('le joueur est dans G.ais : ' + ais); }
+console.log('\n§10 contre-épreuve : un vrai émetteur de serveur n\'est pas touché');
+{ const m = montage(false, 'terriens', 'martiens');
+  m.run('setDecisionSink(function(){}); _activateNation(N_("martiens"));');
+  m.run('_perspectiveSoloGarde("test")');
+  if (m.run('G.player.civ.id') === 'martiens' && m.run('_decisionActive()')) ok('serveur : vue et émetteur laissés tels quels'); else ko('la garde a touché un serveur'); }
+
 console.log(ecarts.length ? '\n❌ ' + ecarts.length + ' écart(s)' : '\n✅ guerre IA–IA dans l\'appli : tout est vert');
 process.exit(ecarts.length ? 1 : 0);
