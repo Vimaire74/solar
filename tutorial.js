@@ -464,7 +464,7 @@ const STEPS=[
   tx:t('tuto.moral_1_revenus_2_0_revenus_remonte_avec','<b>Moral ❤️</b> à 1 : revenus <b>÷ 2</b>. À 0 : plus de revenus. Il remonte avec les techs Spiritualité, les actions civiles, les colonies améliorées.')},
 
  {lab:'Pouvoir gratuit', glow:'btn-ability', pos:'top', trig:'💫',
-  tx:t('tuto.chaque_nation_pouvoir_gratuit_0_ac_1_tou','Chaque nation a un <b>pouvoir gratuit</b> (0 AC, 1×/tour) : 🌍 Diplomatie Verte, 🔴 Surtension (+1 AC), ☠️ Commerce avec les pirates, 🟠 Forge Orbitale. <b>Touche le bouton ✦ Pouvoir</b> (barre du haut) pour lancer Diplomatie Verte.'),
+  tx:t('tuto.chaque_nation_pouvoir_gratuit_0_ac_1_tou','Chaque nation a un <b>pouvoir gratuit</b> (0 AC, 1×/tour) : 🌍 Diplomatie Verte, 🔴 Surtension (+1 AC), 🟣 Commerce avec les pirates, 🟠 Forge Orbitale. <b>Touche le bouton ✦ Pouvoir</b> (barre du haut) pour lancer Diplomatie Verte.'),
   hint:"Touche ✦ Pouvoir"},
 
  {lab:'Valider / annuler chaque action', pos:'top', onShow:function(){ _confirmOn=true; },

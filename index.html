@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-10-03 · v11.22';</script>
+<script>window.SOLAR_BUILD_HTML='2026-10-03 · v11.24';</script>
 <!-- Tampon des erreurs survenues AVANT diagnostic.js (chargé après moteur.js) : il les ramasse au démarrage. -->
 <script>window.__scErreursPrecoces=[];window.addEventListener('error',function(e){try{if(window.scDiagNoterErreur)return;window.__scErreursPrecoces.push({type:'erreur',msg:e.message||String(e),pile:(e.error&&e.error.stack)||'',ou:(e.filename||'').split('/').pop()+':'+e.lineno});}catch(x){}});</script>
 <!-- i18n.js EN TÊTE, avant tout script du corps : il choisit la langue et charge lang/<code>.js (synchrone).
@@ -1315,7 +1315,7 @@ body{font-size:var(--sc-fs,16px);}
 #sc-pastille .pn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #sc-pastille .pp{flex:none;width:28px;height:28px;border-radius:50%;background:#1a2444;border:1px solid #45557a;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;line-height:1}
 /* EMBLÈMES DES NATIONS (01/10, v11.11 — GO de Marc : « repères d'identité » seulement). Les médailles
-   qui affichent l'émoji d'une nation (🌍 🔴 🟠 ☠️) reçoivent l'emblème `assets/nations/<id>_128.png` ;
+   qui affichent l'émoji d'une nation (🌍 🔴 🟠 🟣 — ☠️ = pirates seulement, depuis le 03/10) reçoivent l'emblème `assets/nations/<id>_128.png` ;
    c'est le script `natEmblemes` (bas de page) qui le pose. Le texte du journal, des avis et des courriels
    garde les émojis : ces chaînes servent aussi au serveur et aux courriels, où une image ne s'affiche pas. */
 .nat-emb-on{padding:0!important;overflow:hidden;font-size:0!important;line-height:0!important}
@@ -2560,7 +2560,7 @@ if ('serviceWorker' in navigator && !_natif) {
    ⚠️ Une médaille qui repasse à un émoji ordinaire (🤝, ⚔️…) perd la classe `nat-emb-on`, sinon sa
    police à 0 la rendrait invisible. `.nat-e` = petite pastille dans une ligne (score, classement). */
 (function(){
-  var EMB={'\u{1F30D}':'terriens','\u{1F534}':'martiens','\u{1F7E0}':'jupiteriens','\u2620':'ceinturiens'};
+  var EMB={'\u{1F30D}':'terriens','\u{1F534}':'martiens','\u{1F7E0}':'jupiteriens','\u{1F7E3}':'ceinturiens'};
   var SEL='.fen-medal,.cbt-medal,.dip-medal,.civ-hdr .ce,.medal2,.fen-dep .m,.civ-emoji,#sc-pastille .pp,.nat-e';
   function nation(txt){ return EMB[String(txt||'').replace(/\uFE0F/g,'').trim()]||null; }
   function traiter(el){

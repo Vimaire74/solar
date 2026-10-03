@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-10-03 · v11.22';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-10-03 · v11.24';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -1801,7 +1801,7 @@ function _dateFr(ms){
 /* Une ligne de partie reprenable : qui joue, où en est-on, et faut-il y aller MAINTENANT. */
 function _ligneReprise(p){
   /* Les noms viennent de CIVS (traduits dans la langue du joueur, tranche 2) ; la table en dur ne sert que de repli. */
-  const nomCiv = id => { try{ if(typeof CIVS!=='undefined'&&CIVS[id]) return CIVS[id].emoji+' '+CIVS[id].name; }catch(e){} const _n={terriens:'🌍 Terriens',martiens:'🔴 Martiens',jupiteriens:'🟠 Jupitériens',ceinturiens:'☠️ Ceinturiens'}; return _n[id]||id; };
+  const nomCiv = id => { try{ if(typeof CIVS!=='undefined'&&CIVS[id]) return CIVS[id].emoji+' '+CIVS[id].name; }catch(e){} const _n={terriens:'🌍 Terriens',martiens:'🔴 Martiens',jupiteriens:'🟠 Jupitériens',ceinturiens:'🟣 Ceinturiens'}; return _n[id]||id; };
   const joueurs = (p.joueurs||[]).map(j=>{
     if(j.ia) return '<span style="opacity:.6">'+nomCiv(j.civId)+' ('+t('commun.ia','IA')+')</span>';
     const pastille = j.connecte ? '🟢' : '⚪';

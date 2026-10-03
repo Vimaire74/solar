@@ -16,11 +16,19 @@
      Le 01/10 il a été ramené de 84 Mo à 3,5 Mo (36 fichiers). Un fichier identique à ce qui est déjà
      en ligne n'a rien à faire ici ; une image ou un banc nouveau ou modifié, oui. -->
 
-## 📦 CE LOT EST EN **v11.22** · cache `sw.js` **v243** · 2026-10-03
+## 📦 CE LOT EST EN **v11.24** · cache `sw.js` **v245** · 2026-10-03
 
 > Pour savoir ce qui est EN LIGNE : ouvre solar-game.com, la version est écrite sur l'écran de
-> connexion. Si elle ne dit pas **v11.22**, l'envoi ou le redéploiement n'a pas pris.
+> connexion. Si elle ne dit pas **v11.24**, l'envoi ou le redéploiement n'a pas pris.
 > ⚠️ **Les DEUX ressources Coolify** doivent être redéployées : le site ET le serveur.
+
+**v11.24 — 03/10/2026** — site seulement, le serveur n'a pas changé — `docs/REPRISE.md` §194
+- Journal : plus aucun émoji décoratif ; restent ☠️ (pirates) et la pastille de chaque nation. Les émojis de ressource deviennent l'icône de ressource.
+- Appli (partie hors ligne) : bouton PASSER rétabli à côté de « À TOI » — renonce à une action (−1 AC), comme sur le site.
+
+**v11.23 — 03/10/2026** — site seulement, le serveur n'a pas changé — `docs/REPRISE.md` §193
+- Fenêtre « Investissements activés » : une ligne par nation rivale, avec son emblème (avant : une seule nation, sans nom).
+- Ceinturiens : l'émoji ☠️ est remplacé par 🟣 dans tous les textes (journal, avis, règles, tutoriel) ; ☠️ ne désigne plus que les pirates.
 
 **v11.22 — 03/10/2026** — site seulement, le serveur n'a pas changé
 - Titres de fenêtre trop longs pour le téléphone (« DÉVELOPPEMENT TECHNOLOGIQUE ») : réduits pour tenir dans le cadre.

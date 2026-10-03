@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.22';
+const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.24';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -190,7 +190,7 @@ const CIVS={
     techBonus:'mines_energie',
     passive:'Base sur Io, le monde le plus riche en <i class=ri-energy></i> du système (3<i class=ri-energy></i>/tour dès le premier tour).',
     active:{name:'Forge Orbitale',desc:'Améliore une colonie joviène (Io/Europe/Ganymède/Callisto) 1→2 (0 AC, −1<i class=ri-materials></i> −1<i class=ri-energy></i>)',ac:0,cost:{materials:1,energy:1}}},
-  ceinturiens:{id:'ceinturiens',name:'Ceinturiens',emoji:'☠️',color:'#AB47BC',
+  ceinturiens:{id:'ceinturiens',name:'Ceinturiens',emoji:'🟣',color:'#AB47BC',
     start:{energy:6,materials:4,science:1,morale:2},startForce:3,home:'eris',
     techBonus:'navigation',
     /* ⚠️ « Raids coûtent 1 jeton au lieu de 2 » RETIRÉ le 16/09 (Marc, après la partie 96F6 : « c'est
@@ -4838,9 +4838,14 @@ function showInvestmentActiveModal(pCard, aCard){
   const el=document.getElementById('invest-active-modal');
   if(!el)return;
   const pBenef=pCard?pCard.benefit:'—';
-  const aBenef=aCard?`${aCard.emoji} ${aCard.name} : ${aCard.benefit}`:'—';
-  document.getElementById('inv-active-your').innerHTML=`${pCard.emoji} ${pCard.name} : ${pBenef}`;
-  document.getElementById('inv-active-ai').innerHTML=aBenef;
+  /* 03/10 (Marc) : la fenêtre ne montrait que l'investissement de `G.ais[0]`, sans dire de quelle nation.
+     Désormais une ligne PAR nation rivale, précédée de son emblème (`.nat-e` → image, script natEmblemes). */
+  const lignes=allPlayers().filter(o=>o&&o!==G.player).map(o=>{
+    const c=INVESTMENT_CARDS.find(x=>x.id===o._inv1);
+    return `<div style="margin:3px 0"><span class="nat-e" title="${o.civ.name}">${o.civ.emoji}</span> <b>${o.civ.name}</b> — ${c?`${c.emoji} ${c.name} : ${c.benefit}`:'—'}</div>`;
+  });
+  document.getElementById('inv-active-your').innerHTML=`<span class="nat-e">${G.player.civ.emoji}</span> ${pCard.emoji} ${pCard.name} : ${pBenef}`;
+  document.getElementById('inv-active-ai').innerHTML=lignes.length?lignes.join(''):'—';
   el.classList.remove('hidden');
 }
 function dismissInvestActive(){
@@ -6761,6 +6766,19 @@ function playerActed(){ if(!G._il||!G._humanActive) return; _scHideConfirm(); G.
      on repasse par la boucle sans avancer l'index, et le joueur enchaîne comme l'ordinateur. */
   if((G._dernierCoutAC||0)>0) G._ilIdx++;
   interleaveStep(); }
+/* PASSER UNE ACTION en solo local (l'appli) — même règle que le serveur (`driver.js`, action 'skip') :
+   −1 AC, ligne au journal, la main passe à la nation suivante ; à 0 AC, on sort de la manche.
+   Refusé si une fenêtre est ouverte ou si ✓/↩ attend : il ne doit jamais passer une décision (Marc, 03/10). */
+function passerUneActionIL(){
+  if(!G||!G._il||!G._humanActive||G.phase!=='actions') return;
+  if(_scConfirmArmed) return;
+  if((typeof _aUnEcran==='function'&&_aUnEcran())&&typeof _scAnyModalOpen==='function'&&_scAnyModalOpen()) return;   // décor des bancs : pas d'écran
+  const p=G.player;
+  if((p.acLeft||0)>0) p.acLeft-=1;
+  addLog(J('journal.passe_action','{nation} passe une action.',{nation:_i18nRef(p.civ,'name')}));
+  if(p.acLeft<=0) return passTurnIL();
+  _scHideConfirm(); G._ilLines=[]; G._ilMarkEntry=(G.log&&G.log[0])||null; _ilHide(); G._humanActive=false; G._ilIdx++; interleaveStep();
+}
 function passTurnIL(){ if(!G._il) return; _scHideConfirm(); G._ilLines=[]; G._ilMarkEntry=(G.log&&G.log[0])||null; _ilHide(); G._humanActive=false; G.player._passedRound=true; G._ilIdx++; interleaveStep(); }
 function runEndOfRound(){ return logAuteur('systeme', _runEndOfRound); }
 function _runEndOfRound(){
@@ -7555,7 +7573,7 @@ function revenusBruts(p, opts){
     _det('🤝 Accords commerciaux ×'+_mes,{materials:_mes,morale:_mes});
     _j(J('journal.accord_commercial_2','🤝 Accord commercial : +{mes}<i class=ri-materials></i> +{mes2}<i class=ri-morale></i>',{mes:_mes,mes2:_mes}),'dim');
    }}
-  if(p.civ.id==='ceinturiens'){gains.energy=(gains.energy||0)+1;_det(t('revenu.reserves_ceinture','☠️ Réserves de la Ceinture'),{energy:1});} // réserves de la ceinture
+  if(p.civ.id==='ceinturiens'){gains.energy=(gains.energy||0)+1;_det(t('revenu.reserves_ceinture','🟣 Réserves de la Ceinture'),{energy:1});} // réserves de la ceinture
   /* JUPITÉRIENS — LE +1⚡ NATIONAL EST SUPPRIMÉ (Marc, 2026-08-14).
      ⚠️ TROIS AVANTAGES SE CUMULAIENT SUR LA MÊME RESSOURCE. Io est le nœud le plus riche en
      énergie du jeu (3⚡ ; le suivant est Titan à 2⚡, tout le reste est à 0 ou 1) — et c'est une
@@ -14487,6 +14505,15 @@ function renderTopBar(){
       else if(G.phase==='ai'){ b.textContent=t('barre.ia_jouent','IA jouent…'); b.dataset.etat='calme'; b.classList.add('on'); }
       else if(G.phase==='over'){ b.textContent=t('barre.phase_fin','Terminé'); b.dataset.etat='calme'; b.classList.add('on'); }
       else b.classList.remove('on');
+      /* Bouton PASSER en solo local (03/10) : visible pendant TON coup, sans fenêtre ni ✓/↩ en attente. */
+      const pb=document.getElementById('passer-btn');
+      if(pb){
+        const vis=G.phase==='actions'&&!!G._il&&!!G._humanActive&&!_scConfirmArmed&&!(typeof _scAnyModalOpen==='function'&&_scAnyModalOpen());
+        pb.classList.toggle('on',vis);
+        const te=document.getElementById('tb-etat'); if(te) te.classList.toggle('avec-passer',vis);
+        pb._lie=true;
+        pb.onclick=function(){ if(typeof window._scOnSkip==='function') window._scOnSkip(); else passerUneActionIL(); };
+      }
     }
   }catch(e){}
   /* NB : #top-res est rendu par uiFillIncome() (appelée plus bas) — un seul rendu, sinon le second
@@ -16962,10 +16989,25 @@ function _journalCouleur(e){
   try{ for(const p of [G.player].concat(G.ais||[])){ if(p&&p.civ&&p.civ.id===e.civ) return p.civ.color||'#8faacc'; } }catch(err){}
   return '#3a4470';   // Système
 }
+/* ═══ JOURNAL SANS ÉMOJIS (Marc, 03/10 — refus déjà exprimé il y a plusieurs semaines) ═══
+   AFFICHAGE PUR, un seul point de passage (solo et en ligne passent par `_journalHTML`). Seuls restent :
+   ☠️ (les pirates) et l'émoji de chaque nation (🌍 🔴 🟠 🟣). Les chaînes source ne changent pas : avis,
+   dépêches et rapports ont leurs propres règles. Banc : server/test_journal_sans_emoji.js. */
+function _journalSansEmoji(s){
+  if(!s) return s;
+  const garde=new Set(['\u2620']);
+  try{ for(const k in CIVS){ const em=CIVS[k]&&CIVS[k].emoji; if(em) garde.add(String(em).replace(/\uFE0F/g,'')); } }catch(e){}
+  /* Les émojis de RESSOURCE portent un sens (« +1⚡ ») : ils deviennent l'icône de ressource du jeu (image). */
+  return String(s)
+    .replace(/⚡\uFE0F?/gu,'<i class=ri-energy></i>').replace(/🪨/gu,'<i class=ri-materials></i>')
+    .replace(/🔬/gu,'<i class=ri-science></i>').replace(/❤\uFE0F?/gu,'<i class=ri-morale></i>')
+    .replace(/(?:\p{Extended_Pictographic}|\p{Regional_Indicator})(?:\uFE0F|\u20E3|\p{Emoji_Modifier})*(?:\u200D(?:\p{Extended_Pictographic})(?:\uFE0F)?)*/gu, m=>garde.has(m.replace(/\uFE0F/g,''))?m:'')
+    .replace(/[ \t]{2,}/g,' ').replace(/\(\s+/g,'(').replace(/\s+\)/g,')').replace(/\(\)/g,'').replace(/^\s*(—\s*)?/,'');
+}
 function _journalHTML(log){
   if(!Array.isArray(log)) return '';
   let out='',tourCourant=null,enAttente=[];
-  const ligne=(e,msg,cls,sous)=>'<div class="log-e '+cls+(sous?' log-sous':'')+'" style="--nc:'+_journalCouleur(e)+'">'+_logColorNations(msg.replace(/^\s+/,''))+'</div>';
+  const ligne=(e,msg,cls,sous)=>'<div class="log-e '+cls+(sous?' log-sous':'')+'" style="--nc:'+_journalCouleur(e)+'">'+_logColorNations(_journalSansEmoji(msg).replace(/^\s+/,''))+'</div>';
   /* Le tableau est du plus récent au plus ancien. Une ligne « ↳ paie » est écrite APRÈS son action,
      donc elle la précède ici : on la garde en attente et on la range SOUS l'action qui suit. */
   for(const e of log){
