@@ -16,11 +16,15 @@
      Le 01/10 il a été ramené de 84 Mo à 3,5 Mo (36 fichiers). Un fichier identique à ce qui est déjà
      en ligne n'a rien à faire ici ; une image ou un banc nouveau ou modifié, oui. -->
 
-## 📦 CE LOT EST EN **v11.50** · cache `sw.js` **v271** · 2026-10-03
+## 📦 CE LOT EST EN **v11.51** · cache `sw.js` **v272** · 2026-10-03
 
 > Pour savoir ce qui est EN LIGNE : ouvre solar-game.com, la version est écrite sur l'écran de
-> connexion. Si elle ne dit pas **v11.50**, l'envoi ou le redéploiement n'a pas pris.
+> connexion. Si elle ne dit pas **v11.51**, l'envoi ou le redéploiement n'a pas pris.
 > ⚠️ **Les DEUX ressources Coolify** doivent être redéployées : le site ET le serveur.
+
+**v11.51 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js)
+- Appli : paix ou guerre entre deux ordinateurs annoncée dans la fenêtre habituelle des nouvelles (plus la fenêtre brute).
+- Conquérant : garde de quoi payer Réseau Orbital ET IA Défensive ensemble (avant : seulement la prochaine).
 
 **v11.50 — 03/10/2026** — REDÉPLOYER AUSSI LE SERVEUR (moteur.js)
 - Conquérant : Réseau Orbital noté deux fois plus haut jusqu'au tour 4.

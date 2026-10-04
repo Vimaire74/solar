@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.50';
+const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.51';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -3439,10 +3439,12 @@ function valeurTemperament(coup,nat){
 function penaliteReserveBut(n,coup){
   try{
     const b=n&&n._but; if(!b||!b.etapes||!b.etapes.length||!G||(G.turn||1)>6)return 0;
-    const e=b.etapes[0]; if(!e||e.type!=='tech')return 0;
-    if(coup&&coup.type==='tech'&&coup.card===e.card)return 0;
-    const card=CARDS_POOL.find(x=>x&&x.id===e.card); if(!card||card.tier<2)return 0;
-    const cout=(typeof getEffCost==='function')?getEffCost(card,n):(card.cost||{});
+    /* CUMUL des marches restantes de rang ≥2 (Réseau + IA Déf.) : partie 00a71d, les Martiens prennent le Réseau
+       au T4 et restent à 1⚡ (24🪨 !) — l'IA Défensive, 2⚡, devient impossible, et Marc la prend au T4. */
+    if(coup&&coup.type==='tech'&&b.etapes.some(x=>x&&x.card===coup.card))return 0;   // un coup DE la chaîne
+    const cout={};
+    for(const e of b.etapes){ if(!e||e.type!=='tech')continue; const card=CARDS_POOL.find(x=>x&&x.id===e.card); if(!card||card.tier<2)continue;
+      const c=(typeof getEffCost==='function')?getEffCost(card,n):(card.cost||{}); for(const r in c)cout[r]=(cout[r]||0)+(c[r]||0); }
     let manque=0; for(const r in cout){ manque+=Math.max(0,(cout[r]||0)-((n.res&&n.res[r])||0)); }
     return 4*manque;
   }catch(err){ return 0; }
@@ -17614,6 +17616,12 @@ function notifyNationHit(victim,title,body,genre){
   try{
     if(!victim)return;
     if(victim._isAI)return;                       // IA : pas de fenêtre, tout est déjà journalisé
+    /* Guerre ENTRE IA dans l'appli : l'émetteur muet (`_guerreIAEmetteur`) rendait `_decisionActive()` vrai, et
+       l'avis au joueur (« Paix : Terriens et Jupitériens ») partait en question générique — la fenêtre brute
+       de `askLocalDecision` (Marc, 03/10). Le joueur local garde la fenêtre habituelle des nouvelles. */
+    if(typeof _emetteurGuerreIA!=='undefined'&&_emetteurGuerreIA&&victim.civ){   // solo : seul humain = le joueur local
+      _notePlayerHit(_i18nTexte(title),_i18nTexte(body),genre); return;
+    }
     if(typeof _decisionActive==='function'&&_decisionActive()){
       _emitNotice('raid_hit', victim, {title:title||t('fen.attaque','Attaque'), body:body||'', genre:genre||null}, 'stRien');   // suite nommée : une fermeture ne survit pas à une sauvegarde
       return;
