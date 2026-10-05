@@ -64,6 +64,17 @@ console.log('§1 guerre Terriens–Martiens, solo local de l\'appli');
   if (moi === 'jupiteriens') ok('perspective rendue au joueur'); else ko('perspective restée sur ' + moi);
   if (!m.run('_decisionActive()')) ok('aucun émetteur laissé derrière'); else ko('un émetteur de décisions est resté installé'); }
 
+console.log('\n§9 joueur ÉLIMINÉ en solo : la guerre IA–IA de fin de tour se joue quand même (04/10, v11.52)');
+{ const m = montage(true, 'terriens', 'martiens');
+  m.run('G.player.colonies=[]; updateConnections&&updateConnections(G.player);');
+  if (m.run('estEliminee(G.player)')) ok('le joueur est bien éliminé'); else ko('montage : le joueur n\'est pas éliminé');
+  derouler(m);
+  const fini = m.run('guerreCourante()===null');
+  const vb = JSON.parse(vpCombat(m, 'terriens')).concat(JSON.parse(vpCombat(m, 'martiens')));
+  if (fini) ok('la file des guerres est allée au bout'); else ko('la file s\'est arrêtée');
+  if (vb.length) ok('le combat a eu lieu entre les belligérants : ' + vb.join(', ')); else ko('aucun combat résolu : la file a été vidée (joueur éliminé)');
+  if (m.run('JSON.stringify(__qJoueur)') === '[]') ok('aucune question au joueur éliminé'); else ko('questions au joueur éliminé'); }
+
 console.log('\n§2 contre-épreuve : la guerre du joueur');
 { const m = montage(true, 'terriens', 'jupiteriens'); m.run('stGuerres()');
   const moi = m.run('G.player.civ.id'), contre = m.run('G.warWith'), em = m.run('_decisionActive()');

@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-03 · v11.51';
+const SOLAR_BUILD_MOTEUR = '2026-10-05 · v11.53';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -429,9 +429,11 @@ const DISCOVERY_TILES=[
   {id:'dt8',name:'Anomalie Spatiale',emoji:'🌀',desc:'+1 VP de bonus.',vp:1},
 ];
 const AGENDAS_POOL=[
-  {id:'ag1',name:'Explorateur',emoji:'🚀',desc:'5+ colonies connectées → +8 VP',score(p){return p.colonies.filter(c=>c.connected).length>=5?8:0;}},
+  /* Valeurs revues par Marc le 05/10/2026 (E4) : Explorateur 12, Routes 6, Superpuissance 12 (≥ suffit), Armada 10,
+     Gouvernance 8, Hub 6, Empire énergétique 10, Opulence 10 (surproduction de 🪨 pendant 4 tours), Pacifiste 12 (nouveau). */
+  {id:'ag1',name:'Explorateur',emoji:'🚀',desc:'5+ colonies connectées → +12 VP',score(p){return p.colonies.filter(c=>c.connected).length>=5?12:0;}},
   {id:'ag2',name:'Maître des Routes',emoji:'🛤️',desc:'5+ routes → +6 VP',score(p){return routesComptees(p).length>=5?6:0;}},
-  {id:'ag3',name:'Superpuissance Tech.',emoji:'⚗️',desc:'Plus de cartes Tech que toute autre nation → +8 VP',score(p){const myT=p.cards.filter(c=>c.branch).length;const best=Math.max(...allPlayers().filter(x=>x!==p).map(x=>x.cards.filter(c=>c.branch).length),0);return myT>=best&&myT>0?8:0;}},
+  {id:'ag3',name:'Superpuissance Tech.',emoji:'⚗️',desc:'Au moins autant de cartes Tech que toute autre nation → +12 VP',score(p){const myT=p.cards.filter(c=>c.branch).length;const best=Math.max(...allPlayers().filter(x=>x!==p).map(x=>x.cards.filter(c=>c.branch).length),0);return myT>=best&&myT>0?12:0;}},
   /* ═══ ARMADA SOLAIRE — CE QU'ON COMPTE, ET POURQUOI (Marc, 05/09) ═══
      Partie 083E : deux nations sur trois avaient cet agenda, elles ont fini à 9 et à 0 jetons. Il
      était inatteignable dès qu'on se battait — or c'est un agenda de guerre.
@@ -444,11 +446,15 @@ const AGENDAS_POOL=[
      colonies, qui ne sortent jamais de la réserve — ce sont des défenses automatiques, pas une
      flotte qu'on a construite. `armadaCompte` est la SOURCE UNIQUE : l'agenda, la règle écrite et
      l'IA doivent compter pareil. */
-  {id:'ag4',name:'Armada Solaire',emoji:'⚔️',desc:'15+ jetons Force (réserve + récupération + routes + bonus empathe) → +8 VP',score(p){return armadaCompte(p)>=15?8:0;}},
+  {id:'ag4',name:'Armada Solaire',emoji:'⚔️',desc:'15+ jetons Force (réserve + récupération + routes + bonus empathe) → +10 VP',score(p){return armadaCompte(p)>=15?10:0;}},
   {id:'ag6',name:'Gouvernance Éclairée',emoji:'🏛️',desc:'Gouvernement niveau 4 et Moral 8+ → +8 VP',score(p){return p.gov_level>=4&&(p.res.morale||0)>=8?8:0;}},
   {id:'ag8',name:'Hub Jovien',emoji:'🟠',desc:'3+ colonies joviennes → +6 VP',score(p){const j=['io','europe','ganymede','callisto'];return p.colonies.filter(c=>j.includes(c.nodeId)).length>=3?6:0;}},
-  {id:'ag13',name:'Empire Énergétique',emoji:'⚡',desc:'Toutes les cartes tech qui génèrent <i class=ri-energy></i> → +12 VP',score(p){const energyCards=CARDS_POOL.filter(c=>c.rGain&&(c.rGain.energy||0)>0).map(c=>c.id);return energyCards.length>0&&energyCards.every(id=>possedeCarte(p,id))?12:0;}},
-  {id:'ag14',name:'Opulence Matérielle',emoji:'🪨',desc:'Toutes les cartes tech qui génèrent <i class=ri-materials></i> → +6 VP',score(p){const matCards=CARDS_POOL.filter(c=>c.rGain&&(c.rGain.materials||0)>0).map(c=>c.id);return matCards.length>0&&matCards.every(id=>possedeCarte(p,id))?6:0;}},   // 12 → 6 (Marc, 21/09 : « c'est relativement facile »)
+  {id:'ag13',name:'Empire Énergétique',emoji:'⚡',desc:'Toutes les cartes tech qui génèrent <i class=ri-energy></i> → +10 VP',score(p){const energyCards=CARDS_POOL.filter(c=>c.rGain&&(c.rGain.energy||0)>0).map(c=>c.id);return energyCards.length>0&&energyCards.every(id=>possedeCarte(p,id))?10:0;}},
+  {id:'ag14',name:'Opulence Matérielle',emoji:'🪨',desc:'Surproduction de <i class=ri-materials></i> pendant 4 tours de la partie → +10 VP',score(p){return (p._surprodMat||0)>=4?10:0;}},
+  /* PACIFISTE (Marc, 05/10) : n'avoir déclenché aucune guerre ni lancé aucun assaut, n'avoir jamais refusé la paix, et avoir
+     apaisé au moins une fois (Mission diplomatique, Calmer la population, Diplomatie, Calmer les tensions). Les drapeaux
+     sont posés par les règles elles-mêmes (`_pacifismeRompu`, `_apaisements`) — jamais devinés d'après le journal. */
+  {id:'ag15',name:'Pacifiste',emoji:'🕊️',desc:'Aucune guerre déclenchée, aucun assaut lancé, jamais refusé la paix, et au moins un apaisement (mission, calmer, diplomatie) → +12 VP',score(p){return (!p._pacifismeRompu&&(p._apaisements||0)>0)?12:0;}},
 ];
 /* Illustrations des cartes d'investissement (03/10, v11.32, choix de Marc : style « B ») — AFFICHAGE PUR.
    Petite version (256 px) dans les fenêtres de choix ; la grande (1024 px) est gardée dans assets/invest/grand/. */
@@ -2644,6 +2650,7 @@ function surproductionVP(){
     }
     if(!quoi.length)continue;
     p._surprodTour=G.turn;
+    if((p.res.materials||0)>cap.materials)p._surprodMat=(p._surprodMat||0)+1;   // agenda Opulence (05/10) : tours en surproduction de 🪨
     const n=Math.min(4,quoi.length);
     gagnerVP(p,n,J('vp.surproduction','Surproduction {v}',{v:quoi.join('')}));
     /* Une ligne, la même pour toutes les nations, dans la colonne de la nation (22/09). */
@@ -3190,7 +3197,6 @@ const PROJET_MAX_CIBLES=8;
 /* Le BUT DE JEU du Conquérant (branche IA & Renseignement) : sa prime ne se déduit pas d'une
    évaluation, elle est posée. Réglée par la mesure (`mesure_ia_defensive.js`), pas au jugé. */
 const PROJET_BUT_PRIME=30;   /* 14 → 30 (Marc, 03/10 : « note-la encore plus haut pour le conquérant ») — sonde_reseau2.js : Réseau Orbital notait 15-20 contre 35-52 pour le coup retenu */      // prime ajoutée au coup qui fait avancer le but
-const PROJET_BUT_GAIN_MIN=6;    // gain plancher, pour que le but survive aux tours où il paraît hors de portée
 
 function _cartesBranche(branche){ return CARDS_POOL.filter(c=>c&&c.branch===branche&&c.tier<=3).sort((a,b)=>a.tier-b.tier); }
 /* Les achats manquants pour atteindre le rang 3 de `branche` ; null si la branche est fermée à `nat`. */
@@ -3463,6 +3469,116 @@ function valeurBut(coup,nat){
     const c=CARDS_POOL.find(x=>x&&x.id===e.card);
     const poids=(!c||c.tier>=3)?1:(c.tier===2?((G&&G.turn<=4)?2.4:1.2):0.4);   /* rang 2 doublé aux tours ≤4 (Marc, 03/10 : IA Défensive au T5) */   /* rang 2 = le verrou (jamais acheté) : 0.6 → 1.2 ; rang 1 : 0.15 → 0.4 (03/10) */
     return base*poids;
+  }catch(err){ return 0; }
+}
+/* ═══ LE BUT « EXPANSION » (Marc, 04-05/10/2026, chantier E1) — INCITER, PAS RÉPRIMER ═══
+   Partie du 04/10 : les ordinateurs finissent avec 2-3 colonies, 0-1 route, contre 6 et 5 pour Marc. Mais la
+   tactique « tortue » (capitale seule, technologies de rendement, rien à raider) est VALABLE jusqu'au tour 6-7 :
+   rien avant le tour 6. Dès le tour 6, un objectif de colonies RELIÉES (capitale comprise) : 2 au T6, 3 au T7,
+   4 dès le T8. Le déficit (objectif − reliées) multiplie une prime assise sur le RENDEMENT NET de la colonie
+   (production du nœud − entretien selon les technologies, × tours restants, + ses VP) : un nœud pauvre ou
+   lointain ne vaut rien, l'IA ne colonise pas pour cocher une case. Une route qui rapproche une colonie
+   isolée du réseau est primée par ce qu'elle débloque (production jusque-là nulle + moitié des VP + liaison).
+   Aucune interdiction, aucune pénalité de réserve. `G._primeExpansion` règle le multiplicateur (banc). */
+/* ═══ E4 — L'AGENDA SECRET, PRIORITÉ CROISSANTE DÈS LE TOUR 5 (Marc, 05/10) — inciter, pas réprimer ═══
+   `agendaProgres(p)` = 0..1, la part du chemin faite ; `valeurAgendaEtat(p)` entre dans la note de POSITION simulée :
+   un coup qui fait avancer l'agenda gagne la différence, un coup qui le fait reculer (Tyrannie contre la Gouvernance
+   éclairée) la perd — et reste jouable si le reste compense. Prime = VP de l'agenda × AGENDA_POIDS × rampe (T5 : 1,
+   +20 % par tour jusqu'à 2 au T10). `G._primeAgenda` écrase le poids (banc). */
+const AGENDA_POIDS=4.0;
+function agendaProgres(p){
+  try{
+    const ag=p&&p.agenda; if(!ag)return 0; const b=x=>Math.max(0,Math.min(1,x));
+    switch(ag.id){
+      case 'ag1': return b((p.colonies||[]).filter(c=>c.connected).length/5);
+      case 'ag2': return b(routesComptees(p).length/5);
+      case 'ag3': { const my=(p.cards||[]).filter(c=>c.branch).length; const best=Math.max(0,...allPlayers().filter(x=>x!==p).map(x=>(x.cards||[]).filter(c=>c.branch).length)); return b(my/(best+1)); }
+      case 'ag4': return b(armadaCompte(p)/15);
+      case 'ag6': return b(Math.min(4,p.gov_level||0)/4*0.5+Math.min(8,p.res.morale||0)/8*0.5);
+      case 'ag8': { const j=['io','europe','ganymede','callisto']; return b((p.colonies||[]).filter(c=>j.includes(c.nodeId)).length/3); }
+      case 'ag13': { const ids=CARDS_POOL.filter(c=>c.rGain&&(c.rGain.energy||0)>0).map(c=>c.id); if(!ids.length)return 0;
+        return b(ids.filter(id=>possedeCarte(p,id)).length/ids.length); }
+      case 'ag14': { const cap=realResCap(p); return b(((p._surprodMat||0)+(((p.res.materials||0)>cap.materials)?0.5:0))/4); }
+      case 'ag15': return p._pacifismeRompu?0:((p._apaisements||0)>0?1:0.6);
+      default: return (typeof ag.score==='function'&&ag.score(p)>0)?1:0;
+    }
+  }catch(e){ return 0; }
+}
+function valeurAgendaEtat(p){
+  try{
+    if(!p||!p.agenda||typeof G==='undefined'||!G)return 0;
+    const t=G.turn||1; if(t<5)return 0;
+    const base=Number((/\+(\d+)\s*VP/.exec(p.agenda.desc||'')||[])[1])||8;
+    const poids=(G._primeAgenda!==undefined)?G._primeAgenda:AGENDA_POIDS;
+    const rampe=1+Math.max(0,Math.min(5,t-5))*0.2;
+    return base*poids*rampe*agendaProgres(p);
+  }catch(e){ return 0; }
+}
+/* ═══ E3 — UN POINT D'ACTION PERMANENT VAUT TOUS LES TOURS QUI RESTENT (Marc, 05/10) ═══
+   Trois parties sur trois : les Ceinturiens n'ont pris aucun civique de gouvernement en dix tours, les Jupitériens au
+   tour 6 ou 10. La simulation ne voit qu'un tour : un +1 PA permanent n'y vaut qu'un PA. Prime sur l'ÉTAT simulé :
+   GOUV_POIDS × (PA après − PA avant le coup) × tours restants après celui-ci — forte au T2, nulle au T10 (Démocratie
+   instantanée au dernier tour ne rapporte plus rien). Pas d'obligation : une IA en guerre peut préférer un jeton. */
+const GOUV_POIDS=1.5;
+function valeurActionsPermanentes(n,acAvant){
+  try{
+    if(!n||typeof G==='undefined'||!G)return 0;
+    const restants=Math.max(0,(G.maxTurns||10)-(G.turn||1));
+    const poids=(G._primeGouv!==undefined)?G._primeGouv:GOUV_POIDS;
+    const d=calcAC(n)-(acAvant||0); if(d<=0)return 0;
+    /* L'entretien d'une forme de gouvernement (Démocratie instantanée : −2🪨 −2⚡ par tour) se paie lui aussi tous les
+       tours restants : sans ce terme, une nation pauvre adoptait la Démocratie au T2 et finissait à zéro partout
+       (mesuré, graine 1 : Martiens 25 VP). */
+    let entretien=0; const u=n.govFormUpkeep||{};
+    const w=(typeof POIDS_EVAL!=='undefined'&&POIDS_EVAL&&POIDS_EVAL.production)||{energy:0.85,science:0.7,materials:0.55};
+    for(const r in u)entretien+=(u[r]||0)*(w[r]||0.6);
+    return Math.max(0,poids*d*restants-entretien*restants);
+  }catch(e){ return 0; }
+}
+const EXPANSION_POIDS=4.0;   // à régler par la mesure (sonde_partie_lente.js) ; G._primeExpansion l'écrase
+function expansionObjectif(tour){ return tour<6?0:(tour===6?2:(tour===7?3:4)); }
+function _rendementNetColonie(nat,nodeId,avecRoute){
+  const node=NODES[nodeId]; if(!node||node.decorative)return 0;
+  const w=(typeof POIDS_EVAL!=='undefined'&&POIDS_EVAL&&POIDS_EVAL.production)||{energy:0.85,science:0.7,materials:0.55,morale:0.2};
+  const rev=(typeof revenuDuneColonie==='function')?revenuDuneColonie(nat,{nodeId:nodeId,level:1,connected:true}):(node.res||{});
+  let v=0; for(const r in rev)v+=(rev[r]||0)*(w[r]||0.5);
+  if(!(hasSpec(nat,'bio2_bonus')||hasSpec(nat,'upkeep_e_disc')))v-=(w.energy||0.85);          // 1⚡ d'entretien au Nv.1
+  if(avecRoute){ if(!hasSpec(nat,'route_force_free'))v-=(w.energy||0.85); v+=(w.materials||0.55); }   // route : −1⚡, +1🪨
+  return v;
+}
+function valeurExpansion(coup,nat){
+  try{
+    if(!coup||!nat||!nat.civ||typeof G==='undefined'||!G)return 0;
+    const t=G.turn||1, obj=expansionObjectif(t); if(!obj)return 0;
+    const reliees=(nat.colonies||[]).filter(c=>c.connected||c.nodeId===nat.civ.home).length;
+    const deficit=obj-reliees;
+    const restants=Math.max(0,(G.maxTurns||10)-t);
+    const mult=(G._primeExpansion!==undefined)?G._primeExpansion:EXPANSION_POIDS;
+    if(coup.type==='coloniser'){
+      if(deficit<=0)return 0;
+      const rc=_raccordement(nat,coup.node); if(!rc||rc.etrangers>0||rc.sauts>2)return 0;
+      const node=NODES[coup.node]; if(!node)return 0;
+      /* production nette × tours restants + VP au Nv.1 + ce que l'amélioration pourra encore rapporter (VP × marge,
+         au prorata du temps qui reste pour la monter) — même idée que le « potentiel » d'`evaluerPosition`. */
+      const total=G.maxTurns||10, marge=Math.max(0,(node.maxLv||3)-1);
+      const net=_rendementNetColonie(nat,coup.node,rc.sauts>0)*restants+((node.baseVP||1)+1)+(node.baseVP||1)*marge*(restants/total);
+      if(net<=0)return 0;
+      return mult*deficit*net/(1+rc.sauts);
+    }
+    if(coup.type==='route'){
+      const isolees=(nat.colonies||[]).filter(c=>!c.connected&&c.nodeId!==nat.civ.home); if(!isolees.length)return 0;
+      const avant=isolees.map(c=>{ const r=_raccordement(nat,c.nodeId); return r?r.sauts:99; });
+      nat.routes.push({from:coup.from,to:coup.to,tokens:0});
+      let gain=0;
+      try{ isolees.forEach((c,i)=>{ const r=_raccordement(nat,c.nodeId); const s=r?r.sauts:99; if(s>=avant[i])return;
+        const node=NODES[c.nodeId]; if(!node)return;
+        const prod=_rendementNetColonie(nat,c.nodeId,false)*restants;
+        const vp=((node.baseVP||1)*(c.level||1))*0.5+1;
+        gain+=Math.max(0,prod+vp)/(1+s); }); }
+      finally{ nat.routes.pop(); }
+      return gain>0?mult*Math.max(1,deficit)*gain:0;      // relier ce qui existe vaut toujours, même sans déficit
+    }
+    return 0;
   }catch(err){ return 0; }
 }
 function valeurProjet(coup,nat){
@@ -3832,17 +3948,18 @@ function showAgendaSelModal(){
   if(typeof _syncEndBtn==='function')_syncEndBtn();
 }
 // ── Draft d'agenda côté SERVEUR : chaque nation HUMAINE choisit le sien ; les IA choisissent automatiquement. ──
+/* ═══ L'AGENDA D'UN ORDINATEUR EST TIRÉ AU HASARD, ET IMPOSÉ (Marc, 05/10, E4) ═══
+   Avant : une liste de préférences fixe par nation (et trois identifiants qui n'existaient plus) — « je ne suis pas
+   sûr que les IA choisissent vraiment avec des données valables ». Elles ne lisaient rien de la partie. Désormais :
+   tirage au hasard parmi les agendas ATTEIGNABLES pour la nation (le Hub jovien reste aux Jupitériens), puis l'IA
+   doit le réussir — `valeurAgendaEtat` en fait une priorité croissante dès le tour 5. Le siège `G.player` tenu par
+   l'ordinateur (parties de mesure) reçoit aussi le sien. */
+function agendaAtteignable(ag,nat){ if(!ag||!nat||!nat.civ)return false; if(ag.id==='ag8')return nat.civ.id==='jupiteriens'; if(ag.id==='ag15')return nat._profil!=='guerrier'; return true; }   // Pacifiste : pas pour un Conquérant
 function _aiPickAgendas(){
-  const aiPref={
-    terriens:['ag6','ag10','ag2'],martiens:['ag4','ag3','ag1'],
-    jupiteriens:['ag8','ag1','ag9'],ceinturiens:['ag4','ag11','ag2'],
-  };
-  const shuffled=shuffle([...AGENDAS_POOL]);
-  for(const ai of G.ais){
-    if(ai._isAI===false)continue; // humain : il choisira lui-même
-    const prefs=(aiPref[ai.civ.id]||[]); let pick=null;
-    for(const prefId of prefs){const f=shuffled.find(a=>a.id===prefId);if(f){pick=f;break;}}
-    ai.agenda=pick||shuffled[0];
+  for(const ai of allPlayers()){
+    if(ai._isAI===false||(ai===G.player&&ai._isAI!==true))continue; // humain : il choisira lui-même
+    const cands=shuffle(AGENDAS_POOL.filter(a=>agendaAtteignable(a,ai)));
+    ai.agenda=cands[0]||shuffle([...AGENDAS_POOL])[0];
     /* ⚠️ LE NOM DE L'AGENDA ÉTAIT ÉCRIT ICI, DANS LE JOURNAL QUE L'HUMAIN LIT (Marc, 13/09 :
        « à l'époque je le voyais »). Un agenda « secret » lu au tour 1, ce n'est plus un secret :
        on sait quoi contrer. Même ligne que pour un humain ; le nom est révélé à la fin, dans le
@@ -3944,23 +4061,8 @@ function confirmAgendaChoice(){
   if(!_selectedAgendaId)return;
   const chosen=_agendaPool.find(a=>a.id===_selectedAgendaId);
   G.player.agenda=chosen;
-  // Chaque IA choisit indépendamment dans le pool complet (pas les restes)
-  const aiPref={
-    terriens:['ag6','ag10','ag2'],martiens:['ag4','ag3','ag1'],
-    jupiteriens:['ag8','ag1','ag9'],ceinturiens:['ag4','ag11','ag2'],
-  };
-  const shuffled=shuffle([...AGENDAS_POOL]);
-  for(const ai of G.ais){
-    const prefs=(aiPref[ai.civ.id]||[]);
-    let pick=null;
-    for(const prefId of prefs){const found=shuffled.find(a=>a.id===prefId);if(found){pick=found;break;}}
-    ai.agenda=pick||shuffled[0];
-    /* ⚠️ LE NOM DE L'AGENDA ÉTAIT ÉCRIT ICI, DANS LE JOURNAL QUE L'HUMAIN LIT (Marc, 13/09 :
-       « à l'époque je le voyais »). Un agenda « secret » lu au tour 1, ce n'est plus un secret :
-       on sait quoi contrer. Même ligne que pour un humain ; le nom est révélé à la fin, dans le
-       décompte des VP, comme pour tout le monde. Banc : `test_agenda_secret.js`. */
-    addLog(J('journal.agenda_secret_choisi','📋 {emoji} {nation} — agenda secret choisi.',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name')}),'dim');
-  }
+  // Chaque IA choisit indépendamment dans le pool complet (pas les restes) — même fonction qu'en ligne (04/10)
+  _aiPickAgendas();
   G.agendas=allPlayers().map(p=>p.agenda).filter(Boolean);
   document.getElementById('agenda-sel-modal').classList.add('hidden');
   addLog(J('journal.agenda_choisi','📋 Agenda choisi : {emoji} {nom}',{emoji:chosen.emoji,nom:_i18nRef(chosen,'name')}),'gold');
@@ -5194,7 +5296,7 @@ function _resolveStratChoice(nat, cardId){
       (ans)=>{ const tid=ans&&ans.targetId;
         if(tid){
           const de=_leur?tid:nat.civ.id, vers=_leur?nat.civ.id:tid;
-          const prev=getTens(de,vers); setTens(de,vers,Math.max(0,prev-_amt));
+          const prev=getTens(de,vers); setTens(de,vers,Math.max(0,prev-_amt)); _marquerApaisement(nat);
           addLog(J('journal.10','🕊️ {emoji} {nation}{tension}{prev} → {v}/10 (−{amt})',{emoji:nat.civ.emoji,nation:_i18nRef(nat.civ,'name'),tension:(_leur?J('journal.apaise_tension_envers'," apaise {tid} — sa tension envers elle : ",{tid:tid}):J('journal.calme_tension_vs'," calme sa tension vs {tid} : ",{tid:tid})),prev:prev,v:getTens(de,vers),amt:_amt}),'dim');
           /* Même geste, même effet qu'en solo : la Diplomatie efface la rancune de celui qu'on
              apaise. Sans cette ligne, la carte aurait deux effets différents selon le mode de jeu. */
@@ -5398,7 +5500,7 @@ function applyCalmTension(aiId,mode,amount){
      donnerait une carte qui a l'air de fonctionner et ne protège de rien. */
   if(mode==='diplomatie'){
     const prevD=getTens(aiId,'player');
-    setTens(aiId,'player',Math.max(0,prevD-amount));
+    setTens(aiId,'player',Math.max(0,prevD-amount)); _marquerApaisement(G.player);
     const _n=(G.ais.find(a=>a.civ.id===aiId)||{civ:{name:aiId,emoji:''}});
     addLog(J('journal.mission_diplomatique_chez_tension_envers','🕊️ Mission diplomatique chez {emoji} {nation} : sa tension envers {nation2} {prevd} → {v}/10 (−{amount})',{emoji:_n.civ.emoji,nation:_i18nRef(_n.civ,'name'),nation2:_i18nRef(G.player.civ,'name'),prevd:prevD,v:getTens(aiId,'player'),amount:amount}),'gold');
     /* Le geste que Marc réclamait : il efface la mémoire des agressions, pas seulement la jauge. */
@@ -5438,7 +5540,7 @@ function applyCalmTension(aiId,mode,amount){
     render(); return;
   }
   const prev=getTens('player',aiId);
-  setTens('player',aiId,Math.max(0,prev-amount));
+  setTens('player',aiId,Math.max(0,prev-amount)); _marquerApaisement(G.player);
   const _vers=(G.ais||[]).find(a=>a&&a.civ&&a.civ.id===aiId); // le NOM, pas l'identifiant (« jupiteriens » en minuscule dans D538)
   addLog(J('journal.calme_tension_vers_10','🕊️ {emoji} {nation} calme sa tension vers {v} : −{amount} ({prev} → {v2}/10)',{emoji:G.player.civ.emoji,nation:_i18nRef(G.player.civ,'name'),v:(_vers?J('journal.nation_nom','{emoji} {nation}',{emoji:_vers.civ.emoji,nation:_i18nRef(_vers.civ,'name')}):aiId),amount:amount,prev:prev,v2:getTens('player',aiId)}),'gold');
   if(mode==='strategy'){
@@ -5474,7 +5576,7 @@ function calmerPopulation(nat, cibleId){
   nat.acLeft-=1; nat.res.materials-=1; nat.res.energy-=1; nat.spentThisTurn=(nat.spentThisTurn||0)+3;
   nat.res.morale=Math.min(getResCapFor(nat).morale||10,(nat.res.morale||0)+1);
   const avant=getTens(nat.civ.id,cible.civ.id);
-  setTens(nat.civ.id,cible.civ.id,Math.max(0,avant-CALME_POP_APAISEMENT));
+  setTens(nat.civ.id,cible.civ.id,Math.max(0,avant-CALME_POP_APAISEMENT)); _marquerApaisement(nat);
   addLog(J('journal.calme_population_vis_vis_tension_envers','🕊️ {v} calme sa population vis-à-vis de {emoji} {nation} : {v2} tension envers elle {avant} → {v3}/10 (−{calmepopapaisement}), +1<i class=ri-morale></i>',{v:_evName(nat),emoji:cible.civ.emoji,nation:_i18nRef(cible.civ,'name'),v2:J('journal.ligne_4',"sa"),avant:avant,v3:getTens(nat.civ.id,cible.civ.id),calmepopapaisement:CALME_POP_APAISEMENT}),'gold');
   return true;
 }
@@ -5491,7 +5593,7 @@ function diplomatieCivique(nat, cibleId){
   nat._diploCivique.faites.push(cibleId);
   nat.acLeft-=1; nat.res.materials-=MISSION_DIPLO_COUT_MAT; nat.spentThisTurn=(nat.spentThisTurn||0)+1+MISSION_DIPLO_COUT_MAT;
   const avant=getTens(cible.civ.id,nat.civ.id);
-  setTens(cible.civ.id,nat.civ.id,Math.max(0,avant-MISSION_DIPLO_APAISEMENT));
+  setTens(cible.civ.id,nat.civ.id,Math.max(0,avant-MISSION_DIPLO_APAISEMENT)); _marquerApaisement(nat);
   addLog(J('journal.mission_diplomatique_chez_tension_envers_2','🕊️ Mission diplomatique de {v} chez {emoji} {nation} : sa tension envers {nation2} {avant} → {v2}/10 (−{missiondiploapaisement}, −{cout}<i class=ri-materials></i>)',{v:_evName(nat),emoji:cible.civ.emoji,nation:_i18nRef(cible.civ,'name'),nation2:_i18nRef(nat.civ,'name'),avant:avant,v2:getTens(cible.civ.id,nat.civ.id),missiondiploapaisement:MISSION_DIPLO_APAISEMENT,cout:MISSION_DIPLO_COUT_MAT}),'gold');
   return true;
 }
@@ -6082,10 +6184,11 @@ function guerresPreparer(apres){
   const fraiches=G.wars.filter(w=>w.justDeclared).slice().sort(parOrdre).map(cle);
   G.wars.forEach(w=>{ if(w.justDeclared) w.justDeclared=false; });
   d.guerres=enCours.map(k=>({a:k.a,b:k.b,fraiche:false})).concat(fraiches.map(k=>({a:k.a,b:k.b,fraiche:true})));
-  /* Joueur éliminé, en solo : les guerres restantes sont celles des AUTRES. Leur phase de fin de tour
-     passe par les fenêtres de `G.player` (sans pilote en solo, rien n'y répondrait) — elle est donc
-     sautée ; les ordinateurs continuent de s'assaillir pendant leurs tours d'action (29BD, 22/09). */
-  if(typeof _spectateurSolo==='function'&&_spectateurSolo()) d.guerres=[];
+  /* Joueur éliminé, en solo : les guerres restantes sont celles des AUTRES. Le 22/09 (29BD) leur file
+     était VIDÉE ici, faute de pilote en solo. Depuis §170.3 le pilote local répond pour les ordinateurs
+     et §175 joue une guerre IA–IA par un émetteur muet : la file se joue jusqu'au bout, comme sur le
+     serveur (04/10, v11.52 ; banc test_guerre_ia_ia_appli §5). Les guerres du joueur éliminé, elles,
+     sont déjà éteintes par `appliquerEliminations`. */
   d.guerreIdx=0;
   d.apresGuerres=apres||'stFinDeTour';   // un NOM, pas une fonction : un nom se sérialise
   /* On note QUI entre dans la file, pour pouvoir le remettre en place à la sortie (voir
@@ -6880,11 +6983,24 @@ function interleaveStep(){
     }
     G._humanActive=false;
     const before=(G.log||[]).length;
-    const acted=doAITurn(actor,true);
+    const _acAvant=actor.acLeft||0;
+    let acted=false;
+    /* 04/10 (v11.52) — MÊME TRAITEMENT QUE LE SERVEUR (`driver.js` `_aiTurn`) : une erreur dans le tour d'un
+       ordinateur ne fige plus le tour de table ; la nation passe sa manche, l'erreur est écrite au journal
+       et remontée au rapport de diagnostic (console.error est capté par diagnostic.js). */
+    try{ acted=doAITurn(actor,true); }
+    catch(err){
+      try{ addLog(_i18nRef(actor.civ,'name')+' — '+J('journal.erreur_tour_ia','erreur pendant son tour, manche passée : {msg}',{msg:(err&&err.message)||String(err)}),'red'); }catch(e2){}
+      try{ console.error('[SOLAR] erreur tour IA '+actor.civ.id, err); }catch(e2){}
+      actor._passedRound=true; G._ilIdx++; render(); setTimeout(interleaveStep, 300); return;
+    }
     if(acted&&G.aiActions&&G.aiActions.length){ actor._turnActions=(actor._turnActions||[]).concat(G.aiActions); } // cumule les actions de la manche pour le bilan par nation
     /* Même règle que pour le joueur : ce passage lui coûte autant de places qu'il a dépensé d'AC.
-       Son pouvoir gratuit (0 AC) n'en coûte aucune — il l'enchaîne déjà avec une action payante. */
-    try{ const _ac=(G.aiActions||[]).reduce((n,x)=>n+((x&&x.acPaid)||0),0); actor._passesDues=Math.max(0,_ac-1); }catch(err){}
+       Son pouvoir gratuit (0 AC) n'en coûte aucune — il l'enchaîne déjà avec une action payante.
+       04/10 (v11.52) : compté par la DIFFÉRENCE d'AC avant/après, comme `driver.js` — le champ `acPaid`
+       n'est jamais posé pour un ordinateur (`addAction` sort pour lui), donc la dette valait toujours 0
+       en solo : un Supercroiseur (3 AC) rejouait au passage suivant, alors qu'en ligne il en sautait deux. */
+    try{ const _dep=_acAvant-(actor.acLeft||0); actor._passesDues=Math.max(0,_dep-1); }catch(err){}
     if(!acted||actor.acLeft<=0) actor._passedRound=true;
     G._ilIdx++;
     const _newE=[]; for(const e of (G.log||[])){ if(e===G._ilMarkEntry) break; _newE.push(e); if(_newE.length>60) break; }
@@ -9002,6 +9118,7 @@ function breakAccordAndAttack(nodeId){
 }
 /* `attaquant` : la nation qui assaille. Sans lui, la nation active. */
 function attackColony(nodeId,attaquant){
+  _romprePacifisme(attaquant||G.player,'assaut');
   if(G.phase!=='actions')return;const node=NODES[nodeId];const p=attaquant||G.player;
   /* ⚠️ ON NE DEMANDE PLUS « À QUI EST CE NŒUD » MAIS « QUI LE DÉFEND CONTRE MOI ».
      `getNodeOwnerAI` rendait UNE nation — sur un nœud partagé elle pouvait rendre l'attaquant
@@ -10565,11 +10682,14 @@ function tensionApresAssaut(agresseur, victime, coloniePrise){
   _griefNoter(v,a,apres-avant,coloniePrise?J('grief.colonie_prise','colonie prise'):J('grief.assaut','assaut subi'));
   addLog(J('journal.tension_10_10_peuple_exige_guerre_fin_to','🔥 {emoji} {nation} — tension envers {emoji2} {nation2} : {avant} → {seuil}/10 ({v}). À 10, le peuple exige la guerre en fin de tour.',{emoji:victime.civ.emoji,nation:_i18nRef(victime.civ,'name'),emoji2:agresseur.civ.emoji,nation2:_i18nRef(agresseur.civ,'name'),avant:avant,seuil:apres,v:(coloniePrise?J('journal.colonie_prise',"colonie prise"):J('journal.assaut_repousse',"assaut repoussé"))}),'red');
 }
+function _romprePacifisme(nat,motif){ try{ if(nat&&!nat._pacifismeRompu)nat._pacifismeRompu=motif||'guerre'; }catch(e){} }
+function _marquerApaisement(nat){ try{ if(nat)nat._apaisements=(nat._apaisements||0)+1; }catch(e){} }
 function declarerGuerre(agresseur, cible, raison, declaredBy, opts){
   opts=opts||{};
   if(!agresseur||!cible||agresseur===cible) return null;
   const A=agresseur.civ.id, B=cible.civ.id;
   if(_warBetween(A,B)) return null;                       // déjà en guerre : rien à faire
+  _romprePacifisme(agresseur,'guerre');                   // agenda Pacifiste : déclencher une guerre (populaire comprise) le rompt
   /* ⚠️ LE PACTE PASSE AVANT TOUT — c'est ici qu'il prend corps. TOUTES les guerres du jeu passent
      par cette fonction : agression délibérée, guerre populaire à 10 de tension, refus de la Sphère
      de Dyson. Un seul point de passage, donc une seule garde, donc aucun chemin oublié. */
@@ -11752,7 +11872,7 @@ function evaluerPosition(nat,observateur){
        elle le sera. Avant : plein potentiel, −0,5×VP — Pluton isolée valait ~25 points, d'où les colonies lointaines
        « à tout va ». Un tour par route manquante ; une nation en travers du chemin divise par deux, deux par cinq ;
        aucun chemin praticable : rien. Chaque route à poser coûte en plus son action et son matériau. */
-    potentiel-=(n.baseVP||1)*0.5;                     // isolée : la moitié des VP, et un revenu nul
+    // (04/10, v11.52 : l'ancienne décote −0,5×VP est retirée — le barème §208 ci-dessous est la seule règle)
     _isolees++;
     const rc=_raccordement(nat,c.nodeId);
     if(!rc)continue;
@@ -12640,12 +12760,17 @@ enregistrerCerveau('tacticien', function(ctx){
      un coup qui ruine une nation en guerre n'est retenu que s'il n'y a rien d'autre. */
   const ruineux=new Set();
   const enGuerre=(typeof estEnGuerre==='function')&&estEnGuerre(ctx.nation);
+  const _acAvant=(typeof calcAC==='function')?calcAC(ctx.nation):0;   // E3 : les PA permanents avant le coup
   for(const c of coups){
     let ruine=false;
     const r=simulerCoup(ctx.nation, function(){ return ctx.jouer(c); }, function(){
       const n=ctx.nation;
       ruine=enGuerre&&Math.min(n.res.materials||0,n.res.energy||0)<1;
-      return evaluerPositionRelative(n)-((typeof penaliteReserveBut==='function')?penaliteReserveBut(n,c):0);
+      return evaluerPositionRelative(n)-((typeof penaliteReserveBut==='function')?penaliteReserveBut(n,c):0)
+        /* E4 (05/10) : l'agenda secret, priorité croissante dès le tour 5 — sur l'ÉTAT simulé, donc en différence. */
+        +((typeof valeurAgendaEtat==='function')?valeurAgendaEtat(n):0)
+        /* E3 (05/10) : un PA permanent gagné par ce coup vaut tous les tours qui restent. */
+        +((typeof valeurActionsPermanentes==='function')?valeurActionsPermanentes(n,_acAvant):0);
     });
     if(!r.ok)continue;
     evalues++;
@@ -12672,6 +12797,9 @@ enregistrerCerveau('tacticien', function(ctx){
            qu'elle cherche, le cerveau comment elle le calcule »). Le Bâtisseur vise les colonies
            reliées au niveau 3. */
       +((typeof valeurTemperament==='function')?valeurTemperament(c,ctx.nation):0)
+      /* · `valeurExpansion` — le but « expansion » (E1, 04-05/10) : dès le tour 6, colonies reliées rentables et routes
+           qui raccordent une isolée, à hauteur du déficit et du rendement net. */
+      +((typeof valeurExpansion==='function')?valeurExpansion(c,ctx.nation):0)
       /* · `valeurLevier` — la note de levier des rangs 3 fixée par Marc (§207-208). */
       +((typeof valeurLevier==='function')?valeurLevier(c,ctx.nation):0);
     if(ruine){ ruineux.add(c); continue; }
@@ -12743,6 +12871,7 @@ function moralSuffisantPourAssaillir(ai,cible){
   return ((ai.res.morale||0)-usure)>=1;
 }
 function resoudreAssautIA(ai,nodeId,opts){
+  _romprePacifisme(ai,'assaut');
   const o=opts||{};
   if(!ai||!nodeId)return false;
   const best=(typeof defenseurPrincipal==='function')?defenseurPrincipal(nodeId,ai):null;
@@ -12849,7 +12978,10 @@ function resoudreAssautIA(ai,nodeId,opts){
   }
   const aEmpath=bonusCombatCartes(ai);
   const dEmpath=bonusCombatCartes(best);
-  const dCommit=Math.max(0,Math.min(best.forceTokens||0,best.res.materials||0,best.res.energy||0));
+  /* 04/10 (v11.52) : le défenseur ordinateur répond par LA règle de défense des ordinateurs, `defenseIA`
+     (Navigation : coût ÷ 2, réserve du croiseur, dosage selon la colonie), et non plus par
+     `min(jetons, matériaux, énergie)` — une seconde règle qui ne vivait que sur ce chemin. */
+  const dCommit=Math.max(0,(typeof defenseIA==='function')?defenseIA(best,ai,nodeId):Math.min(best.forceTokens||0,best.res.materials||0,best.res.energy||0));
   /* ⚠️ ON COMPTE D'ABORD, ON ENGAGE ENSUITE. Cette boucle appelait `applyCombatEngage` au moment
      même où elle additionnait les renforts. Tant que l'assaut avait lieu de toute façon, cela ne
      se voyait pas ; depuis qu'il peut être ABANDONNÉ (voir juste en dessous), des cohabitants
@@ -13135,20 +13267,25 @@ function _doAITurnInterne(aiPlayer,oneShot){
      routes sans se soucier de qui possède les nœuds traversés — un relais sur un monde vide relie
      donc parfaitement. */
   function tryRoute(){
-    if(ai.acLeft<1)return false;
-    const matCost=hasSpec(ai,'route_disc')?0:1;
-    if((ai.res.materials||0)<matCost)return false;
+    /* 04/10 (v11.52) : LA POSE PASSE PAR LA PORTE UNIQUE `doEstablishRoute`. Ce réflexe écrivait la route
+       lui-même : jeton posé même sous une technologie qui immunise la route, jeton pris sans égard pour
+       la garnison ni la réserve pirate (`protegerRouteIA`, §154/§161), coût lu sur `route_disc` au lieu
+       de `routeCost`. Le chemin (BFS, tronçons tenables) reste ; seule l'écriture change. */
+    const _rc=(typeof routeCost==='function')?routeCost(ai):{ac:1,mat:hasSpec(ai,'route_disc')?0:1};
+    if(ai.acLeft<(_rc.ac||1))return false;
+    if((ai.res.materials||0)<(_rc.mat||0))return false;
     // (plus de garde énergie : connecter une colonie est vital — une route non alimentée relie quand même la colonie, seul son bonus commercial est différé)
     const _existe=(a,b)=>!!ai.routes.find(r=>(r.from===a&&r.to===b)||(r.from===b&&r.to===a));
     const _poser=(a,b,cible)=>{
-      ai.acLeft--;ai.res.materials=Math.max(0,(ai.res.materials||0)-matCost);ai.spentThisTurn+=1+matCost;
-      const tok=ai.forceTokens>0?1:0;if(tok>0)ai.forceTokens--;
-      ai.routes.push({from:a,to:b,tokens:tok});updateConnections(ai);
+      doEstablishRoute(a,b,ai);
+      const _r=ai.routes.find(r=>(r.from===a&&r.to===b)||(r.from===b&&r.to===a));
+      if(!_r)return false;                       // refusée par la porte unique : rien n'a été payé
+      const tok=_r.tokens||0;
       /* Références, pas noms bruts : ce libellé est relu au bilan et dans le journal par des
          joueurs d'autres langues (« route → Phobos (via Cérès) » en anglais, Marc 20/09). */
       const _nom=(NODES[cible]?_i18nRef(NODES[cible],'name'):cible);
       const _etape=(b!==cible)?J('journal.via',' (via {n})',{n:(NODES[b]?_i18nRef(NODES[b],'name'):b)}):'';
-      addLog(J('journal.route_2','🤖 {nation} route → {nom}{etape}',{nation:_i18nRef(ai.civ,'name'),nom:_nom,etape:_etape}),'dim');
+      // (le journal est écrit par `doEstablishRoute` ; ici seulement la ligne du bilan)
       G.aiActions.push(_i18nAplatir({emoji:'🛤️',name:J('action.route_2','Route → {nom}{etape}',{nom:_nom,etape:_etape}),desc:(tok?J('action.1_deploye','1⚔️ déployé'):J('action.non_protegee','non protégée'))}));
       return true;
     };
@@ -13522,10 +13659,10 @@ function _doAITurnInterne(aiPlayer,oneShot){
          demander. Deux poids, deux mesures : les guerres entre IA s'arrêtaient d'elles-mêmes,
          celles contre un joueur non. Désormais elle VEUT la paix, quel que soit l'adversaire ;
          c'est l'adversaire qui tranche (fenêtre pour un humain, `aiWarPolicy` pour une IA). */
-      ai._wantsPeace=true;
-      if(ai._isAI!==false) addLog(J('journal.cherche_paix_avec','🕊️ {emoji} {nation} cherche la paix avec {v}.',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),v:(_e?J('commun.emoji_nom','{emoji} {nom}',{emoji:_e.civ.emoji,nom:_i18nRef(_e.civ,'name')}):J('journal.adversaire_2',"son adversaire"))}),'dim');
-      return;
-      addLog(J('journal.propose_paix','🕊️ {emoji} {nation} propose la paix.',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name')}),'dim');
+      ai._wantsPeace=true;   // lu par personne : l'ancien cerveau demandait la paix par ce drapeau
+      /* 04/10 (v11.52) : sous le tacticien ce bloc n'a aucun effet (la paix passe par `iaVeutLaPaix`) ;
+         la ligne de journal annonçait donc une intention que rien ne suivait. Témoin historique seulement. */
+      if(ai._isAI!==false&&_cerveauHistorique()) addLog(J('journal.cherche_paix_avec','🕊️ {emoji} {nation} cherche la paix avec {v}.',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),v:(_e?J('commun.emoji_nom','{emoji} {nom}',{emoji:_e.civ.emoji,nom:_i18nRef(_e.civ,'name')}):J('journal.adversaire_2',"son adversaire"))}),'dim');
       return;
     }
     // Guerre jouable → conserver les ressources, monter en puissance, et assaillir dès que possible.
@@ -13535,9 +13672,9 @@ function _doAITurnInterne(aiPlayer,oneShot){
        revient à la colonie perdue. La distance se mesure depuis SES propres colonies. */
     let _cible=target;
     try{
-      if(aiEnnemi(ai)&&typeof getNodeDistance==='function'){
+      if(_e&&typeof getNodeDistance==='function'){   // 04/10 : l'adversaire de guerre, pas la proie des raids (§67.3)
         const _dist=id=>Math.min(...(ai.colonies||[]).map(c=>{const d=getNodeDistance(c.nodeId,id);return (d==null||d<0)?99:d;}).concat([99]));
-        const _nv3=(aiEnnemi(ai).colonies||[]).filter(c=>(c.level||1)>=3).map(c=>({id:c.nodeId,d:_dist(c.nodeId)})).sort((a,b)=>a.d-b.d)[0];
+        const _nv3=(_e.colonies||[]).filter(c=>(c.level||1)>=3).map(c=>({id:c.nodeId,d:_dist(c.nodeId)})).sort((a,b)=>a.d-b.d)[0];
         if(_nv3 && (!target || _nv3.d < _dist(target))) _cible=_nv3.id;
       }
     }catch(e){}
@@ -14081,7 +14218,8 @@ function _doAITurnInterne(aiPlayer,oneShot){
     return Math.min(ai.res.materials||0, ai.res.energy||0) <= r;
   }
   function chooseAndAct(){
-    // Reconnecter une colonie isolée reste toujours le réflexe prioritaire.
+    // Reconnecter une colonie isolée reste toujours le réflexe prioritaire (pour tous les cerveaux : mesuré le
+    // 04/10, sans lui le tacticien laisse 5 isolées en fin de partie contre 0). La pose passe par la porte unique.
     if(ai.colonies.some(c=>!c.connected&&c.nodeId!==ai.civ.home)&&tryRoute())return true;
     // En guerre et trésorerie basse → on THÉSAURISE (on ne dépense pas ce qui servira à se défendre).
     // Réservé à l'ancien cerveau : le tacticien porte sa propre falaise (`perilRessources`).
@@ -16054,7 +16192,7 @@ function stPaixReponse(ans){
   const oui=!!(ans&&(ans.value==='yes'||ans.targetId==='yes'||ans.id==='yes'||ans.accept===true||ans.choice==='yes'));
   if(!prop||!dest){ _paixSuiteJouer('WAR'); return; }
   if(oui) _paixAppliquer(prop,dest,o);
-  else logAuteur(prop, function(){
+  else { _romprePacifisme(dest,'refus de paix'); logAuteur(prop, function(){
     addLog(J('journal.refuse_paix_proposee_conflit_continue','💢 {emoji} {nation} REFUSE la paix proposée par {emoji2} {nation2} — le conflit continue !',{emoji:dest.civ.emoji,nation:_i18nRef(dest.civ,'name'),emoji2:prop.civ.emoji,nation2:_i18nRef(prop.civ,'name')}),'red');
     /* ⚠️ LA FENÊTRE DOIT JOUER LA SUITE, SINON LA PARTIE S'ARRÊTE ICI.
        J'avais d'abord émis une simple `notice` de refus, avec `stRien` pour continuation, avant de
@@ -16065,7 +16203,7 @@ function stPaixReponse(ans){
     showWarModal(J('combat.paix_refusee','💢 Paix refusée'),
       J('combat.refuse_proposition_paix_conflit_continue','{emoji} {nation} refuse ta proposition de paix.<br><br>Le conflit continue — choisis ton assaut à l\'écran suivant.',{emoji:dest.civ.emoji,nation:_i18nRef(dest.civ,'name')}),
       null, dest.civ.id, prop);
-  });
+  }); }
 }
 /* Les EFFETS de la paix, pour un couple explicite — aucun recours à « le joueur » : la réponse peut
    arriver bien après, quand la perspective a changé de nation. */
@@ -16162,6 +16300,7 @@ function submitPeaceOffer(){
     G.player.res.morale=(G.player.res.morale||0)+1;
     _paixSuiteJouer('PEACE');
   }else{
+    _romprePacifisme(peaceAi,'refus de paix');
     addLog(J('journal.refuse_paix_conflit_continue','💢 {v} refuse la paix — le conflit continue !',{v:(peaceAi?_i18nRef(peaceAi.civ,'name'):J('journal.ia',"IA"))}),'red');
     // D'ABORD montrer la réponse adverse ; ENSUITE (au clic) le choix d'assaut.
     showWarModal(J('combat.paix_refusee','💢 Paix refusée'),J('combat.refuse_proposition_paix_conflit_continue_2','{v} refuse ta proposition de paix.<br><br>Le conflit continue — choisis ton assaut à l\'écran suivant.',{v:(peaceAi?peaceAi.civ.emoji+' '+peaceAi.civ.name:J('combat.ennemi_2',"L'ennemi"))}),null);
