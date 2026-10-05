@@ -32,8 +32,14 @@ function montage(pilote, a, b) {
   for (const n of [G.player].concat(G.ais)) { n.res.materials = 10; n.res.energy = 10; n.res.morale = 8; n.forceTokens = 6; n.tempVP = 0; n._vpDetail = []; }
   const run = c => vm.runInContext(c, sb);
   if (pilote) run('_piloteLocalActif=function(){ return true; };');
+  /* 05/10 (E5) : un ordinateur n'attaque plus une capitale seule (garnison 10) avec 6 jetons — c'est une défaite connue.
+     Pour que la guerre ait un combat à livrer, chaque nation ordinaire reçoit une colonie gagnable. */
+  run('(function(){ const pose={terriens:"lune",martiens:"deimos",jupiteriens:"europe"}; for(const n of allPlayers()){ const id=pose[n.civ.id]; if(id&&!allPlayers().some(p=>p.colonies.some(c=>c.nodeId===id))) n.colonies.push({nodeId:id,level:1,connected:true}); } })()');
   run(`var N_=id=>allPlayers().find(n=>n.civ.id===id); G._pendings=[]; G._pending=null;
        declarerGuerre(N_("${a}"),N_("${b}"),"dyson","${a}");`);
+  /* 05/10 (E5) : à forces égales l'ordinateur n'attaque plus (défense attendue ≥ sa puissance) — l'agresseur reçoit
+     l'avantage qui rend l'assaut gagnable, pour que la file ait un combat à résoudre. */
+  run(`N_("${a}").forceTokens=14; N_("${a}").res.materials=18; N_("${a}").res.energy=18;`);
   return { sb, G, run };
 }
 /* Fait tourner la fin de tour des guerres et répond comme le pilote local : IA → réponse du moteur ;

@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-10-05 · v11.55';</script>
+<script>window.SOLAR_BUILD_HTML='2026-10-05 · v11.57';</script>
 <!-- Tampon des erreurs survenues AVANT diagnostic.js (chargé après moteur.js) : il les ramasse au démarrage. -->
 <script>window.__scErreursPrecoces=[];window.addEventListener('error',function(e){try{if(window.scDiagNoterErreur)return;window.__scErreursPrecoces.push({type:'erreur',msg:e.message||String(e),pile:(e.error&&e.error.stack)||'',ou:(e.filename||'').split('/').pop()+':'+e.lineno});}catch(x){}});</script>
 <!-- i18n.js EN TÊTE, avant tout script du corps : il choisit la langue et charge lang/<code>.js (synchrone).
@@ -1354,6 +1354,13 @@ img.cbt-ic{display:inline-block;height:1.35em;width:auto;vertical-align:-.32em;m
 img.cbt-att{filter:drop-shadow(0 0 1px rgba(255,255,255,.9)) drop-shadow(0 0 3px rgba(255,90,60,.6))}
 .fen-medal img.cbt-ic{height:44px;vertical-align:middle;margin:0}
 .cbt-dp{white-space:normal}
+/* 05/10 (captures EN) : le pouvoir se réduit à son icône dès que « À TOI » est affiché, pas seulement quand « Passer »
+   l'est — sur l'écran des cartes Stratégie, « YOUR TURN » était coupé en « YOUR TUR ». */
+.tb-l3:has(#a-toi-badge.on) #btn-ability.tb-pouvoir{padding:0 8px;gap:0}
+.tb-l3:has(#a-toi-badge.on) #btn-ability.tb-pouvoir>span:not(.k){display:none}
+#a-toi-badge{white-space:nowrap}
+/* 05/10 : « Me→them » / « Them→me » tronqués dans Diplo — la colonne s'adapte au libellé (62 px minimum). */
+.dip-lbl{width:auto;min-width:62px}
 </style>
 </head>
 <body>
@@ -1591,7 +1598,7 @@ function lvAppNouvelle(){
   <div class="tb-l1">
     <span id="civ-badge-top" class="cbt-wrap"></span>
     <span id="turn-disp" data-i18n="ui.tour_1_10">Tour 1/10</span>
-    <div id="ac-disp">2 AC</div>
+    <div id="ac-disp" data-i18n="ui.ac_initial">2 AC</div>
     <div id="gov-disp">🏛️ 1</div>
     <span id="phase-disp" hidden></span>
   </div>

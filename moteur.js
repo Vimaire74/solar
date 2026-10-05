@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-05 · v11.55';
+const SOLAR_BUILD_MOTEUR = '2026-10-05 · v11.57';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -3556,7 +3556,9 @@ function valeurExpansion(coup,nat){
     const mult=(G._primeExpansion!==undefined)?G._primeExpansion:EXPANSION_POIDS;
     if(coup.type==='coloniser'){
       if(deficit<=0)return 0;
-      const rc=_raccordement(nat,coup.node); if(!rc||rc.etrangers>0||rc.sauts>2)return 0;
+      /* 05/10 : 2 → 3 sauts (partie 157e79 : depuis la Ceinture de Kuiper aucun nœud libre n'était à ≤ 2 sauts — prime nulle,
+         une seule colonie en fin de partie). La prime reste divisée par (1 + sauts) : un nœud lointain vaut moins. */
+      const rc=_raccordement(nat,coup.node); if(!rc||rc.etrangers>0||rc.sauts>3)return 0;
       const node=NODES[coup.node]; if(!node)return 0;
       /* production nette × tours restants + VP au Nv.1 + ce que l'amélioration pourra encore rapporter (VP × marge,
          au prorata du temps qui reste pour la monter) — même idée que le « potentiel » d'`evaluerPosition`. */
@@ -6025,12 +6027,35 @@ function iaChoixDeCombat(nat){
        On garde la préférence, parce qu'une capitale porte 10 jetons de garnison : les colonies
        ordinaires d'abord, la planète mère seulement s'il n'y a rien d'autre. C'est exactement
        l'idiome déjà employé pour la guerre populaire du joueur (`_fwCols`). */
-    const _ord=ennemi?ennemi.colonies.filter(c=>c.nodeId!==ennemi.civ.home):[];
-    const cibles=_ord.length?_ord:(ennemi?ennemi.colonies.slice():[]);
+    /* ═══ E5 (Marc, 05/10) — ON N'ATTAQUE PAS UNE DÉFENSE QU'ON SAIT PLUS FORTE ═══
+       Partie du 04/10 : Ceinturiens, 4 jetons contre Io, capitale à 10 de garnison → défaite 4 contre 10, 2 jetons perdus
+       pour de bon. Ce choix ne comparait que les RÉSERVES (plafond ≥ jetons ennemis), jamais la défense de la cible.
+       Désormais chaque cible est jugée par `defenseEstimee` (garnison — 10 pour une capitale —, jetons payables ou
+       perçus selon le renseignement, cartes, croiseur), contre ma puissance (jetons + cartes + croiseur). L'égalité
+       revient au défenseur : il faut la dépasser. Préférences inchangées entre les cibles gagnables : colonies
+       ordinaires d'abord, la plus faible ; la capitale seulement si rien d'autre n'est gagnable. Rien de gagnable : défendre. */
+    const _cru=(typeof cruiserAvailable==='function')&&cruiserAvailable(nat)&&(typeof cruiserAfford==='function')&&cruiserAfford(nat);
+    const _maPuiss=plafond+((typeof bonusCombatCartes==='function')?bonusCombatCartes(nat):0)+(_cru?(nat.cruiserPower||5):0);
+    /* Défense ATTENDUE, pas la pire : la garnison, les cartes et le croiseur sont certains ; les jetons de réserve, un
+       défenseur n'en engage en pratique que la moitié environ (`defenseIA`, ⌈payable/2⌉ hors de portée) — supposer qu'il
+       engage tout interdirait tout combat à forces égales. */
+    const _defAttendue=nodeId=>{
+      if(typeof defenseEstimee!=='function'||!ennemi)return 0;
+      const tout=defenseEstimee(nat,ennemi,nodeId);
+      const sur=((typeof garrisonOf==='function')?garrisonOf(ennemi,nodeId):1)
+        +((typeof bonusCombatCartes==='function')?bonusCombatCartes(ennemi):0)
+        +(((typeof cruiserAvailable==='function')&&cruiserAvailable(ennemi)&&(typeof cruiserAfford==='function')&&cruiserAfford(ennemi))?(ennemi.cruiserPower||5):0);
+      /* Le défenseur réduit à deux colonies ou moins se bat « dos au mur » et engage tout (`defenseIA`) — ça se voit. */
+      if((ennemi.colonies||[]).length<=2)return tout;
+      return sur+Math.ceil(Math.max(0,tout-sur)/2);
+    };
+    const _gagnable=c=>_maPuiss>_defAttendue(c.nodeId);
+    const _ord=ennemi?ennemi.colonies.filter(c=>c.nodeId!==ennemi.civ.home&&_gagnable(c)):[];
+    const _cap=ennemi?ennemi.colonies.filter(c=>c.nodeId===ennemi.civ.home&&_gagnable(c)):[];
+    const cibles=_ord.length?_ord:_cap;
     if(cibles.length){
       const cible=cibles.reduce((b,c)=>(!b||(c.level||1)<(b.level||1))?c:b,null);
-      return {action:'attack', node:cible.nodeId, tokens:plafond,
-              cruiser:(typeof cruiserAvailable==='function')&&cruiserAvailable(nat)&&(typeof cruiserAfford==='function')&&cruiserAfford(nat)};
+      return {action:'attack', node:cible.nodeId, tokens:plafond, cruiser:_cru};
     }
   }
   /* Sinon elle se défend avec ce qu'elle peut payer, sans se ruiner. */
@@ -7813,7 +7838,7 @@ function revenusBruts(p, opts){
     const _pris=butinPrisCeTour(col);
     if(_pris) for(const _k of Object.keys(_pris)) _o[_k]=Math.max(0,(_o[_k]||0)-_pris[_k]);
     for(const _k of Object.keys(_o)) gains[_k]=(gains[_k]||0)+_o[_k];
-    _det('🏙️ '+((NODES[col.nodeId]&&NODES[col.nodeId].name)||col.nodeId)+' (Nv.'+(col.level||1)+')',_o);
+    _det('🏙️ '+((NODES[col.nodeId]&&NODES[col.nodeId].name)||col.nodeId)+' ('+t('commun.nv','Nv.')+(col.level||1)+')',_o);
   }
   // Accord commercial actif : +1<i class=ri-materials></i> +1<i class=ri-morale></i> par accord (les deux nations)
   /* ⚠️ LES LIGNES DE JOURNAL DES BONUS ÉTAIENT RÉSERVÉES À LA NATION ACTIVE (`if(p===G.player)`).
@@ -9531,7 +9556,7 @@ function showAiAssaultDefenseModal(ai,target,aiCommit,done,defender){
   const pEmp=bonusCombatCartes(p);
   const cruAvail=cruiserAvailable(p)&&cruiserAfford(p);
   G._aiAssaultCtx={aiId:ai.civ.id,target,aiCommit,done,aiCru:_aiCruAtt};
-  const tgtLabel=target.type==='colony'?('🏙️ Colonie '+target.name+' (Nv.'+(target.obj.level||1)+')'):('🛤️ Route '+target.name);
+  const tgtLabel=target.type==='colony'?('🏙️ '+t('commun.colonie','Colonie')+' '+target.name+' ('+t('commun.nv','Nv.')+(target.obj.level||1)+')'):('🛤️ '+t('commun.route','Route')+' '+target.name);
   /* ═══ BLASON (Marc, 14/09) : l'adversaire d'abord — médaillon, nom en capitales, puis le verbe.
      Même fenêtre qu'en ligne (online.js, `defense`), assemblée par `fenBlason` (index.html). */
   if(typeof fenBlason==='function'){
@@ -12022,6 +12047,16 @@ function evaluerPosition(nat,observateur){
   /* Chaque tempérament ajoute SA définition d'une bonne position (§139.3). Jamais quand on regarde
      un rival : on évalue alors SA position avec NOS yeux, et son caractère ne nous appartient pas. */
   const temperament=(observateur&&observateur!==nat)?0:_termeTemperament(nat,restants,horizon);
+  /* ═══ E6 (Marc, 05/10) — AU DERNIER TOUR, SEULS LES POINTS COMPTENT ═══
+     Partie du 04/10 : au T10 les ordinateurs adoptaient la Démocratie instantanée, achetaient la Propagande, et finissaient
+     avec 15 à 30 ressources en stock — perdues. Au dernier tour, il n'y a plus d'après : la note est le score lui-même
+     (`calcVP`, qui contient déjà les revenus par tour, l'agenda, les cartes, les colonies). Le reste ne sert plus qu'à
+     départager deux coups de même score (× 0,05) — ce qui fait préférer garder une ressource à la dépenser pour rien,
+     et dépenser pour des points (amélioration, carte) à garder. */
+  if((G.turn||1)>=(G.maxTurns||10)){
+    const reste=production+tresorerie+potentiel+perilMoral+perilRessources+force+actions+plafondMoral+risquePirates+immunite+temperament;
+    return calcVP(nat).total+0.05*reste;
+  }
   return acquis+production+tresorerie+potentiel+perilMoral+perilRessources+force+actions+plafondMoral+risquePirates+immunite+temperament;
 }
 /* ═══ TROIS TEMPÉRAMENTS, TROIS FAÇONS DE NOTER UNE POSITION (§139.3, dicté par Marc le 16/09) ═══
@@ -15736,7 +15771,7 @@ function renderRight(){
      +'</div>').join('');}
   /* ⚠️ « ~VP estimés » montrait le total RÉEL de l'ordinateur, agenda secret compris (même fuite que
      l'ordre du tirage, Marc 22/09). On affiche le score visible, comme partout ailleurs. */
-  document.getElementById('r-ai').innerHTML=G.ais.map(ai=>{const aiVP={total:vpAffiche(ai)};const aiCd=ai.forceCooldown.reduce((s,fc)=>s+fc.count,0);const _int=getIntelLevel(G.player);const pf=perceivedForce(G.player,ai);const forceTxt=pf.exact?('⚔️'+pf.val+(aiCd>0?'(+'+aiCd+'cd)':'')+' <span style="color:#5a7a66">'+t('empire.renseignement','(renseignement)')+'</span>'):('⚔️~'+pf.val+' <span style="color:#5a6a8a">'+t('empire.sans_renseignement','(±3, sans renseignement)')+'</span>');const eco=_int>=2?('<i class=ri-energy></i>'+(ai.res.energy||0)+' <i class=ri-materials></i>'+(ai.res.materials||0)+' <i class=ri-science></i>'+(ai.res.science||0)+' <i class=ri-morale></i>'+(ai.res.morale||0)):'<span style="color:#5a6a8a">'+t('empire.eco_inconnus','éco &amp; moral : inconnus (tech Renseignement)')+'</span>';const cru=croiseurLigne(ai);return`<span class="nat-e">${ai.civ.emoji}</span> <strong>${ai.civ.name}</strong> · Nv.${ai.gov_level}<br>${eco}<br>${forceTxt} · ${t('empire.cols_routes','Cols:{c} Routes:{r}',{c:ai.colonies.length,r:ai.routes.length})}${cru?'<br>'+cru:''}<br><strong style="color:#ffd700">${t('empire.vp_estimes','~{vp} VP estimés',{vp:aiVP.total})}</strong>`;}).join('<hr style="border-color:#1a1a3a;margin:4px 0">');
+  document.getElementById('r-ai').innerHTML=G.ais.map(ai=>{const aiVP={total:vpAffiche(ai)};const aiCd=ai.forceCooldown.reduce((s,fc)=>s+fc.count,0);const _int=getIntelLevel(G.player);const pf=perceivedForce(G.player,ai);const forceTxt=pf.exact?('⚔️'+pf.val+(aiCd>0?'(+'+aiCd+'cd)':'')+' <span style="color:#5a7a66">'+t('empire.renseignement','(renseignement)')+'</span>'):('⚔️~'+pf.val+' <span style="color:#5a6a8a">'+t('empire.sans_renseignement','(±3, sans renseignement)')+'</span>');const eco=_int>=2?('<i class=ri-energy></i>'+(ai.res.energy||0)+' <i class=ri-materials></i>'+(ai.res.materials||0)+' <i class=ri-science></i>'+(ai.res.science||0)+' <i class=ri-morale></i>'+(ai.res.morale||0)):'<span style="color:#5a6a8a">'+t('empire.eco_inconnus','éco &amp; moral : inconnus (tech Renseignement)')+'</span>';const cru=croiseurLigne(ai);return`<span class="nat-e">${ai.civ.emoji}</span> <strong>${ai.civ.name}</strong> · ${t('commun.nv','Nv.')}${ai.gov_level}<br>${eco}<br>${forceTxt} · ${t('empire.cols_routes','Cols:{c} Routes:{r}',{c:ai.colonies.length,r:ai.routes.length})}${cru?'<br>'+cru:''}<br><strong style="color:#ffd700">${t('empire.vp_estimes','~{vp} VP estimés',{vp:aiVP.total})}</strong>`;}).join('<hr style="border-color:#1a1a3a;margin:4px 0">');
 }
 function renderActions(){
   const active=G.phase==='actions';
@@ -15775,7 +15810,7 @@ function revenusParNiveau(nodeId,nat){
   for(let lv=1;lv<=max;lv++){
     const o=revenuDuneColonie(p,{nodeId:nodeId,level:lv,connected:true});
     const txt=Object.entries(o).map(([r,a])=>a+rEmoji(r)).join(' ')||'—';
-    bloc.push('<span style="color:#7a8aa0">Nv'+lv+'</span> '+txt);
+    bloc.push('<span style="color:#7a8aa0">'+t('commun.nv','Nv.')+lv+'</span> '+txt);
   }
   return bloc.join(' <span style="color:#3a3a6a">·</span> ');
 }
@@ -16565,13 +16600,13 @@ function warAttackColony(){
     const n=NODES[c.nodeId];
     const dist=Math.min(...p.colonies.map(pc=>getNodeDistance(pc.nodeId,c.nodeId)));
     return`<button onclick="_warSelectColonyTarget('${c.nodeId}')" style="display:block;width:100%;text-align:left;margin-bottom:5px;padding:6px 10px;background:#1a0a0a;border:1px solid #6a2a2a;color:#ffccaa;border-radius:5px;cursor:pointer;font-size:.85em">
-      ${n.emoji} <strong>${n.name}</strong> — Nv.${c.level}${c.connected?' ✓':' ✗ '+t('noeud.deconnectee','déconnectée')}
+      ${n.emoji} <strong>${n.name}</strong> — ${t('commun.nv','Nv.')}${c.level}${c.connected?' ✓':' ✗ '+t('noeud.deconnectee','déconnectée')}
       <span style="color:#88aacc;float:right">${t('guerre.n_noeuds','{n} nœud(s)',{n:dist})}</span>
     </button>`;
   }).join('');
   const homeCol=reachable.find(c=>c.nodeId===ai.civ.home);
   const homeBtn=homeCol?`<button onclick="_warSelectColonyTarget('${ai.civ.home}')" style="display:block;width:100%;text-align:left;margin-bottom:5px;padding:6px 10px;background:#2a0a1a;border:1px solid #8a2a4a;color:#ffaacc;border-radius:5px;cursor:pointer;font-size:.85em">
-    ${NODES[ai.civ.home]?.emoji} <strong>${NODES[ai.civ.home]?.name}</strong> — QG 🏠 Nv.${homeCol.level}
+    ${NODES[ai.civ.home]?.emoji} <strong>${NODES[ai.civ.home]?.name}</strong> — ${t('commun.qg','QG')} 🏠 ${t('commun.nv','Nv.')}${homeCol.level}
   </button>`:'';
   document.getElementById('wcm-info').innerHTML=
     '<div style="color:#9898b8;font-size:.82em;margin-bottom:8px">'+t('guerre.cibles_portee','{n} — {c} cible(s) à portée',{n:'<strong>'+ai.civ.emoji+' '+ai.civ.name+'</strong>',c:reachable.length})+'</div>'+
@@ -17908,13 +17943,16 @@ function drawConnections(){
   const civsEnJeu=(()=>{ try{ return [G.player,...G.ais].map(p=>p.civ.id); }catch(e){ return []; } })();
   const couleurNation=id=>{ try{ return CIVS[id].color; }catch(e){ return '#fff'; } };
   const nomNation=id=>{ try{ return CIVS[id].name; }catch(e){ return id; } };
+  /* 05/10 (Marc, captures EN : « leptune ») : les noms des planètes-décor sont écrits APRÈS les pastilles de durée,
+     qui les recouvraient. */
+  let _labDeco='';
   for(const p of PLANETS_DECO){
     if(p.lunes&&p.lunes.length){const far=Math.max(...p.lunes.map(id=>NODES[id]?Math.hypot(NODES[id].x-p.x,NODES[id].y-p.y):0))+30;s+=`<circle cx="${p.x}" cy="${p.y}" r="${f1(far)}" fill="none" stroke="#9cc2ff" stroke-opacity=".18" stroke-dasharray="4,8"/>`;}
     s+=_vecPlanete(p);
     const ly=p.y+(p.ring?p.r*0.75:p.r)+MT(16);
-    s+=`<text x="${p.x}" y="${f1(ly)}" text-anchor="middle" font-size="${MT(13)}" font-weight="700" font-family="Michroma,'Exo 2',sans-serif" paint-order="stroke" stroke="#04060f" stroke-width="${MT(3.5)}" fill="#e6eeff">${p.name}</text>`;
-    s+=`<text x="${p.x}" y="${f1(ly+MT(15))}" text-anchor="middle" font-size="${MT(9)}" fill="#8fa0c8" paint-order="stroke" stroke="#04060f" stroke-width="${MT(2.5)}">${_infoCarte(p.info)}</text>`;
-    if(p.nation&&civsEnJeu.includes(p.nation))s+=`<text x="${p.x}" y="${f1(ly+MT(28))}" text-anchor="middle" font-size="${MT(9.5)}" font-weight="700" fill="${couleurNation(p.nation)}" paint-order="stroke" stroke="#04060f" stroke-width="${MT(2.5)}">⚑ ${nomNation(p.nation)}</text>`;
+    _labDeco+=`<text x="${p.x}" y="${f1(ly)}" text-anchor="middle" font-size="${MT(13)}" font-weight="700" font-family="Michroma,'Exo 2',sans-serif" paint-order="stroke" stroke="#04060f" stroke-width="${MT(3.5)}" fill="#e6eeff">${p.name}</text>`;
+    _labDeco+=`<text x="${p.x}" y="${f1(ly+MT(15))}" text-anchor="middle" font-size="${MT(9)}" fill="#8fa0c8" paint-order="stroke" stroke="#04060f" stroke-width="${MT(2.5)}">${_infoCarte(p.info)}</text>`;
+    if(p.nation&&civsEnJeu.includes(p.nation))_labDeco+=`<text x="${p.x}" y="${f1(ly+MT(28))}" text-anchor="middle" font-size="${MT(9.5)}" font-weight="700" fill="${couleurNation(p.nation)}" paint-order="stroke" stroke="#04060f" stroke-width="${MT(2.5)}">⚑ ${nomNation(p.nation)}</text>`;
   }
   // Fanion des Ceinturiens sur Éris (nœud, pas planète-décor)
   if(civsEnJeu.includes('ceinturiens')&&NODES.eris)s+=`<text x="${NODES.eris.x}" y="${NODES.eris.y-(NODES.eris.r||15)-MT(9)}" text-anchor="middle" font-size="${MT(9.5)}" font-weight="700" fill="${couleurNation('ceinturiens')}" paint-order="stroke" stroke="#04060f" stroke-width="${MT(2.5)}">⚑ ${nomNation('ceinturiens')}</text>`;
@@ -17933,6 +17971,7 @@ function drawConnections(){
        Phobos–Vesta 43, Éris–Pluton 45, Io–Vesta 49. */
     if(d>=10){const P=routePoint(id,adj,0.74);s+=_pill(P.x,P.y,_range(d),false);}
   }}
+  s+=_labDeco;   // noms des planètes au-dessus des pastilles
   /* DISTANCES ENTRE CAPITALES (jaune, purement visuelles) : Terre → Mars → Jupiter → Éris. Aucune règle :
      ni route constructible, ni adjacence — seulement des durées. Masquables (Marc, 14/08) ; le réglage
      vit sur l'appareil (localStorage), pas dans `G`, sinon la synchro en ligne le perdait (15/09). */
