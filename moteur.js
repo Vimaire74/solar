@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-05 · v11.53';
+const SOLAR_BUILD_MOTEUR = '2026-10-05 · v11.55';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -11409,15 +11409,26 @@ function _estRecolte(card){
   if(card.calmAction||card.diploAction||!card.resGain)return false;
   return ['materials','energy','science'].some(function(r){return (card.resGain[r]||0)>0;});
 }
+/* ═══ E2 — LE VERROU DES RESSOURCES (Marc, 05/10) ═══
+   Trois parties sur trois : une nation finit avec 20-36 matériaux pour 0-9 énergie (ou l'inverse), ne peut plus rien
+   acheter qui demande la ressource manquante, et ne convertit pas. Règle du 18/09 (partie 20C9, test_recoltes_civiques) :
+   UNE récolte par tour, en pénurie (≤ 2) — « le défaut n'est pas la conversion, c'est le PRIX : 1 AC pour +2 ».
+   Ajout du 05/10, qui ne contredit pas ce prix : quand la ressource PAYÉE est AU PLAFOND (elle serait perdue à l'écrêtage
+   de fin de tour), convertir ne coûte que l'action — une deuxième récolte est alors permise, tant que la ressource rendue
+   est sous 6. Jamais plus de deux par tour. Le tacticien juge ensuite par simulation. */
+const RECOLTE_CREUX=6, RECOLTE_MAX_TOUR=2;
 function _recolteAutorisee(nat,card){
   if(!nat||!_estRecolte(card))return true;            // ce n'est pas une récolte : aucune limite ici
-  if((nat._recoltesTour||0)>=1)return false;          // une seule par tour
-  const cost=card.cost||{};
-  /* Il faut une pénurie RÉELLE sur ce que la carte rend, et ne pas s'appauvrir davantage :
-     on refuse une récolte qui coûte la ressource qu'on cherche justement à reconstituer. */
-  return ['materials','energy','science'].some(function(r){
-    return (card.resGain[r]||0)>0 && ((nat.res&&nat.res[r])||0)<=2 && !((cost[r]||0)>0);
-  });
+  const cost=card.cost||{}, res=nat.res||{};
+  const rendue=['materials','energy','science'].find(function(r){ return (card.resGain[r]||0)>0 && !((cost[r]||0)>0); });
+  if(!rendue)return false;
+  /* Pénurie réelle : une récolte par tour, sous 2 (règle du 18/09). */
+  if((nat._recoltesTour||0)<1 && (res[rendue]||0)<=2)return true;
+  /* Excédent au plafond : une de plus, le surplus serait perdu de toute façon. */
+  if((nat._recoltesTour||0)>=RECOLTE_MAX_TOUR)return false;
+  if((res[rendue]||0)>=RECOLTE_CREUX)return false;
+  let cap={}; try{ cap=realResCap(nat)||{}; }catch(e){}
+  return Object.keys(cost).some(function(r){ return (cost[r]||0)>0 && cap[r] && (res[r]||0)>=cap[r]; });
 }
 function aiBuyCivic(ai,card){
   /* Calmer la Population : SA tension envers une nation — il calme celle qu'il déteste le plus (c'est
@@ -11948,10 +11959,17 @@ function evaluerPosition(nat,observateur){
   const loues=Math.max(0,(nat.milLoseNext||0)+(nat.stratForceBonus||0));
   const permanents=Math.max(0,Math.min(12,nat.forceTokens||0)-loues);
   const menace=_menaceRessentie(nat);
+  /* 05/10 (Marc, partie 157e79) : les Ceinturiens ont acheté trois fois Investissements militaires et trois fois Drones
+     de Combat — six actions pour des jetons dissous au tour suivant, sans jamais combattre. La menace (tension 7/10)
+     suffisait à leur donner une valeur. Un jeton loué ne vaut quelque chose que si un combat est POSSIBLE ce tour :
+     la nation est en guerre, ou l'événement annoncé compare les flottes (Supériorité militaire). Sinon : zéro. */
+  const combatPossible=(typeof estEnGuerre==='function'&&estEnGuerre(nat))
+    ||(typeof eventForTurn==='function'&&(eventForTurn(G.turn)||{}).id==='milsup');
+  const louesUtiles=combatPossible?loues:0;
   const force=aveugle
     ?_est.jetons*POIDS_EVAL.force*(POIDS_EVAL.forceMin+(POIDS_EVAL.forceMax-POIDS_EVAL.forceMin)*menace)   // estimée, jamais lue (§143.4)
     :(permanents*POIDS_EVAL.force*(POIDS_EVAL.forceMin+(POIDS_EVAL.forceMax-POIDS_EVAL.forceMin)*menace)
-      +Math.min(loues,Math.max(0,12-permanents))*POIDS_EVAL.force*POIDS_EVAL.forceLouee*menace);
+      +Math.min(louesUtiles,Math.max(0,12-permanents))*POIDS_EVAL.force*POIDS_EVAL.forceLouee*menace);
 
   /* ═══════ LES ACTIONS PAR TOUR SE COMPTENT, ET LE PLAFOND DE MORAL SE PAIE (04/09) ═══════
      Marc, partie FD5F : les Terriens (IA) adoptent la Tyrannie au tour 3 — +1 AC, −2 moral, plafond
@@ -15697,7 +15715,7 @@ function renderRight(){
   }).join('');
   // Agendas
   const myAg=p.agenda;
-  document.getElementById('r-agendas').innerHTML=myAg?(()=>{const score=typeof myAg.score==='function'?myAg.score(p):0;return`<div class="agenda-item"><div class="agenda-name">${myAg.emoji} ${myAg.name}<span style="color:#5a6a8a;font-size:.6em;margin-left:4px">${t('empire.secret','(secret)')}</span></div><div class="agenda-desc">${myAg.desc}</div><div class="agenda-status ${score>0?'agenda-ok':'agenda-no'}">${score>0?'✓ +'+score+' VP':t('empire.en_cours','En cours…')}</div></div>`+G.ais.map(ai=>ai.agenda?`<div class="agenda-item" style="opacity:.55"><div class="agenda-name">${ai.civ.emoji} ${ai.civ.name} — ${ai.agenda.emoji} ${ai.agenda.name}</div></div>`:''). join('');})():'<div style="color:#5a6a8a;font-size:.7em">'+t('empire.aucun_agenda','Aucun agenda')+'</div>';
+  document.getElementById('r-agendas').innerHTML=myAg?(()=>{const score=typeof myAg.score==='function'?myAg.score(p):0;return`<div class="agenda-item"><div class="agenda-name">${myAg.emoji} ${myAg.name}<span style="color:#5a6a8a;font-size:.6em;margin-left:4px">${t('empire.secret','(secret)')}</span></div><div class="agenda-desc">${myAg.desc}</div><div class="agenda-status ${score>0?'agenda-ok':'agenda-no'}">${score>0?'✓ +'+score+' VP':t('empire.en_cours','En cours…')}</div></div>`/* 05/10 (Marc) : les agendas des AUTRES ne s'affichent plus — ils sont secrets jusqu'au décompte final. */;})():'<div style="color:#5a6a8a;font-size:.7em">'+t('empire.aucun_agenda','Aucun agenda')+'</div>';
   // AI summary
   /* ═══ LE CLASSEMENT EN BAS DE L'ÉCRAN EMPIRE ═══
      Marc, 083E : « dans le menu Empire, tout en bas de l'écran, ce serait bien de rappeler les VP
@@ -17252,7 +17270,7 @@ function exportDebugLog(){
   if(!G.debugNotes)G.debugNotes=[];
   let out='=== SOLAR — LOG D\'ANALYSE ===\n';
   out+='Partie : '+G.player.civ.name+' vs '+G.ais.map(a=>a.civ.name).join(', ')+'\n';
-  out+='Agendas : '+G.agendas.map(a=>a.name).join(' / ')+'\n\n';
+  out+='Agenda : '+(G.player.agenda?G.player.agenda.name:'—')+'\n\n';   // 05/10 : le sien seulement, les autres sont secrets
   if(G.debugNotes.length){
     out+='--- QUESTIONS / REMARQUES ---\n';
     for(const n of G.debugNotes){
