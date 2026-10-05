@@ -1,7 +1,6 @@
-# Lot 18-6 — CE LOT EST EN **v11.58** · cache `sw.js` **v279** · 2026-10-05 — SERVEUR À REDÉPLOYER
+# Lot 18-7 — CE LOT EST EN **v11.59** · cache `sw.js` **v280** · 2026-10-05 — SERVEUR À REDÉPLOYER
 
-(Seulement les fichiers changés depuis la v11.57 — lot18-5. Détail : docs/REPRISE.md §229.)
+(Seulement les fichiers changés depuis la v11.58 — lot18-6. Si lot18-6 n'est pas encore en ligne, envoyer lot18-6 PUIS lot18-7. Détail : docs/REPRISE.md §229.)
 
-- Carte du système solaire (vue globale) : nouvelle image peinte, plus claire et plus réaliste (assets/map/global3.webp)
-- Noms des planètes écrits par le jeu sur la carte, traduits en anglais (ils ne sont plus dans l'image)
-- Zones à toucher de la carte recalées sur la nouvelle image
+- Carte du système solaire : zones à toucher et noms des planètes placés selon le calibrage de Marc
+- Carte du système solaire, écran couché : cadrage descendu, selon le calibrage de Marc

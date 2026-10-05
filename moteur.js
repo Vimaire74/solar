@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-05 · v11.58';
+const SOLAR_BUILD_MOTEUR = '2026-10-05 · v11.59';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -15224,7 +15224,7 @@ function _champAsteroides(r0,r1,a0,a1,n,seed,chaud){
    choix de région. `G.mapView` vaut 'global' (image `global2.webp` + zones cliquables invisibles)
    ou 'zoom' (le plateau dessiné). Les coordonnées des zones vivent dans le viewBox 400 × 600 de
    l'image ; celles du plateau dans 1920 × 1920 : `cadrerVueGlobale` pose le bon viewBox. */
-const CADRAGE_GLOBAL_PORTRAIT='0 0 400 600', CADRAGE_GLOBAL_PAYSAGE='0 65 400 380';
+const CADRAGE_GLOBAL_PORTRAIT='0 0 400 600', CADRAGE_GLOBAL_PAYSAGE='0 78 400 380'   /* recalé par Marc sur global3 (v11.59) */;
 function cadrerVueGlobale(){
   const svg=document.getElementById('solar-svg'), wrap=document.getElementById('map-wrap');
   if(!svg)return;
@@ -15236,24 +15236,25 @@ function cadrerVueGlobale(){
   const vb=paysage?CADRAGE_GLOBAL_PAYSAGE:CADRAGE_GLOBAL_PORTRAIT;
   if(svg.getAttribute('viewBox')!==vb)svg.setAttribute('viewBox',vb);
   const b=document.getElementById('map-bandeau');
-  if(b){ const y=paysage?405:560; b.setAttribute('transform','translate(0 '+(y-560)+')'); }
+  if(b){ const y=paysage?418:560; b.setAttribute('transform','translate(0 '+(y-560)+')'); }
 }
 /* ZONES CLIQUABLES DE LA CARTE PEINTE — coordonnées du viewBox 400 × 600, relevées sur `global3.webp`
-   (05/10/2026, v11.58 : nouvelle carte peinte, sans aucun nom dans l'image). x,y,r = zone cliquable ;
+   (05/10/2026, v11.58 : nouvelle carte peinte, sans aucun nom dans l'image ; zones et noms calés par Marc
+   sur la page de calibrage, v11.59). x,y,r = zone cliquable ;
    lx,ly,la = position et ancrage du NOM, écrit par le jeu (PLANETS_DECO.name, retraduit en place) ; pas de nom pour
    Ceinture et Kuiper (il n'y en avait pas non plus dans l'ancienne image). Mercure, absente du rendu
    Pollo, a été peinte à la main dans l'image (copie grise de Vénus). */
 const MAP_HOTSPOTS=[
- {x:160,y:200,r:18,label:'Mercure',pid:'mercure',lx:160,ly:189,la:'middle',sector:'interne',node:'lune'},
- {x:129,y:240,r:18,label:'Vénus',pid:'venus',lx:129,ly:257,la:'middle',sector:'interne',node:'lune'},
- {x:188,y:311,r:20,label:'Terre',pid:'terre',lx:199,ly:324,la:'start',sector:'interne',node:'lune'},
- {x:257,y:311,r:19,label:'Mars',pid:'mars',lx:266,ly:324,la:'start',sector:'interne',node:'phobos'},
- {x:300,y:230,r:26,label:'Jupiter',pid:'jupiter',lx:300,ly:257,la:'middle',sector:'jupiter',node:'io'},   // la base jovienne est Io
- {x:122,y:348,r:26,label:'Saturne',pid:'saturne',lx:122,ly:376,la:'middle',sector:'saturne',node:'titan'},
- {x:134,y:139,r:20,label:'Uranus',pid:'uranus',lx:147,ly:142,la:'start',sector:'externe',node:'triton'},
- {x:289,y:393,r:20,label:'Neptune',pid:'neptune',lx:300,ly:396,la:'start',sector:'externe',node:'triton'},
- {x:97,y:280,r:24,label:'Ceinture',sector:'jupiter',node:'ceres'},
- {x:200,y:95,r:26,label:'Kuiper',sector:'externe',node:'pluto'},
+ {x:161,y:200,r:10,label:'Mercure',pid:'mercure',lx:166,ly:190,la:'middle',sector:'interne',node:'lune'},
+ {x:130,y:240,r:14,label:'Vénus',pid:'venus',lx:131,ly:257,la:'middle',sector:'interne',node:'lune'},
+ {x:189,y:313,r:18,label:'Terre',pid:'terre',lx:189,ly:335,la:'start',sector:'interne',node:'lune'},
+ {x:257,y:311,r:15,label:'Mars',pid:'mars',lx:260,ly:329,la:'start',sector:'interne',node:'phobos'},
+ {x:304,y:230,r:26,label:'Jupiter',pid:'jupiter',lx:309,ly:260,la:'middle',sector:'jupiter',node:'io'},   // la base jovienne est Io
+ {x:123,y:351,r:26,label:'Saturne',pid:'saturne',lx:125,ly:384,la:'middle',sector:'saturne',node:'titan'},
+ {x:134,y:139,r:18,label:'Uranus',pid:'uranus',lx:102,ly:159,la:'start',sector:'externe',node:'triton'},
+ {x:291,y:397,r:18,label:'Neptune',pid:'neptune',lx:286,ly:420,la:'start',sector:'externe',node:'triton'},
+ {x:97,y:276,r:22,label:'Ceinture',sector:'jupiter',node:'ceres'},
+ {x:220,y:121,r:24,label:'Kuiper',sector:'externe',node:'pluto'},
 ];
 function mapGlobalSVG(){
   let s='';
