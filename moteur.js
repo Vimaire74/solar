@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-05 · v11.57';
+const SOLAR_BUILD_MOTEUR = '2026-10-05 · v11.58';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -15238,23 +15238,32 @@ function cadrerVueGlobale(){
   const b=document.getElementById('map-bandeau');
   if(b){ const y=paysage?405:560; b.setAttribute('transform','translate(0 '+(y-560)+')'); }
 }
-/* ZONES CLIQUABLES DE LA CARTE PEINTE — coordonnées du viewBox 400 × 600, relevées sur `global2.webp`
-   le 2026-08-07 (dézoom uniforme autour du Soleil : nouveau = Soleil + (ancien − Soleil) × 0,77). */
+/* ZONES CLIQUABLES DE LA CARTE PEINTE — coordonnées du viewBox 400 × 600, relevées sur `global3.webp`
+   (05/10/2026, v11.58 : nouvelle carte peinte, sans aucun nom dans l'image). x,y,r = zone cliquable ;
+   lx,ly,la = position et ancrage du NOM, écrit par le jeu (PLANETS_DECO.name, retraduit en place) ; pas de nom pour
+   Ceinture et Kuiper (il n'y en avait pas non plus dans l'ancienne image). Mercure, absente du rendu
+   Pollo, a été peinte à la main dans l'image (copie grise de Vénus). */
 const MAP_HOTSPOTS=[
- {x:157,y:203,r:18,label:'Mercure',sector:'interne',node:'lune'},
- {x:134,y:232,r:18,label:'Vénus',sector:'interne',node:'lune'},
- {x:186,y:306,r:20,label:'Terre',sector:'interne',node:'lune'},
- {x:253,y:305,r:19,label:'Mars',sector:'interne',node:'phobos'},
- {x:305,y:231,r:26,label:'Jupiter',sector:'jupiter',node:'io'},   // la base jovienne est Io
- {x:128,y:354,r:26,label:'Saturne',sector:'saturne',node:'titan'},
- {x:138,y:127,r:20,label:'Uranus',sector:'externe',node:'triton'},
- {x:288,y:408,r:20,label:'Neptune',sector:'externe',node:'triton'},
- {x:97,y:275,r:24,label:'Ceinture',sector:'jupiter',node:'ceres'},
+ {x:160,y:200,r:18,label:'Mercure',pid:'mercure',lx:160,ly:189,la:'middle',sector:'interne',node:'lune'},
+ {x:129,y:240,r:18,label:'Vénus',pid:'venus',lx:129,ly:257,la:'middle',sector:'interne',node:'lune'},
+ {x:188,y:311,r:20,label:'Terre',pid:'terre',lx:199,ly:324,la:'start',sector:'interne',node:'lune'},
+ {x:257,y:311,r:19,label:'Mars',pid:'mars',lx:266,ly:324,la:'start',sector:'interne',node:'phobos'},
+ {x:300,y:230,r:26,label:'Jupiter',pid:'jupiter',lx:300,ly:257,la:'middle',sector:'jupiter',node:'io'},   // la base jovienne est Io
+ {x:122,y:348,r:26,label:'Saturne',pid:'saturne',lx:122,ly:376,la:'middle',sector:'saturne',node:'titan'},
+ {x:134,y:139,r:20,label:'Uranus',pid:'uranus',lx:147,ly:142,la:'start',sector:'externe',node:'triton'},
+ {x:289,y:393,r:20,label:'Neptune',pid:'neptune',lx:300,ly:396,la:'start',sector:'externe',node:'triton'},
+ {x:97,y:280,r:24,label:'Ceinture',sector:'jupiter',node:'ceres'},
  {x:200,y:95,r:26,label:'Kuiper',sector:'externe',node:'pluto'},
 ];
 function mapGlobalSVG(){
   let s='';
-  // Les noms des planètes sont dans l'image ; ici uniquement les zones cliquables invisibles.
+  // Noms des planètes : écrits ici (traduits), plus dans l'image. Zones cliquables invisibles par-dessus.
+  for(const h of MAP_HOTSPOTS){
+    if(!h.pid)continue;
+    const pd=PLANETS_DECO.find(q=>q.id===h.pid);
+    const nom=pd?pd.name:h.label;   // PLANETS_DECO est retraduit en place au début de render()
+    s+=`<text x="${h.lx}" y="${h.ly}" text-anchor="${h.la}" font-size="9" font-weight="600" fill="#eef2ff" stroke="#05070f" stroke-width="2.2" stroke-opacity=".75" paint-order="stroke" pointer-events="none" style="letter-spacing:.2px">${nom}</text>`;
+  }
   for(const h of MAP_HOTSPOTS)s+=`<g style="cursor:pointer" onclick="openNodeMap('${h.node}')"><circle cx="${h.x}" cy="${h.y}" r="${h.r}" fill="#000" opacity="0" pointer-events="all"/></g>`;
   s+=`<g id="map-bandeau"><rect x="40" y="560" width="320" height="30" rx="12" fill="#0a1326cc" stroke="#2a3a6a"/><text x="200" y="580" text-anchor="middle" font-size="11" fill="#cfe0ff">${t('carte.touche_planete','Touche une planète → carte détaillée')}</text></g>`;
   return s;

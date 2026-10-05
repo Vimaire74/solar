@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-10-05 · v11.57';</script>
+<script>window.SOLAR_BUILD_HTML='2026-10-05 · v11.58';</script>
 <!-- Tampon des erreurs survenues AVANT diagnostic.js (chargé après moteur.js) : il les ramasse au démarrage. -->
 <script>window.__scErreursPrecoces=[];window.addEventListener('error',function(e){try{if(window.scDiagNoterErreur)return;window.__scErreursPrecoces.push({type:'erreur',msg:e.message||String(e),pile:(e.error&&e.error.stack)||'',ou:(e.filename||'').split('/').pop()+':'+e.lineno});}catch(x){}});</script>
 <!-- i18n.js EN TÊTE, avant tout script du corps : il choisit la langue et charge lang/<code>.js (synchrone).
@@ -1674,9 +1674,9 @@ function lvAppNouvelle(){
           <filter id="glow2"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         </defs>
         <rect x="-4000" y="-4000" width="10000" height="10000" fill="#03040a"/>
-        <!-- 1re vue : carte peinte `global2.webp` (2048 × 3072, 677 Ko ; `global2.jpg` en repli).
+        <!-- 1re vue : carte peinte `global3.webp` (2048 × 3072, 497 Ko, v11.58 ; `global3.jpg` en repli). Noms des planètes écrits par mapGlobalSVG.
              ⚠️ Changer ce dessin oblige à recalculer MAP_HOTSPOTS (moteur.js). Masquée sur le plateau. -->
-        <image id="map-bg-img" href="assets/map/global2.webp" xlink:href="assets/map/global2.webp" x="0" y="0" width="400" height="600" preserveAspectRatio="xMidYMid slice"/>
+        <image id="map-bg-img" href="assets/map/global3.webp" xlink:href="assets/map/global3.webp" x="0" y="0" width="400" height="600" preserveAspectRatio="xMidYMid slice"/>
         <g id="stars"></g>
         <g id="connections"></g>
         <g id="routes-ai"></g>
