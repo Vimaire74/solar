@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-05 · v11.59';
+const SOLAR_BUILD_MOTEUR = '2026-10-06 · v11.63';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -3686,6 +3686,46 @@ function evaluerAssaut(nat,nodeId){
   return {cible:nodeId, defenseur:def.civ.id, frappe:frappe, defense:defense,
           marge:frappe-defense, prise:valeurDeLaPrise(nat,def,nodeId)};
 }
+/* ═══ L'ATTAQUE D'USURE (Marc, 06/10) ═══
+   « Quand une nation s'envole, il n'y a que la prise de colonie qui permette de la réduire. » Contre une nation qui me
+   dépasse d'au moins USURE_ECART VP (score visible) :
+     · avec 🎖️ Stratégie Guerrière (mes jetons reviennent en 1 tour, les siens en 2) : une attaque même PERDANTE l'oblige
+       à engager ses jetons, dont la moitié part en récupération pour 2 tours ; au tour suivant je reviens sur la même
+       colonie avec la supériorité. Le plan est noté (`nat._planUsure`) et une réserve de ressources est gardée pour le
+       second assaut (`penaliteReserveUsure`) ;
+     · sans elle : l'IA fait le compte de l'échange (jetons-tours perdus, ressources) et n'attaque que s'il lui est favorable. */
+const USURE_ECART=20, USURE_PRIME=6, USURE_SECONDE_PRIME=0.5;
+function _recupRapide(n){ return !!(n&&n.investBonus2&&n.investBonus2.fastCooldown&&(n.investBonus2.turnsLeft===undefined||n.investBonus2.turnsLeft>0)); }
+function cibleQuiSEnvole(nat,def){
+  try{ if(!nat||!def||nat===def)return false; const v=(typeof vpAffiche==='function')?vpAffiche:(p=>calcVP(p).total);
+    return (v(def)-v(nat))>=USURE_ECART; }catch(e){ return false; }
+}
+/* Bilan d'une attaque perdue SANS récupération rapide, en jetons-tours (+ ressources à ½) : mes jetons engagés e — la moitié
+   perdue pour le reste de la partie, l'autre immobilisée 2 tours ; ses jetons engagés d — la moitié immobilisée 2 tours. */
+function bilanUsure(nat,def,e,d){
+  const R=Math.max(1,(G.maxTurns||10)-(G.turn||1));
+  const coutMoi=Math.floor(e/2)*R+Math.ceil(e/2)*2+e*0.5*(hasSpec(nat,'nav2_war')?1:2);
+  const coutLui=Math.floor(d/2)*2+d*0.5*(hasSpec(def,'nav2_war')?1:2);
+  return coutLui-coutMoi;
+}
+function attaqueUsurePermise(nat,def){
+  if(!cibleQuiSEnvole(nat,def))return false;
+  if(!_recupRapide(nat))return false;
+  const pl=nat._planUsure; return !(pl&&pl.tour===G.turn);   // une seule attaque d'usure par tour
+}
+function noterPlanUsure(nat,def,nodeId){ try{ nat._planUsure={cible:def.civ.id,node:nodeId,tour:G.turn}; }catch(e){} }
+function secondAssautPrevu(nat,nodeId){ const pl=nat&&nat._planUsure; return !!(pl&&pl.tour===(G.turn||1)-1&&(nodeId===undefined||pl.node===nodeId)); }
+/* Réserve du second assaut : le tour qui suit l'attaque d'usure, garder de quoi engager ses jetons et le croiseur. */
+function penaliteReserveUsure(n,coup){
+  try{
+    if(!secondAssautPrevu(n))return 0;
+    if(coup&&coup.type==='assaut')return 0;
+    const j=Math.max(0,(typeof engageableTokens==='function')?engageableTokens(n):(n.forceTokens||0));
+    const nav=hasSpec(n,'nav2_war');
+    const besoinM=(nav?Math.floor(j/2):j)+((n.hasCruiser)?2:0), besoinE=(nav?Math.ceil(j/2):j)+((n.hasCruiser)?3:0);
+    return 2*(Math.max(0,besoinM-(n.res.materials||0))+Math.max(0,besoinE-(n.res.energy||0)));
+  }catch(e){ return 0; }
+}
 /* La prime (ou la pénalité) ajoutée au coup par le tacticien. */
 function valeurAssaut(coup,nat){
   try{
@@ -3693,7 +3733,13 @@ function valeurAssaut(coup,nat){
     const a=evaluerAssaut(nat,coup.node); if(!a)return 0;
     /* Marge négative : l'assaut est perdu d'avance. On le décourage d'autant plus qu'il est absurde,
        sans jamais l'interdire — une IA acculée peut avoir de bonnes raisons de frapper un mur. */
-    if(a.marge<0) return -ASSAUT_POIDS_ECHEC*Math.min(ASSAUT_ECHEC_PLAFOND,-a.marge);
+    if(a.marge<0){
+      const _def=allPlayers().find(p=>p&&p.civ&&p.civ.id===a.defenseur);
+      if(attaqueUsurePermise(nat,_def)) return USURE_PRIME;   // usure : perdre, mais l'obliger à engager
+      return -ASSAUT_POIDS_ECHEC*Math.min(ASSAUT_ECHEC_PLAFOND,-a.marge);
+    }
+    /* Second assaut du plan d'usure : la prise vaut davantage — c'est tout l'intérêt du premier. */
+    if(secondAssautPrevu(nat,coup.node)) return ASSAUT_POIDS_GAIN*(1+USURE_SECONDE_PRIME)*Math.min(1,a.marge/ASSAUT_MARGE_SURE)*a.prise;
     /* Marge nulle ou juste : la victoire n'est pas acquise (le défenseur peut engager plus que
        prévu). On ne paie la valeur de la prise qu'à proportion de la marge. */
     const confiance=Math.min(1,a.marge/ASSAUT_MARGE_SURE);
@@ -4343,10 +4389,10 @@ function copieEmpathe(nat,cardId){
   const original=cartesCopiablesEmpathe(nat).find(c=>c.id===cardId);
   if(!original)return null;
   const copy={...original,id:'empath_copy_'+cardId,_empathCopy:true};
-  nat.cards.push(copy);
-  // Copie uniquement les effets passifs (rGain, spec), pas les bonus one-shot
-  if(copy.rGain)for(const[r,a]of Object.entries(copy.rGain))nat.rpt[r]=(nat.rpt[r]||0)+a;
-  addLog(J('journal.telepathie_effets_copies_passifs_uniquem','🧬 {emoji} {nation} — Télépathie : effets de {emoji2} {nom} copiés (passifs uniquement)',{emoji:nat.civ.emoji,nation:_i18nRef(nat.civ,'name'),emoji2:original.emoji,nom:_i18nRef(original,'name')}),'gold');
+  /* 06/10 (Marc, partie 9bcb76) : « la Télépathie copie exactement comme l'espionnage » — règle §166.3. Avant : rGain et
+     spec seulement ; l'IA Défensive copiée donnait l'immunité mais pas ses +4 jetons. Même porte que `stEspionnage`. */
+  nat.cards.push(copy); applyCard(copy,nat);
+  addLog(J('journal.telepathie_effets_copies','{emoji} {nation} — Télépathie : {emoji2} {nom} copiée',{emoji:nat.civ.emoji,nation:_i18nRef(nat.civ,'name'),emoji2:original.emoji,nom:_i18nRef(original,'name')}),'gold');
   return copy;
 }
 /* Quelle carte un ordinateur copie-t-il ? Celle qui laisse la meilleure position — essayée pour de
@@ -4358,7 +4404,9 @@ function iaChoixCopieEmpathe(nat){
     const copy={...c,id:'empath_copy_'+c.id,_empathCopy:true};
     nat.cards.push(copy);
     if(copy.rGain)for(const[r,a]of Object.entries(copy.rGain))nat.rpt[r]=(nat.rpt[r]||0)+a;
+    if(copy.forceBonus)nat.forceTokens=(nat.forceTokens||0)+copy.forceBonus;   // 06/10 : la copie donne aussi les jetons
     let v=-Infinity; try{ v=evaluerPositionRelative(nat); }catch(e){}
+    if(copy.forceBonus)nat.forceTokens-=copy.forceBonus;
     if(copy.rGain)for(const[r,a]of Object.entries(copy.rGain))nat.rpt[r]=(nat.rpt[r]||0)-a;
     nat.cards.pop();
     if(v>mv){ mv=v; meilleure=c; }
@@ -6018,7 +6066,9 @@ function iaChoixDeCombat(nat){
   const menace=ennemi?(ennemi.forceTokens||0):0;
   /* Assez forte pour frapper : elle vise la colonie ennemie la plus faible, jamais la capitale
      (mêmes cibles que la posture d'IA existante). */
-  if(plafond>=2&&plafond>=menace){
+  /* 06/10 : plus de condition « réserve ≥ réserve ennemie » — E5 juge chaque cible par sa défense attendue, et l'usure
+     peut frapper plus fort que soi. */
+  if(plafond>=2){
     /* ⚠️ LA CAPITALE EST UNE CIBLE — MAIS EN DERNIER (Marc, 03/09 : « oui les IA peuvent attaquer
        une capitale »). La tâche #6 a supprimé la règle qui l'interdisait, et le joueur l'a bien
        récupérée ; ce chemin de décision, lui, était resté à l'ancienne règle. Une nation réduite à
@@ -6054,8 +6104,21 @@ function iaChoixDeCombat(nat){
     const _cap=ennemi?ennemi.colonies.filter(c=>c.nodeId===ennemi.civ.home&&_gagnable(c)):[];
     const cibles=_ord.length?_ord:_cap;
     if(cibles.length){
-      const cible=cibles.reduce((b,c)=>(!b||(c.level||1)<(b.level||1))?c:b,null);
+      /* Second temps du plan d'usure : la colonie visée au tour précédent passe en premier si elle est gagnable. */
+      const _plan=cibles.find(c=>secondAssautPrevu(nat,c.nodeId));
+      const cible=_plan||cibles.reduce((b,c)=>(!b||(c.level||1)<(b.level||1))?c:b,null);
       return {action:'attack', node:cible.nodeId, tokens:plafond, cruiser:_cru};
+    }
+    /* Rien de gagnable. Contre une nation qui s'envole : attaque d'usure (Stratégie Guerrière) ou bilan d'échange. */
+    if(ennemi&&cibleQuiSEnvole(nat,ennemi)){
+      const _toutes=ennemi.colonies.filter(c=>c.nodeId!==ennemi.civ.home);
+      const _pool=_toutes.length?_toutes:ennemi.colonies.slice();
+      const _c=_pool.reduce((b,c)=>(!b||_defAttendue(c.nodeId)<_defAttendue(b.nodeId))?c:b,null);
+      if(_c){
+        const _d=Math.max(0,_defAttendue(_c.nodeId)-((typeof garrisonOf==='function')?garrisonOf(ennemi,_c.nodeId):1));
+        if(attaqueUsurePermise(nat,ennemi)){ noterPlanUsure(nat,ennemi,_c.nodeId); return {action:'attack', node:_c.nodeId, tokens:plafond, cruiser:false, usure:true}; }
+        if(!_recupRapide(nat)&&bilanUsure(nat,ennemi,plafond,_d)>0) return {action:'attack', node:_c.nodeId, tokens:plafond, cruiser:false, usure:true};
+      }
     }
   }
   /* Sinon elle se défend avec ce qu'elle peut payer, sans se ruiner. */
@@ -8170,7 +8233,9 @@ function buyGeneral(cardId, nation){
      Le militaire se limite désormais par la POSSESSION (voir le contrôle plus haut) : chacun peut
      l'acheter une fois, personne ne prive les autres. */
   if(!card.repeatable&&card.type!=='militaire') G.techTaken.add(cardId);
-  if(!_n._isAI) addLog(J('journal.ac_2','✅ {emoji} {nom} ({cout} AC)',{emoji:card.emoji,nom:_i18nRef(card,'name'),cout:acCost}),'green'); // même règle que ci-dessus : le vert est pour l'humain qui achète
+  /* 06/10 : ligne de titre pour TOUTE nation, comme `buyTech` — sans elle, la ligne « paie » d'un ordinateur se collait sous
+     l'action d'une autre nation (partie 9bcb76 : « ↳ Martians pays: 3 AP » sous le Supercroiseur de Marc). */
+  logEntete(J('journal.entete_achete','{emoji} {nation} — achète {emojicarte} {nom}',{emoji:_n.civ.emoji,nation:_i18nRef(_n.civ,'name'),emojicarte:card.emoji,nom:_i18nRef(card,'name')}),_n._isAI?'dim':'green');
   addAction(card.emoji,J('commun.ref','{v}',{v:_i18nRef(card,'name')}),acCost,cost,J('commun.ref','{v}',{v:_i18nRef(card,'effect')}));
   if(_estLocal(_n))scArmConfirm(card.emoji+' '+card.name,_scCardGains(card));
   closePopup();render();
@@ -11372,6 +11437,14 @@ function chooseInvestmentForAI(ai,level){
      L'ancienne règle ferme visait le Bâtisseur (Colonies Avancées) : le Stratège n'a plus de
      penchant, il compare comme tout le monde. */
   if(level===2&&ai&&ai._profil==='guerrier'){
+    /* Exception (Marc, 06/10) : si Colonies Avancées lui rapporte 25 VP ou plus, il la prend. */
+    const _ca=(INVESTMENT_CARDS_2||[]).find(c=>c.id==='inv2_colonies');
+    if(_ca&&investPayable(_ca,ai)){
+      const avant=calcVP(ai).total, niv=ai.colonies.map(c=>c.level);
+      for(const c of ai.colonies){ const n=NODES[c.nodeId]; if(n)c.level=n.maxLv||3; }
+      const apres=calcVP(ai).total; ai.colonies.forEach((c,i)=>{c.level=niv[i];});
+      if(apres-avant>=25)return _ca.id;
+    }
     const carte=(INVESTMENT_CARDS_2||[]).find(c=>c.id==='inv2_war');
     if(carte&&investPayable(carte,ai))return carte.id;
   }
@@ -12820,6 +12893,7 @@ enregistrerCerveau('tacticien', function(ctx){
       const n=ctx.nation;
       ruine=enGuerre&&Math.min(n.res.materials||0,n.res.energy||0)<1;
       return evaluerPositionRelative(n)-((typeof penaliteReserveBut==='function')?penaliteReserveBut(n,c):0)
+        -((typeof penaliteReserveUsure==='function')?penaliteReserveUsure(n,c):0)
         /* E4 (05/10) : l'agenda secret, priorité croissante dès le tour 5 — sur l'ÉTAT simulé, donc en différence. */
         +((typeof valeurAgendaEtat==='function')?valeurAgendaEtat(n):0)
         /* E3 (05/10) : un PA permanent gagné par ce coup vaut tous les tours qui restent. */
@@ -13072,7 +13146,10 @@ function resoudreAssautIA(ai,nodeId,opts){
      l'IA y allait quand même : cinq assauts, cinq égalités, cinq défaites, 13 jetons perdus
      (journal de Marc, 16/08). Renoncer ne coûte rien — ni AC, ni jeton — et l'IA gardera de quoi
      se défendre, ce qui était l'autre moitié du problème. */
-  if(_engage+aEmpath<=_defReelle){
+  const _usure=(typeof attaqueUsurePermise==='function')&&attaqueUsurePermise(ai,best);
+  if(_usure&&_engage+aEmpath<=_defReelle){ _engage=Math.max(2,commit); noterPlanUsure(ai,best,nodeId);
+    addLog(J('journal.attaque_usure','{emoji} {nation} lance une attaque d\'usure sur {v} — pour immobiliser les jetons de {nation2}.',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),v:(NODES[nodeId]?_i18nRef(NODES[nodeId],'name'):nodeId),nation2:_i18nRef(best.civ,'name')}),'dim'); }
+  else if(_engage+aEmpath<=_defReelle){
     addLog(J('journal.renonce_assaut_defense_trop_forte_contre','🧠 {emoji} {nation} renonce à l\'assaut sur {v} — défense trop forte ({defreelle}🛡️ contre {jetons}⚔️ disponibles).',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name'),v:(NODES[bestCol.nodeId]&&_i18nRef(NODES[bestCol.nodeId],'name'))||bestCol.nodeId,defreelle:_defReelle,jetons:(commit+aEmpath)}),'dim');
     return false;
   }
@@ -14729,10 +14806,10 @@ function copyLogText(){
   try{ full=buildFullLog(); }
   catch(e){
     try{ full=(G.log||[]).map(l=>String((l&&l.msg)||l).replace(/<[^>]+>/g,'')).reverse().join('\n'); }catch(e2){ full=''; }
-    _logToast(t('log.rapport_impossible','⚠️ Rapport complet impossible ({e}) — journal brut copié',{e:(e&&e.message?e.message:'erreur')}));
+    _logToast(t('log.rapport_impossible','Rapport complet impossible ({e}) — journal brut copié',{e:(e&&e.message?e.message:'erreur')}));
   }
-  if(!full){ _logToast(t('log.rien_a_copier','⚠️ Rien à copier')); return; }
-  const ok=()=>_logToast(t('log.copie','✅ Log copié — colle-le dans la conversation'));
+  if(!full){ _logToast(t('log.rien_a_copier','Rien à copier')); return; }
+  const ok=()=>_logToast(t('log.copie','Log copié — colle-le dans la conversation'));
   const montrer=()=>{ /* dernier recours : afficher pour copier à la main */
     try{
       let m=document.getElementById('_logcopie');
@@ -14743,7 +14820,7 @@ function copyLogText(){
       }
       const ta=document.getElementById('_logcopie_ta'); ta.value=full; m.style.display='flex';
       ta.focus(); ta.setSelectionRange(0,ta.value.length);
-    }catch(e){ _logToast('⚠️ Copie impossible'); }
+    }catch(e){ _logToast(t('log.copie_impossible','Copie impossible')); }
   };
   const fallback=()=>{
     try{
@@ -14792,8 +14869,8 @@ function emailLog(){
 }
 function _emailLogMailto(full,sujet){
   const href='mailto:?subject='+encodeURIComponent(sujet)+'&body='+encodeURIComponent(full);
-  if(href.length>1900)_logToast(t('log.long','ℹ️ Log long : l\'email peut être tronqué — préfère « Copier » si besoin.'));
-  try{location.href=href;}catch(e){_logToast('⚠️ Impossible d\'ouvrir l\'email');}
+  if(href.length>1900)_logToast(t('log.long','Log long : le message peut être tronqué — préfère « Copier » si besoin.'));
+  try{location.href=href;}catch(e){_logToast(t('log.partage_impossible','Partage impossible'));}
 }
 function downloadLog(){
   try{
@@ -14802,8 +14879,8 @@ function downloadLog(){
     const a=document.createElement('a');a.href=url;a.download='solar_log_t'+(G.turn||0)+'.txt';
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     setTimeout(()=>URL.revokeObjectURL(url),1500);
-    _logToast(t('log.telecharge','💾 Log téléchargé'));
-  }catch(e){_logToast(t('log.telechargement_impossible','⚠️ Téléchargement impossible'));}
+    _logToast(t('log.telecharge','Log téléchargé'));
+  }catch(e){_logToast(t('log.telechargement_impossible','Téléchargement impossible'));}
 }
 function copyEndLog(){copyLogText();} // compat écran de fin
 /* ═══ UNE GUERRE QUI DURE ENCORE À LA DERNIÈRE SECONDE DOIT QUAND MÊME SE CONCLURE ═══
@@ -15233,7 +15310,13 @@ function cadrerVueGlobale(){
      côtés. Les planètes n'occupent que la bande centrale — en paysage on cadre sur cette bande et
      tout paraît 1,6× plus grand sans perdre un nom. Rappelé au redimensionnement (`uiMapFit`). */
   const paysage=!!(wrap&&wrap.clientWidth>wrap.clientHeight*1.05);
-  const vb=paysage?CADRAGE_GLOBAL_PAYSAGE:CADRAGE_GLOBAL_PORTRAIT;
+  /* v11.60 : l'image `global3w.webp` est ÉLARGIE (x −175 → 575, prolongée par Pollo sur les côtés,
+     centre 0 → 400 inchangé). On élargit donc le cadre à la forme de l'écran (jusqu'à 750 de large)
+     au lieu de laisser du noir sur les côtés ; la hauteur visible reste celle du calibrage de Marc. */
+  const _h=paysage?380:600, _y=paysage?78:0;
+  const _r=(wrap&&wrap.clientHeight)?wrap.clientWidth/wrap.clientHeight:(paysage?1.05:0.667);
+  const _w=Math.round(Math.max(400,Math.min(750,_h*_r)));
+  const vb=(200-_w/2)+' '+_y+' '+_w+' '+_h;
   if(svg.getAttribute('viewBox')!==vb)svg.setAttribute('viewBox',vb);
   const b=document.getElementById('map-bandeau');
   if(b){ const y=paysage?418:560; b.setAttribute('transform','translate(0 '+(y-560)+')'); }
@@ -15251,7 +15334,7 @@ const MAP_HOTSPOTS=[
  {x:257,y:311,r:15,label:'Mars',pid:'mars',lx:260,ly:329,la:'start',sector:'interne',node:'phobos'},
  {x:304,y:230,r:26,label:'Jupiter',pid:'jupiter',lx:309,ly:260,la:'middle',sector:'jupiter',node:'io'},   // la base jovienne est Io
  {x:123,y:351,r:26,label:'Saturne',pid:'saturne',lx:125,ly:384,la:'middle',sector:'saturne',node:'titan'},
- {x:134,y:139,r:18,label:'Uranus',pid:'uranus',lx:102,ly:159,la:'start',sector:'externe',node:'triton'},
+ {x:134,y:139,r:18,label:'Uranus',pid:'uranus',lx:102,ly:159,la:'start',sector:'externe',node:'uranus'},   // Marc 06/10 : ouvrait sur Neptune (Triton)
  {x:291,y:397,r:18,label:'Neptune',pid:'neptune',lx:286,ly:420,la:'start',sector:'externe',node:'triton'},
  {x:97,y:276,r:22,label:'Ceinture',sector:'jupiter',node:'ceres'},
  {x:220,y:121,r:24,label:'Kuiper',sector:'externe',node:'pluto'},
@@ -15285,7 +15368,7 @@ function openNodeMap(nodeId){
 }
 function scrollToNode(nodeId){
   const wrap=document.getElementById('map-wrap'); if(!wrap)return;
-  const n=NODES[nodeId]; if(!n)return;
+  const n=NODES[nodeId]||PLANETS_DECO.find(q=>q.id===nodeId); if(!n)return;   // une planète sans nœud (Uranus) se centre aussi
   const svg=document.getElementById('solar-svg'); if(!svg)return;
   const vb=((svg.getAttribute('viewBox'))||MAP_VIEWBOX).split(' ').map(Number);
   /* ⚠️ LE DESSIN N'OCCUPE PAS TOUTE LA BOÎTE. `preserveAspectRatio="xMidYMid meet"` le met à

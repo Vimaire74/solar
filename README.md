@@ -1,6 +1,9 @@
-# Lot 18-7 — CE LOT EST EN **v11.59** · cache `sw.js` **v280** · 2026-10-05 — SERVEUR À REDÉPLOYER
+# Lot 18-11 — CE LOT EST EN **v11.63** · cache `sw.js` **v284** · 2026-10-06 — SERVEUR À REDÉPLOYER
 
-(Seulement les fichiers changés depuis la v11.58 — lot18-6. Si lot18-6 n'est pas encore en ligne, envoyer lot18-6 PUIS lot18-7. Détail : docs/REPRISE.md §229.)
+(Seulement les fichiers changés depuis la v11.62 — lot18-10. Détail : docs/REPRISE.md §231.)
 
-- Carte du système solaire : zones à toucher et noms des planètes placés selon le calibrage de Marc
-- Carte du système solaire, écran couché : cadrage descendu, selon le calibrage de Marc
+- IA : attaque d'usure contre une nation qui mène de 20 VP ou plus — avec Stratégie Guerrière, attaque même perdante pour immobiliser ses jetons, puis second assaut au tour suivant sur la même colonie, ressources gardées pour le payer
+- IA : sans Stratégie Guerrière, l'attaque contre le meneur n'a lieu que si le bilan d'échange (jetons, ressources) lui est favorable
+- IA : le Conquérant prend toujours Stratégie Guerrière, sauf si Colonies Avancées lui rapporte 25 VP ou plus
+- Journal : ligne « lance une attaque d'usure » (fr, en)
+- Banc : test_usure.js (nouveau)
