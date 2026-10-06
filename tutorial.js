@@ -178,6 +178,7 @@ function resetToNormal(){
   const start=(g.player.civ&&g.player.civ.start)?g.player.civ.start:{energy:2,materials:6,science:3,morale:5};
   g.player.res={...start};
   g.player.acMax=2; g.player.acLeft=2;
+  try{ if(window.uiTab)window.uiTab('map'); }catch(e){}   /* fin des démos de l'arbre : retour à la carte pour la suite */
   /* Le Sénat acheté pendant la démo avait monté le gouvernement : dès le tour 2 le joueur avait 5 AC
      alors que le coach venait de dire « je remets tes AC à 2 ». On remet aussi le gouvernement à zéro. */
   g.player.govPermPts=0; g.player.govFormPts=0; g.player.govForm=null; g.player.govFormAC=0; g.player.govFormMorale=0; g.player.govFormUpkeep=null;
@@ -290,6 +291,9 @@ function runRiverDemo(cb){
    pour amener la carte à l'écran à l'intérieur de la rivière choisie. */
 function tutoRiviere(sec){
   const nom = sec==='sec-civ' ? 'civ' : sec==='sec-mil' ? 'mil' : 'tech';
+  /* 06/10 (appli) : sans l'onglet Techs ouvert, la démo se jouait derrière la carte — « Trois rivières de
+     cartes » s'affichait sur le système solaire si l'élève avait cliqué Suivant au lieu de l'onglet. */
+  try{ if(window.uiTab)window.uiTab('tech'); }catch(e){}
   try{ if(window.techRiviere)window.techRiviere(nom); }catch(e){}
   try{ if(window.techScrollTo)window.techScrollTo(sec); }catch(e){}
 }
@@ -357,7 +361,7 @@ const STEPS=[
  {lab:t('tuto.but','Le but'),
   tx:t('tuto.10_tours_marque_points_victoire_vp_te_gu','En <b>10 tours</b>, marque le plus de <b>🏆 points de victoire (VP)</b>. Je te guide sur les premiers tours.')},
 
- {lab:'Agenda secret', glow:'agenda-sel-modal', pos:'top', confirm:confirmAgenda, sync:'agenda',
+ {lab:t('tuto.lab_agenda','Agenda secret'), glow:'agenda-sel-modal', pos:'top', confirm:confirmAgenda, sync:'agenda',
   tx:t('tuto.agenda_secret_objectif_cache_rapporte_vp','Ton <b>agenda secret</b> : un objectif caché qui rapporte des VP en fin de partie. <b>Clique un agenda</b>, puis <b>Valider et continuer</b>.'),
   hint:t('tuto.choisis_puis_valider','Choisis, puis Valider')},
 
@@ -379,7 +383,7 @@ const STEPS=[
   tx:t('tuto.voici_systeme_solaire_touche_planete_ouv','Voici le système solaire. <b>Touche une planète</b> pour ouvrir le plateau détaillé sur sa région : le Soleil en bas à gauche, chaque corps à sa distance, les lunes autour de leur planète. C\'est là que tu poses colonies et routes ; <b>← Carte</b> revient ici.'),
   hint:t('tuto.regarde_puis_suivant','Regarde, puis Suivant')},
 
- {lab:'Coloniser', glow:'btn-col', pos:'top', trig:'🏗️',
+ {lab:t('tuto.lab_coloniser','Coloniser'), glow:'btn-col', pos:'top', trig:'🏗️',
   tx:t('tuto.clique_lune_ou_asteroide_voisin_capitale','<b>Clique une lune ou un astéroïde voisin</b> de ta capitale, puis <b>🏗️ Coloniser</b> dans sa fiche.'),
   hint:t('tuto.colonise_ou_suivant','Colonise (ou Suivant)')},
 
@@ -397,14 +401,14 @@ const STEPS=[
 
  {lab:t('tuto.pirates','Les pirates'),
   tx:t('tuto.pirates_v2','Les <b>pirates</b> vivent dans la ceinture principale et la ceinture de Kuiper. Au début de chaque tour, chaque route à <b>60 jours ou moins</b> d\'une ceinture risque d\'être pillée : <b>70 %</b> sans jeton, <b>30 %</b> avec. Ils volent 1 ressource (⚡, 🪨 ou 🔬) ; la route ne tombe pas. Les Ceinturiens sont épargnés.'),
-  hint:"Suivant"},
+  hint:t('tuto.hint_suivant','Suivant')},
 
  {lab:t('tuto.ameliorer','Améliorer'), glow:'game-wrap', pos:'top', trig:'⬆️',
   tx:t('tuto.colonie_reliee_peut_monter_niveau_clique','Une colonie <b>reliée</b> peut monter de niveau : <b>clique-la</b>, puis <b>« Niv.2 »</b> dans sa fiche. Niveau 2 = revenus ×1,5.'),
   hint:t('tuto.clique_niv_2_ou_suivant','Clique « Niv.2 » (ou Suivant)')},
 
  // ═══════ CINÉMATIQUE : arbre technologique (le tuto joue, tu regardes) ═══════
- {lab:t('tuto.technologies','Les technologies'), glow:'tech-tabs', awaitClick:'tech-tabs', onShow:boostMaxCine,
+ {lab:t('tuto.technologies','Les technologies'), glow:'m-tabs', awaitClick:'.mtab[data-tab="tech"]', onShow:boostMaxCine,   /* 06/10 : #tech-tabs est caché tant que le panneau Techs est fermé (appli) — on attend le clic sur l'onglet du bas, comme pour Empire */
   tx:t('tuto.passons_technologies_clique_onglet_techs','Passons aux <b>technologies</b>. <b>Clique l\'onglet Techs</b> en bas : je prends la main ensuite. (AC et ressources au maximum pour la démo.)'),
   hint:t('tuto.clique_onglet_techs','Clique l\'onglet Techs')},
 
@@ -414,16 +418,16 @@ const STEPS=[
  {lab:t('tuto.acheter_tech_niveau_1','Acheter une tech (niveau 1)'), glow:'tech-tabs', demo:{kind:'tech',id:'prop1'},
   tx:t('tuto.j_ai_ouvert_propulsion_ionique_niveau_1','J\'ai ouvert <b>Propulsion Ionique</b> (niveau 1, branche Navigation) et cliqué <b>Acheter</b> : <b>1 AC</b> + ressources, décomptés en haut. Une tech est <b>à toi pour toujours</b>.')},
 
- {lab:'Tech niveau 2', glow:'tech-tabs', demo:{kind:'tech',id:'nav2'},
+ {lab:t('tuto.lab_tech2','Tech niveau 2'), glow:'tech-tabs', demo:{kind:'tech',id:'nav2'},
   tx:t('tuto.niveau_2_ia_navigation_exige_niveau_1_me','Le <b>niveau 2</b> (IA de Navigation) exige le <b>niveau 1</b> de la même branche. 1 AC + ressources.')},
 
- {lab:'Tech niveau 3', glow:'tech-tabs', demo:{kind:'tech',id:'hyper3'},
+ {lab:t('tuto.lab_tech3','Tech niveau 3'), glow:'tech-tabs', demo:{kind:'tech',id:'hyper3'},
   tx:t('tuto.niveau_3_hyperpropulsion_exige_niveau_2','Le <b>niveau 3</b> (Hyperpropulsion) exige le niveau 2 et coûte <b>2 AC</b>. Chaque palier ouvre le suivant.')},
 
  {lab:t('tuto.pillage_scientifique','Le pillage scientifique'), glow:'tech-tabs', onShow:function(){simUnlock('expansion');},
   tx:t('tuto.si_autre_nation_possede_niveau_1_branche','Si une <b>autre nation</b> possède le niveau 1 d\'une branche, son <b>niveau 2</b> t\'est ouvert <b>sans acheter le 1</b>. Je viens de le simuler sur la branche <b>Expansion</b>.')},
 
- {lab:'T2 accessible directement', glow:'tech-tabs', demo:{kind:'tech',id:'bio2'},
+ {lab:t('tuto.lab_t2_direct','T2 accessible directement'), glow:'tech-tabs', demo:{kind:'tech',id:'bio2'},
   tx:t('tuto.j_achete_donc_directement_biosphere_avan','J\'achète donc <b>directement</b> Biosphère Avancée (niveau 2) sans son niveau 1.')},
 
  {lab:t('tuto.mais_t3_exige_t2','Mais la T3 exige TA T2'), glow:'tech-tabs',
@@ -433,17 +437,17 @@ const STEPS=[
   tx:t('tuto.retenir_1_2_3_dans_ordre_niveau_2_branch','À retenir : <b>1 → 2 → 3</b> dans l\'ordre ; le niveau 2 d\'une branche est ouvert dès qu\'une nation a le 1 ; le 3 exige ton 2 ; une tech ne se perd jamais.')},
 
  // ─── Actions civiles + gouvernement ───
- {lab:'Actions civiles', glow:'tech-tabs', demo:{kind:'market',id:'cm_culture'},
+ {lab:t('tuto.lab_civiles','Actions civiles'), glow:'tech-tabs', demo:{kind:'market',id:'cm_culture'},
   tx:t('tuto.actions_civiles_vert_j_achete_campagne_c','<b>Actions civiles</b> (vert) : j\'achète <b>Campagne Culturelle</b> (+3 ❤️). Elles donnent du moral, du savoir, ou apaisent la tension. La plupart : <b>une fois par partie</b>.')},
 
- {lab:'Action gouvernementale', glow:'tech-tabs', demo:{kind:'market',id:'gov_senat'},
+ {lab:t('tuto.lab_gouv','Action gouvernementale'), glow:'tech-tabs', demo:{kind:'market',id:'gov_senat'},
   tx:t('tuto.j_achete_senat_solaire_points_gouverneme','J\'achète le <b>Sénat Solaire</b> : des <b>points de Gouvernement</b>.')},
 
  {lab:t('tuto.facteur_gouvernement','Le facteur Gouvernement'), glow:'top-bar',
   tx:t('tuto.gouvernement_5_points_niveau_2_10_3_15_4','<b>Gouvernement</b> : 5 points → niveau 2, 10 → 3, 15 → 4. Chaque niveau = <b>+1 AC par tour</b>. Plus d\'actions, c\'est tout le jeu.')},
 
  // ─── Actions militaires ───
- {lab:'Actions militaires', glow:'tech-tabs', demo:{kind:'gen',id:'mil_invest'},
+ {lab:t('tuto.lab_militaires','Actions militaires'), glow:'tech-tabs', demo:{kind:'gen',id:'mil_invest'},
   tx:t('tuto.actions_militaires_rouge_j_achete_invest','<b>Actions militaires</b> (rouge) : j\'achète <b>Investissements militaires</b> (+2 jetons Force). Attention : 3 cartes sur 4 sont <b>temporaires</b> — leurs jetons partent au tour suivant. Seul le <b>Supercroiseur</b> reste.')},
 
  {lab:t('tuto.couts_achat_vs_chaque_tour','Coûts : à l\'achat vs chaque tour'), glow:'top-bar',
@@ -463,11 +467,11 @@ const STEPS=[
  {lab:t('tuto.moral','Le moral'), glow:'top-bar',
   tx:t('tuto.moral_1_revenus_2_0_revenus_remonte_avec','<b>Moral ❤️</b> à 1 : revenus <b>÷ 2</b>. À 0 : plus de revenus. Il remonte avec les techs Spiritualité, les actions civiles, les colonies améliorées.')},
 
- {lab:'Pouvoir gratuit', glow:'btn-ability', pos:'top', trig:'💫',
-  tx:t('tuto.chaque_nation_pouvoir_gratuit_0_ac_1_tou','Chaque nation a un <b>pouvoir gratuit</b> (0 AC, 1×/tour) : 🌍 Diplomatie Verte, 🔴 Surtension (+1 AC), 🟣 Commerce avec les pirates, 🟠 Forge Orbitale. <b>Touche le bouton ✦ Pouvoir</b> (barre du haut) pour lancer Diplomatie Verte.'),
-  hint:"Touche ✦ Pouvoir"},
+ {lab:t('tuto.lab_pouvoir','Pouvoir gratuit'), glow:'btn-ability', pos:'top', trig:'💫',
+  tx:t('tuto.chaque_nation_pouvoir_gratuit_0_ac_1_tou','Chaque nation a un <b>pouvoir gratuit</b> (0 AC, 1×/tour) : 🌍 Diplomatie Verte, 🔴 Surtension (+1 AC), 🟣 Commerce avec les pirates, 🟠 Forge Orbitale. <b>Touche le bouton ✦</b> (barre du haut) pour lancer Diplomatie Verte.'),
+  hint:t('tuto.hint_pouvoir','Touche ✦')},
 
- {lab:'Valider / annuler chaque action', pos:'top', onShow:function(){ _confirmOn=true; },
+ {lab:t('tuto.lab_valider','Valider / annuler chaque action'), pos:'top', onShow:function(){ _confirmOn=true; },
   tx:t('tuto.apres_chaque_action_fenetre_bas_droite_r','Après chaque action, une fenêtre en bas à droite résume le gain : <b>✓ Valider</b> ou <b>↩ Annuler</b>. Tant que tu n\'as pas validé, tu peux revenir en arrière. Seuls <b>raids et combats</b> sont définitifs.')},
 
  {lab:t('tuto.essaie_valider_ou_annuler','Essaie : valider ou annuler'), pos:'top', sync:'confirmvalidate',
@@ -484,7 +488,7 @@ const STEPS=[
 
  {lab:t('tuto.toi_jouer','À toi de jouer !'), free:true,
   tx:t('tuto.joue_tour_librement_coloniser_relier_ame','Joue ce tour librement : <b>coloniser → relier → améliorer → techs</b>. Valide chaque action. Quand tu n\'as plus d\'AC, le bilan arrive ; je m\'occupe du reste et je reviens pour les <b>fenêtres spéciales</b>.'),
-  hint:"Joue ; valide chaque action"},
+  hint:t('tuto.hint_joue','Joue ; valide chaque action')},
 ];
 // Après le tour libre : on présente les fenêtres spéciales une à une. Certaines sont AFFICHÉES pour de vrai
 // (avec un contenu d'illustration), sans avoir à les déclencher par le jeu — les IA étant passives ici.
@@ -502,7 +506,7 @@ const SPECIAL=[
  {lab:t('tuto.onglet_diplo_tension','Onglet Diplo ⚔️ — la tension'), glow:'m-tabs', onShow:function(){demoPanel('diplo');},
   tx:t('tuto.diplo_tension_monte_quand_te_raide_qu_ri','<b>⚔️ Diplo</b> : la <b>tension</b> monte quand on te raide, qu\'un rival te domine ou te bloque. À <b>10</b>, guerre. Elle baisse avec un <b>accord commercial</b> (−3 chacun, depuis une colonie adverse sur la carte) ou <b>Calmer la population</b> (−3).')},
 
- {lab:'Onglet Journal 📜', glow:'m-tabs', onShow:function(){demoPanel('journal');},
+ {lab:t('tuto.lab_journal','Onglet Journal 📜'), glow:'m-tabs', onShow:function(){demoPanel('journal');},
   tx:t('tuto.journal_tout_passe_tour_tour_pourquoi_ro','<b>📜 Journal</b> : tout ce qui s\'est passé, tour par tour — pourquoi une route est tombée, pourquoi une guerre a éclaté. Le lien <b>Règles</b> et <b>Recommencer</b> sont ici.')},
 
  {lab:t('tuto.evenements','Les événements 🎯'), glow:'top-bar', onShow:function(){demoPanel('map');},
@@ -518,7 +522,7 @@ const SPECIAL=[
  // ── L'initiative : ajoutée le 2026-08-23 avec la règle des deux combats (§14.3 des règles) ──
  {lab:t('tuto.frappe_premier','Qui frappe en premier ? 🎖️'),
   tx:t('tuto.avec_deux_combats_nation_choisit_ordre_i','Avec deux combats, une nation choisit l\'ordre : c\'est l\'<b>initiative</b>. Elle va à qui a l\'<b>Hyperpropulsion</b>, sinon à qui a le <b>moins attaqué</b> dans le tour, sinon au plus avancé, puis au mieux armé. Le journal dit qui et pourquoi.'),
-  hint:"Suivant"},
+  hint:t('tuto.hint_suivant','Suivant')},
 
  {lab:t('tuto.attaque_colonie_immediate','Attaque de colonie (immédiate)'), glow:'war-modal', pos:'top', onShow:demoAssault, inhibit:['#war-modal button'],
   tx:t('tuto.3_toi_assailles_colonie_combat_resolu_im','3ᵉ : <b>toi</b> tu assailles une colonie. Combat résolu <b>immédiatement</b> ; si tu gagnes, tu la <b>captures</b>. Une colonie se défend à <b>1</b> (sa garnison permanente) <b>+ les jetons</b> que le défenseur ajoute ; une capitale à <b>10 + les jetons</b>, et sa prise vaut <b>+10 VP</b>.')},
@@ -578,7 +582,7 @@ function renderCoachForStep(s){
   const hasConfirm=typeof s.confirm==='function';
   let onNext=null, nextText=t('tuto.suivant','Suivant ▶');
   if(s.requireChoice){
-    nextText='Continuer ▶';
+    nextText=t('tuto.continuer','Continuer ▶');
     onNext=function(){ const m=$(s.requireChoice); if(m && !m.classList.contains('hidden')){ note(t('tuto.choisis_abord_option_dans_fenetre_ci_des','👉 Choisis d\'abord une option dans la fenêtre ci-dessous.')); } else if(_advTimer){ /* le choix vient d'être fait : l'avancée est déjà programmée, un second clic sauterait une étape */ } else { advance(); } };
   } else if(hasConfirm){
     nextText=t('tuto.valider_continuer_2','Valider et continuer ▶');
@@ -645,6 +649,8 @@ function enterFreePlay(){
   coach(t('tuto.jeu_libre_tour','Jeu libre · ton tour'),
     t('tuto.joue_tour_valider_apres_chaque_action_qu','Joue ton tour : <b>✓ Valider</b> après chaque action. Quand tu n\'as plus d\'AC, le <b>bilan</b> arrive tout seul ; je m\'occupe de l\'investissement et de l\'événement, et je reprends la main pour les <b>fenêtres spéciales</b>.'),
     {noNext:true});
+  /* 06/10 (appli) : en haut, le coach recouvrait la fenêtre « Nouvelles pour toi » du tour 2 et ses boutons. En jeu libre il va en bas. */
+  if(_coachEl&&!_userMoved){ _coachEl.style.top='auto'; _coachEl.style.bottom='14px'; }
 }
 function onLog(msg){
   msg=String(msg||'');
@@ -663,6 +669,8 @@ function onLog(msg){
 
 /* ---------- fin ---------- */
 let _finished=false;
+/* Le moteur demande s'il est dans la partie GUIDÉE (pas de rappel « pouvoir gratuit » par-dessus le coach). */
+window.scTutoGuide=function(){ return !_free&&!_special&&!_finished; };
 function finish(){
   if(_finished)return; _finished=true;
   clearGlow(); hideCoach(); unInhibit(); hideCursor(); hideAllSpecialModals();
@@ -692,7 +700,9 @@ function startWatch(){
       if(vis('invest-modal')||vis('invest2-modal')){
         const m=vis('invest-modal')?$('invest-modal'):$('invest2-modal');
         const o=m.querySelector('.inv-opt:not(.inv-nope)');
-        if(o){ const nom=(o.querySelector('.inv-opt-name')||{}).textContent||t('tuto.investissement','un investissement'); o.click(); note(t('tuto.investissement_j_ai_pris_toi_explique_fe','💼 <b>Investissement</b> : j\'ai pris « {v} » pour toi — je t\'explique cette fenêtre juste après.',{v:nom.trim()})); }
+        /* 06/10 : depuis que chaque choix se VALIDE (§172), cliquer l'option ne faisait que la sélectionner — la fenêtre
+           restait ouverte et le tutoriel tournait en rond (« Tour suivant » sans effet). On valide aussi. */
+        if(o){ const nom=(o.querySelector('.inv-opt-name')||{}).textContent||t('tuto.investissement','un investissement'); o.click(); const _v=m.querySelector('.choix-valider button'); if(_v){ _v.disabled=false; _v.click(); } note(t('tuto.investissement_j_ai_pris_toi_explique_fe','💼 <b>Investissement</b> : j\'ai pris « {v} » pour toi — je t\'explique cette fenêtre juste après.',{v:nom.trim()})); }
         else { try{ const b=m.querySelector('button'); if(b)b.click(); }catch(e){} }
         return;
       }

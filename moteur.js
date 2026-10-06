@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-06 · v11.68';
+const SOLAR_BUILD_MOTEUR = '2026-10-06 · v11.69';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -3945,6 +3945,8 @@ function _scAbilityAvailable(){
 function _scAbilityReminderOpen(){return typeof document!=='undefined'&&!!document.getElementById('sc-ability-reminder');}
 function _scShowAbilityReminder(){
   if(typeof document==='undefined'||_scAbilityReminderOpen())return;
+  /* Tutoriel (06/10) : pendant la partie GUIDÉE, ce rappel couvrait l'écran (démos de l'arbre, étape « Pouvoir gratuit »). */
+  try{ if(typeof window!=='undefined'&&typeof window.scTutoGuide==='function'&&window.scTutoGuide())return; }catch(e){}
   const p=G.player;const name=(p.civ.active&&p.civ.active.name)||_SC_ABNAME[p.civ.id]||t('pouvoir.ton_pouvoir','ton pouvoir gratuit');
   // Le rappel apparaît maintenant quand il te reste ENCORE des actions (à 1 AC) : le bouton de refus ne doit
   // donc PAS passer le tour — il referme simplement la fenêtre et te laisse jouer. Textes adaptés.
