@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-06 · v11.64';
+const SOLAR_BUILD_MOTEUR = '2026-10-06 · v11.65';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -15330,20 +15330,35 @@ function cadrerVueGlobale(){
   const svg=document.getElementById('solar-svg'), wrap=document.getElementById('map-wrap');
   if(!svg)return;
   if(G&&G.mapView&&G.mapView!=='global')return;
-  /* L'image est en PORTRAIT : sur un écran large elle tient en hauteur et laisse du vide sur les
-     côtés. Les planètes n'occupent que la bande centrale — en paysage on cadre sur cette bande et
-     tout paraît 1,6× plus grand sans perdre un nom. Rappelé au redimensionnement (`uiMapFit`). */
-  const paysage=!!(wrap&&wrap.clientWidth>wrap.clientHeight*1.05);
-  /* v11.60 : l'image `global3w.webp` est ÉLARGIE (x −175 → 575, prolongée par Pollo sur les côtés,
-     centre 0 → 400 inchangé). On élargit donc le cadre à la forme de l'écran (jusqu'à 750 de large)
-     au lieu de laisser du noir sur les côtés ; la hauteur visible reste celle du calibrage de Marc. */
-  const _h=paysage?380:600, _y=paysage?78:0;
-  const _r=(wrap&&wrap.clientHeight)?wrap.clientWidth/wrap.clientHeight:(paysage?1.05:0.667);
-  const _w=Math.round(Math.max(400,Math.min(750,_h*_r)));
-  const vb=(200-_w/2)+' '+_y+' '+_w+' '+_h;
+  /* v11.65 : DEUX IMAGES. Écran nettement en largeur (rapport ≥ 1,25) → carte paysage
+     `global_paysage.webp` (repère 1536 × 1024, zones MAP_HOTSPOTS_PAYSAGE), cadrée pour remplir l'écran
+     sans couper le système. Sinon → carte portrait `global3.webp` (400 × 600, zones MAP_HOTSPOTS) :
+     entière en portrait, bande calibrée par Marc (y 78 → 458) si l'écran est un peu plus large que haut.
+     Rappelé au redimensionnement (`uiMapFit`). */
+  const r=(wrap&&wrap.clientHeight)?wrap.clientWidth/wrap.clientHeight:0.667;
+  const large=r>=1.25, paysage=r>1.05;
+  const img=document.getElementById('map-bg-img');
+  if(img){
+    const src=large?'assets/map/global_paysage.webp':'assets/map/global3.webp';
+    if(img.getAttribute('href')!==src){ img.setAttribute('href',src); img.setAttributeNS('http://www.w3.org/1999/xlink','href',src); }
+    img.setAttribute('width',large?1536:400); img.setAttribute('height',large?1024:600);
+  }
+  const zp=document.getElementById('map-z-portrait'), zl=document.getElementById('map-z-paysage');
+  if(zp)zp.style.display=large?'none':''; if(zl)zl.style.display=large?'':'none';
+  let vb;
+  if(large){
+    let x=0,y=0,w=1536,h=1024;
+    if(r>=1.5){ h=Math.round(1536/r); y=Math.round(Math.max(0,Math.min(1024-h,560-h/2))); }
+    else { w=Math.round(1024*r); x=Math.round(Math.max(0,Math.min(1536-w,763-w/2))); }
+    vb=x+' '+y+' '+w+' '+h;
+    const bp=document.getElementById('map-bandeau-p');
+    if(bp)bp.setAttribute('transform','translate('+(x+w/2)+' '+(y+h-56)+')');
+  } else {
+    vb=paysage?CADRAGE_GLOBAL_PAYSAGE:CADRAGE_GLOBAL_PORTRAIT;
+    const b=document.getElementById('map-bandeau');
+    if(b){ const yb=paysage?418:560; b.setAttribute('transform','translate(0 '+(yb-560)+')'); }
+  }
   if(svg.getAttribute('viewBox')!==vb)svg.setAttribute('viewBox',vb);
-  const b=document.getElementById('map-bandeau');
-  if(b){ const y=paysage?418:560; b.setAttribute('transform','translate(0 '+(y-560)+')'); }
 }
 /* ZONES CLIQUABLES DE LA CARTE PEINTE — coordonnées du viewBox 400 × 600, relevées sur `global3.webp`
    (05/10/2026, v11.58 : nouvelle carte peinte, sans aucun nom dans l'image ; zones et noms calés par Marc
@@ -15363,17 +15378,39 @@ const MAP_HOTSPOTS=[
  {x:97,y:276,r:22,label:'Ceinture',sector:'jupiter',node:'ceres'},
  {x:220,y:121,r:24,label:'Kuiper',sector:'externe',node:'pluto'},
 ];
+/* CARTE PAYSAGE (v11.65, Marc 06/10) : image `global_paysage.webp`, repère 1536 × 1024 (planètes posées
+   à la main sur le décor C1, ordre réel, copie 4K Pollo). Utilisée quand l'écran est nettement en
+   largeur (rapport ≥ 1,25 : tablette couchée, ordinateur) ; sinon la carte portrait `global3.webp`. */
+const MAP_HOTSPOTS_PAYSAGE=[
+ {x:674,y:478,r:24,pid:'mercure',lx:674,ly:507,node:'lune'},
+ {x:899,y:505,r:30,pid:'venus',lx:899,ly:539,node:'lune'},
+ {x:591,y:531,r:36,pid:'terre',lx:591,ly:572,node:'lune'},
+ {x:1000,y:452,r:28,pid:'mars',lx:1000,ly:485,node:'phobos'},
+ {x:299,y:558,r:58,pid:'jupiter',lx:299,ly:617,node:'io'},
+ {x:1243,y:593,r:50,pid:'saturne',lx:1243,ly:645,node:'titan'},
+ {x:433,y:664,r:38,pid:'uranus',lx:433,ly:705,node:'uranus'},
+ {x:1341,y:500,r:38,pid:'neptune',lx:1341,ly:541,node:'triton'},
+ {x:765,y:590,r:26,label:'Ceinture',node:'ceres'},
+ {x:765,y:733,r:34,label:'Kuiper',node:'pluto'},
+];
+function _mapNomPlanete(pid,def){ const pd=PLANETS_DECO.find(q=>q.id===pid); return pd?pd.name:def; }   // PLANETS_DECO est retraduit en place au début de render()
 function mapGlobalSVG(){
-  let s='';
+  let s='<g id="map-z-portrait">';
   // Noms des planètes : écrits ici (traduits), plus dans l'image. Zones cliquables invisibles par-dessus.
   for(const h of MAP_HOTSPOTS){
     if(!h.pid)continue;
-    const pd=PLANETS_DECO.find(q=>q.id===h.pid);
-    const nom=pd?pd.name:h.label;   // PLANETS_DECO est retraduit en place au début de render()
-    s+=`<text x="${h.lx}" y="${h.ly}" text-anchor="${h.la}" font-size="9" font-weight="600" fill="#eef2ff" stroke="#05070f" stroke-width="2.2" stroke-opacity=".75" paint-order="stroke" pointer-events="none" style="letter-spacing:.2px">${nom}</text>`;
+    s+=`<text x="${h.lx}" y="${h.ly}" text-anchor="${h.la}" font-size="9" font-weight="600" fill="#eef2ff" stroke="#05070f" stroke-width="2.2" stroke-opacity=".75" paint-order="stroke" pointer-events="none" style="letter-spacing:.2px">${_mapNomPlanete(h.pid,h.label)}</text>`;
   }
   for(const h of MAP_HOTSPOTS)s+=`<g style="cursor:pointer" onclick="openNodeMap('${h.node}')"><circle cx="${h.x}" cy="${h.y}" r="${h.r}" fill="#000" opacity="0" pointer-events="all"/></g>`;
   s+=`<g id="map-bandeau"><rect x="40" y="560" width="320" height="30" rx="12" fill="#0a1326cc" stroke="#2a3a6a"/><text x="200" y="580" text-anchor="middle" font-size="11" fill="#cfe0ff">${t('carte.touche_planete','Touche une planète → carte détaillée')}</text></g>`;
+  s+='</g><g id="map-z-paysage" style="display:none">';
+  for(const h of MAP_HOTSPOTS_PAYSAGE){
+    if(!h.pid)continue;
+    s+=`<text x="${h.lx}" y="${h.ly}" text-anchor="middle" font-size="16" font-weight="600" fill="#eef2ff" stroke="#05070f" stroke-width="3.6" stroke-opacity=".75" paint-order="stroke" pointer-events="none" style="letter-spacing:.3px">${_mapNomPlanete(h.pid,h.pid)}</text>`;
+  }
+  for(const h of MAP_HOTSPOTS_PAYSAGE)s+=`<g style="cursor:pointer" onclick="openNodeMap('${h.node}')"><circle cx="${h.x}" cy="${h.y}" r="${h.r}" fill="#000" opacity="0" pointer-events="all"/></g>`;
+  s+=`<g id="map-bandeau-p"><rect x="-280" y="0" width="560" height="40" rx="16" fill="#0a1326cc" stroke="#2a3a6a"/><text x="0" y="26" text-anchor="middle" font-size="17" fill="#cfe0ff">${t('carte.touche_planete','Touche une planète → carte détaillée')}</text></g>`;
+  s+='</g>';
   return s;
 }
 function backToMap(){
