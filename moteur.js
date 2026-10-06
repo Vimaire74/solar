@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-06 · v11.67';
+const SOLAR_BUILD_MOTEUR = '2026-10-06 · v11.68';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -17919,7 +17919,7 @@ function scDemander(o){
      l'insertion, aucun banc ne pourrait vérifier ce qu'elle contient — ni le défilement, ni la
      hauteur des boutons, ni le découpage en paragraphes. Une fonction pure les rend mesurables. */
   const balisage=
-      '<div id="sc-ask" style="position:fixed;inset:0;background:rgba(4,4,18,.86);z-index:900;display:flex;align-items:center;justify-content:center;padding:14px">'
+      '<div id="sc-ask" style="position:fixed;inset:0;background:rgba(4,4,18,.86);z-index:9600;display:flex;align-items:center;justify-content:center;padding:14px">'
       +'<div role="dialog" aria-modal="true" aria-labelledby="sc-ask-t" style="background:#0d1128;border:2px solid #39569c;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.7);max-width:440px;width:100%;max-height:calc(100dvh - 28px);display:flex;flex-direction:column">'
         +'<div id="sc-ask-t" style="font-family:var(--font-titre);font-size:.82em;letter-spacing:.06em;color:#cfe0ff;padding:14px 16px 8px">'+_esc(titre)+'</div>'
         /* ⚠️ C'EST CE `overflow:auto`, AVEC LE `max-height` AU-DESSUS, QUI RÉPOND À « la fenêtre
