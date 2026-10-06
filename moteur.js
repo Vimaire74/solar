@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-06 · v11.63';
+const SOLAR_BUILD_MOTEUR = '2026-10-06 · v11.64';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -3668,7 +3668,9 @@ function valeurDeLaPrise(nat,def,nodeId){
   const node=NODES[nodeId]; if(!node)return 0;
   const col=(def.colonies||[]).find(c=>c.nodeId===nodeId); if(!col)return 0;
   const niveauApres=Math.max(1,(col.level||1)-1);
-  const vp=(node.vp||0)*niveauApres;
+  /* 06/10 : `node.vp` n'existe pas — les nœuds portent `baseVP`. Les VP de la prise valaient donc toujours 0 et seule la
+     production comptait. */
+  const vp=(node.baseVP||node.vp||0)*niveauApres;
   let prod=0;
   try{
     const r=revenuDuneColonie(def,{nodeId:nodeId,level:niveauApres,connected:true})||{};
@@ -3714,7 +3716,24 @@ function attaqueUsurePermise(nat,def){
   const pl=nat._planUsure; return !(pl&&pl.tour===G.turn);   // une seule attaque d'usure par tour
 }
 function noterPlanUsure(nat,def,nodeId){ try{ nat._planUsure={cible:def.civ.id,node:nodeId,tour:G.turn}; }catch(e){} }
-function secondAssautPrevu(nat,nodeId){ const pl=nat&&nat._planUsure; return !!(pl&&pl.tour===(G.turn||1)-1&&(nodeId===undefined||pl.node===nodeId)); }
+/* Le second assaut vise la NATION affaiblie, pas forcément la même colonie (Marc, 06/10) : celle qui m'arrange le plus. */
+function secondAssautPrevu(nat,defId){ const pl=nat&&nat._planUsure; return !!(pl&&pl.tour===(G.turn||1)-1&&(defId===undefined||pl.cible===defId)); }
+/* Ce qu'une colonie prise m'apporterait, À MOI (Marc, 06/10 : « gain de VP, gain de ressources, ou possibilité de la
+   connecter rapidement par une route ») : VP du nœud au niveau d'après la prise (× ½ si elle reste isolée), production
+   sur les tours restants (même échelle qu'`evaluerPosition`), +1 VP de liaison et pleine valeur si elle se raccorde en
+   une route au plus. */
+function interetDeLaColonie(nat,def,nodeId){
+  try{
+    const node=NODES[nodeId]; const col=(def.colonies||[]).find(c=>c.nodeId===nodeId); if(!node||!col)return 0;
+    const niv=Math.max(1,(col.level||1)-1), restants=Math.max(0,(G.maxTurns||10)-(G.turn||1));
+    const rc=(typeof _raccordement==='function')?_raccordement(nat,nodeId):null;
+    const relie=!!(rc&&rc.etrangers===0&&rc.sauts<=1);
+    const vp=(node.baseVP||1)*niv*(relie?1:0.5)+(relie?1:0);
+    let prod=0; const r=revenuDuneColonie(nat,{nodeId:nodeId,level:niv,connected:true})||{};
+    const w=(POIDS_EVAL&&POIDS_EVAL.production)||{}; for(const k in r)prod+=(r[k]||0)*(w[k]||0.5);
+    return vp+prod*restants*0.36*(relie?1:0.5);
+  }catch(e){ return 0; }
+}
 /* Réserve du second assaut : le tour qui suit l'attaque d'usure, garder de quoi engager ses jetons et le croiseur. */
 function penaliteReserveUsure(n,coup){
   try{
@@ -3739,7 +3758,10 @@ function valeurAssaut(coup,nat){
       return -ASSAUT_POIDS_ECHEC*Math.min(ASSAUT_ECHEC_PLAFOND,-a.marge);
     }
     /* Second assaut du plan d'usure : la prise vaut davantage — c'est tout l'intérêt du premier. */
-    if(secondAssautPrevu(nat,coup.node)) return ASSAUT_POIDS_GAIN*(1+USURE_SECONDE_PRIME)*Math.min(1,a.marge/ASSAUT_MARGE_SURE)*a.prise;
+    if(secondAssautPrevu(nat,a.defenseur)){
+      const _d2=allPlayers().find(p=>p&&p.civ&&p.civ.id===a.defenseur);
+      return ASSAUT_POIDS_GAIN*(1+USURE_SECONDE_PRIME)*Math.min(1,a.marge/ASSAUT_MARGE_SURE)*Math.max(a.prise,interetDeLaColonie(nat,_d2,coup.node));
+    }
     /* Marge nulle ou juste : la victoire n'est pas acquise (le défenseur peut engager plus que
        prévu). On ne paie la valeur de la prise qu'à proportion de la marge. */
     const confiance=Math.min(1,a.marge/ASSAUT_MARGE_SURE);
@@ -6104,9 +6126,11 @@ function iaChoixDeCombat(nat){
     const _cap=ennemi?ennemi.colonies.filter(c=>c.nodeId===ennemi.civ.home&&_gagnable(c)):[];
     const cibles=_ord.length?_ord:_cap;
     if(cibles.length){
-      /* Second temps du plan d'usure : la colonie visée au tour précédent passe en premier si elle est gagnable. */
-      const _plan=cibles.find(c=>secondAssautPrevu(nat,c.nodeId));
-      const cible=_plan||cibles.reduce((b,c)=>(!b||(c.level||1)<(b.level||1))?c:b,null);
+      /* Second temps du plan d'usure (Marc, 06/10) : contre la nation affaiblie, la colonie gagnable qui m'ARRANGE le plus
+         — VP, ressources, raccordement rapide — et pas forcément celle de la veille. */
+      const cible=secondAssautPrevu(nat,ennemi&&ennemi.civ.id)
+        ? cibles.reduce((b,c)=>(!b||interetDeLaColonie(nat,ennemi,c.nodeId)>interetDeLaColonie(nat,ennemi,b.nodeId))?c:b,null)
+        : cibles.reduce((b,c)=>(!b||(c.level||1)<(b.level||1))?c:b,null);
       return {action:'attack', node:cible.nodeId, tokens:plafond, cruiser:_cru};
     }
     /* Rien de gagnable. Contre une nation qui s'envole : attaque d'usure (Stratégie Guerrière) ou bilan d'échange. */

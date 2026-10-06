@@ -20,8 +20,10 @@ console.log('2. Jupitériens +30 VP, Martiens avec Stratégie Guerrière : attaq
 { const m = montage(30, true); const ev = m.run('vpAffiche(J_)-vpAffiche(M)'); const c = choix(m); const pl = m.run('JSON.stringify(M._planUsure||null)');
   if (c.action === 'attack' && c.usure && /europe/.test(pl)) ok('écart ' + ev + ' VP → ' + JSON.stringify(c) + ' plan ' + pl); else ko('écart ' + ev + ' : ' + JSON.stringify(c) + ' plan ' + pl);
   const c2 = choix(m); if (c2.action !== 'attack') ok('une seule usure par tour : ' + c2.action); else ko('deuxième usure le même tour');
-  m.G.turn = 7; m.run('J_.forceTokens=0;'); const c3 = choix(m);
-  if (c3.action === 'attack' && c3.node === 'europe' && !c3.usure) ok('tour suivant, défense affaiblie : second assaut sur Europe'); else ko('tour suivant : ' + JSON.stringify(c3)); }
+  m.G.turn = 7; m.run('J_.forceTokens=0; J_.colonies.push({nodeId:"ceres",level:2,connected:true});');
+  const ie = m.run('interetDeLaColonie(M,J_,"europe")'), ic = m.run('interetDeLaColonie(M,J_,"ceres")'); const c3 = choix(m);
+  if (c3.action === 'attack' && !c3.usure && c3.node === (ic > ie ? 'ceres' : 'europe')) ok('tour suivant : second assaut sur la colonie qui l\'arrange — ' + c3.node + ' (Cérès ' + ic.toFixed(1) + ' / Europe ' + ie.toFixed(1) + ')'); else ko('tour suivant : ' + JSON.stringify(c3) + ' Cérès ' + ic + ' Europe ' + ie);
+  if (ic > ie) ok('Cérès (voisine de Phobos, raccordable) vaut plus qu\'Europe (lointaine)'); else ko('Cérès ' + ic + ' ≤ Europe ' + ie); }
 console.log('3. Jupitériens +30 VP, SANS Stratégie Guerrière : bilan d\'échange défavorable → pas d\'attaque');
 { const m = montage(30, false); const b = m.run('bilanUsure(M,J_,6,10)'); const c = choix(m);
   if (c.action !== 'attack') ok('bilan ' + b.toFixed(1) + ' → ' + c.action); else ko('attaque malgré bilan ' + b); }
