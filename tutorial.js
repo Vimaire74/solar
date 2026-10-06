@@ -480,7 +480,7 @@ const STEPS=[
   hint:t('tuto.action_puis_valider','Une action, puis ✓ Valider')},
 
  {lab:t('tuto.fin_tour','Fin du tour'), confirm:confirmEndTurn, sync:'endturn',
-  tx:t('tuto.bouton_fin_tour_quand_chacun_joue_ac_bil','Pas de bouton « fin de tour » : quand chacun a joué ses AC, le <b>bilan</b> arrive tout seul. Clique <b>Valider et continuer</b>.'),
+  tx:t('tuto.bouton_fin_tour_quand_chacun_joue_ac_bil','Pas de bouton « fin de tour » : quand chacun a joué ses AC, le <b>bilan</b> arrive tout seul. Une action dont tu ne veux pas ? Touche <b>Passer</b> (barre du haut, à côté de « À TOI ») : tu y renonces et la main passe. Clique <b>Valider et continuer</b>.'),
   hint:t('tuto.valider_continuer','Valider et continuer')},
 
  {lab:t('tuto.bilan_tour','Le bilan de tour'), pos:'top', confirm:confirmEOT, sync:'eot',
@@ -583,7 +583,7 @@ function renderCoachForStep(s){
   let onNext=null, nextText=t('tuto.suivant','Suivant ▶');
   if(s.requireChoice){
     nextText=t('tuto.continuer','Continuer ▶');
-    onNext=function(){ const m=$(s.requireChoice); if(m && !m.classList.contains('hidden')){ note(t('tuto.choisis_abord_option_dans_fenetre_ci_des','👉 Choisis d\'abord une option dans la fenêtre ci-dessous.')); } else if(_advTimer){ /* le choix vient d'être fait : l'avancée est déjà programmée, un second clic sauterait une étape */ } else { advance(); } };
+    onNext=function(){ const m=$(s.requireChoice); if(m && !m.classList.contains('hidden')){ note(t('tuto.choisis_abord_option_dans_fenetre_ci_des','Choisis d\'abord une option dans la fenêtre ci-dessous.')); } else if(_advTimer){ /* le choix vient d'être fait : l'avancée est déjà programmée, un second clic sauterait une étape */ } else { advance(); } };
   } else if(hasConfirm){
     nextText=t('tuto.valider_continuer_2','Valider et continuer ▶');
     /* ═══════ « VALIDER ET CONTINUER » POUVAIT NE RIEN FAIRE DU TOUT ═══════
@@ -658,7 +658,7 @@ function onLog(msg){
   if(!_seen.event && /[ÉE]V[ÉE]NEMENT/i.test(msg)){ _seen.event=1;
     note(t('tuto.evenement_tours_pairs_evenement_survient','🎯 <b>Événement</b> : aux tours pairs, un événement survient — bonus, malus ou compétition entre nations. Lis-le : il peut rapporter des VP.')); }
   if(!_seen.tension && /tension/i.test(msg)){ _seen.tension=1;
-    note(t('tuto.tension_monte_avec_rival_raids_proximite','😤 <b>Tension</b> : elle monte avec un rival (raids, proximité, refus). À <b>10</b>, la guerre éclate. Un accord commercial ou « Calmer la population » la fait baisser.')); }
+    note(t('tuto.tension_monte_avec_rival_raids_proximite','<b>Tension</b> : elle monte avec un rival (raids, proximité, refus). À <b>10</b>, la guerre éclate. Un accord commercial ou « Calmer la population » la fait baisser.')); }
   if(!_seen.raid && /(Raid|pille)/i.test(msg)){ _seen.raid=1;
     note(t('tuto.raid_te_vole_ressources_tension_monte_pr','⚔️ <b>Raid</b> : on te vole des ressources et la tension monte. Protège tes routes avec des jetons Force, ou réponds.')); }
   if(!_seen.war && /GUERRE/i.test(msg)){ _seen.war=1;
@@ -674,7 +674,7 @@ window.scTutoGuide=function(){ return !_free&&!_special&&!_finished; };
 function finish(){
   if(_finished)return; _finished=true;
   clearGlow(); hideCoach(); unInhibit(); hideCursor(); hideAllSpecialModals();
-  const ov=el(t('tuto.bravo_as_bases_colonise_relie_ameliore_c','<div id="tuto-final"><div class="big">🏆</div><h2>Bravo, tu as les bases !</h2><p>Colonise, relie, améliore, cherche des technos, gère ton moral, et vise le plus de <b>VP</b> en 10 tours. Les événements, la tension et la guerre, tu les maîtriseras en jouant.</p><div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"><button onclick="location.reload()">↻ Refaire le tuto</button><button class="ghost" onclick="location.href=\'index.html\'">🎮 Vers le jeu</button></div></div>'));
+  const ov=el(t('tuto.bravo_as_bases_colonise_relie_ameliore_c','<div id="tuto-final"><div class="big">🏆</div><h2>Bravo, tu as les bases !</h2><p>Colonise, relie, améliore, cherche des technos, gère ton moral, et vise le plus de <b>VP</b> en 10 tours. Les événements, la tension et la guerre, tu les maîtriseras en jouant.</p><div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"><button onclick="location.reload()">↻ Refaire le tuto</button><button class="ghost" onclick="location.href=\'index.html\'">Vers le jeu</button></div></div>'));
   document.body.appendChild(ov);
 }
 
@@ -776,7 +776,7 @@ function hookGame(){
       if(_free && !_special && g && g.turn>=3){
         /* Tour 3 : la carte est choisie par le jeu (la première), pour que le tour démarre et que
            l'écran soit libre ; `startWatch` gèle ensuite. */
-        try{ if(Array.isArray(g._stratPool)&&g._stratPool.length){ const f=g._stratPool.filter(c=>c&&!c.calmTension&&!c.calmTheirs&&!c.initiative); const c=(f[0]||g._stratPool[0]); if(window.applyStrategy)window.applyStrategy(c.id); note(t('tuto.carte_strategie_tour_3_choisie_toi','🃏 <b>Carte Stratégie</b> du tour 3 : « {nom} », choisie pour toi.',{nom:c.name})); return; } }catch(e){ console.error('[TUTO strat T3]',e); }
+        try{ if(Array.isArray(g._stratPool)&&g._stratPool.length){ const f=g._stratPool.filter(c=>c&&!c.calmTension&&!c.calmTheirs&&!c.initiative); const c=(f[0]||g._stratPool[0]); if(window.applyStrategy)window.applyStrategy(c.id); note(t('tuto.carte_strategie_tour_3_choisie_toi','<b>Carte Stratégie</b> du tour 3 : « {nom} », choisie pour toi.',{nom:c.name})); return; } }catch(e){ console.error('[TUTO strat T3]',e); }
         startSpecial(); return;
       }
       /* Les cartes qui ouvrent une SECONDE fenêtre (Calmer les tensions, Diplomatie : choisir une
@@ -806,7 +806,7 @@ function startTuto(){
 }
 function showWelcome(){
   injectCSS();
-  const ov=el(t('tuto.apprendre_jouer_solar_jeu_strategie_spat','<div id="tuto-welcome"><div class="big">🌌</div><h1>Apprendre à jouer</h1><p><b>Solar</b> — jeu de stratégie spatiale. Ce tutoriel te fait jouer une vraie partie, guidée pas à pas sur les <b>4 premiers tours</b>.</p><p>À chaque étape, fais l\'action indiquée sur l\'élément <b style="color:#ffd34d">en surbrillance</b>, ou clique « Suivant » pour avancer.</p><button id="tuto-go">Commencer ▶</button></div>'));
+  const ov=el(t('tuto.apprendre_jouer_solar_jeu_strategie_spat','<div id="tuto-welcome"><h1>Apprendre à jouer</h1><p><b>Solar</b> — jeu de stratégie spatiale. Ce tutoriel te fait jouer une vraie partie, guidée pas à pas sur les <b>4 premiers tours</b>.</p><p>À chaque étape, fais l\'action indiquée sur l\'élément <b style="color:#ffd34d">en surbrillance</b>, ou clique « Suivant » pour avancer.</p><button id="tuto-go">Commencer ▶</button></div>'));
   document.body.appendChild(ov);
   $('tuto-go').onclick=startTuto;
 }
