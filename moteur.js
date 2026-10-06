@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-06 · v11.65';
+const SOLAR_BUILD_MOTEUR = '2026-10-06 · v11.67';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -3842,7 +3842,13 @@ function initGame(civId,aiCivIds){
 function saveUndo(){undoStack.push({etat:scSerialize()});}
 function _restaurerPhoto(etat){
   const _disc=JSON.stringify((G&&G._discCache)||{});
+  /* 06/10 (partie 9cbc39, T6 : « route Ceres → Europa » en double, « ↳ paie » des Martiens disparu) :
+     `G._enteteAction` est LA MÊME ligne que l'une de `G.log`. La recoudre en place réécrivait donc une
+     autre ligne du journal avec le texte de l'en-tête : un doublon, et une ligne perdue. On la détache
+     avant, puis on la rattache à sa ligne restaurée. */
+  if(G) G._enteteAction=null;
   _fusionEnPlace(G,scDeserialize(etat));
+  try{ const h=G._enteteAction; if(h&&Array.isArray(G.log)){ const j=G.log.findIndex(e=>e&&typeof e==='object'&&e.entete&&e.msg===h.msg&&e.civ===h.civ&&e.turn===h.turn); G._enteteAction=j>=0?G.log[j]:null; } }catch(e){}
   try{ G._discCache=JSON.parse(_disc); }catch(e){}
   if(typeof rehydrateState==='function')rehydrateState(G);
   if(typeof refreshWarViews==='function')refreshWarViews();
@@ -15340,7 +15346,7 @@ function cadrerVueGlobale(){
   const img=document.getElementById('map-bg-img');
   if(img){
     const src=large?'assets/map/global_paysage.webp':'assets/map/global3.webp';
-    if(img.getAttribute('href')!==src){ img.setAttribute('href',src); img.setAttributeNS('http://www.w3.org/1999/xlink','href',src); }
+    if(img.getAttribute('href')!==src){ img.setAttribute('href',src); if(typeof img.setAttributeNS==='function') img.setAttributeNS('http://www.w3.org/1999/xlink','href',src); }  /* le serveur (bac à sable sans vrai DOM) n'a pas setAttributeNS : sans ce garde-fou, le début de tour plantait */
     img.setAttribute('width',large?1536:400); img.setAttribute('height',large?1024:600);
   }
   const zp=document.getElementById('map-z-portrait'), zl=document.getElementById('map-z-paysage');
