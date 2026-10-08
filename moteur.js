@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-08 · v11.74';
+const SOLAR_BUILD_MOTEUR = '2026-10-08 · v11.75';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -14596,6 +14596,19 @@ function vpAffiche(p){
 // ── Log de partie : construction + copier / email / télécharger (en jeu ET à la fin) ──
 // Rapport lisible : chaque action de chaque nation avec coûts + gain, groupée par tour,
 // puis le calcul final des points de victoire. Émojis de guerre seulement.
+/* Même règle que le journal (§194), pour le TEXTE du rapport de partie : seuls ☠️ et les pastilles de nation restent.
+   Les émojis qui portent un sens deviennent des mots courts (ressources, attaque/défense). */
+function _texteSansEmoji(s){
+  if(!s) return s;
+  const garde=new Set(['\u2620']);
+  try{ for(const k in CIVS){ const em=CIVS[k]&&CIVS[k].emoji; if(em) garde.add(String(em).replace(/\uFE0F/g,'')); } }catch(e){}
+  const mot={'⚡':t('res.abr_energie','én'),'🪨':t('res.abr_materiaux','mat'),'🔬':t('res.abr_savoir','sav'),'❤':t('res.abr_moral','mor'),'🙂':t('res.abr_moral','mor'),'⚔':t('res.abr_attaque','att'),'🛡':t('res.abr_defense','déf')};
+  return String(s)
+    .replace(/^([ \t]*)(?:⚔|⚙)\uFE0F?[ \t]*/gm,'$1')   // ⚔️ / ⚙️ en tête de ligne : simples marqueurs, retirés
+    .replace(/(?:\p{Extended_Pictographic}|\p{Regional_Indicator})(?:\uFE0F|\u20E3|\p{Emoji_Modifier})*(?:\u200D(?:\p{Extended_Pictographic})(?:\uFE0F)?)*/gu,
+      m=>{ const b=m.replace(/\uFE0F/g,''); if(garde.has(b))return m; if(mot[b])return ' '+mot[b]; return ''; })
+    .replace(/ +\n/g,'\n').replace(/([^\s]) {2}(?=\S)/g,'$1 ');   // pas de fusion des espaces en début de ligne : les tableaux restent alignés
+}
 function buildJournalReport(){
   const L=[];
   L.push('=== SOLAR — RAPPORT DE PARTIE ===');
@@ -14665,7 +14678,7 @@ function buildJournalReport(){
   /* La trajectoire et les décisions des IA — voir `_analyseTexte`. Placées APRÈS le décompte, pour
      que le lecteur pressé trouve d'abord son score, et l'enquêteur ce qu'il lui faut ensuite. */
   try{ for(const l of _analyseTexte())L.push(l); }catch(e){}
-  return L.join('\n');
+  return _texteSansEmoji(L.join('\n'));   // 08/10 (Marc) : pas d'émojis dans le rapport non plus, sauf ☠️ et pastilles de nation
 }
 /* ═══ LE JOURNAL EXPORTÉ = LE JOURNAL VU (Marc, 03/10) ═══
    « Copier le log doit copier exactement ce qui est visible dans le journal. » `buildFullLog` rendait le RAPPORT de
