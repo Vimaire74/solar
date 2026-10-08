@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-06 · v11.70';
+const SOLAR_BUILD_MOTEUR = '2026-10-07 · v11.71';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -517,21 +517,25 @@ const INVESTMENT_CARDS_2=[
    applyBenefit(G,p){if(!p.investBonus2)p.investBonus2={};p.investBonus2.moraleFlat=4;p.investBonus2.turnsLeft=4;if(p===G.player)addLog(J('journal.confort_4_tour_pendant_3_tours','🕊️ Confort : +4<i class=ri-morale></i>/tour pendant 3 tours !'),'gold');},
    applyCost(G,p){p.res.materials=Math.max(0,(p.res.materials||0)-4);if(p===G.player)addLog(J('journal.confort_4','🕊️ Confort : −4<i class=ri-materials></i>'),'red');}
   },
-  {id:'inv2_colonies',name:'Colonies Avancées',emoji:'🏗️',cout:{energy:3},/* le ÷2 des matériaux est toujours payable : seul le −3⚡ peut manquer */
+  /* Contrepartie revue par Marc (07/10) : l'ancienne (stock de matériaux ÷2, une fois) se contournait en vidant son
+     stock juste avant — pour un gain de 25 à 40 VP. Désormais −8🪨 −3⚡ au début du tour 7, puis revenu de
+     matériaux ÷2 et revenu d'énergie −3 pendant les tours 7 à 9 (voir `revenusDe`, bloc Niv.2). */
+  {id:'inv2_colonies',name:'Colonies Avancées',emoji:'🏗️',cout:{materials:8,energy:3},
    benefit:'Toutes tes colonies déjà possédées → niveau max (entretien payant normalement).',
-   contrepartie:'<i class=ri-materials></i> ÷2 + −3<i class=ri-energy></i> immédiat',
+   contrepartie:'−8<i class=ri-materials></i> −3<i class=ri-energy></i> immédiat, puis revenus T7→T9 : <i class=ri-materials></i> ÷2 et −3<i class=ri-energy></i>',
    applyBenefit(G,p){
      let upgraded=0;
      for(const col of p.colonies){const node=NODES[col.nodeId];if(col.level<node.maxLv){upgraded++;col.level=node.maxLv;}}
      updateConnections(p);
      if(!p.investBonus2)p.investBonus2={};
      p.investBonus2.turnsLeft=4;
+     p.investBonus2.matHalf=true; p.investBonus2.energieMoins=3;
      if(p===G.player)addLog(J('journal.colonies_avancees_colonie_niveau_max_ent','🏗️ Colonies Avancées : {upgraded} colonie(s) au niveau max (entretien payant) !',{upgraded:upgraded}),'gold');
    },
    applyCost(G,p){
-     const half=Math.floor((p.res.materials||0)/2);p.res.materials=half;
+     p.res.materials=Math.max(0,(p.res.materials||0)-8);
      p.res.energy=Math.max(0,(p.res.energy||0)-3);
-     if(p===G.player)addLog(J('journal.colonies_avancees_2_3','🏗️ Colonies Avancées : <i class=ri-materials></i> ÷2, −3<i class=ri-energy></i>'),'red');
+     if(p===G.player)addLog(J('journal.colonies_avancees_cout_v2','🏗️ Colonies Avancées : −8<i class=ri-materials></i> −3<i class=ri-energy></i>, puis revenus ÷2 en matériaux et −3<i class=ri-energy></i> jusqu\'au tour 9'),'red');
    }
   },
   {id:'inv2_union',name:'Union Sacrée',emoji:'🧠',cout:{materials:3,science:4},
@@ -5837,7 +5841,7 @@ function _startTurnBegin(){
            ne figuraient pas ici. Confort dure trois tours comme les autres. `unionSacree` n'est
            PAS remis à zéro : il débloque la branche Empathes, et une branche débloquée le reste
            — l'annuler retirerait au joueur des cartes déjà achetées. */
-        p.investBonus2.fastCooldown=false;p.investBonus2.moraleX2=false;p.investBonus2.moraleFlat=0;
+        p.investBonus2.fastCooldown=false;p.investBonus2.moraleX2=false;p.investBonus2.moraleFlat=0;p.investBonus2.matHalf=false;p.investBonus2.energieMoins=0;
         addLog(J('journal.investissement_niv_2_expire_t7_t9_couver','⌛ {emoji} {nation} — investissement Niv.2 expiré (T7→T9 couverts).',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name')}),'dim');
       }
     }
@@ -7976,6 +7980,13 @@ function revenusBruts(p, opts){
     // moraleX2 : gains de moral doublés
     if(p.investBonus2.moraleX2&&gains.morale){const before=gains.morale;gains.morale=Math.floor(gains.morale*2);_j(J('journal.confort_population_actif_2','🕊️ Confort Population actif : <i class=ri-morale></i>×2 ({before}→{moral})',{before:before,moral:gains.morale}),'dim');}
     if(p.investBonus2.moraleFlat){gains.morale=(gains.morale||0)+p.investBonus2.moraleFlat;_det(t('revenu.confort_population','🕊️ Confort de la Population'),{morale:p.investBonus2.moraleFlat});}
+    /* Colonies Avancées (07/10) : revenu brut de matériaux ÷2 (arrondi bas) et revenu d'énergie −3, tours 7 à 9. */
+    if(p.investBonus2.matHalf||p.investBonus2.energieMoins){
+      const _o={};
+      if(p.investBonus2.matHalf&&gains.materials>0){const m=gains.materials-Math.floor(gains.materials/2);gains.materials-=m;if(m)_o.materials=-m;}
+      if(p.investBonus2.energieMoins&&gains.energy>0){const e=Math.min(gains.energy,p.investBonus2.energieMoins);gains.energy-=e;if(e)_o.energy=-e;}
+      if(Object.keys(_o).length)_det(t('revenu.colonies_avancees','🏗️ Colonies Avancées'),_o);
+    }
   }
   // Empathes T1 : +1<i class=ri-energy></i> par tranche de 2 routes
   if(hasSpec(p,'empath_routes')&&p.routes.length>=2){
@@ -11503,7 +11514,7 @@ function chooseInvestmentForAI(ai,level){
       case 'inv2_war': s+=(typeof profilActifDe==='function'&&profilActifDe(ai)===PROFILS_IA.guerrier)?8:
                           (atWar?5:((ai.civ.id==='martiens'||ai.civ.id==='terriens')?2:1)); break;
       case 'inv2_comfort': s+=morale<=4?4:1; break;
-      case 'inv2_colonies': s+=belowMax*1.5; break;
+      case 'inv2_colonies': s+=belowMax*1.5-2; break;   // −2 : la contrepartie pèse désormais trois tours (07/10)
       case 'inv2_union': s+=sci>=1?3:1; break;
     }
     /* L'IA ne choisit pas une carte qu'elle ne pourra pas payer (Marc, 2026-08-09) : le
