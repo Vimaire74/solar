@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-08 · v11.73';
+const SOLAR_BUILD_MOTEUR = '2026-10-08 · v11.74';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -728,9 +728,15 @@ function _forceTotal(p){return (p.forceTokens||0)+((p.forceCooldown||[]).reduce(
 // SOURCE UNIQUE : jetons Force réellement ENGAGEABLES (guerre / raid) = réserve − garnison obligatoire
 // (1 jeton réservé par colonie connectée hors base). Les jetons posés sur les routes et ceux en récupération
 // ne sont déjà PAS dans p.forceTokens. Utilisé par la barre du haut ET les fenêtres de combat (plus d'écart).
+/* ═══ GARNISON ET JETON DE PROTECTION (Marc, 08/10 — partie 4625e3) ═══
+   « J'ai perdu des jetons en construisant des routes » : la garnison (1 jeton par colonie, non engageable) ne
+   comptait que les colonies RELIÉES, et le jeton de protection d'une nouvelle colonie n'arrivait qu'au bilan.
+   Relier une colonie faisait donc baisser les jetons engageables. Désormais toute colonie hors capitale garde sa
+   garnison dès sa fondation, et le jeton de protection est donné au même instant : le compte ne bouge plus. */
+function jetonProtectionColonie(p){ if(!p)return; p.forceTokens=(p.forceTokens||0)+1; try{ if(typeof G!=='undefined'&&G&&p===G.player&&!G._simulationIA)addLog(J('journal.jeton_force_vaisseaux_protection_nouvell','⚔️ +{newcol} jeton(s) Force — vaisseaux de protection des nouvelles colonies.',{newcol:1}),'gold'); }catch(e){} }
 function engageableTokens(p){
   if(!p)return 0;
-  const garrison=(p.colonies||[]).filter(function(c){return c.connected&&c.nodeId!==p.civ.home;}).length;
+  const garrison=(p.colonies||[]).filter(function(c){return c.nodeId!==p.civ.home;}).length;
   return Math.max(0,(p.forceTokens||0)-garrison);
 }
 // SOURCE UNIQUE — combien de jetons on peut PAYER (c'est CE plafond qui limite la taille d'un assaut).
@@ -2416,7 +2422,7 @@ function capturerNoeud(vainqueur, nodeId){
     delete sienne.noUpgrade;
     sienne.connected=conn;
   }else{
-    vainqueur.colonies.push({nodeId:nodeId, level:nouveau, connected:conn, _conquest:3});
+    vainqueur.colonies.push({nodeId:nodeId, level:nouveau, connected:conn, _conquest:3}); jetonProtectionColonie(vainqueur);
   }
   if(typeof updateConnections==='function')updateConnections(vainqueur);
   /* ⚠️ CE MESSAGE ANNONÇAIT TOUJOURS UN « ACCORD FORCÉ », ET C'ÉTAIT FAUX NEUF FOIS SUR DIX.
@@ -8063,7 +8069,7 @@ function doRevenues(){
     for(const[r,a]of Object.entries(gains))p.res[r]=Math.min(caps[r]||10,(p.res[r]||0)+a);
     // +1 jeton Force par colonie NOUVELLEMENT acquise ce tour (vaisseaux de protection) — une seule fois par colonie
     const _prevCol=(p._colCountLastTurn===undefined)?p.colonies.length:p._colCountLastTurn;
-    const _newCol=p.colonies.length-_prevCol;
+    const _newCol=0;   // 08/10 (Marc) : le jeton de protection est donné À LA FONDATION (`jetonProtectionColonie`), plus au bilan
     if(_newCol>0){p.forceTokens+=_newCol;if(p===G.player)addLog(J('journal.jeton_force_vaisseaux_protection_nouvell','⚔️ +{newcol} jeton(s) Force — vaisseaux de protection des nouvelles colonies.',{newcol:_newCol}),'gold');}
     p._colCountLastTurn=p.colonies.length;
     // Mécontentement de conquête : −2<i class=ri-morale></i> le 1er tour de possession, −1<i class=ri-morale></i> les 2 suivants (apaisé par une amélioration de la colonie)
@@ -8421,7 +8427,7 @@ function _extraSolarColonize(p,nid){
   let _occ=null;
   if(occupied){_occ=allPlayers().find(function(pl){return pl!==p&&pl.colonies.some(function(c){return c.nodeId===nid;});});_accordEnregistrer(nid,p,_occ);}
   const connected=(typeof checkConnected==='function')?checkConnected(nid,p):false;
-  p.colonies.push({nodeId:nid,level:1,connected,noUpgrade:!!occupied});
+  p.colonies.push({nodeId:nid,level:1,connected,noUpgrade:!!occupied}); jetonProtectionColonie(p);
   updateConnections(p);
   /* L'occupant est PRÉVENU (Marc, 02/10 : « aucun message du jeu pour me le dire »). */
   if(_occ&&_occ!==p){ try{ notifyNationHit(_occ,
@@ -8499,7 +8505,7 @@ function doColonize(nodeId, nation){
   _n.spentThisTurn+=ac+mat+en;
   logEntete(J('journal.entete_colonise','{emoji} {nation} — 🚩 colonise {noeud}',{emoji:_n.civ.emoji,nation:_i18nRef(_n.civ,'name'),noeud:_i18nRef(node,'name')}),_n._isAI?'dim':'green');
   const connected=checkConnected(nodeId,_n);
-  _n.colonies.push({nodeId,level:1,connected});
+  _n.colonies.push({nodeId,level:1,connected}); jetonProtectionColonie(_n);
   updateConnections(_n);
   // Moral one-time : Niv.1 = +1<i class=ri-morale></i> pour tous; colonie éloignée = −1<i class=ri-morale></i> (conditions difficiles)
   // Biosphère Avancée (bio2_bonus) supprime le malus des colonies difficiles
@@ -11397,7 +11403,7 @@ function doPostWarColonize(nodeId){
   }
   p.res.materials-=matCost;p.res.energy-=enCost;
   const connected=checkConnected(nodeId,p);
-  p.colonies.push({nodeId,level:1,connected});updateConnections(p);
+  p.colonies.push({nodeId,level:1,connected});jetonProtectionColonie(p);updateConnections(p);
   addLog(J('journal.butin_guerre_colonises','🚩 Butin de guerre : colonise {noeud} !',{noeud:_i18nRef(node,'name')}),'gold');
   render();dismissWarModal();
 }
@@ -13450,7 +13456,9 @@ function _doAITurnInterne(aiPlayer,oneShot){
     // (plus de garde énergie : connecter une colonie est vital — une route non alimentée relie quand même la colonie, seul son bonus commercial est différé)
     const _existe=(a,b)=>!!ai.routes.find(r=>(r.from===a&&r.to===b)||(r.from===b&&r.to===a));
     const _poser=(a,b,cible)=>{
-      doEstablishRoute(a,b,ai);
+      /* 08/10 (partie 4625e3) : sans `acteurAction`, `addAction` croyait que c'était le JOUEUR qui posait la
+         route — le rapport de partie lui attribuait les routes des ordinateurs (« [Jovians] Route Phobos → Vesta »). */
+      acteurAction(ai,function(){ doEstablishRoute(a,b,ai); });
       const _r=ai.routes.find(r=>(r.from===a&&r.to===b)||(r.from===b&&r.to===a));
       if(!_r)return false;                       // refusée par la porte unique : rien n'a été payé
       const tok=_r.tokens||0;
@@ -13583,7 +13591,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
     if((ai.res.materials||0)<mat||(ai.res.energy||0)<en)return false;
     ai.acLeft--;ai.res.materials=Math.max(0,(ai.res.materials||0)-mat);
     ai.res.energy=Math.max(0,(ai.res.energy||0)-en);ai.spentThisTurn+=1+mat+en;
-    const connected=checkConnected(bestAdj,ai);ai.colonies.push({nodeId:bestAdj,level:1,connected});
+    const connected=checkConnected(bestAdj,ai);ai.colonies.push({nodeId:bestAdj,level:1,connected});jetonProtectionColonie(ai);
     updateConnections(ai);owned.add(bestAdj);
     addLog(J('journal.colonise','🤖 {nation} colonise {noeud}',{nation:_i18nRef(ai.civ,'name'),noeud:_i18nRef(NODES[bestAdj],'name')}),'dim');
     G.aiActions.push(_i18nAplatir({emoji:'🏗️',name:J('action.colonise','Colonise {noeud}',{noeud:_i18nRef(NODES[bestAdj],'name')}),desc:J('action.nv_1_score','Nv.1 (score:{v})',{v:bestScore.toFixed(0)})}));
@@ -14636,7 +14644,7 @@ function buildJournalReport(){
     const _bloc=(titre,valeur,regle,lignes,siVide)=>{
       L.push('   '+titre+' : '+(valeur||0)+'   ['+regle+']');
       const _L=(lignes&&lignes.length)?lignes:(siVide?[siVide]:[]);
-      for(const x of _L)L.push('      · '+String(_i18nTexte(x)).replace(/<[^>]+>/g,''));
+      for(const x of _L)L.push('      · '+String(_i18nTexte(x)).replace(/<i\s+class=["']?ri-(energy|materials|science|morale)["']?\s*><\/i>/gi,(m,k)=>t({energy:'res.energie',materials:'res.materiaux',science:'res.savoir',morale:'res.moral'}[k],k)).replace(/<[^>]+>/g,''));   // 08/10 : « All tech cards that generate  → » — l'icône disparaissait du rapport texte
     };
     _bloc('Colonies',v.colVP,'VP du nœud × niveau, ×1 si connectée, ×0,5 si isolée, +1 par colonie reliée',_d.colonies,'aucune colonie');
     _bloc('Routes',v.routeVP,'+1 VP par route établie',_d.routes,'aucune route établie');
@@ -15854,7 +15862,7 @@ function renderRight(){
   // Force tokens — 4 catégories : dispo (rouge) / garnison colonies (rosé) / sur routes (gris) / récupération (bleu)
   const onRoute=p.routes.filter(r=>(r.tokens||0)>0).length;
   const onCd=p.forceCooldown.reduce((s,fc)=>s+fc.count,0);
-  const reservedCol=p.colonies.filter(c=>c.connected&&c.nodeId!==p.civ.home).length; // 1 jeton réservé/garnison par colonie connectée
+  const reservedCol=p.colonies.filter(c=>c.nodeId!==p.civ.home).length; // 1 jeton réservé/garnison par colonie connectée
   const inReserve=p.forceTokens||0;
   const garrison=Math.min(inReserve,reservedCol);          // rosé : réservés par tes colonies
   const freeAvail=Math.max(0,inReserve-reservedCol);       // rouge : réellement engageables en attaque
@@ -16864,7 +16872,7 @@ function _warShowAttackSlider(){
   const stratBonus=(p.stratBonus&&p.stratBonus.combatBonus)||0;
   const targetNode=NODES[_warAttackColonyTarget];
   // Plancher de défense : 1 jeton réservé par colonie connectée hors base (non engageables en attaque)
-  const defFloor=p.colonies.filter(c=>c.connected&&c.nodeId!==p.civ.home).length;
+  const defFloor=p.colonies.filter(c=>c.nodeId!==p.civ.home).length;
   const engageable=engageableTokens(p); // MÊME source que la barre du haut → plus d'écart d'affichage
   const intel=getIntelLevel(G.player);
   document.getElementById('wcm-sub').textContent=t('guerre.attaque_choisis','Attaque {n} — choisis tes jetons :',{n:(targetNode?_i18nRef(targetNode,'name'):J('guerre.colonie','colonie'))});
@@ -17129,7 +17137,7 @@ function warDefendTarget(){
   atkBtns.style.display='';
   atkBtns.innerHTML='<button onclick="confirmWarDefense()" style="padding:8px 20px;background:#2a1200;border:1px solid #cc6622;color:#ffaa66;border-radius:7px;cursor:pointer;font-weight:700;font-size:.9em">'+t('defense.btn','🛡️ Défendre avec ces jetons')+'</button> <button class="atk-cancel" onclick="cancelWarCombat()">'+t('commun.annuler_fleche','↩ Annuler')+'</button>';
   // Plancher de défense : 1 jeton réservé par colonie connectée hors base
-  const defFloor2=p.colonies.filter(c=>c.connected&&c.nodeId!==p.civ.home).length;
+  const defFloor2=p.colonies.filter(c=>c.nodeId!==p.civ.home).length;
   const _affD=maxAffordableTokens(p); // SOURCE UNIQUE : tient compte de l'IA de Navigation (coût ÷2)
   const maxDef=Math.max(0,Math.min(p.forceTokens-defFloor2,_affD));
   slider.min=0;slider.max=maxDef;slider.value=Math.min(Math.ceil(maxDef/2),maxDef);

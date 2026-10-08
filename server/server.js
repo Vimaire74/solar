@@ -1,4 +1,4 @@
-/* Solar Conquest — serveur multijoueur autoritaire (tâche A du chantier).
+/* SOLAR — serveur multijoueur autoritaire (tâche A du chantier).
    Node + WebSocket (ws) autour du GameDriver prouvé (server/driver.js).
    - L'état vit ici ; les clients envoient des INTENTIONS (act / answer), le serveur valide et pousse.
    - Comptes simples : fichier JSON + scrypt (zéro dépendance BDD pour la v1 ; schéma SQL prêt pour plus tard).
@@ -222,7 +222,7 @@ function sendMail(to, subject, text, attachments) {
   // l'email devienne obligatoire) → on n'essaie même pas : l'envoi échouerait silencieusement.
   if (!isEmail(to)) { noteMailError('NON ENVOYÉ à « ' + to + ' » : ce compte a un pseudo, pas une adresse email. Le joueur doit créer un compte avec son email.'); return; }
   if (!_transport) { noteMailError('NON ENVOYÉ à ' + to + ' : SMTP non configuré (variables SMTP_* absentes).'); return; }
-  _transport.sendMail(Object.assign({ from: MAIL_FROM, to, subject, text }, (attachments && attachments.length) ? { attachments } : {}))
+  _transport.sendMail(Object.assign({ from: MAIL_FROM, to, subject, text, textEncoding: 'base64' /* 08/10 : en quoted-printable, un caractère accentué ou un émoji coupé en fin de ligne arrivait en « �� » dans les rapports */ }, (attachments && attachments.length) ? { attachments } : {}))
     .then(() => {})
     .catch(e => { console.error('sendMail:', e.message); noteMailError('ÉCHEC vers ' + to + ' : ' + e.message); });
 }
@@ -2313,7 +2313,7 @@ try {
 }
 
 server.listen(PORT, () => {
-  console.log('Solar Conquest server — port ' + PORT + ' — moteur: ' + HTML + ' — data: ' + DATA);
+  console.log('SOLAR server — port ' + PORT + ' — moteur: ' + HTML + ' — data: ' + DATA);
   // Les parties en cours sont rechargées depuis leur fichier (état + déroulement). Voir le bandeau
   // « PARTIES QUI SURVIVENT AU REDÉMARRAGE » plus haut.
   try { rechargerParties(); } catch (e) { console.error('rechargerParties:', e.message); }

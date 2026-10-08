@@ -1,9 +1,10 @@
-# Lot 18-21 — CE LOT EST EN **v11.73** · cache `sw.js` **v294** · 2026-10-08
+# Lot 18-22 — CE LOT EST EN **v11.74** · cache `sw.js` **v295** · 2026-10-08 — SERVEUR À REDÉPLOYER
 
-(Seulement les fichiers changés depuis la v11.72 — lot18-20. Détail : docs/REPRISE.md §239.)
+(Seulement les fichiers changés depuis la v11.73 — lot18-21. Détail : docs/REPRISE.md §240.)
 
-- Tutoriel, jeu libre : le coach se réduit à un bouton flèche jaune déplaçable ; un toucher le rouvre
-- Tutoriel : plus de fenêtre rouge « on t'attaque » (pillage des pirates) pendant le tutoriel
-- Tutoriel : plus de note bleue « Pouvoir gratuit utilisé »
-- Règles : s'ouvrent par-dessus le jeu avec un bouton « Retour au jeu » (fin du tutoriel, panneau Journal dans l'appli)
-- Règles : bouton « Retour au jeu » en haut de la page quand elle est ouverte seule (accueil de l'appli)
+- Jetons : la garnison compte pour toute colonie, reliée ou non ; relier une colonie ne fait plus baisser les jetons utilisables
+- Jetons : le jeton de protection d'une nouvelle colonie (fondée ou prise) est donné tout de suite, plus au bilan
+- Règles §14.4 et revenus (FR / EN) mises à jour en conséquence
+- Rapport de partie : les routes posées par les ordinateurs ne sont plus attribuées au joueur
+- Rapport de partie : les icônes de ressources s'écrivent en toutes lettres (agenda Empire énergétique)
+- Courriels du serveur envoyés en base64 (caractères cassés « �� » dans les rapports)
