@@ -1,7 +1,7 @@
-# Lot 18-19 — CE LOT EST EN **v11.71** · cache `sw.js` **v292** · 2026-10-07 — SERVEUR À REDÉPLOYER
+# Lot 18-20 — CE LOT EST EN **v11.72** · cache `sw.js` **v293** · 2026-10-08
 
-(Seulement les fichiers changés depuis la v11.70 — lot18-18. Détail : docs/REPRISE.md §237.)
+(Seulement les fichiers changés depuis la v11.71 — lot18-19. Détail : docs/REPRISE.md §238.)
 
-- Investissement Colonies Avancées : −8 matériaux −3 énergie au début du tour 7 (il faut les avoir pour le choisir)
-- Colonies Avancées : revenu de matériaux ÷2 et revenu d'énergie −3 pendant les tours 7 à 9 (ligne visible au bilan)
-- Colonies Avancées : texte de la carte et règles §15 (FR / EN) mis à jour ; l'IA tient compte de la nouvelle contrepartie
+- Tutoriel : textes revus par Marc, étape par étape (35 textes), en français et en anglais
+- Tutoriel : emblèmes des nations à l'étape du pouvoir gratuit, pastilles de jetons (rouge, garnison) dans les textes
+- Tutoriel : écran final avec le résumé des VP de fin de partie et un bouton Règles du jeu
