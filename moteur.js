@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-08 · v11.72';
+const SOLAR_BUILD_MOTEUR = '2026-10-08 · v11.73';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -18008,6 +18008,13 @@ function _showPlayerHitModal(){
   if(typeof document==='undefined'||!document.body||typeof document.body.insertAdjacentHTML!=='function')return;
   const tous=(G&&G._ilPlayerHits)||[];
   if(!tous.length){return;}
+  /* Tutoriel (Marc, 08/10) : les avis « on t'attaque » (pillage des pirates…) surgissaient en plein jeu libre
+     et pendant les explications. Le tutoriel parle des pirates lui-même : on retire ces coups de la file. */
+  try{ if(typeof window!=='undefined'&&typeof window.scTutoActif==='function'&&window.scTutoActif()){
+    const reste=tous.filter(h=>!(h&&h.genre==='coup'));
+    if(reste.length!==tous.length){ G._ilPlayerHits=reste; if(!reste.length){ G._hitsAffiches=0; _ackPlayerHits(); return; } }
+  } }catch(e){}
+  if(!G._ilPlayerHits.length)return;
   const old=document.getElementById('sc-attack-notice');if(old)old.remove();
   /* ═══ UNE FENÊTRE À LA FOIS, DANS L'ORDRE (Marc, 03/10 — partie lente, §196) ═══
      1) Si une autre fenêtre est ouverte (investissements activés, bilan, stratégie…), on attend qu'elle
@@ -18019,10 +18026,11 @@ function _showPlayerHitModal(){
     if(!G._hitsAttente){ G._hitsAttente=true; setTimeout(function(){ G._hitsAttente=false; _showPlayerHitModal(); },300); }
     return;
   }
+  const _tous=G._ilPlayerHits;
   const _coup=h=>!!(h&&h.genre==='coup');
-  let _n=1; while(_n<tous.length&&_coup(tous[_n])===_coup(tous[0])) _n++;
+  let _n=1; while(_n<_tous.length&&_coup(_tous[_n])===_coup(_tous[0])) _n++;
   G._hitsAffiches=_n;
-  const hits=tous.slice(0,_n);
+  const hits=_tous.slice(0,_n);
   /* Blason B (Marc, 15/09) : « attaqué par NATION » en rouge, même famille que les fenêtres de guerre. */
   if(typeof fenAttaques==='function'){
     document.body.insertAdjacentHTML('beforeend','<div id="sc-attack-notice" style="position:fixed;inset:0;background:rgba(4,4,18,.86);z-index:650;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:48px 10px 10px">'
@@ -18042,6 +18050,19 @@ function _showPlayerHitModal(){
         '<button onclick="_ackPlayerHits()" style="margin-top:6px;width:100%;padding:12px;background:#16401a;border:1px solid #2f6b34;color:#bff3cf;border-radius:9px;font-weight:800;cursor:pointer;font-size:1em">✓ Continuer</button>'+
       '</div></div>');
 }
+/* ═══ LES RÈGLES S'OUVRENT PAR-DESSUS LE JEU (Marc, 08/10) ═══
+   Dans l'appli, ouvrir regles.html quittait le jeu (ou le tutoriel) sans bouton pour y revenir. Les règles
+   s'affichent maintenant dans un cadre plein écran, avec un bouton de retour. */
+function scOuvrirRegles(){
+  if(typeof document==='undefined')return;
+  const url=(typeof i18nPage==='function')?i18nPage('regles.html'):'regles.html';
+  const old=document.getElementById('sc-regles-ov'); if(old)old.remove();
+  document.body.insertAdjacentHTML('beforeend','<div id="sc-regles-ov" style="position:fixed;inset:0;z-index:2147483600;background:#05080f;display:flex;flex-direction:column">'
+    +'<div style="flex:0 0 auto;padding:max(8px,env(safe-area-inset-top,0px)) 10px 8px;background:#0d1128;border-bottom:1px solid #39569c;display:flex;justify-content:flex-start">'
+    +'<button type="button" onclick="var e=document.getElementById(\'sc-regles-ov\');if(e)e.remove();" style="min-height:40px;padding:0 16px;background:#16223f;color:#cfe0ff;border:1px solid #39569c;border-radius:9px;font-weight:700;cursor:pointer">'+t('regles.retour_jeu','◀ Retour au jeu')+'</button></div>'
+    +'<iframe src="'+url+'" style="flex:1 1 auto;width:100%;border:0;background:#fff"></iframe></div>');
+}
+if(typeof window!=='undefined')window.scOuvrirRegles=scOuvrirRegles;
 function _ackPlayerHits(){
   const e=document.getElementById('sc-attack-notice');if(e)e.remove();
   if(G&&G._ilPlayerHits){ G._ilPlayerHits.splice(0,G._hitsAffiches||G._ilPlayerHits.length); G._hitsAffiches=0; }

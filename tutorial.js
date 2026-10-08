@@ -49,6 +49,12 @@ function injectCSS(){
   #tuto-welcome button,#tuto-final button{background:#ffd34d;color:#1a1400;border:0;border-radius:12px;padding:12px 26px;font-weight:800;font-size:1.05em;cursor:pointer;margin-top:6px}
   #tuto-final button.ghost{background:#16223f;color:#cfe0ff;border:1px solid #33507f}
   .tuto-hidden{display:none!important}
+  /* Jeu libre (Marc, 08/10) : le coach se réduit à un bouton flèche jaune, déplaçable. */
+  #tuto-mini-btn{display:none}
+  #tuto-coach.tuto-mini{width:54px!important;height:54px;padding:0;border-radius:50%;max-height:none;background:#ffd34d;overflow:hidden}
+  #tuto-coach.tuto-mini #tuto-body,#tuto-coach.tuto-mini #tuto-title,#tuto-coach.tuto-mini #tuto-min{display:none!important}
+  #tuto-coach.tuto-mini #tuto-head{margin:0;padding:0;border:0;width:100%;height:100%;justify-content:center}
+  #tuto-coach.tuto-mini #tuto-mini-btn{display:block;width:100%;height:100%;padding:0;margin:0;border:0;border-radius:50%;background:#ffd34d;color:#1a1400;font-size:1.5em;font-weight:900;line-height:1;cursor:move}
   .tuto-inhibited{pointer-events:none!important;cursor:default!important}
   #top-bar.tuto-resflash{animation:tutoResFlash 1.1s ease}
   @keyframes tutoResFlash{0%,100%{box-shadow:none;transform:scale(1)}30%{box-shadow:0 0 26px 6px #ffd34d, inset 0 0 22px #ffd34d55;transform:scale(1.03)}}
@@ -72,7 +78,7 @@ function coach(stepLabel, html, opts){
   const backBtn = opts.noBack ? '' : '<button id="tuto-back" class="skip">'+t('tuto.retour','◀ Retour')+'</button>';
   const nextBtn = opts.noNext ? '' : '<button id="tuto-next">'+nextTxt+'</button>';
   _coachEl.innerHTML=
-    '<div id="tuto-head"><span id="tuto-title">'+(stepLabel||'Tutoriel')+'</span>'+
+    '<div id="tuto-head"><button id="tuto-mini-btn" type="button" title="'+t('tuto.ouvrir','Ouvrir le tutoriel')+'">▲</button><span id="tuto-title">'+(stepLabel||'Tutoriel')+'</span>'+
       '<button id="tuto-min" title="'+t('tuto.reduire_agrandir','Réduire / agrandir')+'">'+(_collapsed?'+':'–')+'</button></div>'+
     '<div id="tuto-body"'+(_collapsed?' style="display:none"':'')+'>'+
       '<div class="tx">'+html+'</div>'+
@@ -80,17 +86,31 @@ function coach(stepLabel, html, opts){
     '</div>';
   const nx=$('tuto-next'); if(nx)nx.onclick=opts.onNext||(()=>advance());
   const bk=$('tuto-back'); if(bk)bk.onclick=()=>back();
-  $('tuto-min').onclick=toggleCollapse;
+  $('tuto-min').onclick=function(){ if(_free&&!_special){ setMini(true); } else toggleCollapse(); };
   _coachEl.classList.remove('tuto-hidden');
 }
+let _miniPos=null;
+function setMini(on){
+  if(!_coachEl)return;
+  _coachEl.classList.toggle('tuto-mini',!!on);
+  const st=_coachEl.style;
+  if(on){
+    if(_miniPos){ st.left=_miniPos.left; st.top=_miniPos.top; st.right='auto'; st.bottom='auto'; }
+    else { st.left='auto'; st.top='56%'; st.right='8px'; st.bottom='auto'; }   // à mi-hauteur à droite : en bas, il couvrait « Tour suivant »
+    st.transform='none';
+  } else {
+    st.left=''; st.right=''; st.transform=''; st.top='auto'; st.bottom='14px'; _userMoved=false;
+  }
+}
 function toggleCollapse(){ _collapsed=!_collapsed; const b=$('tuto-body'); if(b)b.style.display=_collapsed?'none':''; const m=$('tuto-min'); if(m)m.textContent=_collapsed?'+':'–'; }
-function back(){ if(_finished)return; clearTimeout(_advTimer); _advTimer=null; if(_free)_free=false; _cur=Math.max(0,_cur-1); showStep(); }
+function back(){ if(_finished)return; clearTimeout(_advTimer); _advTimer=null; if(_free){_free=false; setMini(false);} _cur=Math.max(0,_cur-1); showStep(); }
 function _pt(e){ const t=(e.touches&&e.touches[0])||(e.changedTouches&&e.changedTouches[0]); return t?{x:t.clientX,y:t.clientY}:{x:e.clientX,y:e.clientY}; }
 function makeDraggable(){
   const start=(e)=>{ if(!e.target.closest('#tuto-head')||e.target.id==='tuto-min')return;
     const p=_pt(e); const r=_coachEl.getBoundingClientRect(); const ox=p.x-r.left, oy=p.y-r.top;
-    const mv=(ev)=>{ const q=_pt(ev); _coachEl.style.left=(q.x-ox)+'px'; _coachEl.style.top=(q.y-oy)+'px'; _coachEl.style.right='auto'; _coachEl.style.bottom='auto'; _coachEl.style.transform='none'; _userMoved=true; if(ev.cancelable)ev.preventDefault(); };
-    const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); document.removeEventListener('touchmove',mv); document.removeEventListener('touchend',up); };
+    const mini=_coachEl.classList.contains('tuto-mini'); let bouge=false;
+    const mv=(ev)=>{ const q=_pt(ev); if(Math.abs(q.x-p.x)+Math.abs(q.y-p.y)<6&&!bouge)return; bouge=true; _coachEl.style.left=(q.x-ox)+'px'; _coachEl.style.top=(q.y-oy)+'px'; _coachEl.style.right='auto'; _coachEl.style.bottom='auto'; _coachEl.style.transform='none'; if(mini)_miniPos={left:_coachEl.style.left,top:_coachEl.style.top}; else _userMoved=true; if(ev.cancelable)ev.preventDefault(); };
+    const up=()=>{ if(mini&&!bouge)setMini(false); document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); document.removeEventListener('touchmove',mv); document.removeEventListener('touchend',up); };
     document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
     document.addEventListener('touchmove',mv,{passive:false}); document.addEventListener('touchend',up);
     if(e.cancelable)e.preventDefault();
@@ -633,7 +653,7 @@ function advance(){ _cur++; if(_cur>=curArr().length){ if(_special){ finish(); }
 // Transition : après le tour libre, on passe aux explications des fenêtres spéciales.
 function startSpecial(){
   if(_special||_finished)return;
-  _special=true; _free=false; _cur=0;
+  _special=true; _free=false; _cur=0; setMini(false);
   clearGlow(); hideCursor(); clearTimeout(_advTimer); _advTimer=null;
   showStep();
 }
@@ -651,6 +671,7 @@ function enterFreePlay(){
     {noNext:true});
   /* 06/10 (appli) : en haut, le coach recouvrait la fenêtre « Nouvelles pour toi » du tour 2 et ses boutons. En jeu libre il va en bas. */
   if(_coachEl&&!_userMoved){ _coachEl.style.top='auto'; _coachEl.style.bottom='14px'; }
+  setMini(true);
 }
 function onLog(msg){
   msg=String(msg||'');
@@ -663,18 +684,18 @@ function onLog(msg){
     note(t('tuto.raid_te_vole_ressources_tension_monte_pr','⚔️ <b>Raid</b> : on te vole des ressources et la tension monte. Protège tes routes avec des jetons Force, ou réponds.')); }
   if(!_seen.war && /GUERRE/i.test(msg)){ _seen.war=1;
     note(t('tuto.guerre_combat_resout_avec_jetons_force_c','🚨 <b>Guerre</b> : le combat se résout avec tes <b>jetons Force</b>. Tu choisis combien engager en attaque ou en défense. Tu peux proposer la paix ensuite.')); }
-  if(!_seen.power && /💫/.test(msg)){ _seen.power=1;
-    note(t('tuto.pouvoir_gratuit_utilise_gratuit_0_ac_dis','💫 <b>Pouvoir gratuit utilisé !</b> {v}. C\'est <b>gratuit (0 AC)</b> et disponible <b>1×/tour</b> — regarde le changement en haut de l\'écran.',{v:msg.replace(/^💫\s*/,'')})); }
+  /* (08/10, Marc) plus de note « Pouvoir gratuit utilisé » : le jeu ne confirme plus le pouvoir, le tutoriel non plus. */
 }
 
 /* ---------- fin ---------- */
 let _finished=false;
 /* Le moteur demande s'il est dans la partie GUIDÉE (pas de rappel « pouvoir gratuit » par-dessus le coach). */
 window.scTutoGuide=function(){ return !_free&&!_special&&!_finished; };
+window.scTutoActif=function(){ return !_finished; };
 function finish(){
-  if(_finished)return; _finished=true;
+  if(_finished)return; _finished=true; setMini(false);
   clearGlow(); hideCoach(); unInhibit(); hideCursor(); hideAllSpecialModals();
-  const ov=el(t('tuto.bravo_as_bases_colonise_relie_ameliore_c','<div id="tuto-final"><div class="big">🏆</div><h2>Bravo, tu as les bases !</h2><p>Colonise, relie, améliore, cherche des techs, gère ton moral, et cherche à avoir le plus de <b>VP</b> en 10 tours. Les événements, la tension et la guerre, tu les maîtriseras en jouant.</p><div style="max-width:min(440px,88vw);text-align:left;font-size:.88em;line-height:1.45"><b>Tes VP en fin de partie :</b><ul style="margin:6px 0 0;padding-left:1.2em"><li>Colonies : VP de la planète × niveau (moitié si isolée), +1 par colonie reliée</li><li>Routes : +1 par route vers tes propres colonies</li><li>Cartes : la valeur inscrite (techs 1, 3 ou 5 selon le niveau)</li><li>Technologies : +0,5 par tech</li><li>Revenus : par ressource, +2 au-delà de 5 par tour, +5 au-delà de 10</li><li>Agenda secret : sa prime s\'il est rempli</li><li>Événements : gagnants des événements, +2 par combat gagné, découvertes, surproduction</li><li>Capitale prise : +10</li><li>Bonus de certaines techs (Exploration Extra-Solaire, Éveil Collectif)</li></ul></div><div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"><button onclick="location.reload()">↻ Refaire le tuto</button><button class="ghost" onclick="location.href=\'regles.html\'">Règles du jeu</button><button class="ghost" onclick="location.href=\'index.html\'">Vers le jeu</button></div></div>'));
+  const ov=el(t('tuto.bravo_as_bases_colonise_relie_ameliore_c','<div id="tuto-final"><div class="big">🏆</div><h2>Bravo, tu as les bases !</h2><p>Colonise, relie, améliore, cherche des techs, gère ton moral, et cherche à avoir le plus de <b>VP</b> en 10 tours. Les événements, la tension et la guerre, tu les maîtriseras en jouant.</p><div style="max-width:min(440px,88vw);text-align:left;font-size:.88em;line-height:1.45"><b>Tes VP en fin de partie :</b><ul style="margin:6px 0 0;padding-left:1.2em"><li>Colonies : VP de la planète × niveau (moitié si isolée), +1 par colonie reliée</li><li>Routes : +1 par route vers tes propres colonies</li><li>Cartes : la valeur inscrite (techs 1, 3 ou 5 selon le niveau)</li><li>Technologies : +0,5 par tech</li><li>Revenus : par ressource, +2 au-delà de 5 par tour, +5 au-delà de 10</li><li>Agenda secret : sa prime s\'il est rempli</li><li>Événements : gagnants des événements, +2 par combat gagné, découvertes, surproduction</li><li>Capitale prise : +10</li><li>Bonus de certaines techs (Exploration Extra-Solaire, Éveil Collectif)</li></ul></div><div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"><button onclick="location.reload()">↻ Refaire le tuto</button><button class="ghost" onclick="if(window.scOuvrirRegles)scOuvrirRegles();else location.href=\'regles.html\'">Règles du jeu</button><button class="ghost" onclick="location.href=\'index.html\'">Vers le jeu</button></div></div>'));
   document.body.appendChild(ov);
 }
 

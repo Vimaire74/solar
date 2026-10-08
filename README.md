@@ -1,7 +1,9 @@
-# Lot 18-20 — CE LOT EST EN **v11.72** · cache `sw.js` **v293** · 2026-10-08
+# Lot 18-21 — CE LOT EST EN **v11.73** · cache `sw.js` **v294** · 2026-10-08
 
-(Seulement les fichiers changés depuis la v11.71 — lot18-19. Détail : docs/REPRISE.md §238.)
+(Seulement les fichiers changés depuis la v11.72 — lot18-20. Détail : docs/REPRISE.md §239.)
 
-- Tutoriel : textes revus par Marc, étape par étape (35 textes), en français et en anglais
-- Tutoriel : emblèmes des nations à l'étape du pouvoir gratuit, pastilles de jetons (rouge, garnison) dans les textes
-- Tutoriel : écran final avec le résumé des VP de fin de partie et un bouton Règles du jeu
+- Tutoriel, jeu libre : le coach se réduit à un bouton flèche jaune déplaçable ; un toucher le rouvre
+- Tutoriel : plus de fenêtre rouge « on t'attaque » (pillage des pirates) pendant le tutoriel
+- Tutoriel : plus de note bleue « Pouvoir gratuit utilisé »
+- Règles : s'ouvrent par-dessus le jeu avec un bouton « Retour au jeu » (fin du tutoriel, panneau Journal dans l'appli)
+- Règles : bouton « Retour au jeu » en haut de la page quand elle est ouverte seule (accueil de l'appli)

@@ -32,6 +32,9 @@
   </style>
 </head>
 <body>
+<!-- Retour au jeu (Marc, 08/10) : ouverte seule dans l'appli, cette page n'avait aucun moyen de revenir au jeu. Masqué quand la page est affichée dans le cadre des règles du jeu (scOuvrirRegles), qui a son propre bouton. -->
+<a id="rg-retour" href="index.html" onclick="if(history.length>1){history.back();return false;}" style="display:inline-block;margin:10px 0 0;padding:8px 14px;border:1px solid #39569c;border-radius:9px;background:#16223f;color:#cfe0ff;text-decoration:none;font-weight:700">◀ Back to the game</a>
+<script>try{if(window.self!==window.top)document.getElementById("rg-retour").style.display="none";}catch(e){}</script>
 
 <h1 id="haut">Solar — rules of the game</h1>
 <p class="sous">2 to 4 nations • 10 turns • interplanetary strategy</p>
