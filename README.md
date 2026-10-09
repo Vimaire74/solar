@@ -1,6 +1,5 @@
-# Lot 18-24 — CE LOT EST EN **v11.76** · cache `sw.js` **v297** · 2026-10-09
+# Lot 18-25 — CE LOT EST EN **v11.77** · cache `sw.js` **v298** · 2026-10-09 — SERVEUR À REDÉPLOYER
 
-(Seulement les fichiers changés depuis la v11.75 — lot18-23. Détail : docs/REPRISE.md §244.)
+(Seulement les fichiers changés depuis la v11.76 — lot18-24. Détail : docs/REPRISE.md §245.)
 
-- Tutoriel, fenêtre spéciale 10 : montre la vraie fenêtre d'assaut d'une colonie (jetons engagés, case du Supercroiseur)
-- Tutoriel, fenêtre spéciale 10 : texte complété (FR / EN)
+- Raid : une colonie non reliée à sa capitale peut de nouveau être pillée (elle produit toujours)

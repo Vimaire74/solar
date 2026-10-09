@@ -1,6 +1,6 @@
 /* TEST — LE RAID FRAPPE LA COLONIE CHOISIE, JAMAIS UNE AUTRE (Marc, 03/10)
    Avant : un raid sur une colonie non reliée pillait la plus productive de la victime (clic Cérès → Phobos pillée).
-   §1 colonie non reliée : raid refusé, aucun AC ni jeton dépensé, rien pris.
+   §1 colonie non reliée (règle de Marc, 09/10 : elle produit quand même) : c'est ELLE qui est pillée, pas une autre.
    §2 colonie reliée : c'est elle qui est marquée pillée, pas une autre.  Usage : node test_raid_colonie_choisie.js */
 'use strict';
 const path = require('path'); const { Engine } = require('./game-core.js');
@@ -14,12 +14,9 @@ function montage() {
   sb.setDecisionSink(() => {}); return { sb, G, moi, mar };
 }
 console.log('§1 Cérès non reliée');
-{ const m = montage(); const ac = m.moi.acLeft, tok = m.moi.forceTokens, res = JSON.stringify(m.moi.res);
-  m.sb.doRaidTarget('martiens', 'ceres');
-  if (m.moi.acLeft === ac && m.moi.forceTokens === tok) ok('raid refusé, rien dépensé'); else ko('AC ' + ac + '→' + m.moi.acLeft + ', jetons ' + tok + '→' + m.moi.forceTokens);
-  if (JSON.stringify(m.moi.res) === res) ok('rien pris'); else ko('ressources changées');
+{ const m = montage(); m.sb.doRaidTarget('martiens', 'ceres');
   const pil = m.mar.colonies.filter(c => m.sb.coloniePilleeCeTour(c)).map(c => c.nodeId);
-  if (!pil.length) ok('aucune colonie martienne pillée'); else ko('pillée à la place : ' + pil.join(',')); }
+  if (pil.join(',') === 'ceres') ok('Cérès pillée, et elle seule (une colonie non reliée produit quand même)'); else ko('pillées : ' + (pil.join(',') || 'aucune')); }
 console.log('§2 Vesta reliée');
 { const m = montage(); m.sb.doRaidTarget('martiens', 'vesta');
   const pil = m.mar.colonies.filter(c => m.sb.coloniePilleeCeTour(c)).map(c => c.nodeId);

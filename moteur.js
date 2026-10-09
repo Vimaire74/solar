@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-09 · v11.76';
+const SOLAR_BUILD_MOTEUR = '2026-10-09 · v11.77';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -7851,7 +7851,9 @@ function _wireRevTip(){const el=document.getElementById('top-res');if(!el)return
    est impossible, ce serait pas logique ») — sa production du tour est déjà partie. */
 function coloniePilleeCeTour(col){ return !!(col&&col._raidTour===(G&&G.turn)); }
 function butinDeRaid(cible,nodeId){
-  const cols=(cible.colonies||[]).filter(c=>c.connected&&!(NODES[c.nodeId]&&NODES[c.nodeId].decorative)&&!coloniePilleeCeTour(c));
+  /* 09/10 (Marc) : une colonie produit TOUJOURS ; non reliée, sa production n'entre simplement pas dans le stock de
+     sa nation. Elle se pille donc comme les autres — l'ancienne exclusion des colonies non reliées est retirée. */
+  const cols=(cible.colonies||[]).filter(c=>!(NODES[c.nodeId]&&NODES[c.nodeId].decorative)&&!coloniePilleeCeTour(c));
   if(!cols.length) return {col:null,butin:{}};
   let col=nodeId?cols.find(c=>c.nodeId===nodeId):null;
   if(nodeId&&!col) return {col:null,butin:{}};   // colonie désignée non pillable : jamais de report sur une autre (Marc, 03/10)
@@ -9005,7 +9007,7 @@ function doRaidTarget(aiId,nodeId,pillard){
       const _cc=(target.colonies||[]).find(function(c){return c.nodeId===nodeId;});
       /* Le raid frappe LA colonie choisie, jamais une autre (Marc, 03/10 : « le raid ne doit se faire que sur
          la colonie choisie par le raideur »). Une colonie non reliée ne produit rien : raid refusé, rien payé. */
-      if(_cc&&!_cc.connected){addLog(J('journal.raid_colonie_non_reliee','⚠️ {v} n\'est pas reliée à sa capitale : elle ne produit rien, il n\'y a rien à piller.',{v:(NODES[nodeId]&&_i18nRef(NODES[nodeId],'name'))||nodeId}),'red');return;}
+      /* (09/10, Marc) plus de refus pour une colonie non reliée : elle produit quand même, voir `butinDeRaid`. */
       if(_cc&&coloniePilleeCeTour(_cc)){addLog(J('journal.deja_ete_pillee_tour_production_partie','⚠️ {v} a déjà été pillée ce tour — sa production est partie.',{v:(NODES[nodeId]&&_i18nRef(NODES[nodeId],'name'))||nodeId}),'red');return;}
     }
     if(p.acLeft<1){addLog(J('journal.raid_besoin_1_ac','⚠️ Raid : besoin 1 AC.'),'red');return;}
