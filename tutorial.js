@@ -211,6 +211,7 @@ function simUnlock(branch){ const g=G(); if(!g)return; g.branchTiers=g.branchTie
 /* ---------- Fenêtres spéciales : on affiche les VRAIES fenêtres du jeu (avec un contenu d'illustration) ---------- */
 // « Mode neutre » : ferme TOUTES les fenêtres spéciales et de transition de tour (pour ne rien laisser bloquer l'écran).
 function hideAllSpecialModals(){
+  try{ _rendreCroiseur(); }catch(e){}
   ['forced-war-modal','war-modal','war-combat-modal',
    'invest-modal','invest2-modal','invest-active-modal','eot-modal','strategy-modal','event-modal','event-announce-modal','agenda-sel-modal','discovery-modal','route-token-modal'
   ].forEach(function(id){ const m=$(id); if(m)m.classList.add('hidden'); });
@@ -241,10 +242,23 @@ function demoWarDeclared(){
     t('tuto.nation_rivale_declare_guerre_souvent_apr','Une nation rivale <b>t\'a déclaré la guerre</b> (souvent après une provocation ou un refus d\'accord).<br><br><em>C\'est elle l\'agresseur : elle frappe <b>maintenant</b> — prépare ta <b>défense</b>. Tu pourras <b>riposter à ton tour</b>.</em>'), null); }catch(e){ console.error('[TUTO warDecl]',e); }
 }
 // Assaut de colonie — combat résolu IMMÉDIATEMENT (fenêtre de résultat, sûr).
+/* La VRAIE fenêtre d'assaut d'une colonie (Marc, 09/10 : « elle n'existe pas dans le jeu ») : le curseur des jetons
+   engagés, et la case du Supercroiseur — prêté le temps de l'illustration, rendu à la fenêtre suivante. */
+let _cruPrete=null;
+function _rendreCroiseur(){ const g=G(); if(_cruPrete&&g&&g.player){ g.player.hasCruiser=_cruPrete.has; g.player.cruiserCooldown=_cruPrete.cd; } _cruPrete=null; }
 function demoAssault(){
-  try{ if(window.showWarModal)window.showWarModal(t('tuto.assaut_colonie','⚔️ Assaut sur une colonie'),
-    t('tuto.quand_attaques_colonie_ennemie_combat_re','Quand <b>tu</b> attaques une colonie ennemie, le combat est résolu <b>immédiatement</b> (une seule manche) : si tu gagnes, tu <b>captures</b> la colonie.<br><br>Puissance — Toi : <strong>6</strong> | Ennemi : <strong>4</strong>'),
-    {txt:t('tuto.victoire_colonie_capturee','🏆 Victoire ! Colonie capturée.'), cls:'win'}); }catch(e){ console.error('[TUTO assault]',e); }
+  const g=G(); if(!g||!g.player)return;
+  const p=g.player;
+  p.forceTokens=Math.max(p.forceTokens||0,6);
+  p.res.materials=Math.max(p.res.materials||0,10); p.res.energy=Math.max(p.res.energy||0,10);
+  if(!_cruPrete){ _cruPrete={has:p.hasCruiser,cd:p.cruiserCooldown}; p.hasCruiser=true; p.cruiserCooldown=0; }
+  try{
+    const ai=(g.ais||[])[0];
+    const col=ai?((ai.colonies||[]).find(c=>c.nodeId!==ai.civ.home)||{nodeId:ai.civ.home}).nodeId:null;
+    if(window.showWarCombatModal)window.showWarCombatModal(function(){});
+    _warAttackColonyTarget=col;
+    if(typeof _warShowAttackSlider==='function')_warShowAttackSlider();
+  }catch(e){ console.error('[TUTO assault]',e); }
 }
 // Négociation de paix — la VRAIE fenêtre (retombe sur la 1re IA si pas de guerre active).
 function demoPeace(){
@@ -544,8 +558,8 @@ const SPECIAL=[
   tx:t('tuto.avec_deux_combats_nation_choisit_ordre_i','Avec deux combats, une nation choisit l\'ordre : c\'est l\'<b>initiative</b>. Elle va à qui a l\'<b>Hyperpropulsion</b>, sinon à qui a le <b>moins attaqué</b> dans le tour, sinon au plus avancé, puis au mieux armé. Le journal dit qui et pourquoi.'),
   hint:t('tuto.hint_suivant','Suivant')},
 
- {lab:t('tuto.attaque_colonie_immediate','Attaque de colonie (immédiate)'), glow:'war-modal', pos:'top', onShow:demoAssault, inhibit:['#war-modal button'],
-  tx:t('tuto.3_toi_assailles_colonie_combat_resolu_im','3ᵉ cas de figure : c\'est <b>toi</b> qui assailles une colonie. Le combat est résolu <b>immédiatement</b> ; si tu gagnes, tu la <b>captures</b>. Une colonie se défend avec <b>1 jeton</b> <span class="ft-dot reserved" style="width:9px;height:9px;vertical-align:-1px"></span> (sa garnison permanente) <b>+ les jetons</b> <span class="ft-dot avail" style="width:9px;height:9px;vertical-align:-1px"></span> que le défenseur ajoute après que tu as choisi les tiens : il connaît donc la force de ton attaque. Une <b>capitale</b> est mieux défendue : <b>10</b> de base + les jetons que le défenseur ajoute. Sa prise vaut <b>+10 VP</b>.')},
+ {lab:t('tuto.attaque_colonie_immediate','Attaque de colonie (immédiate)'), glow:'war-combat-modal', pos:'top', onShow:demoAssault, inhibit:['#war-combat-modal button','#war-combat-modal input'],
+  tx:t('tuto.3_toi_assailles_colonie_combat_resolu_im','3ᵉ cas de figure : c\'est <b>toi</b> qui assailles une colonie. Le combat est résolu <b>immédiatement</b> ; si tu gagnes, tu la <b>captures</b>. Une colonie se défend avec <b>1 jeton</b> <span class="ft-dot reserved" style="width:9px;height:9px;vertical-align:-1px"></span> (sa garnison permanente) <b>+ les jetons</b> <span class="ft-dot avail" style="width:9px;height:9px;vertical-align:-1px"></span> que le défenseur ajoute après que tu as choisi les tiens : il connaît donc la force de ton attaque. Une <b>capitale</b> est mieux défendue : <b>10</b> de base + les jetons que le défenseur ajoute. Sa prise vaut <b>+10 VP</b>.<br>Dans cette fenêtre, règle le nombre de <b>jetons engagés</b> et coche le <b>Supercroiseur</b> si tu en as un.')},
 
  // ── Négociation de paix (vraie fenêtre) ──
  {lab:t('tuto.negociation_paix','Négociation de paix 🕊️'), glow:'peace-modal', pos:'top', onShow:demoPeace, inhibit:['#peace-modal button'],
