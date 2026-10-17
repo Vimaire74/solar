@@ -51,7 +51,7 @@ console.log('═'.repeat(84));
 console.log('VERSIONS — LES TROIS ESTAMPILLES DOIVENT DIRE LA MÊME CHOSE');
 console.log('═'.repeat(84) + '\n');
 
-const html = estampille(lire('index.html'), /window\.SOLAR_BUILD_HTML\s*=\s*'([^']+)'/);
+const html = estampille(lire('play.html'), /window\.SOLAR_BUILD_HTML\s*=\s*'([^']+)'/);
 const js   = estampille(lire('online.js'),  /const\s+SOLAR_BUILD_JS\s*=\s*'([^']+)'/);
 const mot  = estampille(lire('moteur.js'),  /const\s+SOLAR_BUILD_MOTEUR\s*=\s*'([^']+)'/);
 const sw   = estampille(lire('sw.js'),      /const\s+VERSION\s*=\s*'([^']+)'/);
@@ -110,7 +110,7 @@ console.log('\n4. Le lot de livraison porte les mêmes estampilles que les sourc
   /* Le message d'erreur de Marc dit « renvoie les fichiers manquants » : le cas où l'on met à jour
      les sources mais où le lot uploadé garde les anciens fichiers est exactement celui-ci. */
   const lot = f => { try { return fs.readFileSync(path.join(RACINE, _DOSSIER_ENVOI, LOT, f), 'utf8'); } catch (e) { return null; } };
-  const lHtml = estampille(lot('index.html'), /window\.SOLAR_BUILD_HTML\s*=\s*'([^']+)'/);
+  const lHtml = estampille(lot('play.html'), /window\.SOLAR_BUILD_HTML\s*=\s*'([^']+)'/);
   const lJs   = estampille(lot('online.js'),  /const\s+SOLAR_BUILD_JS\s*=\s*'([^']+)'/);
   const lMot  = estampille(lot('moteur.js'),  /const\s+SOLAR_BUILD_MOTEUR\s*=\s*'([^']+)'/);
   if (lHtml === null && lJs === null && lMot === null) {

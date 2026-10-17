@@ -22,7 +22,7 @@
 const path = require('path');
 const vm = require('vm');
 const { Engine } = require('./game-core.js');
-const HTML = path.join(__dirname, '..', 'index.html');
+const HTML = path.join(__dirname, '..', 'play.html');
 
 const ecarts = [];
 const ok = s => console.log('   ✔ ' + s);

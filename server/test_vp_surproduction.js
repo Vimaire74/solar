@@ -12,7 +12,7 @@
 const path = require('path');
 const vm = require('vm');
 const { loadLogic } = require('./game-core.js');
-const HTML = path.join(__dirname, '..', 'index.html');
+const HTML = path.join(__dirname, '..', 'play.html');
 const ecarts = [];
 const ok = s => console.log('   ✔ ' + s);
 const ko = s => { ecarts.push(s); console.log('   ❌ ' + s); };
@@ -41,7 +41,7 @@ console.log('§1 Deux ressources au-dessus du plafond : +2 VP, et l\'excédent r
   if (vp(m.jup) === 2) ok('+2 VP'); else ko('+' + vp(m.jup) + ' VP au lieu de +2');
   if (/Surproduction/.test(motifs(m.jup)[0] || '')) ok('le motif dit « Surproduction »'); else ko('motif : ' + motifs(m.jup));
   if (m.jup.res.energy === 12 && m.jup.res.materials === 20) ok('l\'excédent est bien écrêté (12⚡ 20🪨)'); else ko('pas écrêté');
-  const l = lignes(m).find(x => /Surproduction/.test(x));
+  const l = lignes(m).find(x => /Surproduction|surproduction/.test(x));
   if (l) ok('journal : « ' + l.slice(0, 80) + ' »'); else ko('rien au journal');
 }
 
