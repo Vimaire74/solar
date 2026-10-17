@@ -12,7 +12,7 @@ RUN cd server && npm install --omit=dev --no-fund --no-audit
 # normalement, puis échoue à la CRÉATION d'une partie avec « MOTEUR INTROUVABLE : /app/moteur.js ».
 # C'est exactement ce qui est arrivé au premier déploiement de la v7.4 : ce Dockerfile datait d'avant
 # l'extraction et ne copiait qu'index.html.
-COPY index.html moteur.js ./
+COPY play.html moteur.js ./
 
 # ⚠️ ET LES LANGUES (21/09). Sans ce dossier, le serveur démarre, joue, et rédige TOUT en français :
 # le bilan de fin de tour (qu'il écrit lui-même, une fois par langue), ses messages, le courriel de
@@ -21,7 +21,7 @@ COPY index.html moteur.js ./
 COPY lang ./lang
 
 COPY server/server.js server/driver.js server/game-core.js server/bot.js server/diagnostic-serveur.js server/
-ENV GAME_HTML=/app/index.html \
+ENV GAME_HTML=/app/play.html \
     DATA_DIR=/data \
     PORT=8080
 
@@ -33,4 +33,4 @@ EXPOSE 8080
 
 # GARDE-FOU AU DÉMARRAGE : mieux vaut refuser de démarrer que d'accepter des joueurs et les planter
 # à la création de la première partie. Le message dit quoi faire, pas seulement ce qui manque.
-CMD ["sh", "-c", "test -f /app/moteur.js || { echo 'DÉMARRAGE REFUSÉ : /app/moteur.js est absent de l image.'; echo 'Les règles du jeu vivent dans moteur.js depuis la v7.2. Vérifie que le Dockerfile contient'; echo '  COPY index.html moteur.js ./'; echo 'et que le contexte de build est bien la RACINE du dépôt (Base Directory = /).'; exit 1; }; exec node server/server.js"]
+CMD ["sh", "-c", "test -f /app/moteur.js || { echo 'DÉMARRAGE REFUSÉ : /app/moteur.js est absent de l image.'; echo 'Les règles du jeu vivent dans moteur.js depuis la v7.2. Vérifie que le Dockerfile contient'; echo '  COPY play.html moteur.js ./'; echo 'et que le contexte de build est bien la RACINE du dépôt (Base Directory = /).'; exit 1; }; exec node server/server.js"]

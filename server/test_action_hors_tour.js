@@ -24,7 +24,7 @@ const ok = s => console.log('   ✔ ' + s);
 const ko = s => { ecarts.push(s); console.log('   ❌ ' + s); };
 
 function monter() {
-  const sb = loadLogic(path.join(__dirname, '..', 'index.html'));
+  const sb = loadLogic(path.join(__dirname, '..', 'play.html'));
   sb.initGame('terriens', ['martiens', 'jupiteriens']);
   const G = sb.__G; G.turn = 2; G.phase = 'actions'; G._il = true;
   G.player._isAI = false; G.ais.forEach(a => a._isAI = true);

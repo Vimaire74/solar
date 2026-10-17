@@ -16,7 +16,7 @@
 'use strict';
 const path = require('path');
 const { GameDriver } = require('./driver.js');
-const HTML = path.join(__dirname, '..', 'index.html');
+const HTML = path.join(__dirname, '..', 'play.html');
 
 const PARTIES = parseInt(process.env.PARTIES || '6', 10);
 const DEPART = parseInt(process.env.DEPART || '0', 10);

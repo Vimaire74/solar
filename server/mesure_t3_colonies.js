@@ -8,7 +8,7 @@
 'use strict';
 const path = require('path');
 const { GameDriver } = require('./driver.js');
-const HTML = path.join(__dirname, '..', 'index.html');
+const HTML = path.join(__dirname, '..', 'play.html');
 const PARTIES = parseInt(process.env.PARTIES || '1', 10), DEPART = parseInt(process.env.DEPART || '0', 10);
 const CIVS = ['terriens', 'martiens', 'jupiteriens', 'ceinturiens'];
 function graine(n) { let x = (n + 1) >>> 0; Math.random = function () { x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; }; }

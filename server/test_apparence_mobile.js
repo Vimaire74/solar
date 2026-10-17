@@ -32,7 +32,7 @@ const path = require('path');
 const vm = require('vm');
 const { loadLogic } = require('./game-core.js');
 const RACINE = path.join(__dirname, '..');
-const HTML = path.join(RACINE, 'index.html');
+const HTML = path.join(RACINE, 'play.html');
 
 const ecarts = [];
 const ok = s => console.log('   ✔ ' + s);
@@ -40,7 +40,7 @@ const ko = s => { ecarts.push(s); console.log('   ❌ ' + s); };
 const note = s => console.log('     ' + s);
 const lire = f => { try { return fs.readFileSync(path.join(RACINE, f), 'utf8'); } catch (e) { return null; } };
 
-const INDEX = lire('index.html');
+const INDEX = lire('play.html');
 const MOTEUR = lire('moteur.js');
 const ONLINE = lire('online.js');
 

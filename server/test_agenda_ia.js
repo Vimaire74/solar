@@ -4,7 +4,7 @@
 const path = require('path'); const vm = require('vm');
 const { loadLogic } = require('./game-core.js');
 const ecarts = []; const ok = s => console.log('   ✔ ' + s); const ko = s => { ecarts.push(s); console.log('   ❌ ' + s); };
-const HTML = path.join(__dirname, '..', 'index.html');
+const HTML = path.join(__dirname, '..', 'play.html');
 
 console.log('1. Le tirage varie d\'une partie à l\'autre, le Hub jovien reste aux Jupitériens, le siège ordinateur « joueur » a un agenda');
 { const vus = new Set(); let hubHorsJupiter = 0, sansAgenda = 0;

@@ -26,7 +26,7 @@ const { GameDriver } = require('./driver.js');
 const diagnostic = require('./diagnostic-serveur.js');   // rapports de diagnostic envoyés par l'appli (28/09)
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
-const HTML = process.env.GAME_HTML || path.join(__dirname, '..', 'index.html');
+const HTML = process.env.GAME_HTML || path.join(__dirname, '..', 'play.html');   // le jeu (index.html est la page d'accueil publique depuis le 13/10)
 /* ═══ LANGUES CÔTÉ SERVEUR (v10.78) ═══
    Le serveur écrit en français ; chaque joueur lit dans SA langue. Deux mécanismes :
      · ce qui part au client (journal, fenêtres, erreurs) voyage avec sa clé — `K(cle, fr, p)` ici,
@@ -1374,10 +1374,68 @@ function refuser(res) {   // 404 volontaire : on ne confirme pas l'existence de 
   res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
   res.end('Not found');
 }
+
+/* ═══ ACCÈS AU JEU EN LIGNE DEPUIS LE SITE (13/10/2026, demande de Marc) ═══════════════════════════
+   La racine de solar-game.com devient une page de présentation publique ; le jeu passe à play.html,
+   derrière UN mot de passe partagé, pour que les curieux venus du Play Store n'entrent pas dans les
+   parties en ligne. Le mot de passe se change dans /stats (formulaire, sans terminal).
+   - POST /api/acces {mdp}  → {ok, jeton}   ·   GET /api/acces?jeton=…  → {ok}
+   - Le jeton = HMAC(secret) : changer le mot de passe tire un nouveau secret → anciens jetons morts.
+   - WebSocket : exigé SEULEMENT si la connexion vient du site (Origin solar-game.com). L'appli
+     Android (Origin https://localhost) et les bancs locaux ne sont pas concernés.
+   - /api/diagnostic (rapports de l'appli) n'est PAS touché : il reste ouvert.
+   Fichier : DATA/acces_site.json (sel, empreinte scrypt, secret). Jamais le mot de passe en clair. */
+const ACCES_FILE = path.join(DATA, 'acces_site.json');
+let acces = null;
+try { acces = JSON.parse(fs.readFileSync(ACCES_FILE, 'utf8')); } catch (e) { acces = null; }
+const ORIGINE_SITE = /^https:\/\/(www\.)?solar-game\.com$/i;
+function egalTC(a, b) { a = Buffer.from(String(a || ''), 'utf8'); b = Buffer.from(String(b || ''), 'utf8'); return a.length === b.length && a.length > 0 && crypto.timingSafeEqual(a, b); }
+function accesDefinir(mdp) {
+  const sel = crypto.randomBytes(16).toString('hex');
+  acces = { sel, hash: crypto.scryptSync(String(mdp), sel, 32).toString('hex'), secret: crypto.randomBytes(32).toString('hex'), depuis: Date.now() };
+  try { fs.mkdirSync(DATA, { recursive: true }); fs.writeFileSync(ACCES_FILE, JSON.stringify(acces)); } catch (e) { console.error('acces_site.json : écriture impossible', e.message); }
+}
+function accesJeton() { return acces ? crypto.createHmac('sha256', acces.secret).update('solar-acces').digest('hex') : ''; }
+function accesJetonValide(j) { return !!acces && egalTC(j, accesJeton()); }
+function accesMdpValide(m) { if (!acces || !m) return false; return egalTC(crypto.scryptSync(String(m), acces.sel, 32).toString('hex'), acces.hash); }
+const _accesEchecs = new Map();   // ip → [horodatages] : 10 essais faux par 10 minutes, puis refus
+function accesTropDEssais(ip) { const t = Date.now(), l = (_accesEchecs.get(ip) || []).filter(x => t - x < 600000); _accesEchecs.set(ip, l); return l.length >= 10; }
+function accesEchec(ip) { const l = _accesEchecs.get(ip) || []; l.push(Date.now()); _accesEchecs.set(ip, l); }
+function lireCorps(req, max, cb) { let b = ''; req.on('data', d => { b += d; if (b.length > max) req.destroy(); }); req.on('end', () => cb(b)); }
+function accesHttp(req, res) {   // true si la requête est traitée ici
+  if (!req.url || req.url.indexOf('/api/acces') !== 0) return false;
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return true; }
+  const json = (o) => { res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(o)); };
+  if (req.method === 'GET') {
+    let j = ''; try { j = new URL(req.url, 'http://x').searchParams.get('jeton') || ''; } catch (e) {}
+    json({ ok: accesJetonValide(j) }); return true;
+  }
+  const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+  lireCorps(req, 2000, (b) => {
+    let m = ''; try { m = String(JSON.parse(b).mdp || ''); } catch (e) {}
+    if (!acces) return json({ ok: false, raison: 'non_configure' });
+    if (accesTropDEssais(ip)) return json({ ok: false, raison: 'trop_essais' });
+    if (accesMdpValide(m)) return json({ ok: true, jeton: accesJeton() });
+    accesEchec(ip); json({ ok: false, raison: 'faux' });
+  });
+  return true;
+}
+function accesStatsHtml(url) {
+  const etat = acces ? 'défini le ' + frDate(acces.depuis) : '<b style="color:#ff9b8a">PAS ENCORE DÉFINI — personne ne peut entrer dans play.html depuis le site</b>';
+  return '<form method="post" action="' + String(url).replace(/"/g, '&quot;') + '" style="margin:10px 0 14px;padding:10px 12px;border:1px solid #3a4a7a;border-radius:8px;background:#111833">'
+    + '<b>Mot de passe du jeu sur le site (play.html)</b> — ' + etat + '<br>'
+    + '<input name="mdp_site" type="text" minlength="4" required placeholder="nouveau mot de passe" style="margin-top:8px;padding:6px 8px;background:#0a0e1e;color:#dfe8ff;border:1px solid #3a4a7a;border-radius:6px;font:inherit"> '
+    + '<button type="submit">Changer le mot de passe</button>'
+    + '<div class="sub" style="margin:6px 0 0">Les testeurs déjà entrés devront saisir le nouveau mot de passe. L\'appli Android n\'est pas concernée.</div></form>';
+}
 const server = http.createServer((req, res) => {
   if (req.url === '/health') { res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); res.end('{"ok":true,"games":' + games.size + '}'); return; }
   // Toute page de service exige la clé, AVANT d'exécuter quoi que ce soit.
   if (req.url && /^\/(bot|admin|mailtest|stats|debug|diagnostics)\b/.test(req.url) && !cleValide(req.url)) return refuser(res);
+  if (accesHttp(req, res)) return;   // mot de passe du site (play.html) — voir le bandeau ACCÈS plus haut
   /* Rapports de diagnostic : `POST /api/diagnostic` (ouvert, sans rien de personnel, choisi par le
      joueur) et `/diagnostics?key=` (lecture, protégée ci-dessus). Voir diagnostic-serveur.js. */
   if (diagnostic.traiter(req, res, path.join(DATA, 'diagnostics'), cleValide, (r, id) => {
@@ -1570,6 +1628,14 @@ const server = http.createServer((req, res) => {
     return h;
   }
   if (req.url === '/stats' || req.url.indexOf('/stats?') === 0) {
+    if (req.method === 'POST') {   // formulaire « Mot de passe du jeu sur le site » (clé déjà vérifiée à l'entrée)
+      lireCorps(req, 2000, (b) => {
+        let m = ''; try { m = (new URLSearchParams(b).get('mdp_site') || '').trim(); } catch (e) {}
+        if (m.length >= 4) accesDefinir(m);
+        res.writeHead(303, { Location: req.url }); res.end();
+      });
+      return;
+    }
     /* ═══════════════════════════════════════════════════════════════════════════════════════
        STATS — UN TABLEAU, UNE LIGNE PAR PARTIE
        ---------------------------------------------------------------------------------------
@@ -1664,6 +1730,7 @@ const server = http.createServer((req, res) => {
       + '<h1>Parties — ' + lignes.length + '</h1>'
       + '<div class="sub">Généré le ' + frDate(Date.now()) + ' · fond ambré = partie sans heure de fin (en cours, en attente ou abandonnée)</div>'
       + '<div class="barre"><button id="csv">📋 Copier le tableau (CSV)</button></div>'
+      + accesStatsHtml(req.url)
       + diagStatsHtml()
       + '<table><thead><tr><th>Partie</th><th>Début</th><th>Fin / durée</th><th>Initiant</th><th>Humains</th><th>IA</th><th>Tour</th><th>Scores</th><th>Bugs</th><th>Debug</th></tr></thead>'
       + '<tbody>' + tr + '</tbody></table>'
@@ -1760,7 +1827,19 @@ const server = http.createServer((req, res) => {
 });
 const wss = new WebSocketServer({ server });
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
+  /* Accès depuis le site : jeton exigé (voir ACCÈS plus haut). L'appli et le local passent. */
+  try {
+    const origine = String((req && req.headers && req.headers.origin) || '');
+    if (ORIGINE_SITE.test(origine)) {
+      const j = new URL((req && req.url) || '/', 'http://x').searchParams.get('acces') || '';
+      if (!accesJetonValide(j)) {
+        sendTo(ws, { t: 'error', msg: K('srv.acces_refuse', 'Accès réservé aux testeurs : mot de passe requis.'), acces: false });
+        try { ws.close(4003, 'acces'); } catch (e) {}
+        return;
+      }
+    }
+  } catch (e) {}
   const sess = { user: null, game: null };
 
   const err = (msg, extra) => sendTo(ws, Object.assign({ t: 'error', msg }, extra || {}));

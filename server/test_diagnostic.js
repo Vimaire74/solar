@@ -25,7 +25,7 @@ const ok = s => console.log('   ✔ ' + s);
 const ko = s => { ecarts.push(s); console.log('   ❌ ' + s); };
 
 function montage() {
-  const sb = loadLogic(path.join(RACINE, 'index.html'));
+  const sb = loadLogic(path.join(RACINE, 'play.html'));
   const mem = {};
   sb.localStorage = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: k => { delete mem[k]; }, clear() { for (const k in mem) delete mem[k]; } };
   sb.navigator = { userAgent: 'Mozilla/5.0 (Linux; Android 14; SM-F741B Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/140.0.0.0 Mobile Safari/537.36', language: 'fr-CH', deviceMemory: 8, hardwareConcurrency: 8, onLine: true };
@@ -197,7 +197,7 @@ console.log('\n7. LA FENÊTRE');
   if (/ni votre nom, ni votre adresse/.test(h) && /confidentialite\.html/.test(h)) ok('le texte dit ce qui part, ce qui ne part pas, et lie la confidentialité'); else ko('texte incomplet');
   if ((h.match(/min-height:44px/g) || []).length >= 3) ok('boutons de 44 px'); else ko('boutons trop petits');
   if (h.indexOf('sc-diag-jamais') < 0 && h.indexOf('sc-diag-voir') < 0 && sb.scDiagBalisage(true).indexOf('sc-diag-jamais') < 0) ok('ni « Voir » ni « Ne plus proposer » (03/10)'); else ko('bouton retiré encore présent');
-  const idx = fs.readFileSync(path.join(RACINE, 'index.html'), 'utf8');
+  const idx = fs.readFileSync(path.join(RACINE, 'play.html'), 'utf8');
   if ((idx.match(/scDiagOuvrir\(false\)/g) || []).length === 2 && /<script src="diagnostic\.js">/.test(idx) && /__scErreursPrecoces/.test(idx)) ok('index.html : deux boutons, le script, le tampon précoce'); else ko('index.html incomplet');
   const sw = fs.readFileSync(path.join(RACINE, 'sw.js'), 'utf8');
   if (/diagnostic\.js/.test(sw)) ok('sw.js pré-cache diagnostic.js'); else ko('sw.js oublie diagnostic.js');

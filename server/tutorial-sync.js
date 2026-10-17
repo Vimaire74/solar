@@ -38,7 +38,7 @@ const vm = require('vm');
 const { Engine, setRecorder } = require('./game-core.js');
 
 const RACINE = path.join(__dirname, '..');
-const F_INDEX = path.join(RACINE, 'index.html');
+const F_INDEX = path.join(RACINE, 'play.html');
 const F_TUTOJS = path.join(RACINE, 'tutorial.js');
 const F_TUTOHTML = path.join(RACINE, 'tutorial.html');
 const FIX = process.argv.includes('--fix');
@@ -243,7 +243,10 @@ for (const m of modales) {
 }
 
 /* ---------------------------------------------------------------- 6. tutorial.html à jour */
-const attenduHtml = index.replace('<script src="online.js"></script>', '<script src="tutorial.js"></script>');
+/* 13/10 : le jeu s'appelle play.html et porte la porte des testeurs (acces.js). Le tutoriel reste public :
+   on retire cette ligne de la copie. */
+const attenduHtml = index.replace('<script src="online.js"></script>', '<script src="tutorial.js"></script>')
+  .replace(/<!-- Porte d'entrée du site[^\n]*\n<script src="acces\.js"><\/script>\n/, '');
 let htmlAJour = false;
 try { htmlAJour = fs.readFileSync(F_TUTOHTML, 'utf8') === attenduHtml; } catch (e) {}
 if (!htmlAJour) {

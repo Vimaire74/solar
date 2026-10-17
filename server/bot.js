@@ -1,4 +1,4 @@
-/* Solar Conquest — BOT-JOUEUR « Claude » : joue comme un client humain (via WebSocket),
+/* SOLAR — BOT-JOUEUR « Claude » : joue comme un client humain (via WebSocket),
    avec de vraies actions (coloniser/route/tech/upgrade/raid) et de vraies réponses aux décisions.
    Sert de partenaire de test : Marc l'invite dans une partie via http://…/bot?code=XXXX
    Différence avec un siège IA : le bot passe par le MÊME chemin réseau qu'un humain
@@ -12,7 +12,7 @@ const { loadLogic } = require('./game-core.js');
 let _aux = null, _NODES = null, _CARDS = null;
 function aux() { // contexte du moteur partagé par tous les bots (données + fonctions de coût)
   if (!_aux) {
-    _aux = loadLogic(process.env.GAME_HTML || path.join(__dirname, '..', 'index.html'));
+    _aux = loadLogic(process.env.GAME_HTML || path.join(__dirname, '..', 'play.html'));
     _NODES = vm.runInContext('NODES', _aux);
     _CARDS = vm.runInContext('CARDS_POOL', _aux);
   }
@@ -92,7 +92,7 @@ function chooseAction(G, civ) {
     }
   } catch (e) {}
   try { // raid occasionnel si beaucoup de jetons en réserve
-    const tc = me.civ.id === 'ceinturiens' ? 1 : 2;
+    const tc = 2;   // 16/09 : plus de rabais ceinturien sur le raid
     if (me.acLeft >= 1 && me.forceTokens >= tc + 2 && Math.random() < 0.2) {
       const foes = [G.player].concat(G.ais || []).filter(x => x.civ.id !== civ && x.colonies.length);
       if (foes.length) { const f = pick(foes); options.push({ type: 'raid', target: f.civ.id, node: f.colonies[0].nodeId }); }

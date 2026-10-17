@@ -25,7 +25,7 @@
 'use strict';
 const path = require('path'), fs = require('fs');
 let pw; try { pw = require('playwright'); } catch (e) { pw = require('/tmp/claude-0/node_modules/playwright'); }
-const URL = process.env.URL || 'http://127.0.0.1:8766/index.html';
+const URL = process.env.URL || 'http://127.0.0.1:8766/play.html';
 const OUT = process.env.OUT || '/tmp/claude-0/parcours';
 fs.mkdirSync(OUT, { recursive: true });
 const ecarts = [];

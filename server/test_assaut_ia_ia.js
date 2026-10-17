@@ -35,7 +35,7 @@
 const fs = require('fs');
 const path = require('path');
 const { loadLogic } = require('./game-core.js');
-const HTML = path.join(__dirname, '..', 'index.html');
+const HTML = path.join(__dirname, '..', 'play.html');
 const MOTEUR = path.join(__dirname, '..', 'moteur.js');
 
 const ecarts = [];

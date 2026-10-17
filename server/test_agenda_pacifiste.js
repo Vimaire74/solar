@@ -3,7 +3,7 @@
 const path = require('path'); const vm = require('vm');
 const { loadLogic } = require('./game-core.js');
 const ecarts = []; const ok = s => console.log('   ✔ ' + s); const ko = s => { ecarts.push(s); console.log('   ❌ ' + s); };
-const sb = loadLogic(path.join(__dirname, '..', 'index.html')); sb.initGame('terriens', ['martiens', 'jupiteriens', 'ceinturiens']);
+const sb = loadLogic(path.join(__dirname, '..', 'play.html')); sb.initGame('terriens', ['martiens', 'jupiteriens', 'ceinturiens']);
 const G = sb.__G; const run = c => vm.runInContext(c, sb); G.phase = 'actions'; G.turn = 3;
 const N = id => run('allPlayers().find(p=>p.civ.id==="' + id + '")');
 const AG = run('AGENDAS_POOL'); const pac = AG.find(a => a.id === 'ag15'), opu = AG.find(a => a.id === 'ag14');
@@ -23,7 +23,7 @@ console.log('2. Opulence : 4 tours en surproduction de 🪨');
   if ((j._surprodMat || 0) === 4 && opu.score(j) === 10) ok('4 tours → 10 VP (compteur ' + j._surprodMat + ')'); else ko('compteur ' + j._surprodMat + ', score ' + opu.score(j));
   const c = N('ceinturiens'); c.agenda = opu; if (opu.score(c) === 0) ok('sans surproduction : 0'); else ko('score ' + opu.score(c)); }
 console.log('3. Un Conquérant ne tire jamais Pacifiste');
-{ let n = 0; for (let i = 0; i < 12; i++) { const sb2 = loadLogic(path.join(__dirname, '..', 'index.html')); sb2.initGame('terriens', ['martiens', 'jupiteriens', 'ceinturiens']);
+{ let n = 0; for (let i = 0; i < 12; i++) { const sb2 = loadLogic(path.join(__dirname, '..', 'play.html')); sb2.initGame('terriens', ['martiens', 'jupiteriens', 'ceinturiens']);
     vm.runInContext('_aiPickAgendas()', sb2); for (const p of sb2.__G.ais) if (p._profil === 'guerrier' && p.agenda && p.agenda.id === 'ag15') n++; }
   if (!n) ok('0 sur 12 tirages'); else ko(n + ' Conquérant(s) pacifiste(s)'); }
 console.log('\n' + '═'.repeat(70));
