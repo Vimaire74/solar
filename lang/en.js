@@ -2048,6 +2048,7 @@ window.SOLAR_LANG_DICT = {
   "srv.pas_decider_propre_concession": "you do not decide on your own concession",
   "srv.pas_voter_propre_remplacement": "you cannot vote for your own replacement",
   "srv.rapport_vide": "empty report",
+  "srv.acces_refuse": "Access reserved for testers: password required.",
   "srv.remplace_par_ia": "🤖 {nom} is replaced by an AI {motif}.",
   "srv.renonce_jouer_ia_reprend": "🤖 {v} gives up playing — an AI takes over {nation}.",
   "srv.repris_ia_partie_continue": "🤖 {nation} is taken over by an AI — the game goes on.",

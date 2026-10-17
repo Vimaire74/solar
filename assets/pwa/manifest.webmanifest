@@ -3,7 +3,7 @@
   "short_name": "SOLAR",
   "description": "Jeu de stratégie spatiale au tour par tour — conquête du système solaire.",
   "lang": "fr",
-  "start_url": "/",
+  "start_url": "/play.html",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

@@ -1672,6 +1672,7 @@
   "srv.pas_decider_propre_concession": "tu ne décides pas de ta propre concession",
   "srv.pas_voter_propre_remplacement": "tu ne peux pas voter ton propre remplacement",
   "srv.rapport_vide": "rapport vide",
+  "srv.acces_refuse": "Accès réservé aux testeurs : mot de passe requis.",
   "srv.remplace_par_ia": "🤖 {nom} est remplacé par une IA {motif}.",
   "srv.renonce_jouer_ia_reprend": "🤖 {v} renonce à jouer — une IA reprend {nation}.",
   "srv.repris_ia_partie_continue": "🤖 {nation} est repris par une IA — la partie continue.",
