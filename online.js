@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-10-09 · v11.77';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-10-13 · v11.78';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -65,7 +65,11 @@ function connect(onReady){
   if (STATE.ws && STATE.ws.readyState === 1){ if(onReady) onReady(); return; }
   status(t('web.connexion_serveur','Connexion au serveur…'));
   let ws;
-  try { ws = new WebSocket(SERVER_URL); }
+  if (STATE.accesRefuse) { if (window.solarAccesPorte) window.solarAccesPorte(); return; }
+  /* Jeton d'accès du site (13/10, acces.js) : exigé par le serveur pour les connexions venues de
+     solar-game.com, ignoré pour l'appli. Absent = la connexion sera refusée (message 'error', acces:false). */
+  let _acces = ''; try { _acces = localStorage.getItem('solar-acces') || ''; } catch (e) {}
+  try { ws = new WebSocket(SERVER_URL + (_acces ? '?acces=' + encodeURIComponent(_acces) : '')); }
   catch(e){ status(t('web.serveur_injoignable','⚠️ Serveur injoignable')); return; }
   STATE.ws = ws;
   ws.onopen = () => {
@@ -88,7 +92,8 @@ function connect(onReady){
     STATE.connected = false;
     clearInterval(STATE._pingTimer);
     // reconnexion systématique dès qu'on a une session (pas seulement en partie)
-    if (STATE.user || STATE.token){ status(t('web.connexion_perdue_reconnexion_cours','🔌 Connexion perdue — reconnexion en cours…')); scheduleReconnect(); }
+    if (STATE.accesRefuse){ hideStatus(); if (window.solarAccesPorte) window.solarAccesPorte(); }
+    else if (STATE.user || STATE.token){ status(t('web.connexion_perdue_reconnexion_cours','🔌 Connexion perdue — reconnexion en cours…')); scheduleReconnect(); }
     /* ⚠️ « JE TAPE MON MOT DE PASSE, RIEN NE SE PASSE » (Marc, 07/09, juste après un redéploiement).
        Sans session, si le serveur ne répond pas à l'ouverture (redémarrage en cours), le bouton
        ne produisait AUCUN retour : le statut « Connexion au serveur… » restait affiché, sans
@@ -297,6 +302,7 @@ function handle(m){
       break;
     case 'error':
       console.warn('[SC] serveur:', m.msg);
+      if (m.acces === false){ STATE.accesRefuse = true; try{ localStorage.removeItem('solar-acces'); }catch(e){} if (window.solarAccesPorte) window.solarAccesPorte(); break; }
       if (/introuvable/.test(m.msg||'') && STATE.user){
         // la partie mémorisée n'existe plus (serveur redéployé) : on l'oublie et on va au lobby
         try{ localStorage.removeItem('sc_ws_game'); }catch(e){}
