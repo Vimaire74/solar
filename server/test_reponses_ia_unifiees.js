@@ -7,7 +7,7 @@
 const path = require('path');
 const { GameDriver } = require('./driver.js');
 const ecarts = []; const ok = s => console.log('   ✔ ' + s); const ko = s => { ecarts.push(s); console.log('   ❌ ' + s); };
-const d = new GameDriver(path.join(__dirname, '..', 'index.html'));
+const d = new GameDriver(path.join(__dirname, '..', 'play.html'));
 d.sb.initGame('terriens', ['martiens', 'jupiteriens']);
 const G = d.sb.__G; const M = G.ais[0];
 const Q = [

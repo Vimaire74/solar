@@ -3,7 +3,7 @@
 const path = require('path'); const vm = require('vm');
 const { loadLogic } = require('./game-core.js');
 const ecarts = []; const ok = s => console.log('   ✔ ' + s); const ko = s => { ecarts.push(s); console.log('   ❌ ' + s); };
-const HTML = path.join(__dirname, '..', 'index.html');
+const HTML = path.join(__dirname, '..', 'play.html');
 console.log('E5. Ceinturiens, 4 jetons, contre les Jupitériens réduits à Io (capitale, garnison 10)');
 { const sb = loadLogic(HTML); sb.initGame('jupiteriens', ['ceinturiens']); const G = sb.__G; const run = c => vm.runInContext(c, sb);
   run('var c=allPlayers().find(p=>p.civ.id==="ceinturiens"), j=allPlayers().find(p=>p.civ.id==="jupiteriens"); c.forceTokens=4; c.res.materials=10; c.res.energy=10; j.forceTokens=0; j.colonies=j.colonies.filter(x=>x.nodeId===j.civ.home); G.warWith="jupiteriens";');

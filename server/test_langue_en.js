@@ -98,7 +98,7 @@ function estFrancais(s) {
   return !!(m && new Set(m.map(x => x.toLowerCase())).size >= 2);
 }
 function analyser() {
-  const sb = require('./game-core.js').loadLogic(path.join(__dirname, '..', 'index.html'));
+  const sb = require('./game-core.js').loadLogic(path.join(__dirname, '..', 'play.html'));
   const dict = fs.readFileSync(path.join(__dirname, '..', 'lang', 'en.js'), 'utf8');
   vm.runInContext(dict + '\n;globalThis.SOLAR_LANG_DICT = (typeof window!=="undefined" && window.SOLAR_LANG_DICT) || globalThis.SOLAR_LANG_DICT || null;', sb);
   if (!sb.SOLAR_LANG_DICT) { console.log('❌ dictionnaire anglais illisible'); process.exit(1); }
@@ -108,7 +108,7 @@ function analyser() {
   function scan(fenetre, o, chemin, prof) {
     if (prof > 7 || o == null) return;
     if (typeof o === 'string') {
-      if (estFrancais(o)) { const c = fenetre + '|' + o.slice(0, 80); if (!vus.has(c)) { vus.add(c); trouves.push({ fenetre, chemin, texte: o.slice(0, 170) }); } }
+      if (estFrancais(o)) { const c = fenetre + '|' + o.slice(0, 80); if (!vus.has(c)) { vus.add(c); const _t = o.replace(/<[^>]+>/g, ' '); const _m = _t.search(ACC); const _i = Math.max(0, (_m >= 0 ? _m : 0) - 60); trouves.push({ fenetre, chemin, texte: (_i ? '…' : '') + _t.slice(_i, _i + 170) }); } }
       return;
     }
     if (Array.isArray(o)) { o.forEach((v, i) => scan(fenetre, v, chemin + '[' + i + ']', prof + 1)); return; }

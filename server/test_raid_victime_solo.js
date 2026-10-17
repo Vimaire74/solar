@@ -22,7 +22,7 @@ const ok = s => console.log('   ✔ ' + s);
 const ko = s => { ecarts.push(s); console.log('   ❌ ' + s); };
 
 function monter() {
-  const sb = loadLogic(path.join(__dirname, '..', 'index.html'));
+  const sb = loadLogic(path.join(__dirname, '..', 'play.html'));
   sb.initGame('jupiteriens', ['terriens', 'martiens']);
   const G = sb.__G; G.turn = 3; G.phase = 'actions'; G._il = true;
   G.player._isAI = false; G.ais.forEach(a => a._isAI = true);
@@ -43,6 +43,10 @@ console.log('§1 solo : avis à la victime');
   if (coup) ok('avis « coup » : ' + coup.title); else ko('aucun avis « coup » pour la victime (' + hits.length + ' avis)');
   if (coup && /Terriens/.test(coup.title)) ok('le pillard est nommé'); else if (coup) ko('pillard absent du titre : ' + coup.title);
   if (coup && /pille/i.test(coup.title)) ok('titre « te pille »'); else if (coup) ko('titre inattendu : ' + coup.title);
+  /* 03/10 (Marc) : la colonie pillée est nommée, et la perte porte sur le PROCHAIN revenu. */
+  if (coup && /pillent Io/.test(coup.title)) ok('colonie nommée dans le titre'); else if (coup) ko('colonie absente du titre : ' + coup.title);
+  const _corps = coup ? JSON.stringify(coup) : '';
+  if (/prochain revenu|ne produisait rien/.test(_corps)) ok('« sur ton prochain revenu »'); else if (coup) ko('corps sans « prochain revenu » : ' + _corps.slice(0, 200));
   console.log('\n§2 solo : pillage subi retenu');
   const r = JSON.parse(run('JSON.stringify(G.player._raidsThisTurn||[])'));
   if (r.length === 1) ok('1 raid retenu chez la victime'); else ko(r.length + ' raid(s) retenus chez la victime');

@@ -6,7 +6,7 @@
 const path = require('path'), vm = require('vm');
 const { loadLogic } = require('./game-core.js');
 const ecarts = []; const ok = s => console.log('   ✔ ' + s); const ko = s => { ecarts.push(s); console.log('   ❌ ' + s); };
-const sb = loadLogic(path.join(__dirname, '..', 'index.html'));
+const sb = loadLogic(path.join(__dirname, '..', 'play.html'));
 sb.initGame('ceinturiens', ['terriens', 'martiens', 'jupiteriens']);
 const HTML = lignes => vm.runInContext('_journalHTML(' + JSON.stringify(lignes.map(m => ({ msg: m, turn: 2, civ: null }))) + ')', sb);
 const H = lignes => vm.runInContext('_journalHTML(' + JSON.stringify(lignes.map(m => ({ msg: m, turn: 2, civ: null }))) + ')', sb).replace(/<[^>]+>/g, '|');

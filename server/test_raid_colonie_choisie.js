@@ -6,7 +6,7 @@
 const path = require('path'); const { Engine } = require('./game-core.js');
 const ecarts = []; const ok = s => console.log('   ✔ ' + s); const ko = s => { ecarts.push(s); console.log('   ❌ ' + s); };
 function montage() {
-  const eng = new Engine(path.join(__dirname, '..', 'index.html')); const sb = eng.sb;
+  const eng = new Engine(path.join(__dirname, '..', 'play.html')); const sb = eng.sb;
   sb.initGame('terriens', ['martiens']); const G = sb.__G; G.turn = 3; G.phase = 'actions';
   const moi = G.player, mar = G.ais[0]; moi._isAI = false; mar._isAI = true;
   moi.acLeft = 3; moi.forceTokens = 6; moi.res.energy = 10; moi.res.materials = 10;

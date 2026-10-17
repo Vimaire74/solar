@@ -21,7 +21,7 @@
 const path = require('path');
 const vm = require('vm');
 const { loadLogic } = require('./game-core.js');
-const HTML = path.join(__dirname, '..', 'index.html');
+const HTML = path.join(__dirname, '..', 'play.html');
 const ecarts = [];
 const ok = s => console.log('   ✔ ' + s);
 const ko = s => { ecarts.push(s); console.log('   ❌ ' + s); };
@@ -125,3 +125,20 @@ console.log('§6 Le compteur repart à zéro au tour suivant');
 console.log('');
 if (ecarts.length) { console.log('❌ ' + ecarts.length + ' écart(s) :'); ecarts.forEach(e => console.log('   - ' + e)); process.exit(1); }
 console.log('✅ test_recoltes_civiques : une récolte par tour, en pénurie seulement, sur les deux chemins.');
+
+/* 05/10 (E2, Marc) : quand la ressource PAYÉE est au plafond — perdue à l'écrêtage — une récolte est permise même
+   hors pénurie stricte (ressource rendue < 6), au plus deux par tour. */
+console.log('§E2 excédent au plafond : convertir ce qui serait perdu');
+{
+  const m = montage();
+  m.mar.res.energy = 4; m.mar.res.materials = 20; m.mar.res.science = 10; m.mar._recoltesTour = 0;
+  if (autorisee(m, 'cm_explore')) ok('énergie 4, matériaux au plafond (20) : la récolte d\'He3 est permise'); else ko('refusée malgré le plafond');
+  m.mar.res.materials = 19; m.mar.res.science = 5;
+  if (!autorisee(m, 'cm_explore')) ok('matériaux 19 et science 5 (rien au plafond) : refusée, le prix compte'); else ko('permise sous le plafond');
+  m.mar.res.materials = 20; m.mar.res.energy = 6;
+  if (!autorisee(m, 'cm_explore')) ok('énergie à 6 : rien à combler, refusée'); else ko('permise sans creux');
+  m.mar.res.energy = 4; m.mar._recoltesTour = 2;
+  if (!autorisee(m, 'cm_explore')) ok('deux récoltes déjà faites : refusée'); else ko('troisième récolte permise');
+}
+console.log('\n' + '═'.repeat(70));
+if (ecarts.length) { console.log('❌ ' + ecarts.length + ' écart(s) (bloc E2)'); process.exit(1); }

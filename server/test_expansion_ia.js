@@ -10,7 +10,7 @@ const path = require('path');
 const vm = require('vm');
 const { loadLogic } = require('./game-core.js');
 const ecarts = []; const ok = s => console.log('   ✔ ' + s); const ko = s => { ecarts.push(s); console.log('   ❌ ' + s); };
-const sb = loadLogic(path.join(__dirname, '..', 'index.html'));
+const sb = loadLogic(path.join(__dirname, '..', 'play.html'));
 sb.initGame('terriens', ['martiens', 'jupiteriens', 'ceinturiens']);
 const run = c => vm.runInContext(c, sb);
 const G = sb.__G;

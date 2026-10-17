@@ -19,7 +19,7 @@
 'use strict';
 const path = require('path'), vm = require('vm');
 const { loadLogic } = require('./game-core.js');
-const HTML = process.argv[2] || path.join(__dirname, '..', 'index.html');
+const HTML = process.argv[2] || path.join(__dirname, '..', 'play.html');
 
 const ecarts = [];
 const ok = s => console.log('   ✔ ' + s);

@@ -3,7 +3,7 @@
 const path = require('path'); const vm = require('vm');
 const { loadLogic } = require('./game-core.js');
 const ecarts = []; const ok = s => console.log('   ✔ ' + s); const ko = s => { ecarts.push(s); console.log('   ❌ ' + s); };
-const sb = loadLogic(path.join(__dirname, '..', 'index.html')); sb.initGame('terriens', ['martiens', 'jupiteriens', 'ceinturiens']);
+const sb = loadLogic(path.join(__dirname, '..', 'play.html')); sb.initGame('terriens', ['martiens', 'jupiteriens', 'ceinturiens']);
 const G = sb.__G; const run = c => vm.runInContext(c, sb);
 const m = G.ais.find(a => a.civ.id === 'martiens'); const acAvant = run('calcAC(allPlayers().find(p=>p.civ.id==="martiens"))');
 const v = (tour) => { G.turn = tour; return run('valeurActionsPermanentes(allPlayers().find(p=>p.civ.id==="martiens"),' + acAvant + ')'); };

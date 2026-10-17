@@ -19,7 +19,7 @@ const ok = s => console.log('   ✔ ' + s);
 const ko = s => { ecarts.push(s); console.log('   ❌ ' + s); };
 const moitie = s => /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(s) || s.includes('�');
 
-const sb = loadLogic(path.join(__dirname, '..', 'index.html'));
+const sb = loadLogic(path.join(__dirname, '..', 'play.html'));
 sb.initGame('jupiteriens', ['terriens', 'martiens']);
 const T = s => vm.runInContext('_riToText(' + JSON.stringify(s) + ')', sb);
 

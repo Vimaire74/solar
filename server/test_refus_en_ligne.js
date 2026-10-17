@@ -13,7 +13,7 @@
 const path = require('path');
 const { GameDriver } = require('./driver.js');
 const vm = require('vm');
-const HTML = path.join(__dirname, '..', 'index.html');
+const HTML = path.join(__dirname, '..', 'play.html');
 const ecarts = [];
 const ok = s => console.log('   ✔ ' + s);
 const ko = s => { ecarts.push(s); console.log('   ❌ ' + s); };

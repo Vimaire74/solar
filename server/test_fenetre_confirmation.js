@@ -32,7 +32,7 @@ const path = require('path');
 const vm = require('vm');
 const { loadLogic } = require('./game-core.js');
 const RACINE = path.join(__dirname, '..');
-const HTML = path.join(RACINE, 'index.html');
+const HTML = path.join(RACINE, 'play.html');
 
 const ecarts = [];
 const ok = s => console.log('   ✔ ' + s);

@@ -26,7 +26,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { loadLogic } = require('./game-core.js');
-const HTML = path.join(__dirname, '..', 'index.html');
+const HTML = path.join(__dirname, '..', 'play.html');
 
 const ecarts = [];
 const ok = s => console.log('   ✔ ' + s);
@@ -129,7 +129,9 @@ console.log('\n4. Un poste à zéro dit pourquoi il est à zéro');
     agenda: (m.A.agenda && m.A.agenda.name) || null,
     detail: { colVP: v.colVP, routeVP: v.routeVP, cardsVP: v.cardsVP, techBonusVP: v.techBonusVP,
       rptVP: v.rptVP, agendasVP: v.agendasVP, evtVP: v.evtVP, extraVP: v.extraVP,
-      extraDetail: v.extraDetail || [], det: v.det || null } }];
+      extraDetail: v.extraDetail || [], det: v.det || null,
+      /* Comme server.js depuis le 21/09 : le détail archivé RENDU par langue (`calcVPDetRendu`). */
+      rendu: { fr: m.sb.calcVPDetRendu(m.A, null) } } }];
   const txt = corps({ code: 'BANC', dateFr: '25/08/2026', turn: 9, joueurs: [], scores, journal: [], bugs: [] });
   const lignes = txt.split('\n');
   const posteVide = lignes.findIndex(l => /Revenus par tour .* 0 /.test(l));
@@ -158,7 +160,8 @@ console.log('\n5. Le rapport SOLO et le rapport SERVEUR ne divergent pas');
     agenda: (m.moi.agenda && m.moi.agenda.name) || null,
     detail: { colVP: v.colVP, routeVP: v.routeVP, cardsVP: v.cardsVP, techBonusVP: v.techBonusVP,
       rptVP: v.rptVP, agendasVP: v.agendasVP, evtVP: v.evtVP, extraVP: v.extraVP,
-      extraDetail: v.extraDetail || [], det: v.det || null } }];
+      extraDetail: v.extraDetail || [], det: v.det || null,
+      rendu: { fr: m.sb.calcVPDetRendu(m.moi, null) } } }];
   const serveur = corps({ code: 'BANC', dateFr: '25/08/2026', turn: 9, joueurs: [], scores, journal: [], bugs: [] });
   const temoins = ((v.det && v.det.colonies) || []).slice(0, 2)
     .concat((v.det && v.det.evt) || []);
