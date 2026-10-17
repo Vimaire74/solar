@@ -12,7 +12,7 @@
    ========================================================================== */
 'use strict';
 let pw; try { pw = require('playwright'); } catch (e) { pw = require('/tmp/claude-0/node_modules/playwright'); }
-const URL = process.env.URL || 'http://127.0.0.1:8766/index.html';
+const URL = process.env.URL || 'http://127.0.0.1:8766/play.html';
 const ecarts = []; const ok = s => console.log('   ✔ ' + s); const ko = s => { ecarts.push(s); console.log('   ❌ ' + s); };
 const TROUVER = `(() => {
   const vis = e => e && getComputedStyle(e).display !== 'none' && getComputedStyle(e).visibility !== 'hidden' && e.getClientRects().length && !e.classList.contains('hidden');

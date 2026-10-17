@@ -3,7 +3,7 @@
 'use strict';
 const path=require('path'); const {GameDriver}=require('./driver.js');
 let x=(parseInt(process.argv[2]||'0',10)+1)>>>0; Math.random=function(){x^=x<<13;x>>>=0;x^=x>>17;x^=x<<5;x>>>=0;return x/4294967296;};
-const d=new GameDriver(path.join(__dirname,'..','index.html'));
+const d=new GameDriver(path.join(__dirname,'..','play.html'));
 d.boot(['terriens','martiens','jupiteriens','ceinturiens'].map(c=>({civId:c,isAI:true})),()=>{});
 const sb=d.sb,G=sb.__G; G._cerveauIA='tacticien';
 const tous=[G.player].concat(G.ais||[]); const conq=tous.find(p=>p.civ.id===(process.env.CONQ||'martiens'))||tous[1]; const A=['batisseur','opportuniste','batisseur']; let k=0;
