@@ -37,7 +37,7 @@ const MOTEURS = [
      qui se trouvait être en retard d'une version — jusqu'au jour où on l'a synchronisé. Les deux
      colonnes seraient alors devenues identiques, l'écart nul, et le banc aurait cessé de prouver
      quoi que ce soit tout en restant vert d'apparence. `server/temoin_v9.69/` ne bouge plus. */
-  { nom: 'AVANT (témoin v9.69, figé)', html: path.join(__dirname, 'temoin_v9.69', 'play.html') },
+  { nom: 'AVANT (témoin v9.69, figé)', html: path.join(__dirname, 'temoin_v9.69', 'index.html') },
   { nom: 'APRÈS (dossier de travail)',  html: path.join(__dirname, '..', 'play.html') },
 ];
 

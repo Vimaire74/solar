@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-13 · v11.78';
+const SOLAR_BUILD_MOTEUR = '2026-10-24 · v11.79';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -698,7 +698,7 @@ const EVENTS=[
    }},
   {id:'pirates',type:'menace',name:'Prolifération des pirates',emoji:'☠️',preview:'Les pirates frappent les routes de la nation la plus riche en <i class=ri-materials></i> (stock à la fin des actions, AVANT le revenu du tour) : les routes sans jeton NI technologie de protection sont détruites ; celles avec un jeton ont 50% de chance d\'être perdues, mais 2 au maximum.',
    /* La cible se juge sur le stock d'AVANT le revenu du tour (photo prise dans `stFinDeTour`) : voir la note là-bas. */
-   resolve(G){const h=_evTop(function(p){return (p._stockAvantRevenu&&p._stockAvantRevenu.materials!==undefined)?p._stockAvantRevenu.materials:(p.res.materials||0);});if(h.length!==1)return J('evt.res_pirates_aucune_cible','Prolifération des pirates — aucune cible claire.');const tgt=h[0];let unp=0,prot=0,tech=0;const keep=[];for(const r of tgt.routes){if((r.tokens||0)>0){/* jeton posé : 50% chacune, MAX 2 perdues */ if(prot<2&&Math.random()<0.5){tgt.forceCooldown.push({count:r.tokens,returnTurn:getCooldownTurn(tgt)});prot++;}else keep.push(r);}else if(routeProtegee(tgt,r)){keep.push(r);tech++;/* protégée par une TECHNOLOGIE : elle n'a pas besoin de jeton */}else unp++;/* ni jeton ni technologie : détruite */}tgt.routes=keep;updateConnections(tgt);
+   resolve(G){const h=_evTop(function(p){return (p._stockAvantRevenu&&p._stockAvantRevenu.materials!==undefined)?p._stockAvantRevenu.materials:(p.res.materials||0);});if(h.length!==1)return J('evt.res_pirates_aucune_cible','Prolifération des pirates — aucune cible claire.');const tgt=h[0];G._evCible={ev:'pirates',civ:tgt.civ.id,tour:G.turn};let unp=0,prot=0,tech=0;const keep=[];for(const r of tgt.routes){if((r.tokens||0)>0){/* jeton posé : 50% chacune, MAX 2 perdues */ if(prot<2&&Math.random()<0.5){tgt.forceCooldown.push({count:r.tokens,returnTurn:getCooldownTurn(tgt)});prot++;}else keep.push(r);}else if(routeProtegee(tgt,r)){keep.push(r);tech++;/* protégée par une TECHNOLOGIE : elle n'a pas besoin de jeton */}else unp++;/* ni jeton ni technologie : détruite */}tgt.routes=keep;updateConnections(tgt);
     /* −1 moral SEULEMENT si les pirates ont mordu : une nation visée mais dont toutes les routes
        étaient protégées n'a rien subi, et son peuple n'a aucune raison de s'en émouvoir. */
     if((unp+prot)>0)tgt.res.morale=Math.max(0,(tgt.res.morale||0)-1);if(tech)addLog(J('journal.route_epargnee_protegees_technologie_san','🛡️ {tech} route(s) de {v} épargnée(s) — protégées par une technologie, sans jeton nécessaire.',{tech:tech,v:_evName(tgt)}),'gold');if((unp+prot)===0)return J('evt.res_pirates_rien','Prolifération des pirates — {v} est la nation la plus riche en <i class=ri-materials></i> et devient la cible des pirates, mais AUCUNE route n\'est perdue.',{v:_evName(tgt)});
@@ -6571,10 +6571,11 @@ function guerreOrdreChoisi(ans,civId){
    sait déjà ne pas frapper deux fois dans le même tour (`war._aiAssaultedThisTurn`). L'appel
    redondant retombe donc simplement sur `guerreSuivante`. */
 function _guerreLancerOrdre(jePremier){
+  G._wcmRang=jePremier?1:2;   // titre de la fenêtre de combat (24/10) : « tu frappes en premier » / « à ton tour »
   if(jePremier){ showWarCombatModal('guerreCombatLiveChoisi'); return; }   // moi → puis riposte adverse
   maybeAiAssaultPlayer(guerreEnnemi(), 'guerreMonAssaut');                 // eux → puis mon assaut
 }
-function guerreMonAssaut(){ showWarCombatModal('guerreCombatLiveChoisi'); }
+function guerreMonAssaut(){ G._wcmRang=2; showWarCombatModal('guerreCombatLiveChoisi'); }
 
 /* ⚠️ « 0 JETON » NE VEUT PLUS DIRE « JE TIENS » QUAND LE SUPERCROISEUR EST DÉPLOYÉ.
    Marc, partie 2959, tour 9 : « j'ai attaqué Titan, j'ai déterminé que j'utilisais le supercroiseur
@@ -8632,7 +8633,7 @@ function deployerJetonSurRoute(nat, route, opts){
      C'est ici, la porte commune, que la règle manquait. */
   if(typeof routesProtegeesParTech==='function'&&routesProtegeesParTech(nat)) return false;
   const gratuit=hasSpec(nat,'route_force_free');
-  if(!gratuit&&engageableTokens(nat)<1) return false; // garnison exclue (13/09) — test_raid_garnison.js
+  if(!gratuit&&jetonsPermanentsEngageables(nat)<1) return false; // garnison et jetons temporaires exclus (13/09, 24/10)
   if(opts.ac){ if((nat.acLeft||0)<1) return false; nat.acLeft-=1; nat.spentThisTurn=(nat.spentThisTurn||0)+1; }
   if(!gratuit) nat.forceTokens-=1;
   route.tokens=1;
@@ -8705,12 +8706,12 @@ function doEstablishRoute(from,to, nation){
      (il n'y a pas de choix), ni jeton gratuit (il ne servirait à rien). Le journal dit pourquoi —
      un jeton qui n'apparaît pas sans explication passe pour un oubli. */
   const _dejaProtegee=(typeof routesProtegeesParTech==='function')&&routesProtegeesParTech(_n);
-  if(!_dejaProtegee&&_n.forceTokens>0&&!hasSpec(_n,'route_force_free')){
+  if(!_dejaProtegee&&jetonsPermanentsEngageables(_n)>0&&!hasSpec(_n,'route_force_free')){
     _pendingRouteObj=newRoute;
     document.getElementById('rtm-info').innerHTML=
       (routeAPorteeDesPirates(newRoute)
-        ?t('ui.route_jeton_pirates_portee','Route <strong>{nom} → {nom2}</strong><br>Jetons disponibles : <strong>{jetons}</strong><br><span style="color:#7880a0;font-size:.92em">Route à portée des pirates (60 jours ou moins de la ceinture principale ou de Kuiper). À chaque début de tour : 70 % de risque de pillage sans jeton, 30 % avec — 1 ressource volée. La route ne tombe jamais et connecte avec ou sans jeton.</span>',{nom:_i18nRef(fn,'name'),nom2:_i18nRef(tn,'name'),jetons:_n.forceTokens})
-        :t('ui.route_jeton_pirates_hors','Route <strong>{nom} → {nom2}</strong><br>Jetons disponibles : <strong>{jetons}</strong><br><span style="color:#7880a0;font-size:.92em">Route hors de portée des pirates (plus de 60 jours des ceintures) : un jeton n\'y sert à rien contre eux. La route connecte avec ou sans jeton.</span>',{nom:_i18nRef(fn,'name'),nom2:_i18nRef(tn,'name'),jetons:_n.forceTokens}));
+        ?t('ui.route_jeton_pirates_portee','Route <strong>{nom} → {nom2}</strong><br>Jetons disponibles : <strong>{jetons}</strong><br><span style="color:#7880a0;font-size:.92em">Route à portée des pirates (60 jours ou moins de la ceinture principale ou de Kuiper). À chaque début de tour : 70 % de risque de pillage sans jeton, 30 % avec — 1 ressource volée. La route ne tombe jamais et connecte avec ou sans jeton.</span>',{nom:_i18nRef(fn,'name'),nom2:_i18nRef(tn,'name'),jetons:jetonsPermanentsEngageables(_n)})
+        :t('ui.route_jeton_pirates_hors','Route <strong>{nom} → {nom2}</strong><br>Jetons disponibles : <strong>{jetons}</strong><br><span style="color:#7880a0;font-size:.92em">Route hors de portée des pirates (plus de 60 jours des ceintures) : un jeton n\'y sert à rien contre eux. La route connecte avec ou sans jeton.</span>',{nom:_i18nRef(fn,'name'),nom2:_i18nRef(tn,'name'),jetons:jetonsPermanentsEngageables(_n)}));
     document.getElementById('route-token-modal').classList.remove('hidden');
   }else{
     /* IA DE NAVIGATION (`route_force_free`) — « déploiement GRATUIT en jetons ».
@@ -8740,7 +8741,7 @@ function doEstablishRoute(from,to, nation){
 }
 function confirmRouteToken(deploy){
   document.getElementById('route-token-modal').classList.add('hidden');
-  if(deploy&&_pendingRouteObj&&G.player.forceTokens>0){
+  if(deploy&&_pendingRouteObj&&jetonsPermanentsEngageables(G.player)>0){
     _pendingRouteObj.tokens=1;G.player.forceTokens--;
     /* Le jeton posé figure sur la ligne de la route au rapport, comme pour l'ordinateur (audit du 03/10, §199). */
     try{ const _jr=(G._journal||[]).slice().reverse().find(e=>e&&!e.auto&&e.turn===G.turn&&e.nat===G.player.civ.name&&/Route/.test(e.name||''));
@@ -8811,7 +8812,7 @@ function routeManageDeploy(){
     routeManageClose();return;
   }
   const isFree=hasSpec(p,'route_force_free');
-  if(!isFree&&engageableTokens(p)<1){addLog(J('journal.aucun_jeton_engageable_garnison_compte','⚠️ Aucun jeton engageable (la garnison ne compte pas).'),'red');routeManageClose();return;}
+  if(!isFree&&jetonsPermanentsEngageables(p)<1){addLog(J('journal.aucun_jeton_permanent_route','⚠️ Aucun jeton permanent disponible : la garnison et les jetons temporaires ne se posent pas sur une route.'),'red');routeManageClose();return;}
   undoStack=[];
   p.acLeft--;p.spentThisTurn+=1;
   if(!isFree)p.forceTokens--;
@@ -9018,7 +9019,7 @@ function doRaidTarget(aiId,nodeId,pillard){
     if(engageableTokens(p)<tc){addLog(J('journal.raid_besoin_jeton_force_engageable_garni','⚠️ Raid : besoin {tc} jeton(s) Force engageable(s) (la garnison ne compte pas).',{tc:tc}),'red');return;}
     if(enCost>0&&(p.res.energy||0)<enCost){addLog(J('journal.raid_besoin_carburant','⚠️ Raid : besoin {cout}<i class=ri-energy></i> (carburant).',{cout:enCost}),'red');return;}
     undoStack=[];
-    p.acLeft-=1;p.forceTokens-=tc;p.forceCooldown.push({count:tc,returnTurn:getCooldownTurn(p)});
+    p.acLeft-=1;var _tmpRaid=consommerTemporaires(p,tc);p.forceTokens-=tc;if(tc-_tmpRaid>0)p.forceCooldown.push({count:tc-_tmpRaid,returnTurn:getCooldownTurn(p)});
     if(enCost>0)p.res.energy-=enCost;
     p.spentThisTurn=(p.spentThisTurn||0)+1+tc+enCost;
     /* ⚠️ LE BUTIN NE VIENT PLUS DU STOCK AU HASARD, MAIS D'UNE COLONIE (voir `butinDeRaid`). */
@@ -9051,7 +9052,8 @@ function doRaidTarget(aiId,nodeId,pillard){
     /* On se souvient d'avoir été pillé (§134 étape 4) — la tension redescend, pas la mémoire. */
     if(typeof ajouterRancune==='function') ajouterRancune(target,p);
     if(typeof _marquerCause==='function') _marquerCause(target,p);
-    addLog(J('journal.raid_jeton_recuperation_tension_3','⚔️ Raid sur {emoji} {nation}{v} ! {v2}{cout} ({tc} jeton en récupération, tension +3)',{emoji:target.civ.emoji,nation:_i18nRef(target.civ,'name'),v:(_nomCol?J('journal.production_pillee'," — production de {nomcol} pillée",{nomcol:_nomCol}):''),v2:(stolen.join(' ')||J('journal.rien_prendre',"rien à prendre")),cout:(enCost>0?' (−1<i class=ri-energy></i>)':''),tc:tc}),'green');
+    /* En-tête d'action (24/10) : la ligne « ↳ paie » du joueur s'y range, comme pour l'ordinateur. */
+    logEntete(J('journal.raid_jeton_recuperation_tension_3','⚔️ Raid sur {emoji} {nation}{v} ! {v2}{cout} ({tc} jeton en récupération, tension +3)',{emoji:target.civ.emoji,nation:_i18nRef(target.civ,'name'),v:(_nomCol?J('journal.production_pillee'," — production de {nomcol} pillée",{nomcol:_nomCol}):''),v2:(stolen.join(' ')||J('journal.rien_prendre',"rien à prendre")),cout:(enCost>0?' (−1<i class=ri-energy></i>)':''),tc:(tc-_tmpRaid)}),'green');
     /* Rapport de Marc (30/09) : « Raid 🔴 — 1 AC → Volé : +1 énergie+2 matériaux » — ni la colonie,
        ni les jetons pourtant prélevés. Même ligne que pour l'ordinateur. Banc : test_raid_rapport.js. */
     var _payeRaid={force:tc}; if(enCost>0)_payeRaid.energy=enCost;
@@ -9409,6 +9411,25 @@ function playerAssaultColony(nodeId,enemyAI,attaquant){
 // Engager e jetons coûte 1<i class=ri-materials></i> +1<i class=ri-energy></i> par jeton. Les jetons engagés quittent le pool :
 // s'ils survivent (camp non vaincu) ils reviennent après récupération ; si le camp PERD,
 // la moitié est détruite définitivement, le reste revient après récupération.
+/* ═══ JETONS TEMPORAIRES ENGAGÉS EN PREMIER (Marc, 24/10/2026) ═══
+   « Les +2 jetons reçus en début de tour et temporaires, on les utilise en priorité pour raider et
+   attaquer ; on s'en fiche qu'ils reviennent en deux tours puisqu'ils s'en vont — il ne faut pas
+   après enlever des jetons de la réserve. » Avant : un raid avec les 2 jetons de Military Surge les
+   envoyait en récupération, puis l'expiration retirait encore 2 jetons… permanents.
+   Règle : tout engagement puise d'abord dans les temporaires (stratégie, puis renforts militaires) ;
+   un temporaire engagé disparaît (ni récupération, ni retour) ; l'expiration ne retire que ceux qui
+   restent. SOURCE UNIQUE pour raids et combats. Banc : server/test_jetons_temporaires.js */
+function jetonsTemporaires(p){ return p?Math.max(0,(p.stratForceBonus||0)+(p.milLoseNext||0)):0; }
+function consommerTemporaires(p,n){
+  if(!p) return 0;
+  let reste=Math.max(0,n|0), pris=0;
+  const a=Math.min(reste,Math.max(0,p.stratForceBonus||0)); if(a){p.stratForceBonus-=a;reste-=a;pris+=a;}
+  const b=Math.min(reste,Math.max(0,p.milLoseNext||0)); if(b){p.milLoseNext-=b;reste-=b;pris+=b;}
+  return pris;
+}
+/* Un jeton posé sur une ROUTE ne peut pas être temporaire (Marc, 24/10 : « les jetons posés sur des
+   routes ne peuvent pas être des jetons temporaires !! ») : il faut un jeton permanent hors garnison. */
+function jetonsPermanentsEngageables(p){ return p?Math.max(0,engageableTokens(p)-jetonsTemporaires(p)):0; }
 function applyCombatEngage(p,e,won){
   e=Math.max(0,e|0); if(e<=0||!p)return;
   // IA de Navigation (nav2_war) : COÛT de guerre divisé par 2 EXACTEMENT. Quand le nombre de jetons est
@@ -9421,17 +9442,19 @@ function applyCombatEngage(p,e,won){
   p.res.energy=Math.max(0,(p.res.energy||0)-rcE);
   p.forceTokens=Math.max(0,(p.forceTokens||0)-e);      // tous les engagés quittent temporairement le pool
   if(!p.forceCooldown)p.forceCooldown=[];
+  const tmp=consommerTemporaires(p,e), perm=e-tmp;     // les temporaires partent en premier et ne reviennent pas
+  let back=0, recov=0, lost=0;
   if(won){
     // VICTOIRE (règle) : seule la MOITIÉ des jetons engagés part en récupération ; l'autre moitié reste DISPO tout de suite.
-    const recov=Math.floor(e/2);
-    p.forceTokens+=(e-recov);                          // l'autre moitié revient immédiatement
+    recov=Math.floor(perm/2); back=perm-recov;
+    p.forceTokens+=back;                               // l'autre moitié revient immédiatement
     if(recov>0)p.forceCooldown.push({count:recov,returnTurn:getCooldownTurn(p)});
   }else{
     // DÉFAITE : la moitié est perdue définitivement, le reste part en récupération.
-    const lost=Math.floor(e/2);
-    const back=e-lost;
-    if(back>0)p.forceCooldown.push({count:back,returnTurn:getCooldownTurn(p)});
+    lost=Math.floor(perm/2); recov=perm-lost;
+    if(recov>0)p.forceCooldown.push({count:recov,returnTurn:getCooldownTurn(p)});
   }
+  p._dernierEngagement={tour:G&&G.turn, e:e, tmp:tmp, back:back, recov:recov, lost:lost, won:!!won};   // lu par journalCombat
 }
 // ── ATTAQUE DE ROUTE : détruit la route (pas de récupération, indéfendable) — sauf protection ──
 function resolveRouteAttack(attacker,defender,route,commit){
@@ -9582,8 +9605,16 @@ function maybeAiAssaultPlayer(ai,done,defender,prefNode){
       addLog(J('journal.maintient_guerre_mais_moyens_attaquer_to','🛡️ {emoji} {nation} maintient la guerre mais n\'a pas les moyens d\'attaquer ce tour.',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name')}),'dim');
       const _na=_i18nAplatir({emoji:'🛡️',name:J('action.guerre_attaque_tour','En guerre — n\'a pas attaqué ce tour'),desc:J('action.moyens_insuffisants','moyens insuffisants')});
       if(ai._turnActions)ai._turnActions.push(_na);else ai._turnActions=[_na];
-      if(typeof notifyNationHit==='function')notifyNationHit(defender,J('avis.aucun_assaut_contre_toi','🛡️ Aucun assaut contre toi'),
-        J('avis.attaque_tour_ci_guerre_continue_mais_lui','{emoji} {nation} <b>n\'a pas attaqué</b> ce tour-ci.<br>La guerre continue, mais il lui manque les jetons, les ressources ou le moral pour monter un assaut.<br><br>Tes positions sont intactes.',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name')}));
+      /* 24/10 (Marc) : « s'il a renoncé, ça doit être dit à ce moment-là et pas au début du tour suivant ».
+         L'avis (notifyNationHit) ne s'affichait qu'au tour suivant. L'assailli humain reçoit maintenant
+         une FENÊTRE tout de suite, dans la séquence de fin de tour ; la suite attend sa fermeture. */
+      const _titreNa=J('avis.aucun_assaut_contre_toi','🛡️ Aucun assaut contre toi');
+      const _corpsNa=J('avis.attaque_tour_ci_guerre_continue_mais_lui','{emoji} {nation} <b>n\'a pas attaqué</b> ce tour-ci.<br>La guerre continue, mais il lui manque les jetons, les ressources ou le moral pour monter un assaut.<br><br>Tes positions sont intactes.',{emoji:ai.civ.emoji,nation:_i18nRef(ai.civ,'name')});
+      if(typeof done==='string'&&done&&defender&&defender._isAI===false&&typeof showWarModal==='function'&&!G._simulationIA){
+        showWarModal(_titreNa,_corpsNa,null);
+        _warSuite(done); return;
+      }
+      if(typeof notifyNationHit==='function')notifyNationHit(defender,_titreNa,_corpsNa);
     }
     _assautSuite(done);return;
   }
@@ -11004,16 +11035,21 @@ function journalCombat(p,engages,gagne,puissance,detailPuissance,croiseurArme){
   const e=Math.max(0,engages|0);
   const demi=(typeof hasSpec==='function'&&hasSpec(p,'nav2_war'));
   const cM=demi?Math.floor(e/2):e, cE=demi?Math.ceil(e/2):e;
-  const recup=e>0?Math.floor(e/2):0;
+  /* Répartition RÉELLE, posée par applyCombatEngage (appelé avant) : les temporaires engagés n'y
+     figurent ni en retour ni en récupération. Repli sur la règle simple si l'engagement n'a pas été tracé. */
+  const _de=(p._dernierEngagement&&p._dernierEngagement.e===e&&p._dernierEngagement.tour===(G&&G.turn))?p._dernierEngagement:null;
+  const recup=_de?(gagne?_de.recov:_de.lost):(e>0?Math.floor(e/2):0);
+  const _tmpUt=_de?_de.tmp:0;
   /* J et non t : cette ligne part dans le journal, lu en ligne dans d'autres langues (BCE3, 21/09 :
      « revenu(s) tout de suite » restait en français dans le rapport anglais). */
-  const sort=(gagne?J('ui.revenu_tout_suite_recuperation','{v} revenu(s) tout de suite, {recup} en récupération',{v:e-recup,recup:recup}):J('ui.perdu_definitivement_recuperation','{recup} PERDU(S) définitivement, {v} en récupération',{recup:recup,v:e-recup}));
+  const sort=(gagne?J('ui.revenu_tout_suite_recuperation','{v} revenu(s) tout de suite, {recup} en récupération',{v:e-recup-_tmpUt,recup:recup}):J('ui.perdu_definitivement_recuperation','{recup} PERDU(S) définitivement, {v} en récupération',{recup:recup,v:e-recup-_tmpUt}));
+  const sortTmp=_tmpUt>0?J('ui.temporaires_engages',' ({n} temporaire(s), dissous)',{n:_tmpUt}):'';
   const techs=_techsCombat(p,croiseurArme);
   /* Le coût du Supercroiseur figurait sur sa propre ligne, pas ici : Marc (B628) a lu ce récapitulatif
      et conclu que l'adversaire « n'avait payé que pour ses jetons ». Tout le coût, sur une ligne. */
   const _cc=(croiseurArme&&typeof cruiserCost==='function')?cruiserCost(p):null;
   const _coutCr=_cc?J('ui.cout_croiseur',' + Supercroiseur −{m}<i class=ri-materials></i> −{e}<i class=ri-energy></i>',{m:_cc.materials,e:_cc.energy}):'';
-  addLog(J('journal.jeton_engage_cout_puissance_jetons','📊 {emoji} {nation} — {e} jeton(s) engagé(s) · coût −{cm}<i class=ri-materials></i> −{ce}<i class=ri-energy></i>{cout} · puissance {puissance}{v} · jetons : {sort}{v2}',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),e:e,cm:cM,ce:cE,cout:_coutCr,puissance:puissance,v:(detailPuissance?J('commun.parenthese',' ({v})',{v:detailPuissance}):''),sort:sort,v2:(techs.length?J('journal.techs'," · techs : {v}",{v:_jJoindre(techs,', ')}):J('journal.aucune_tech_combat'," · aucune tech de combat"))}),'dim');
+  addLog(J('journal.jeton_engage_cout_puissance_jetons','📊 {emoji} {nation} — {e} jeton(s) engagé(s) · coût −{cm}<i class=ri-materials></i> −{ce}<i class=ri-energy></i>{cout} · puissance {puissance}{v} · jetons : {sort}{v2}',{emoji:p.civ.emoji,nation:_i18nRef(p.civ,'name'),e:e,cm:cM,ce:cE,cout:_coutCr,puissance:puissance,v:(detailPuissance?J('commun.parenthese',' ({v})',{v:detailPuissance}):''),sort:(sortTmp?J('commun.joint','{a}{sep}{b}',{a:sort,sep:'',b:sortTmp}):sort),v2:(techs.length?J('journal.techs'," · techs : {v}",{v:_jJoindre(techs,', ')}):J('journal.aucune_tech_combat'," · aucune tech de combat"))}),'dim');
 }
 /* ─── DÉFENSE D'UNE NATION TENUE PAR L'ORDINATEUR ──────────────────────────────
    Règle posée par Marc le 2026-08-08. Elle remplace `min(jetons, matériaux, énergie)` — qui
@@ -13684,7 +13720,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
     }
     if(!isPirate&&(ai.res.morale||0)<=2)return false; // self-intérêt : moral bas → l'IA se soigne au lieu de piller
     if(_e.res.energy+_e.res.materials<=0)return false;
-    ai.acLeft--;ai.forceTokens-=raidTok;ai.forceCooldown.push({count:raidTok,returnTurn:getCooldownTurn(ai)});
+    ai.acLeft--;{const _tmp=consommerTemporaires(ai,raidTok);ai.forceTokens-=raidTok;if(raidTok-_tmp>0)ai.forceCooldown.push({count:raidTok-_tmp,returnTurn:getCooldownTurn(ai)});}
     ai._attacksThisTurn=(ai._attacksThisTurn||0)+1;
     if(raidEn>0)ai.res.energy-=raidEn;
     ai.spentThisTurn+=1+raidTok+raidEn;
@@ -13983,7 +14019,7 @@ function _doAITurnInterne(aiPlayer,oneShot){
     /* On a déjà buté sur son IA Défensive : inutile d'y laisser des jetons tour après tour.
        C'est la contrepartie du message envoyé au joueur — l'ordinateur, lui, s'en souvient. */
     if(ai._raidsImmunises&&ai._raidsImmunises[best.civ.id]!==undefined&&hasSpec(best,'ia_immune'))return false;
-    ai.acLeft--;ai.forceTokens-=raidTok;ai.forceCooldown.push({count:raidTok,returnTurn:getCooldownTurn(ai)});ai.spentThisTurn+=1+raidTok;
+    ai.acLeft--;{const _tmp=consommerTemporaires(ai,raidTok);ai.forceTokens-=raidTok;if(raidTok-_tmp>0)ai.forceCooldown.push({count:raidTok-_tmp,returnTurn:getCooldownTurn(ai)});}ai.spentThisTurn+=1+raidTok;
     ai._attacksThisTurn=(ai._attacksThisTurn||0)+1;
     addTens(best.civ.id,ai.civ.id,5,J('grief.raid','raid subi'));addTens(ai.civ.id,best.civ.id,1,J('grief.raid_fait','raid commis'));   // victime +5, pillard +1 (barème unique, 24/08)
     if(hasSpec(best,'ia_immune')){addLog(J('journal.ia_defensive_bloque_raid_2','🛡️ {emoji} {nation} (IA Défensive) bloque le raid de {nation2}.',{emoji:best.civ.emoji,nation:_i18nRef(best.civ,'name'),nation2:_i18nRef(ai.civ,'name')}),'dim');G.aiActions.push(_i18nAplatir({emoji:'🛡️',name:J('action.raid_bloque','Raid bloqué'),desc:J('action.vs_4','vs {nation}',{nation:_i18nRef(best.civ,'name')})}));return true;}
@@ -14608,7 +14644,11 @@ function _texteSansEmoji(s){
   return String(s)
     .replace(/^([ \t]*)(?:⚔|⚙)\uFE0F?[ \t]*/gm,'$1')   // ⚔️ / ⚙️ en tête de ligne : simples marqueurs, retirés
     .replace(/(?:\p{Extended_Pictographic}|\p{Regional_Indicator})(?:\uFE0F|\u20E3|\p{Emoji_Modifier})*(?:\u200D(?:\p{Extended_Pictographic})(?:\uFE0F)?)*/gu,
-      m=>{ const b=m.replace(/\uFE0F/g,''); if(garde.has(b))return m; if(mot[b])return ' '+mot[b]; return ''; })
+      /* Le mot court ne remplace l'émoji que derrière une QUANTITÉ (« −2⚡ » → « −2 én »). Devant un nom
+         (« 🛡️ IA Défensive », « ⚔️ Supercroiseur », « ⚡ Sphère de Dyson ») il donnait « def Defensive AI »,
+         « att Supercruiser » (rapport du 24/10) : là, l'émoji est simplement retiré. */
+      (m,pos,str)=>{ const b=m.replace(/\uFE0F/g,''); if(garde.has(b))return m;
+        if(mot[b]&&/[0-9]\s*$/.test(str.slice(Math.max(0,pos-3),pos)))return ' '+mot[b]; return ''; })
     .replace(/ +\n/g,'\n').replace(/([^\s]) {2}(?=\S)/g,'$1 ');   // pas de fusion des espaces en début de ligne : les tableaux restent alignés
 }
 function buildJournalReport(){
@@ -16195,7 +16235,7 @@ const _nomFr=_i18nTexte(name),_gainFr=_i18nTexte(gainDesc);
 resPaid=trierRes(resPaid||{});   // ordre de la barre du haut (03/10)
 const _entry={emoji,name:_nomFr,acPaid:acPaid||0,resPaid:resPaid||{},gainDesc:_gainFr||''};
 _memoJChamp(_entry,'name',name);_memoJChamp(_entry,'gainDesc',gainDesc);
-G.turnActions.push(_entry);/* « ↳ paie » sous l'en-tête de l'action du joueur — même ligne que pour l'ordinateur (22/09). */try{if(G._enteteAction&&!G._entetePayee&&G._enteteAction.civ===(G.player&&G.player.civ&&G.player.civ.id)){const _pp=[];for(const[r,a]of Object.entries(resPaid||{}))if(a>0)_pp.push('−'+a+rEmoji(r));addLogSous(J('journal.paie','   ↳ {emoji} {nation} paie : {v}{suffixe}',{emoji:G.player.civ.emoji,nation:_i18nRef(G.player.civ,'name'),v:((acPaid||0)?J('journal.ac_3',"{acp} AC",{acp:acPaid}):J('journal.0_ac',"0 AC")),suffixe:(_pp.length?J('journal.suffixe_parts',' {v}',{v:_pp.join(' ')}):J('journal.aucune_ressource',' (aucune ressource)'))}),'dim');}}catch(e){}if(G.player){if(!G.player._turnActions)G.player._turnActions=[];G.player._turnActions.push(_entry);}/* journal par nation : indispensable au bilan en multijoueur */if(G){G._scStuckTries=0;try{G._journal=G._journal||[];G._journal.push({turn:G.turn||0,nat:(G.player&&G.player.civ&&G.player.civ.name)||'Toi',name:_nomFr,ac:acPaid||0,cost:_normCost(resPaid),gain:_riToText(_gainFr),war:_isWarAct(_nomFr),auto:false});}catch(e){}}/* (bandeau « action faite » supprimé le 30/09 — voir la note avant `showDiscoveryModal`) *//* ⚠️ LA ROTATION SE COMPTE EN ACTIONS DÉPENSÉES, PAS EN COUPS (Marc, 20/09). Deux règles ici :
+G.turnActions.push(_entry);/* « ↳ paie » sous l'en-tête de l'action du joueur — même ligne que pour l'ordinateur (22/09). */try{if(G._enteteAction&&!G._entetePayee&&G._enteteAction.civ===(G.player&&G.player.civ&&G.player.civ.id)){const _pp=[];for(const[r,a]of Object.entries(resPaid||{}))if(a>0)_pp.push(r==='force'?J('journal.moins_jetons_force','−{n} jeton(s) Force',{n:a}):('−'+a+rEmoji(r)));addLogSous(J('journal.paie','   ↳ {emoji} {nation} paie : {v}{suffixe}',{emoji:G.player.civ.emoji,nation:_i18nRef(G.player.civ,'name'),v:((acPaid||0)?J('journal.ac_3',"{acp} AC",{acp:acPaid}):J('journal.0_ac',"0 AC")),suffixe:(_pp.length?J('journal.suffixe_parts',' {v}',{v:_jJoindre(_pp,' ')}):J('journal.aucune_ressource',' (aucune ressource)'))}),'dim');}}catch(e){}if(G.player){if(!G.player._turnActions)G.player._turnActions=[];G.player._turnActions.push(_entry);}/* journal par nation : indispensable au bilan en multijoueur */if(G){G._scStuckTries=0;try{G._journal=G._journal||[];G._journal.push({turn:G.turn||0,nat:(G.player&&G.player.civ&&G.player.civ.name)||'Toi',name:_nomFr,ac:acPaid||0,cost:_normCost(resPaid),gain:_riToText(_gainFr),war:_isWarAct(_nomFr),auto:false});}catch(e){}}/* (bandeau « action faite » supprimé le 30/09 — voir la note avant `showDiscoveryModal`) *//* ⚠️ LA ROTATION SE COMPTE EN ACTIONS DÉPENSÉES, PAS EN COUPS (Marc, 20/09). Deux règles ici :
    · un coup À 0 AC — le POUVOIR NATIONAL — ne rend pas la main. Il ne coûte pas d'action, il ne
      doit pas en coûter une dans le tour de table. L'ordinateur enchaînait déjà pouvoir + action
      dans le même passage (`doAITurn`), le joueur non : sa partie 2A5F, tour 6, montre son
@@ -16399,7 +16439,7 @@ function showPeaceOfferModal(isJustDeclared,cb){
     if(_v)_v.innerHTML=_declParAdv?t('paix.ils_ont_declare','Ils t\'ont déclaré la guerre. Que veux-tu faire ?'):(declBy==='player'?t('paix.tu_as_declare','Tu as déclaré la guerre. Proposer la paix ?'):t('paix.proposer','Proposer la paix ?')); }
   document.getElementById('pm-combatants').innerHTML=
     `<span style="color:${p.civ.color};font-weight:700">${p.civ.emoji} ${p.civ.name}</span>`+
-    `<span style="color:#556;font-size:.9em"> ⚔️ contre ⚔️ </span>`+
+    `<span style="color:#556;font-size:.9em"> ⚔️ ${t('fen.contre','contre')} ⚔️ </span>`+
     `<span style="color:${ai?ai.civ.color:'#888'};font-weight:700">${ai?ai.civ.emoji:''} ${ai?ai.civ.name:'IA'}</span>`;
   document.getElementById('pm-declaredby').textContent=
     declBy==='player'?t('paix.declaree_par_toi','Guerre déclarée par toi — l\'IA répond.'):(isJustDeclared?'':t('paix.declaree_par','Guerre déclarée par {n}.',{n:(ai?_i18nRef(ai.civ,'name'):J('techs.l_ia','l\'IA'))}));   // redondant quand le verbe le dit déjà
@@ -16567,6 +16607,15 @@ function rejectPeace(){
   const cols=_colsOrd.length?_colsOrd:(ai?ai.colonies.slice():[]);
   // La suite de la paix est un NOM : on la met de côté au lieu de la « garder sous le coude » dans
   // une fermeture — le bouton « Annuler » doit pouvoir y revenir même après un rechargement.
+  /* ═══ PLUS D'ASSAUT SUPPLÉMENTAIRE AU REFUS DE LA PAIX (Marc, 24/10) ═══
+     « J'ai attaqué Pluton (1/2), puis au 2/2 on m'a encore proposé d'attaquer — le Jupitérien aurait
+     dû attaquer. » En solo, refuser la paix ouvrait tout de suite un assaut (Pluton), PUIS la file
+     posait l'ordre des deux combats de fin de tour : ce premier assaut comptait dans la rétrocession,
+     l'adversaire recevait l'initiative, encaissait en premier… et le joueur frappait une 2e fois.
+     En ligne, `adOffreDePaix` répond simplement « WAR » : le joueur a ses combats dans l'ordre de
+     bataille, comme l'adversaire. Le solo fait désormais EXACTEMENT la même chose (un seul code). */
+  _paixSuiteJouer('WAR');
+  return;
   const suite=fluxDonnees().suitePaix; fluxDonnees().suitePaix=null;
   if(!ai||!cols.length){addLog(J('journal.poursuis_guerre_aucune_colonie_ennemie_a','⚔️ poursuit la guerre (aucune colonie ennemie à assaillir ce tour).'),'red');if(suite)fluxAppeler(suite,'WAR');return;}
   G._warContinueSuite=suite;
@@ -16702,11 +16751,18 @@ function showWarCombatModal(cb){
   const p=G.player;
   const warCombAi=G.warWith?G.ais.find(a=>a.civ.id===G.warWith)||G.ais[0]:G.ais[0];
   const aiTok=warCombAi?warCombAi.forceTokens:0;
-  const _pfWar=perceivedForce(p,warCombAi);const enemyForceTxt=_pfWar.exact?(_pfWar.val+'⚔️ <span style="color:#5a7a66">(renseignement — exact)</span>'):('~'+_pfWar.val+'⚔️ <span style="color:#5a6a8a">(±3, sans renseignement)</span>');
+  const _pfWar=perceivedForce(p,warCombAi);const enemyForceTxt=_pfWar.exact?(_pfWar.val+'⚔️ <span style="color:#5a7a66">'+t('guerre.renseignement_exact','(renseignement — exact)')+'</span>'):('~'+_pfWar.val+'⚔️ <span style="color:#5a6a8a">'+t('guerre.sans_renseignement','(±3, sans renseignement)')+'</span>');
   const aiRoutes=warCombAi?warCombAi.routes.slice():[]; // TOUTES les routes ennemies (protégées ET non protégées)
   document.getElementById('wcm-turn').textContent=G.turn;
-  const warTourNum=G.warTurnsLeft===2?'1':'2';
-  document.getElementById('wcm-sub').textContent=t('guerre.tour_cible','Tour de guerre {n}/2 — choisis ta cible :',{n:(warTourNum==='1'?'1':'2')});
+  /* ⚠️ « Tour de guerre 2/2 » (Marc, 24/10) lisait `G.warTurnsLeft`, reste de l'ancien modèle à deux
+     tours de guerre : la fenêtre annonçait toujours « 2/2 », et Marc, qui venait d'assaillir Pluton,
+     a cru qu'on lui offrait une seconde attaque à la place des Jupitériens. Le combat proposé était
+     bien le sien (initiative cédée à l'adversaire, qui a choisi d'encaisser en premier) : seul le
+     titre trompait. Il dit maintenant ce qui se passe. */
+  const _rang=G._wcmRang; G._wcmRang=null;
+  document.getElementById('wcm-sub').textContent=_rang===1?t('guerre.combat_fin_tour_premier','Combat de fin de tour — tu frappes en premier. Choisis ta cible :')
+    :_rang===2?t('guerre.combat_fin_tour_second','Combat de fin de tour — à toi de frapper. Choisis ta cible :')
+    :t('guerre.combat_cible','Combat — choisis ta cible :');
   // Pré-décision IA : attaquer ou tenir ? (caché du joueur)
   const _keepStance=!!G._warKeepStance;G._warKeepStance=false; // "Annuler" → garder la posture (pas de re-tirage)
   /* ═══ PLUS DE DÉFENSE FANTÔME EN SOLO NON PLUS (Marc, 02/10 — appli, guerre contre les Jupitériens) ═══
@@ -17330,7 +17386,15 @@ function showEventModal(ev,msg){
   const badge=document.getElementById('evm-badge');badge.textContent=typeLabels[ev.type]||ev.type;badge.style.color=typeColors[ev.type]?({competition:'#ff6b62',menace:'#ffb347',opportunite:'#5fd08a'})[ev.type]:'#ffd34d';   // Blason : kicker coloré, sans fond
   document.getElementById('evm-name').textContent=ev.name;document.getElementById('evm-result').innerHTML=msg;   // l'emoji est déjà dans le médaillon
   const consEl=document.getElementById('evm-consequence');const good=['remportes','domines','protège','Égalité','Science !','you win','dominate','protect','Draw','Tie'].some(k=>msg.includes(k));const bad=['perds','perd','Défaite','−','you lose','lose ','Defeat'].some(k=>msg.includes(k));
-  if(msg.includes('te protéger')||msg.includes('protect yourself')){consEl.textContent=t('evt.protege','🛡️ Tu as réussi à te protéger !');consEl.style.color='#88ee88';consEl.classList.remove('hidden');}
+  /* Événement qui VISE une nation (24/10, Marc : « je suis martien, je perds, je ne bénéficie pas ! ») :
+     le verdict ne se devine plus dans le texte (« protected » y faisait lire un bénéfice) — la règle
+     nomme sa cible. Visé → impact négatif ; une autre nation visée → pas de verdict. */
+  const _cible=(G&&G._evCible&&G._evCible.ev===ev.id&&G._evCible.tour===G.turn)?G._evCible.civ:null;
+  if(_cible){
+    if(G.player&&_cible===G.player.civ.id){consEl.textContent=t('evt.negatif','⚠️ Impact négatif.');consEl.style.color='#ff8866';consEl.classList.remove('hidden');}
+    else consEl.classList.add('hidden');
+  }
+  else if(msg.includes('te protéger')||msg.includes('protect yourself')){consEl.textContent=t('evt.protege','🛡️ Tu as réussi à te protéger !');consEl.style.color='#88ee88';consEl.classList.remove('hidden');}
   else if(bad&&!good){consEl.textContent=t('evt.negatif','⚠️ Impact négatif.');consEl.style.color='#ff8866';consEl.classList.remove('hidden');}
   else if(good){consEl.textContent=t('evt.benefice','✓ Ta civilisation en bénéficie !');consEl.style.color='#88ee88';consEl.classList.remove('hidden');}
   else consEl.classList.add('hidden');

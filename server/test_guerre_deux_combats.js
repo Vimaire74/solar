@@ -33,7 +33,7 @@ const fs = require('fs');
 const vm = require('vm');
 const { loadLogic } = require('./game-core.js');
 const HTML = path.join(__dirname, '..', 'play.html');
-const TEMOIN = path.join(__dirname, 'temoin_v9.69', 'play.html');
+const TEMOIN = path.join(__dirname, 'temoin_v9.69', 'index.html');
 
 const ecarts = [];
 const ok = s => console.log('   ✔ ' + s);

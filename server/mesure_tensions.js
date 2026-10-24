@@ -31,7 +31,7 @@ const { loadLogic } = require('./game-core.js');
 
 const PARTIES = 10;
 const MOTEURS = [
-  { nom: 'AVANT (témoin v9.69, figé)', html: path.join(__dirname, 'temoin_v9.69', 'play.html') },
+  { nom: 'AVANT (témoin v9.69, figé)', html: path.join(__dirname, 'temoin_v9.69', 'index.html') },
   { nom: 'APRÈS (dossier de travail)', html: path.join(__dirname, '..', 'play.html') },
 ];
 

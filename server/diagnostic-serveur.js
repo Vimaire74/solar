@@ -106,6 +106,14 @@ function traiter(req, res, dossier, cleValide, surRapport) {
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return true; }
     if (req.method !== 'POST') { res.writeHead(405, { 'Content-Type': 'application/json; charset=utf-8' }); res.end('{"ok":false,"raison":"POST attendu"}'); return true; }
     let corps = '', trop = false;
+    /* 06/10 (partie 9cbc39, « ���� Martians — Vesta ») : sans décodeur, un émoji coupé entre deux paquets
+       réseau devenait des caractères de remplacement. setEncoding recolle les octets avant de les lire. */
+    req.setEncoding('utf8');
+    /* ⚠️ « �� » DANS LES RAPPORTS (24/10) : `corps += chunk` convertissait CHAQUE morceau du flux en
+       texte séparément ; un caractère accentué ou une flèche (2-3 octets) coupé entre deux morceaux
+       devenait « �� » (« (r��el », « Force �� 1 att »). setEncoding('utf8') recolle les octets à
+       cheval. Le correctif « base64 » du 08/10 visait le courriel : le mal était à la réception. */
+    req.setEncoding('utf8');
     req.on('data', chunk => { if (trop) return; corps += chunk; if (corps.length > MAX_OCTETS + 1024) { trop = true; } });
     req.on('end', () => {
       const r = trop ? { ok: false, statut: 413, raison: 'rapport trop volumineux' } : enregistrer(corps, dossier);

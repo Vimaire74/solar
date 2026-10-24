@@ -1401,7 +1401,7 @@ function accesMdpValide(m) { if (!acces || !m) return false; return egalTC(crypt
 const _accesEchecs = new Map();   // ip → [horodatages] : 10 essais faux par 10 minutes, puis refus
 function accesTropDEssais(ip) { const t = Date.now(), l = (_accesEchecs.get(ip) || []).filter(x => t - x < 600000); _accesEchecs.set(ip, l); return l.length >= 10; }
 function accesEchec(ip) { const l = _accesEchecs.get(ip) || []; l.push(Date.now()); _accesEchecs.set(ip, l); }
-function lireCorps(req, max, cb) { let b = ''; req.on('data', d => { b += d; if (b.length > max) req.destroy(); }); req.on('end', () => cb(b)); }
+function lireCorps(req, max, cb) { let b = ''; req.setEncoding('utf8'); req.on('data', d => { b += d; if (b.length > max) req.destroy(); }); req.on('end', () => cb(b)); }
 function accesHttp(req, res) {   // true si la requête est traitée ici
   if (!req.url || req.url.indexOf('/api/acces') !== 0) return false;
   res.setHeader('Access-Control-Allow-Origin', '*');

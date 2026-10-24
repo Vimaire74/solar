@@ -1,7 +1,7 @@
 /* Build de CE fichier, affiché sur l'écran de connexion. À INCRÉMENTER à chaque modification.
    Il est distinct de celui d'index.html : si les deux diffèrent à l'écran, c'est qu'un seul
    des deux fichiers a été mis en ligne (upload partiel ou cache) — la cause exacte est visible. */
-const SOLAR_BUILD_JS = '2026-10-13 · v11.78';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
+const SOLAR_BUILD_JS = '2026-10-24 · v11.79';   /* ⚠️ LES TROIS ESTAMPILLES BOUGENT ENSEMBLE — celle-ci,
    `window.SOLAR_BUILD_HTML` (index.html) et `SOLAR_BUILD_MOTEUR` (moteur.js). L'écran de connexion
    compare les trois et crie « Versions incohérentes » dès que l'une diverge.
    ⚠️ CET AVERTISSEMENT EXISTAIT DÉJÀ EN COMMENTAIRE, ET IL N'A RIEN EMPÊCHÉ : oublié une première
@@ -759,7 +759,7 @@ function showPeaceReal(pending){
   /* Marc, 15/09 : si l'adversaire VIENT de déclarer la guerre, cette fenêtre est l'annonce elle-même :
      « Paix ou guerre ? » / NATION / « Ils t'ont déclaré la guerre. Que veux-tu faire ? ». Sinon « contre NATION ». */
   const _declParAdv=!!o.isJustDeclared&&o.declaredBy!=='player';
-  set('pm-kicker', (_declParAdv?t('web.paix_ou_guerre','Paix ou guerre ?'):'contre'));
+  set('pm-kicker', (_declParAdv?t('web.paix_ou_guerre','Paix ou guerre ?'):t('web.contre','contre')));
   try{ document.getElementById('pm-kicker').classList.toggle('fen-prep',!_declParAdv); }catch(e){}
   set('pm-verb', (_declParAdv?t('web.ils_ont_declare_guerre_veux_faire','Ils t\'ont déclaré la guerre. Que veux-tu faire ?'):(o.declaredBy==='player'?t('web.as_declare_guerre_proposer_paix','Tu as déclaré la guerre. Proposer la paix ?'):t('web.proposer_paix','Proposer la paix ?'))));
   set('pm-declaredby', (o.declaredBy==='player'?t('web.guerre_declaree_toi_adversaire_repond','Guerre déclarée par toi — l\'adversaire répond.'):(o.isJustDeclared?'':t('web.guerre_declaree','Guerre déclarée par {atkname}.',{atkname:atkName}))));
@@ -2194,7 +2194,7 @@ function askLocalDecision(pending){
          sinon (Marc, FE37 : « on ne peut pas voir la force ennemie alors que j'ai la technologie »). */
       const _chipsGuerre=()=>{ const c=[];
         if(o.warTurnsLeft!==undefined) c.push(t('web.tour_guerre_2','Tour de guerre <b>{v}/2</b>',{v:(o.warTurnsLeft>=2?'1':'2')}));
-        if(o.enemyForce) c.push('Force ennemie <b>'+(o.enemyForce.exact?'':'~')+o.enemyForce.val+'⚔️</b>'+(o.enemyForce.exact?' (renseignement exact)':' (±3, sans renseignement)'));
+        if(o.enemyForce) c.push(t('web.force_ennemie','Force ennemie')+' <b>'+(o.enemyForce.exact?'':'~')+o.enemyForce.val+'⚔️</b> '+(o.enemyForce.exact?t('guerre.renseignement_exact','(renseignement — exact)'):t('guerre.sans_renseignement','(±3, sans renseignement)')));
         return c; };
       /* Ce que le défenseur peut aligner : garnison de la colonie (règle connue : 1, ou 10 pour une
          capitale) + ce qu'il engage, borné par sa force (exacte ou estimée). */
@@ -2205,7 +2205,7 @@ function askLocalDecision(pending){
         const limite=((((maxF<force?t('web.possedes_jeton_mais_peux_payer_1_1_jeton','<div style="color:#ffcc88;font-size:.82em;margin-bottom:4px">⚠️ Tu possèdes {jetons} jeton(s) mais ne peux en <b>payer</b> que {maxf} (1🪨 +1⚡ par jeton engagé).</div>',{jetons:force,maxf:maxF}):''))));
         const cruLigne=((((cru.has?t('web.deployer_supercroiseur_3','<label style="display:flex;align-items:center;gap:8px;margin:8px 0;{v}"><input type="checkbox" id="sc-cru" style="width:auto"{v2}><span>⚓ Déployer le Supercroiseur <b>+{v3}⚔️</b>{v4}</span></label>',{v:(cru.afford?'':'opacity:.5'),v2:(cru.afford?'':' disabled'),v3:cru.power||5,v4:(cru.afford?'':' — ressources insuffisantes')}):''))));
         if(_blason){
-          decisionPanel(fenBlason({ton:'war', emoji:_enEmo, kicker:'contre', prep:true, nation:esc(o.enemyName||'ennemi'),
+          decisionPanel(fenBlason({ton:'war', emoji:_enEmo, kicker:t('web.contre','contre'), prep:true, nation:esc(o.enemyName||'ennemi'),
             verbe:title, chips:_chipsGuerre(), corps:(hint?hint:'')+limite,
             milieu:'<div class="fen-slider"><div class="row"><span>'+t('assaut.jetons_engages','Jetons engagés')+'</span><b><span id="sc-wcv">'+Math.min(1,maxF)+'</span> / <span id="sc-wcmax">'+maxF+'</span></b></div>'
               +'<input type="range" id="sc-wc" min="0" max="'+maxF+'" value="'+Math.min(1,maxF)+'" aria-label="'+t('assaut.jetons_engages','Jetons engagés')+'">'
@@ -2262,7 +2262,7 @@ function askLocalDecision(pending){
         /* Et on DIT pourquoi tout est gris, au lieu de laisser croire à une fenêtre cassée. */
         if(maxF<1) b+=t('web.as_quoi_engager_seul_jeton_1_1_chacun_au','<div style="color:#ffcc88;font-size:.82em;margin-top:6px">⚠️ Tu n\'as pas de quoi engager un seul jeton (1🪨 +1⚡ chacun) : aucune attaque n\'est possible ce tour-ci.</div>');
         if(_blason){
-          b=fenBlason({ton:'war', emoji:_enEmo, kicker:'contre', prep:true, nation:esc(o.enemyName||'ennemi'),
+          b=fenBlason({ton:'war', emoji:_enEmo, kicker:t('web.contre','contre'), prep:true, nation:esc(o.enemyName||'ennemi'),
             verbe:t('web.fais_tour','Que fais-tu ce tour ?'), chips:_chipsGuerre().concat([t('web.engageables_possedes','Engageables <b>{n}</b>{v}',{n:maxF,v:((maxF<force)?t('web.sur_possedes',' / {n} possédés',{n:force}):'')})]).concat(threat?[t('web.menace_sur','🛡️ Menace sur <b>{n}</b>',{n:esc(threat.name||'')})]:[]),
             milieu:'<div style="text-align:left">'+b+'</div>'});
         }
