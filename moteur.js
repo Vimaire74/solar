@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-24 · v11.79';
+const SOLAR_BUILD_MOTEUR = '2026-10-26 · v11.80';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -14644,11 +14644,12 @@ function _texteSansEmoji(s){
   return String(s)
     .replace(/^([ \t]*)(?:⚔|⚙)\uFE0F?[ \t]*/gm,'$1')   // ⚔️ / ⚙️ en tête de ligne : simples marqueurs, retirés
     .replace(/(?:\p{Extended_Pictographic}|\p{Regional_Indicator})(?:\uFE0F|\u20E3|\p{Emoji_Modifier})*(?:\u200D(?:\p{Extended_Pictographic})(?:\uFE0F)?)*/gu,
-      /* Le mot court ne remplace l'émoji que derrière une QUANTITÉ (« −2⚡ » → « −2 én »). Devant un nom
-         (« 🛡️ IA Défensive », « ⚔️ Supercroiseur », « ⚡ Sphère de Dyson ») il donnait « def Defensive AI »,
-         « att Supercruiser » (rapport du 24/10) : là, l'émoji est simplement retiré. */
+      /* Mot court ou rien ? (26/10, corrige §250) L'émoji est retiré seulement quand il PRÉCÈDE UN NOM
+         (« 🛡️ IA Défensive », « ⚔️ Supercroiseur » → pas de « def Defensive AI »). Partout ailleurs il devient
+         son mot court : « −2⚡ » → « −2 én », « Surproduction ⚡🪨 » → « Surproduction én mat », en-têtes de tableau. */
       (m,pos,str)=>{ const b=m.replace(/\uFE0F/g,''); if(garde.has(b))return m;
-        if(mot[b]&&/[0-9]\s*$/.test(str.slice(Math.max(0,pos-3),pos)))return ' '+mot[b]; return ''; })
+        const apres=str.slice(pos+m.length,pos+m.length+2);
+        if(mot[b]&&!/^ ?\p{L}/u.test(apres))return ' '+mot[b]; return ''; })
     .replace(/ +\n/g,'\n').replace(/([^\s]) {2}(?=\S)/g,'$1 ');   // pas de fusion des espaces en début de ligne : les tableaux restent alignés
 }
 function buildJournalReport(){

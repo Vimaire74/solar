@@ -6,7 +6,7 @@
 <title>Solar</title>
 <!-- Numéro de build affiché sur l'écran de connexion. À INCRÉMENTER À CHAQUE MODIFICATION de ce fichier :
      c'est le seul moyen de savoir avec certitude quelle version tourne réellement en ligne. -->
-<script>window.SOLAR_BUILD_HTML='2026-10-24 · v11.79';</script>
+<script>window.SOLAR_BUILD_HTML='2026-10-26 · v11.80';</script>
 <!-- Porte d'entrée du site (13/10) : mot de passe des testeurs ; sans effet dans l'appli et en local. -->
 <script src="acces.js"></script>
 <!-- Tampon des erreurs survenues AVANT diagnostic.js (chargé après moteur.js) : il les ramasse au démarrage. -->
@@ -1334,7 +1334,14 @@ img.nat-emb-i{display:inline-block;width:1.4em;height:1.4em;vertical-align:-.35e
 .tb-l3:has(#passer-btn.on) #tb-etat{max-width:none;flex:0 0 auto}
 .tb-l3:has(#passer-btn.on) #a-toi-badge{flex:0 0 auto;overflow:visible;text-overflow:clip;font-size:.44em;letter-spacing:.04em;padding:0 6px}   /* jamais « À T… » */
 .tb-l3:has(#passer-btn.on) #passer-btn{font-size:.42em;letter-spacing:.02em;padding:0 6px}
-.tb-l3:has(#passer-btn.on) .tb-puce{flex-shrink:1;min-width:0}
+/* 26/10 (Marc, Flip 6 avec le texte agrandi d'Android) : « 150 » sortait de sa pastille et la pastille des jetons était
+   rognée — les pastilles avaient le droit de rétrécir SOUS leur contenu. Elles gardent maintenant leur taille ; c'est
+   l'espace libre, les écarts, le bouton ✦ et le trophée qui cèdent. Mesuré à 320 px, texte ×1,35 : rien ne déborde. */
+.tb-l3:has(#passer-btn.on){gap:4px}
+.tb-l3:has(#passer-btn.on) .tb-esp{min-width:0}
+.tb-l3:has(#passer-btn.on) .tb-puce{flex-shrink:0;padding:3px 5px}
+.tb-l3:has(#passer-btn.on) #btn-ability.tb-pouvoir{padding:0 5px}
+@media (max-width:520px){.tb-l3:has(#passer-btn.on) #tb-vp .tb-ico{display:none}}   /* le trophée cède sa place au chiffre */
 /* CARTES INVESTISSEMENT EN CARTOUCHES PLEINE LARGEUR, l'une sous l'autre, coût légèrement accentué (Marc, 03/10). */
 #inv-opts,#inv2-opts{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:8px;max-height:none;overflow:visible}
 #inv-opts .inv-opt,#inv2-opts .inv-opt{width:auto;display:grid;grid-template-columns:48px 1fr;column-gap:12px;align-items:center;text-align:left;padding:10px 14px}
@@ -1609,7 +1616,7 @@ function lvAppNouvelle(){
     <div id="top-income" hidden></div>
   </div>
   <div class="tb-l3">
-    <span class="tb-puce vp" id="tb-vp" title="Score VP estimé" data-i18n-title="ui.title_score_vp_estime">🏆 0</span>
+    <span class="tb-puce vp" id="tb-vp" title="Score VP estimé" data-i18n-title="ui.title_score_vp_estime"><span class="tb-ico">🏆 </span>0</span>
     <span class="tb-puce jet" id="tb-jet" title="Jetons Force engageables (net) — utilisables en guerre ou pour un raid. Exclut la garnison des colonies, les jetons posés sur les routes et ceux en récupération." data-i18n-title="ui.title_jetons_force_engageables_net_utilisables">0 <i></i></span>
     <span class="tb-esp"></span>
     <button class="tb-pouvoir" id="btn-ability" type="button" onclick="useAbility()"><span class="k">✦</span><span data-i18n="ui.pouvoir">Pouvoir</span></button>
@@ -2517,7 +2524,7 @@ function uiFillIncome(){
         '<span class="ti" style="color:'+icol+'">'+sign+inc+' /t</span></div>';
     }).join('');
   }
-  var vp=document.getElementById('tb-vp'); if(vp){ try{ vp.textContent='🏆 '+calcVP(p).total; }catch(e){} }
+  var vp=document.getElementById('tb-vp'); if(vp){ try{ vp.innerHTML='<span class="tb-ico">🏆 </span>'+calcVP(p).total; }catch(e){} }
   var jt=document.getElementById('tb-jet');
   if(jt){ try{ jt.innerHTML=((typeof engageableTokens==='function')?engageableTokens(p):(p.forceTokens||0))+' <i></i>'; }catch(e){ jt.innerHTML=(p.forceTokens||0)+' <i></i>'; } }
   _wireRevTip();
