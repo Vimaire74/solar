@@ -4,7 +4,7 @@
    une version plus ancienne restée en ligne. On ne peut pas diagnostiquer ce qu'on ne peut pas
    identifier. Les trois fichiers portent maintenant leur version, et l'écran de connexion les
    compare : si l'un des trois diffère, il l'affiche en rouge. */
-const SOLAR_BUILD_MOTEUR = '2026-10-26 · v11.80';
+const SOLAR_BUILD_MOTEUR = '2026-11-02 · v11.81';
 try{ window.SOLAR_BUILD_MOTEUR = SOLAR_BUILD_MOTEUR; }catch(e){}
 /* ═══ t() — UN TEXTE DANS LA LANGUE DU JOUEUR (18/09/2026, voir i18n.js et lang/LISEZ-MOI.md) ═══
    t( cle , texte français avec {param} , {param: valeur})   — voir lang/LISEZ-MOI.md pour la forme exacte
@@ -3857,6 +3857,11 @@ function _restaurerPhoto(etat){
      autre ligne du journal avec le texte de l'en-tête : un doublon, et une ligne perdue. On la détache
      avant, puis on la rattache à sa ligne restaurée. */
   if(G) G._enteteAction=null;
+  /* ⚠️ LE JOURNAL REPART D'UN TABLEAU NEUF (Marc, partie 07034c, 02/11 : après « Action annulée »,
+     « War Effort » en double et « Ordre du draft » disparu). Recoudre le journal ligne à ligne
+     réécrivait les ANCIENS objets-lignes avec le contenu d'autres lignes : une ligne copiée, une perdue.
+     Les lignes restaurées sont prises telles quelles, sans toucher aux anciennes. */
+  if(G&&Array.isArray(G.log)) G.log=[];
   _fusionEnPlace(G,scDeserialize(etat));
   try{ const h=G._enteteAction; if(h&&Array.isArray(G.log)){ const j=G.log.findIndex(e=>e&&typeof e==='object'&&e.entete&&e.msg===h.msg&&e.civ===h.civ&&e.turn===h.turn); G._enteteAction=j>=0?G.log[j]:null; } }catch(e){}
   try{ G._discCache=JSON.parse(_disc); }catch(e){}
@@ -13822,7 +13827,11 @@ function _doAITurnInterne(aiPlayer,oneShot){
     /* (Initiative : déjà appliquée au moment du draft, voir `_runDraftStep` — l'ordre du tour est
        tiré AVANT ce bloc, il fallait que le drapeau soit posé à temps.) */
     if(card.acBonus)ai.acLeft+=card.acBonus;
-    if(card.force)ai.forceTokens+=card.force;
+    /* ⚠️ MÊMES RÈGLES QUE LE JOUEUR (Marc, partie 07034c, 02/11) : Surge Militaire donnait à l'IA
+       2 jetons PERMANENTS (jamais marqués temporaires, donc jamais retirés), et Effort de Guerre
+       (`forceKeep`) ne lui donnait RIEN. Voir `_applyStratTo`. */
+    if(card.force){ai.forceTokens+=card.force;ai.stratForceBonus=(ai.stratForceBonus||0)+card.force;}
+    if(card.forceKeep)ai.forceTokens+=card.forceKeep;
     if(card.res){const cap=getResCapFor(ai);for(const[r,a]of Object.entries(card.res))ai.res[r]=Math.min(cap[r]||99,(ai.res[r]||0)+a);}
     if(card.warRisk)G.warRisk=Math.max(0,G.warRisk+card.warRisk);
     G.aiActions.push(_i18nAplatir({emoji:card.emoji,name:J('action.strategie','Stratégie : {nom}',{nom:_i18nRef(card,'name')}),desc:_jRef(card,'desc')}));
